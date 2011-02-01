@@ -112,6 +112,7 @@ void EventBridge::sendEmote(Player* player, uint32 emote)
 {
 	char msg[1024];
 
-	sprintf(msg, "EMOTE|%u|%llu\n", emote, player->GetGUID());
+	sprintf(msg, "EMOTE|%u|%llu", emote, player->GetGUID());
+	sLog->outBasic("Sending: [%s]", msg);
 	this->sendMessage(msg);
 }
