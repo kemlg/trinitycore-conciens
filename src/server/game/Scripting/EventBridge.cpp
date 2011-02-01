@@ -9,6 +9,7 @@
 #include <stdlib.h>
 
 #include "EventBridge.h"
+#include "Log.h"
 
 const char*	endMsg		= "\n";
 const int	port_out	= 6969;
@@ -27,7 +28,7 @@ void* processMessages(void* ptr)
 		recv_data[bytes_recieved] = '\n';
 		recv_data[bytes_recieved+1] = '\0';
 
-		Log.Notice("EventBridgeThread", recv_data);
+		sLog->outBasic("EventBridgeThread %d", recv_data);
 		//if (strcmp(recv_data, "q") == 0 || strcmp(recv_data, "Q") == 0)
 		//{
 		//	close(sock);
@@ -49,7 +50,7 @@ EventBridge::EventBridge()
 	pthread_t			thread1;
 	int					iret;
 
-	Log.Notice("EventBridge", "Starting EventBridge...");
+	sLog->outBasic("EventBridge: Starting EventBridge...");
 	host = gethostbyname("127.0.0.1");
 
 	this->sockin = socket(AF_INET, SOCK_STREAM, 0);
@@ -63,22 +64,22 @@ EventBridge::EventBridge()
 	connect(sockin, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
 	if(sockin < 1)
 	{
-		Log.Notice("EventBridge", "sockin < 1");
+		sLog->outBasic("EventBridge: sockin < 1");
 	}
 	else
 	{
-		Log.Notice("EventBridge", "sockin >= 1");
+		sLog->outBasic("EventBridge: sockin >= 1");
 	}
 
 	server_addr.sin_port = htons(port_out);
 	connect(sockout, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
 	if(sockout < 1)
 	{
-		Log.Notice("EventBridge", "sockout < 1");
+		sLog->outBasic("EventBridge: sockout < 1");
 	}
 	else
 	{
-		Log.Notice("EventBridge", "sockout >= 1");
+		sLog->outBasic("EventBridge: sockout >= 1");
 	}
 
 	/* Create independent threads each of which will execute function */
