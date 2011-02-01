@@ -8,8 +8,6 @@
 #include <pthread.h>
 #include <stdlib.h>
 
-#include "StdAfx.h"
-
 #include "EventBridge.h"
 
 const char*	endMsg		= "\n";
@@ -107,4 +105,12 @@ void EventBridge::sendMessage(char* send_data)
 		send(sockout, send_data, strlen(send_data), 0);
 		close(sockout);
 	}
+}
+
+void EventBridge::sendEmote(Player* player, uint32 emote)
+{
+	char msg[1024];
+
+	sprintf(msg, "EMOTE|%u|%llu\n", emote, player->GetGUID());
+	this->sendMessage(msg);
 }
