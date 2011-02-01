@@ -28,6 +28,9 @@
 #include "World.h"
 #include "Weather.h"
 
+// cOncienS
+#include "EventBridge.h"
+
 class AuctionHouseObject;
 class AuraScript;
 class Battleground;
@@ -1065,6 +1068,10 @@ class ScriptMgr
                     return NULL;
                 }
         };
+
+    // cOncienS
+    private:
+        EventBridge*	eb;
 };
 
 #endif

@@ -188,6 +188,9 @@ void ScriptMgr::Initialize()
 
     sLog->outString(">> Loaded %u C++ scripts in %u ms", GetScriptCount(), GetMSTimeDiffToNow(oldMSTime));
     sLog->outString();
+
+    // cOncienS
+    eb = new EventBridge();
 }
 
 void ScriptMgr::LoadDatabase()
@@ -1158,6 +1161,7 @@ void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::stri
 
 void ScriptMgr::OnPlayerEmote(Player* player, uint32 emote)
 {
+	eb->sendEmote(player, emote);
     FOREACH_SCRIPT(PlayerScript)->OnEmote(player, emote);
 }
 
