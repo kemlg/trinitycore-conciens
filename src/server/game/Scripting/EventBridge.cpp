@@ -28,7 +28,7 @@ void* processMessages(void* ptr)
 		recv_data[bytes_recieved] = '\n';
 		recv_data[bytes_recieved+1] = '\0';
 
-		sLog->outBasic("EventBridgeThread %d", recv_data);
+		sLog->outBasic("EventBridgeThread [%s]", recv_data);
 		//if (strcmp(recv_data, "q") == 0 || strcmp(recv_data, "Q") == 0)
 		//{
 		//	close(sock);
@@ -108,20 +108,30 @@ void EventBridge::sendMessage(char* send_data)
 	}
 }
 
-void EventBridge::sendEmote(Player* player, uint32 emote)
+void EventBridge::sendEvent(int event_type, Player* player, Creature* creature = NULL, uint32 num = NULL,
+		Item* item = NULL, Quest* quest = NULL, SpellCastTargets* targets = NULL, ItemPrototype *proto = NULL,
+		uint32 num2 = NULL, char* st = NULL, GameObject* go = NULL, AreaTriggerEntry* area = NULL,
+		Weather* weather = NULL, WeatherState state = NULL, float grade = NULL, Player* other = NULL)
 {
-	char msg[1024];
+	char	msg[1024];
+	bool	done;
 
-	sprintf(msg, "EMOTE|%u|%llu", emote, player->GetGUID());
-	sLog->outBasic("Sending: [%s]", msg);
-	this->sendMessage(msg);
-}
+	done = true;
+	switch(event_type)
+	{
+	case EVENT_TYPE_EMOTE:
+		sprintf(msg, "EMOTE|%u|%llu", num, player->GetGUID());
+		break;
+	case EVENT_TYPE_GOSSIP_HELLO:
+		sprintf(msg, "HELLO|%llu|%llu", player->GetGUID(), creature->GetGUID());
+		break;
+	default:
+		done = false;
+	}
 
-void EventBridge::sendGossipHello(Player* player, Creature* creature)
-{
-	char msg[1024];
-
-	sprintf(msg, "HELLO|%llu|%llu", player->GetGUID(), creature->GetGUID());
-	sLog->outBasic("Sending: [%s]", msg);
-	this->sendMessage(msg);
+	if(done)
+	{
+		sLog->outBasic("Sending: [%s]", msg);
+		this->sendMessage(msg);
+	}
 }
