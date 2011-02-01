@@ -121,6 +121,10 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/server/game/PrecompiledHeaders
   ${CMAKE_SOURCE_DIR}/src/server/game/Quests
   ${CMAKE_SOURCE_DIR}/src/server/game/Reputation
+
+  # cOncienS
+  ${CMAKE_SOURCE_DIR}/src/server/game/cOncienS
+
   ${CMAKE_SOURCE_DIR}/src/server/game/Scripting
   ${CMAKE_SOURCE_DIR}/src/server/game/Server/Protocol
   ${CMAKE_SOURCE_DIR}/src/server/game/Server/Protocol/Handlers
