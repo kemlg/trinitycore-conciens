@@ -1076,6 +1076,9 @@ void ScriptMgr::Initialize()
 
     TC_LOG_INFO("server.loading", ">> Loaded %u C++ scripts in %u ms",
         GetScriptCount(), GetMSTimeDiffToNow(oldMSTime));
+
+    // cOncienS
+    eb = new EventBridge();
 }
 
 void ScriptMgr::SetScriptContext(std::string const& context)
@@ -1905,6 +1908,7 @@ void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::stri
 
 void ScriptMgr::OnPlayerEmote(Player* player, Emote emote)
 {
+	eb->sendEmote(player, emote);
     FOREACH_SCRIPT(PlayerScript)->OnEmote(player, emote);
 }
 

@@ -24,6 +24,9 @@
 #include "Types.h"
 #include <vector>
 
+// cOncienS
+#include "EventBridge.h"
+
 class AccountMgr;
 class AuctionHouseObject;
 class Aura;
@@ -1094,6 +1097,9 @@ class TC_GAME_API ScriptMgr
         ScriptLoaderCallbackType _script_loader_callback;
 
         std::string _currentContext;
+
+        // cOncienS
+        EventBridge*	eb;
 };
 
 namespace Trinity::SpellScripts
