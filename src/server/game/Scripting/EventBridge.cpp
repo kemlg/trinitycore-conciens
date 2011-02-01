@@ -116,3 +116,12 @@ void EventBridge::sendEmote(Player* player, uint32 emote)
 	sLog->outBasic("Sending: [%s]", msg);
 	this->sendMessage(msg);
 }
+
+void EventBridge::sendGossipHello(Player* player, Creature* creature)
+{
+	char msg[1024];
+
+	sprintf(msg, "HELLO|%llu|%llu", player->GetGUID(), creature->GetGUID());
+	sLog->outBasic("Sending: [%s]", msg);
+	this->sendMessage(msg);
+}
