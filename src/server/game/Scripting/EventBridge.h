@@ -19,6 +19,7 @@
 #include <errno.h>
 
 #include "Player.h"
+#include "Creature.h"
 
 class EventBridge
 {
@@ -27,6 +28,7 @@ public:
 	virtual ~EventBridge();
 	void sendMessage(char*);
 	void sendEmote(Player*,uint32);
+	void sendGossipHello(Player*,Creature*);
 
 private:
 	int					sockout, sockin;
