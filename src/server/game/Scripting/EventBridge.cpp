@@ -125,6 +125,11 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	case EVENT_TYPE_GOSSIP_HELLO:
 		sprintf(msg, "HELLO|%llu|%llu", player->GetGUID(), creature->GetGUID());
 		break;
+	case EVENT_TYPE_OBJECT_UPDATE:
+		sprintf(msg, "OBJECT_UPDATE|%llu", go->GetGUID());
+		break;
+	case EVENT_TYPE_CREATURE_UPDATE:
+		sprintf(msg, "CREATURE_UPDATE|%llu", creature->GetGUID());
 	default:
 		sprintf(msg, "UNDEF|%d", event_type);
 //		done = false;
