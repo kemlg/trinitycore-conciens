@@ -116,6 +116,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 {
 	char	msg[1024];
 	bool	done;
+	float	x, y, z;
 
 	done = true;
 	switch(event_type)
@@ -130,7 +131,9 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 		sprintf(msg, "OBJECT_UPDATE|%llu", go->GetGUID());
 		break;
 	case EVENT_TYPE_CREATURE_UPDATE:
-		sprintf(msg, "CREATURE_UPDATE|%llu", creature->GetGUID());
+		creature->GetPosition(x, y, z);
+		sprintf(msg, "CREATURE_UPDATE|%llu|%f|%f|%f", creature->GetGUID(), x, y, z);
+		break;
 	default:
 		sprintf(msg, "UNDEF|%d", event_type);
 //		done = false;
