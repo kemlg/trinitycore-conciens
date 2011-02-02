@@ -108,10 +108,10 @@ void EventBridge::sendMessage(char* send_data)
 	}
 }
 
-void EventBridge::sendEvent(int event_type, Player* player, Creature* creature = NULL, uint32 num = NULL,
-		Item* item = NULL, Quest* quest = NULL, SpellCastTargets* targets = NULL, ItemPrototype *proto = NULL,
-		uint32 num2 = NULL, char* st = NULL, GameObject* go = NULL, AreaTriggerEntry* area = NULL,
-		Weather* weather = NULL, WeatherState state = NULL, float grade = NULL, Player* other = NULL)
+void EventBridge::sendEvent(const int event_type, const Player* player, const Creature* creature, const uint32 num,
+	const Item* item, const Quest* quest, const SpellCastTargets* targets, const ItemPrototype *proto,
+	const uint32 num2, const char* st, const GameObject* go, const AreaTriggerEntry* area,
+	const Weather* weather, const int state, const float grade, const Player* other)
 {
 	char	msg[1024];
 	bool	done;
@@ -126,7 +126,8 @@ void EventBridge::sendEvent(int event_type, Player* player, Creature* creature =
 		sprintf(msg, "HELLO|%llu|%llu", player->GetGUID(), creature->GetGUID());
 		break;
 	default:
-		done = false;
+		sprintf(msg, "UNDEF|%d", event_type);
+//		done = false;
 	}
 
 	if(done)

@@ -1534,7 +1534,7 @@ bool ScriptMgr::OnQuestAccept(Player* player, Item* item, Quest const* quest)
     ASSERT(item);
     ASSERT(quest);
 
-    eb->sendEvent(EVENT_TYPE_QUEST_ACCEPT, player, NULL, NULL, item, quest);
+    eb->sendEvent(EVENT_TYPE_QUEST_ACCEPT, player, (Creature*)NULL, (uint32)NULL, item, quest);
     GET_SCRIPT_RET(ItemScript, item->GetScriptId(), tmpscript, false);
     player->PlayerTalkClass->ClearMenus();
     return tmpscript->OnQuestAccept(player, item, quest);
@@ -1858,7 +1858,7 @@ void ScriptMgr::OnPlayerTalentsReset(Player* player, bool noCost)
 
 void ScriptMgr::OnPlayerMoneyChanged(Player* player, int32& amount)
 {
-    eb->sendEvent(EVENT_TYPE_MONEY_CHANGED,player,NULL,(uint32)newLevel);
+    eb->sendEvent(EVENT_TYPE_MONEY_CHANGED,player,NULL,(uint32)amount);
     FOREACH_SCRIPT(PlayerScript)->OnMoneyChanged(player, amount);
 }
 

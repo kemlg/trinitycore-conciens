@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "Weather.h"
 #include "Player.h"
 #include "Creature.h"
 #include "Item.h"
@@ -26,7 +27,6 @@
 enum EventTypes
 {
 	EVENT_TYPE_EMOTE,
-	EVENT_TYPE_QUEST_ACCEPT,
 	EVENT_TYPE_ITEM_USE,
 	EVENT_TYPE_ITEM_EXPIRE,
 	EVENT_TYPE_GOSSIP_HELLO,
@@ -67,8 +67,10 @@ public:
 	EventBridge();
 	virtual ~EventBridge();
 	void sendMessage(char*);
-	void sendEvent(int,Player*,Creature*,uint32,Item*,Quest*,SpellCastTargets*,ItemPrototype*,uint32,char*,GameObject*,
-			AreaTriggerEntry*,Weather*,WeatherState,float,Player*);
+	void sendEvent(const int event_type, const Player* player, const Creature* creature = NULL, const uint32 num = NULL,
+		const Item* item = NULL, const Quest* quest = NULL, const SpellCastTargets* targets = NULL, const ItemPrototype *proto = NULL,
+		const uint32 num2 = NULL, const char* st = NULL, const GameObject* go = NULL, const AreaTriggerEntry* area = NULL,
+		const Weather* weather = NULL, const int state = NULL, const float grade = NULL, const Player* other = NULL);
 
 private:
 	int					sockout, sockin;
