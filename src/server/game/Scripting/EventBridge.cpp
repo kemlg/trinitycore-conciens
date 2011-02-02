@@ -10,6 +10,7 @@
 
 #include "EventBridge.h"
 #include "Log.h"
+#include "GameObject.h"
 
 const char*	endMsg		= "\n";
 const int	port_out	= 6969;
