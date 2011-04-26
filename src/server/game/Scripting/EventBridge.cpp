@@ -160,7 +160,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 		sprintf(msg, "CREATURE_UPDATE|%llu|%f|%f|%f", creature->GetGUID(), x, y, z);
 		break;
 	case EVENT_TYPE_QUEST_ACCEPT:
-		if(creature == null)
+		if(creature == NULL)
 		{
 			sprintf(msg, "QUEST_ACCEPT_ITEM|%llu|%llu|%lu", player->GetGUID(), item->GetGUID(), quest->GetQuestId());
 		}
