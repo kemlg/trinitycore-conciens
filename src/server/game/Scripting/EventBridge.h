@@ -73,7 +73,10 @@ public:
 		const Weather* weather = NULL, const int state = NULL, const float grade = NULL, const Player* other = NULL);
 
 private:
-	int					sockout, sockin;
+	int		sockout, sockin;
+	void	createSocket();
+	void	createSocketIn();
+	void	createSocketOut();
 };
 
 #endif /* EVENTBRIDGE_H_ */

@@ -26,10 +26,18 @@ void* processMessages(void* ptr)
 	while(1)
 	{
 		bytes_recieved = recv(sock, recv_data, 1022, 0);
-		recv_data[bytes_recieved] = '\n';
-		recv_data[bytes_recieved+1] = '\0';
 
-		sLog->outBasic("EventBridgeThread [%s]", recv_data);
+		if(bytes_recieved < 1)
+		{
+			this->createSocketIn();
+		}
+		else
+		{
+			recv_data[bytes_recieved] = '\n';
+			recv_data[bytes_recieved+1] = '\0';
+			sLog->outBasic("EventBridgeThread [%s]", recv_data);
+		}
+
 		//if (strcmp(recv_data, "q") == 0 || strcmp(recv_data, "Q") == 0)
 		//{
 		//	close(sock);
@@ -44,14 +52,11 @@ void* processMessages(void* ptr)
 	}
 }
 
-EventBridge::EventBridge()
+void EventBridge::createSocketIn()
 {
 	struct hostent*		host;
 	struct sockaddr_in	server_addr;
-	pthread_t			thread1;
-	int					iret;
 
-	sLog->outBasic("EventBridge: Starting EventBridge...");
 	host = gethostbyname("127.0.0.1");
 
 	this->sockin = socket(AF_INET, SOCK_STREAM, 0);
@@ -71,6 +76,21 @@ EventBridge::EventBridge()
 	{
 		sLog->outBasic("EventBridge: sockin >= 1");
 	}
+}
+
+void EventBridge::createSocketOut()
+{
+	struct hostent*		host;
+	struct sockaddr_in	server_addr;
+
+	host = gethostbyname("127.0.0.1");
+
+	this->sockin = socket(AF_INET, SOCK_STREAM, 0);
+	this->sockout = socket(AF_INET, SOCK_STREAM, 0);
+
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr = *((struct in_addr *) host->h_addr);
+	bzero(&(server_addr.sin_zero), 8);
 
 	server_addr.sin_port = htons(port_out);
 	connect(sockout, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
@@ -82,9 +102,25 @@ EventBridge::EventBridge()
 	{
 		sLog->outBasic("EventBridge: sockout >= 1");
 	}
+}
+
+void EventBridge::createSocket()
+{
+	this->createSocketIn();
+	this->createSocketOut();
+}
+
+EventBridge::EventBridge()
+{
+	pthread_t			thread1;
+	int					iret;
+
+	sLog->outBasic("EventBridge: Starting EventBridge...");
+
+	this->createSocket();
 
 	/* Create independent threads each of which will execute function */
-	iret = pthread_create(&thread1, NULL, processMessages, (void*)&sockin);
+	iret = pthread_create(&thread1, NULL, processMessages, (void*)&this->sockin);
 
     /* Wait till threads are complete before main continues. Unless we  */
     /* wait we run the risk of executing an exit which will terminate   */
@@ -99,13 +135,22 @@ EventBridge::~EventBridge()
 
 void EventBridge::sendMessage(char* send_data)
 {
-	send(sockout, send_data, strlen(send_data), 0);
-	send(sockout, endMsg, strlen(endMsg), 0);
+	int	ret;
 
-	if(strcmp(send_data, "q") == 0 || strcmp(send_data, "Q") == 0)
+	ret = send(sockout, send_data, strlen(send_data), 0);
+	if(ret == -1)
 	{
-		send(sockout, send_data, strlen(send_data), 0);
-		close(sockout);
+		this->createSocketOut();
+	}
+	else
+	{
+		send(sockout, endMsg, strlen(endMsg), 0);
+
+		if(strcmp(send_data, "q") == 0 || strcmp(send_data, "Q") == 0)
+		{
+			send(sockout, send_data, strlen(send_data), 0);
+			close(sockout);
+		}
 	}
 }
 
