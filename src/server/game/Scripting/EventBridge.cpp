@@ -29,7 +29,27 @@ void* processMessages(void* ptr)
 
 		if(bytes_recieved < 1)
 		{
-			this->createSocketIn();
+			struct hostent*		host;
+			struct sockaddr_in	server_addr;
+
+			host = gethostbyname("127.0.0.1");
+
+			sock = socket(AF_INET, SOCK_STREAM, 0);
+
+			server_addr.sin_family = AF_INET;
+			server_addr.sin_addr = *((struct in_addr *) host->h_addr);
+			bzero(&(server_addr.sin_zero), 8);
+
+			server_addr.sin_port = htons(port_in);
+			connect(sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
+			if(sock < 1)
+			{
+				sLog->outBasic("EventBridge: sockin < 1");
+			}
+			else
+			{
+				sLog->outBasic("EventBridge: sockin >= 1");
+			}
 		}
 		else
 		{
@@ -60,7 +80,6 @@ void EventBridge::createSocketIn()
 	host = gethostbyname("127.0.0.1");
 
 	this->sockin = socket(AF_INET, SOCK_STREAM, 0);
-	this->sockout = socket(AF_INET, SOCK_STREAM, 0);
 
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr = *((struct in_addr *) host->h_addr);
@@ -85,7 +104,6 @@ void EventBridge::createSocketOut()
 
 	host = gethostbyname("127.0.0.1");
 
-	this->sockin = socket(AF_INET, SOCK_STREAM, 0);
 	this->sockout = socket(AF_INET, SOCK_STREAM, 0);
 
 	server_addr.sin_family = AF_INET;
