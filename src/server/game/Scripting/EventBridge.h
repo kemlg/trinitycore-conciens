@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "Spell.h"
 #include "Weather.h"
 #include "Player.h"
 #include "Creature.h"
