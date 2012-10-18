@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,21 +15,22 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "vault_of_archavon.h"
 
 #define EMOTE_BERSERK           -1590002
 
 //Spells Archavon
 #define SPELL_ROCK_SHARDS        58678
-#define SPELL_CRUSHING_LEAP      RAID_MODE(58960,60894)//Instant (10-80yr range) -- Leaps at an enemy, inflicting 8000 Physical damage, knocking all nearby enemies away, and creating a cloud of choking debris.
-#define SPELL_STOMP              RAID_MODE(58663,60880)
-#define SPELL_IMPALE             RAID_MODE(58666,60882) //Lifts an enemy off the ground with a spiked fist, inflicting 47125 to 52875 Physical damage and 9425 to 10575 additional damage each second for 8 sec.
+#define SPELL_CRUSHING_LEAP      RAID_MODE(58960, 60894)//Instant (10-80yr range) -- Leaps at an enemy, inflicting 8000 Physical damage, knocking all nearby enemies away, and creating a cloud of choking debris.
+#define SPELL_STOMP              RAID_MODE(58663, 60880)
+#define SPELL_IMPALE             RAID_MODE(58666, 60882) //Lifts an enemy off the ground with a spiked fist, inflicting 47125 to 52875 Physical damage and 9425 to 10575 additional damage each second for 8 sec.
 #define SPELL_BERSERK            47008
 //Spells Archavon Warders
-#define SPELL_ROCK_SHOWER        RAID_MODE(60919,60923)
-#define SPELL_SHIELD_CRUSH       RAID_MODE(60897,60899)
-#define SPELL_WHIRL              RAID_MODE(60902,60916)
+#define SPELL_ROCK_SHOWER        RAID_MODE(60919, 60923)
+#define SPELL_SHIELD_CRUSH       RAID_MODE(60897, 60899)
+#define SPELL_WHIRL              RAID_MODE(60902, 60916)
 
 //4 Warders spawned
 #define ARCHAVON_WARDER          32353 //npc 32353
@@ -47,7 +48,7 @@ enum Events
     EVENT_BERSERK           = 5,    // 300s cd
 
     //mob
-    EVENT_ROCK_SHOWER       = 6,    // set = 20s cd,unkown cd
+    EVENT_ROCK_SHOWER       = 6,    // set = 20s cd, unkown cd
     EVENT_SHIELD_CRUSH      = 7,    // set = 30s cd
     EVENT_WHIRL             = 8,    // set= 10s cd
 };
@@ -63,7 +64,7 @@ class boss_archavon : public CreatureScript
             {
             }
 
-            void EnterCombat(Unit * /*who*/)
+            void EnterCombat(Unit* /*who*/)
             {
                 events.ScheduleEvent(EVENT_ROCK_SHARDS, 15000);
                 events.ScheduleEvent(EVENT_CHOKING_CLOUD, 30000);
@@ -81,7 +82,7 @@ class boss_archavon : public CreatureScript
 
                 events.Update(diff);
 
-                if (me->HasUnitState(UNIT_STAT_CASTING))
+                if (me->HasUnitState(UNIT_STATE_CASTING))
                     return;
 
                 while (uint32 eventId = events.ExecuteEvent())
@@ -89,12 +90,12 @@ class boss_archavon : public CreatureScript
                     switch (eventId)
                     {
                         case EVENT_ROCK_SHARDS:
-                            if (Unit* target = SelectUnit(SELECT_TARGET_RANDOM, 0))
+                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                                 DoCast(target, SPELL_ROCK_SHARDS);
                             events.ScheduleEvent(EVENT_ROCK_SHARDS, 15000);
                             break;
                         case EVENT_CHOKING_CLOUD:
-                            if (Unit* target = SelectUnit(SELECT_TARGET_RANDOM, 0))
+                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                                 DoCast(target, SPELL_CRUSHING_LEAP, true); //10y~80y, ignore range
                             events.ScheduleEvent(EVENT_CHOKING_CLOUD, 30000);
                             break;
@@ -161,7 +162,7 @@ class mob_archavon_warder : public CreatureScript
 
                 events.Update(diff);
 
-                if (me->HasUnitState(UNIT_STAT_CASTING))
+                if (me->HasUnitState(UNIT_STATE_CASTING))
                     return;
 
                 while (uint32 eventId = events.ExecuteEvent())
@@ -169,7 +170,7 @@ class mob_archavon_warder : public CreatureScript
                     switch (eventId)
                     {
                         case EVENT_ROCK_SHOWER:
-                            if (Unit* target = SelectUnit(SELECT_TARGET_RANDOM, 0))
+                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                                 DoCast(target, SPELL_ROCK_SHOWER);
                             events.ScheduleEvent(EVENT_ROCK_SHARDS, 6000);
                             break;

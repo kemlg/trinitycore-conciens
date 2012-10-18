@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Karazhan
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 #define SAY_AGGRO                       -1532057
 #define SAY_SUMMON1                     -1532058
@@ -48,14 +49,14 @@ class boss_curator : public CreatureScript
 public:
     boss_curator() : CreatureScript("boss_curator") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_curatorAI (pCreature);
+        return new boss_curatorAI (creature);
     }
 
     struct boss_curatorAI : public ScriptedAI
     {
-        boss_curatorAI(Creature *c) : ScriptedAI(c) {}
+        boss_curatorAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 AddTimer;
         uint32 HatefulBoltTimer;
@@ -75,17 +76,17 @@ public:
             me->ApplySpellImmune(0, IMMUNITY_DAMAGE, SPELL_SCHOOL_MASK_ARCANE, true);
         }
 
-        void KilledUnit(Unit * /*victim*/)
+        void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_KILL1,SAY_KILL2), me);
+            DoScriptText(RAND(SAY_KILL1, SAY_KILL2), me);
         }
 
-        void JustDied(Unit * /*victim*/)
+        void JustDied(Unit* /*killer*/)
         {
             DoScriptText(SAY_DEATH, me);
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
         }
@@ -132,13 +133,13 @@ public:
                 {
                     //Summon Astral Flare
                     Creature* AstralFlare = DoSpawnCreature(17096, float(rand()%37), float(rand()%37), 0, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 5000);
-                    Unit *pTarget = NULL;
-                    pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0);
+                    Unit* target = NULL;
+                    target = SelectTarget(SELECT_TARGET_RANDOM, 0);
 
-                    if (AstralFlare && pTarget)
+                    if (AstralFlare && target)
                     {
                         AstralFlare->CastSpell(AstralFlare, SPELL_ASTRAL_FLARE_PASSIVE, false);
-                        AstralFlare->AI()->AttackStart(pTarget);
+                        AstralFlare->AI()->AttackStart(target);
                     }
 
                     //Reduce Mana by 10% of max health
@@ -159,9 +160,9 @@ public:
                         }
                         else
                         {
-                            if (urand(0,1) == 0)
+                            if (urand(0, 1) == 0)
                             {
-                                DoScriptText(RAND(SAY_SUMMON1,SAY_SUMMON2), me);
+                                DoScriptText(RAND(SAY_SUMMON1, SAY_SUMMON2), me);
                             }
                         }
                     }
@@ -184,8 +185,8 @@ public:
                 else
                     HatefulBoltTimer = 15000;
 
-                if (Unit *pTarget = SelectUnit(SELECT_TARGET_TOPAGGRO, 1))
-                    DoCast(pTarget, SPELL_HATEFUL_BOLT);
+                if (Unit* target = SelectTarget(SELECT_TARGET_TOPAGGRO, 1))
+                    DoCast(target, SPELL_HATEFUL_BOLT);
 
             } else HatefulBoltTimer -= diff;
 
@@ -194,7 +195,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_curator()
 {

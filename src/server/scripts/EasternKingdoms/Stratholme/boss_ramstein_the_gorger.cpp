@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Stratholme
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "stratholme.h"
 
 #define SPELL_TRAMPLE       5568
@@ -36,19 +37,19 @@ class boss_ramstein_the_gorger : public CreatureScript
 public:
     boss_ramstein_the_gorger() : CreatureScript("boss_ramstein_the_gorger") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_ramstein_the_gorgerAI (pCreature);
+        return new boss_ramstein_the_gorgerAI (creature);
     }
 
     struct boss_ramstein_the_gorgerAI : public ScriptedAI
     {
-        boss_ramstein_the_gorgerAI(Creature *c) : ScriptedAI(c)
+        boss_ramstein_the_gorgerAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = me->GetInstanceScript();
+            instance = me->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 Trample_Timer;
         uint32 Knockout_Timer;
@@ -59,20 +60,20 @@ public:
             Knockout_Timer = 12000;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
             for (uint8 i = 0; i < 30; ++i)
             {
-                if (Creature* mob = me->SummonCreature(C_MINDLESS_UNDEAD,3969.35f+irand(-10,10),-3391.87f+irand(-10,10),119.11f,5.91f,TEMPSUMMON_TIMED_OR_DEAD_DESPAWN,1800000))
-                    mob->AI()->AttackStart(me->SelectNearestTarget(500));
+                if (Creature* mob = me->SummonCreature(C_MINDLESS_UNDEAD, 3969.35f+irand(-10, 10), -3391.87f+irand(-10, 10), 119.11f, 5.91f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 1800000))
+                    mob->AI()->AttackStart(me->SelectNearestTarget(100.0f));
             }
 
-            if (pInstance)
-                pInstance->SetData(TYPE_RAMSTEIN,DONE);
+            if (instance)
+                instance->SetData(TYPE_RAMSTEIN, DONE);
         }
 
         void UpdateAI(const uint32 diff)

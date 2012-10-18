@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -37,7 +37,7 @@ Weather::Weather(uint32 zone, WeatherData const* weatherChances)
     m_type = WEATHER_TYPE_FINE;
     m_grade = 0;
 
-    sLog->outDetail("WORLD: Starting weather system for zone %u (change every %u minutes).", m_zone, (uint32)(m_timer.GetInterval() / (MINUTE*IN_MILLISECONDS)));
+    sLog->outInfo(LOG_FILTER_GENERAL, "WORLD: Starting weather system for zone %u (change every %u minutes).", m_zone, (uint32)(m_timer.GetInterval() / (MINUTE*IN_MILLISECONDS)));
 }
 
 /// Launch a weather update
@@ -97,7 +97,7 @@ bool Weather::ReGenerate()
 
     static char const* seasonName[WEATHER_SEASONS] = { "spring", "summer", "fall", "winter" };
 
-    sLog->outDebug("Generating a change in %s weather for zone %u.", seasonName[season], m_zone);
+    sLog->outInfo(LOG_FILTER_GENERAL, "Generating a change in %s weather for zone %u.", seasonName[season], m_zone);
 
     if ((u < 60) && (m_grade < 0.33333334f))                // Get fair
     {
@@ -134,7 +134,7 @@ bool Weather::ReGenerate()
             if (m_grade > 0.6666667f)
             {
                                                             // Severe change, but how severe?
-                uint32 rnd = urand(0,99);
+                uint32 rnd = urand(0, 99);
                 if (rnd < 50)
                 {
                     m_grade -= 0.6666667f;
@@ -147,7 +147,7 @@ bool Weather::ReGenerate()
     }
 
     // At this point, only weather that isn't doing anything remains but that have weather data
-    uint32 chance1 =          m_weatherChances->data[season].rainChance;
+    uint32 chance1 = m_weatherChances->data[season].rainChance;
     uint32 chance2 = chance1+ m_weatherChances->data[season].snowChance;
     uint32 chance3 = chance2+ m_weatherChances->data[season].stormChance;
 
@@ -189,19 +189,11 @@ bool Weather::ReGenerate()
     return m_type != old_type || m_grade != old_grade;
 }
 
-void Weather::SendWeatherUpdateToPlayer(Player *player)
+void Weather::SendWeatherUpdateToPlayer(Player* player)
 {
     WorldPacket data(SMSG_WEATHER, (4+4+4));
 
     data << uint32(GetWeatherState()) << (float)m_grade << uint8(0);
-    player->GetSession()->SendPacket(&data);
-}
-
-void Weather::SendFineWeatherUpdateToPlayer(Player *player)
-{
-    WorldPacket data(SMSG_WEATHER, (4+4+4));
-
-    data << (uint32)WEATHER_STATE_FINE << (float)0.0f << uint8(0);
     player->GetSession()->SendPacket(&data);
 }
 
@@ -226,7 +218,7 @@ bool Weather::UpdateWeather()
 
     ///- Log the event
     char const* wthstr;
-    switch(state)
+    switch (state)
     {
         case WEATHER_STATE_LIGHT_RAIN:
             wthstr = "light rain";
@@ -266,7 +258,7 @@ bool Weather::UpdateWeather()
             wthstr = "fine";
             break;
     }
-    sLog->outDetail("Change the weather of zone %u to %s.", m_zone, wthstr);
+    sLog->outInfo(LOG_FILTER_GENERAL, "Change the weather of zone %u to %s.", m_zone, wthstr);
 
     sScriptMgr->OnWeatherChange(this, state, m_grade);
     return true;
@@ -289,7 +281,7 @@ WeatherState Weather::GetWeatherState() const
     if (m_grade<0.27f)
         return WEATHER_STATE_FINE;
 
-    switch(m_type)
+    switch (m_type)
     {
         case WEATHER_TYPE_RAIN:
             if (m_grade<0.40f)

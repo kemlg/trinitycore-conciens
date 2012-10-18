@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -33,20 +33,31 @@ npc_guardian            100%    guardianAI used to prevent players from accessin
 npc_garments_of_quests   80%    NPC's related to all Garments of-quests 5621, 5624, 5625, 5648, 565
 npc_injured_patient     100%    patients for triage-quests (6622 and 6624)
 npc_doctor              100%    Gustaf Vanhowzen and Gregory Victor, quest 6622 and 6624 (Triage)
-npc_kingdom_of_dalaran_quests   Misc NPC's gossip option related to quests 12791, 12794 and 12796
 npc_mount_vendor        100%    Regular mount vendors all over the world. Display gossip if player doesn't meet the requirements to buy
 npc_rogue_trainer        80%    Scripted trainers, so they are able to offer item 17126 for class quest 6681
 npc_sayge               100%    Darkmoon event fortune teller, buff player based on answers given
 npc_snake_trap_serpents  80%    AI for snakes that summoned by Snake Trap
 npc_shadowfiend         100%   restore 5% of owner's mana when shadowfiend die from damage
 npc_locksmith            75%    list of keys needs to be confirmed
+npc_firework            100%    NPC's summoned by rockets and rocket clusters, for making them cast visual
 EndContentData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
+#include "ScriptedGossip.h"
 #include "ScriptedEscortAI.h"
 #include "ObjectMgr.h"
 #include "ScriptMgr.h"
 #include "World.h"
+#include "PetAI.h"
+#include "PassiveAI.h"
+#include "CombatAI.h"
+#include "GameEventMgr.h"
+#include "GridNotifiers.h"
+#include "GridNotifiersImpl.h"
+#include "Cell.h"
+#include "CellImpl.h"
+#include "SpellAuras.h"
 
 /*########
 # npc_air_force_bots
@@ -60,9 +71,9 @@ enum SpawnType
 
 struct SpawnAssociation
 {
-    uint32 m_uiThisCreatureEntry;
-    uint32 m_uiSpawnedCreatureEntry;
-    SpawnType m_SpawnType;
+    uint32 thisCreatureEntry;
+    uint32 spawnedCreatureEntry;
+    SpawnType spawnType;
 };
 
 enum eEnums
@@ -71,10 +82,10 @@ enum eEnums
     AURA_DURATION_TIME_LEFT         = 5000
 };
 
-const float RANGE_TRIPWIRE          = 15.0f;
-const float RANGE_GUARDS_MARK       = 50.0f;
+float const RANGE_TRIPWIRE          = 15.0f;
+float const RANGE_GUARDS_MARK       = 50.0f;
 
-SpawnAssociation m_aSpawnAssociations[] =
+SpawnAssociation spawnAssociations[] =
 {
     {2614,  15241, SPAWNTYPE_ALARMBOT},                     //Air Force Alarm Bot (Alliance)
     {2615,  15242, SPAWNTYPE_ALARMBOT},                     //Air Force Alarm Bot (Horde)
@@ -112,141 +123,137 @@ public:
 
     struct npc_air_force_botsAI : public ScriptedAI
     {
-        npc_air_force_botsAI(Creature* pCreature) : ScriptedAI(pCreature)
+        npc_air_force_botsAI(Creature* creature) : ScriptedAI(creature)
         {
-            m_pSpawnAssoc = NULL;
-            m_uiSpawnedGUID = 0;
+            SpawnAssoc = NULL;
+            SpawnedGUID = 0;
 
             // find the correct spawnhandling
-            static uint32 uiEntryCount = sizeof(m_aSpawnAssociations)/sizeof(SpawnAssociation);
+            static uint32 entryCount = sizeof(spawnAssociations) / sizeof(SpawnAssociation);
 
-            for (uint8 i=0; i<uiEntryCount; ++i)
+            for (uint8 i = 0; i < entryCount; ++i)
             {
-                if (m_aSpawnAssociations[i].m_uiThisCreatureEntry == pCreature->GetEntry())
+                if (spawnAssociations[i].thisCreatureEntry == creature->GetEntry())
                 {
-                    m_pSpawnAssoc = &m_aSpawnAssociations[i];
+                    SpawnAssoc = &spawnAssociations[i];
                     break;
                 }
             }
 
-            if (!m_pSpawnAssoc)
-                sLog->outErrorDb("TCSR: Creature template entry %u has ScriptName npc_air_force_bots, but it's not handled by that script", pCreature->GetEntry());
+            if (!SpawnAssoc)
+                sLog->outError(LOG_FILTER_SQL, "TCSR: Creature template entry %u has ScriptName npc_air_force_bots, but it's not handled by that script", creature->GetEntry());
             else
             {
-                CreatureInfo const* spawnedTemplate = GetCreatureTemplateStore(m_pSpawnAssoc->m_uiSpawnedCreatureEntry);
+                CreatureTemplate const* spawnedTemplate = sObjectMgr->GetCreatureTemplate(SpawnAssoc->spawnedCreatureEntry);
 
                 if (!spawnedTemplate)
                 {
-                    m_pSpawnAssoc = NULL;
-                    sLog->outErrorDb("TCSR: Creature template entry %u does not exist in DB, which is required by npc_air_force_bots", m_pSpawnAssoc->m_uiSpawnedCreatureEntry);
+                    sLog->outError(LOG_FILTER_SQL, "TCSR: Creature template entry %u does not exist in DB, which is required by npc_air_force_bots", SpawnAssoc->spawnedCreatureEntry);
+                    SpawnAssoc = NULL;
                     return;
                 }
             }
         }
 
-        SpawnAssociation* m_pSpawnAssoc;
-        uint64 m_uiSpawnedGUID;
+        SpawnAssociation* SpawnAssoc;
+        uint64 SpawnedGUID;
 
         void Reset() {}
 
         Creature* SummonGuard()
         {
-            Creature* pSummoned = me->SummonCreature(m_pSpawnAssoc->m_uiSpawnedCreatureEntry, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 300000);
+            Creature* summoned = me->SummonCreature(SpawnAssoc->spawnedCreatureEntry, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 300000);
 
-            if (pSummoned)
-                m_uiSpawnedGUID = pSummoned->GetGUID();
+            if (summoned)
+                SpawnedGUID = summoned->GetGUID();
             else
             {
-                sLog->outErrorDb("TCSR: npc_air_force_bots: wasn't able to spawn Creature %u", m_pSpawnAssoc->m_uiSpawnedCreatureEntry);
-                m_pSpawnAssoc = NULL;
+                sLog->outError(LOG_FILTER_SQL, "TCSR: npc_air_force_bots: wasn't able to spawn Creature %u", SpawnAssoc->spawnedCreatureEntry);
+                SpawnAssoc = NULL;
             }
 
-            return pSummoned;
+            return summoned;
         }
 
         Creature* GetSummonedGuard()
         {
-            Creature* pCreature = Unit::GetCreature(*me, m_uiSpawnedGUID);
+            Creature* creature = Unit::GetCreature(*me, SpawnedGUID);
 
-            if (pCreature && pCreature->isAlive())
-                return pCreature;
+            if (creature && creature->isAlive())
+                return creature;
 
             return NULL;
         }
 
-        void MoveInLineOfSight(Unit* pWho)
+        void MoveInLineOfSight(Unit* who)
         {
-            if (!m_pSpawnAssoc)
+            if (!SpawnAssoc)
                 return;
 
-            if (pWho->isTargetableForAttack() && me->IsHostileTo(pWho))
+            if (me->IsValidAttackTarget(who))
             {
-                Player* pPlayerTarget = pWho->GetTypeId() == TYPEID_PLAYER ? CAST_PLR(pWho) : NULL;
+                Player* playerTarget = who->ToPlayer();
 
                 // airforce guards only spawn for players
-                if (!pPlayerTarget)
+                if (!playerTarget)
                     return;
 
-                Creature* pLastSpawnedGuard = m_uiSpawnedGUID == 0 ? NULL : GetSummonedGuard();
+                Creature* lastSpawnedGuard = SpawnedGUID == 0 ? NULL : GetSummonedGuard();
 
                 // prevent calling Unit::GetUnit at next MoveInLineOfSight call - speedup
-                if (!pLastSpawnedGuard)
-                    m_uiSpawnedGUID = 0;
+                if (!lastSpawnedGuard)
+                    SpawnedGUID = 0;
 
-                switch(m_pSpawnAssoc->m_SpawnType)
+                switch (SpawnAssoc->spawnType)
                 {
                     case SPAWNTYPE_ALARMBOT:
                     {
-                        if (!pWho->IsWithinDistInMap(me, RANGE_GUARDS_MARK))
+                        if (!who->IsWithinDistInMap(me, RANGE_GUARDS_MARK))
                             return;
 
-                        Aura* pMarkAura = pWho->GetAura(SPELL_GUARDS_MARK);
-                        if (pMarkAura)
+                        Aura* markAura = who->GetAura(SPELL_GUARDS_MARK);
+                        if (markAura)
                         {
                             // the target wasn't able to move out of our range within 25 seconds
-                            if (!pLastSpawnedGuard)
+                            if (!lastSpawnedGuard)
                             {
-                                pLastSpawnedGuard = SummonGuard();
+                                lastSpawnedGuard = SummonGuard();
 
-                                if (!pLastSpawnedGuard)
+                                if (!lastSpawnedGuard)
                                     return;
                             }
 
-                            if (pMarkAura->GetDuration() < AURA_DURATION_TIME_LEFT)
-                            {
-                                if (!pLastSpawnedGuard->getVictim())
-                                    pLastSpawnedGuard->AI()->AttackStart(pWho);
-                            }
+                            if (markAura->GetDuration() < AURA_DURATION_TIME_LEFT)
+                                if (!lastSpawnedGuard->getVictim())
+                                    lastSpawnedGuard->AI()->AttackStart(who);
                         }
                         else
                         {
-                            if (!pLastSpawnedGuard)
-                                pLastSpawnedGuard = SummonGuard();
+                            if (!lastSpawnedGuard)
+                                lastSpawnedGuard = SummonGuard();
 
-                            if (!pLastSpawnedGuard)
+                            if (!lastSpawnedGuard)
                                 return;
 
-                            pLastSpawnedGuard->CastSpell(pWho, SPELL_GUARDS_MARK, true);
+                            lastSpawnedGuard->CastSpell(who, SPELL_GUARDS_MARK, true);
                         }
                         break;
                     }
                     case SPAWNTYPE_TRIPWIRE_ROOFTOP:
                     {
-                        if (!pWho->IsWithinDistInMap(me, RANGE_TRIPWIRE))
+                        if (!who->IsWithinDistInMap(me, RANGE_TRIPWIRE))
                             return;
 
-                        if (!pLastSpawnedGuard)
-                            pLastSpawnedGuard = SummonGuard();
+                        if (!lastSpawnedGuard)
+                            lastSpawnedGuard = SummonGuard();
 
-                        if (!pLastSpawnedGuard)
+                        if (!lastSpawnedGuard)
                             return;
 
                         // ROOFTOP only triggers if the player is on the ground
-                        if (!pPlayerTarget->IsFlying())
-                        {
-                            if (!pLastSpawnedGuard->getVictim())
-                                pLastSpawnedGuard->AI()->AttackStart(pWho);
-                        }
+                        if (!playerTarget->IsFlying() && !lastSpawnedGuard->getVictim())
+                            lastSpawnedGuard->AI()->AttackStart(who);
+
                         break;
                     }
                 }
@@ -254,8 +261,7 @@ public:
         }
     };
 
-
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_air_force_botsAI(creature);
     }
@@ -281,22 +287,22 @@ class npc_lunaclaw_spirit : public CreatureScript
 public:
     npc_lunaclaw_spirit() : CreatureScript("npc_lunaclaw_spirit") { }
 
-    bool OnGossipHello(Player *pPlayer, Creature *pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (pPlayer->GetQuestStatus(QUEST_BODY_HEART_A) == QUEST_STATUS_INCOMPLETE || pPlayer->GetQuestStatus(QUEST_BODY_HEART_H) == QUEST_STATUS_INCOMPLETE)
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_GRANT, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
+        if (player->GetQuestStatus(QUEST_BODY_HEART_A) == QUEST_STATUS_INCOMPLETE || player->GetQuestStatus(QUEST_BODY_HEART_H) == QUEST_STATUS_INCOMPLETE)
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_GRANT, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
 
-        pPlayer->SEND_GOSSIP_MENU(TEXT_ID_DEFAULT, pCreature->GetGUID());
+        player->SEND_GOSSIP_MENU(TEXT_ID_DEFAULT, creature->GetGUID());
         return true;
     }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 /*uiSender*/, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        if (uiAction == GOSSIP_ACTION_INFO_DEF+1)
+        player->PlayerTalkClass->ClearMenus();
+        if (action == GOSSIP_ACTION_INFO_DEF + 1)
         {
-            pPlayer->SEND_GOSSIP_MENU(TEXT_ID_PROGRESS, pCreature->GetGUID());
-            pPlayer->AreaExploredOrEventHappens(pPlayer->GetTeam() == ALLIANCE ? QUEST_BODY_HEART_A : QUEST_BODY_HEART_H);
+            player->SEND_GOSSIP_MENU(TEXT_ID_PROGRESS, creature->GetGUID());
+            player->AreaExploredOrEventHappens(player->GetTeam() == ALLIANCE ? QUEST_BODY_HEART_A : QUEST_BODY_HEART_H);
         }
         return true;
     }
@@ -320,7 +326,7 @@ public:
 
     struct npc_chicken_cluckAI : public ScriptedAI
     {
-        npc_chicken_cluckAI(Creature *c) : ScriptedAI(c) {}
+        npc_chicken_cluckAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 ResetFlagTimer;
 
@@ -331,9 +337,9 @@ public:
             me->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
         }
 
-        void EnterCombat(Unit * /*who*/) {}
+        void EnterCombat(Unit* /*who*/) {}
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
             // Reset flags after a certain time has passed so that the next player has to start the 'event' again
             if (me->HasFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER))
@@ -342,27 +348,29 @@ public:
                 {
                     EnterEvadeMode();
                     return;
-                } else ResetFlagTimer -= diff;
+                }
+                else
+                    ResetFlagTimer -= diff;
             }
 
             if (UpdateVictim())
                 DoMeleeAttackIfReady();
         }
 
-        void ReceiveEmote(Player* pPlayer, uint32 emote)
+        void ReceiveEmote(Player* player, uint32 emote)
         {
-            switch(emote)
+            switch (emote)
             {
-                case TEXTEMOTE_CHICKEN:
-                    if (pPlayer->GetQuestStatus(QUEST_CLUCK) == QUEST_STATUS_NONE && rand()%30 == 1)
+                case TEXT_EMOTE_CHICKEN:
+                    if (player->GetQuestStatus(QUEST_CLUCK) == QUEST_STATUS_NONE && rand() % 30 == 1)
                     {
                         me->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
                         me->setFaction(FACTION_FRIENDLY);
                         DoScriptText(EMOTE_HELLO, me);
                     }
                     break;
-                case TEXTEMOTE_CHEER:
-                    if (pPlayer->GetQuestStatus(QUEST_CLUCK) == QUEST_STATUS_COMPLETE)
+                case TEXT_EMOTE_CHEER:
+                    if (player->GetQuestStatus(QUEST_CLUCK) == QUEST_STATUS_COMPLETE)
                     {
                         me->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
                         me->setFaction(FACTION_FRIENDLY);
@@ -373,23 +381,23 @@ public:
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_chicken_cluckAI(creature);
     }
 
-    bool OnQuestAccept(Player* /*pPlayer*/, Creature* pCreature, const Quest *_Quest)
+    bool OnQuestAccept(Player* /*player*/, Creature* creature, Quest const* quest)
     {
-        if (_Quest->GetQuestId() == QUEST_CLUCK)
-            CAST_AI(npc_chicken_cluck::npc_chicken_cluckAI, pCreature->AI())->Reset();
+        if (quest->GetQuestId() == QUEST_CLUCK)
+            CAST_AI(npc_chicken_cluck::npc_chicken_cluckAI, creature->AI())->Reset();
 
         return true;
     }
 
-    bool OnQuestComplete(Player* /*pPlayer*/, Creature* pCreature, const Quest *_Quest)
+    bool OnQuestComplete(Player* /*player*/, Creature* creature, Quest const* quest)
     {
-        if (_Quest->GetQuestId() == QUEST_CLUCK)
-            CAST_AI(npc_chicken_cluck::npc_chicken_cluckAI, pCreature->AI())->Reset();
+        if (quest->GetQuestId() == QUEST_CLUCK)
+            CAST_AI(npc_chicken_cluck::npc_chicken_cluckAI, creature->AI())->Reset();
 
         return true;
     }
@@ -410,75 +418,82 @@ public:
 
     struct npc_dancing_flamesAI : public ScriptedAI
     {
-        npc_dancing_flamesAI(Creature *c) : ScriptedAI(c) {}
+        npc_dancing_flamesAI(Creature* creature) : ScriptedAI(creature) {}
 
-        bool active;
-        uint32 can_iteract;
+        bool Active;
+        uint32 CanIteract;
 
         void Reset()
         {
-            active = true;
-            can_iteract = 3500;
+            Active = true;
+            CanIteract = 3500;
             DoCast(me, SPELL_BRAZIER, true);
             DoCast(me, SPELL_FIERY_AURA, false);
             float x, y, z;
-            me->GetPosition(x,y,z);
-            me->Relocate(x,y,z + 0.94f);
-            me->AddUnitMovementFlag(MOVEMENTFLAG_LEVITATING);
+            me->GetPosition(x, y, z);
+            me->Relocate(x, y, z + 0.94f);
+            me->SetDisableGravity(true);
             me->HandleEmoteCommand(EMOTE_ONESHOT_DANCE);
             WorldPacket data;                       //send update position to client
             me->BuildHeartBeatMsg(&data);
-            me->SendMessageToSet(&data,true);
+            me->SendMessageToSet(&data, true);
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
-            if (!active)
+            if (!Active)
             {
-                if (can_iteract <= diff)
+                if (CanIteract <= diff)
                 {
-                    active = true;
-                    can_iteract = 3500;
+                    Active = true;
+                    CanIteract = 3500;
                     me->HandleEmoteCommand(EMOTE_ONESHOT_DANCE);
-                } else can_iteract -= diff;
+                }
+                else
+                    CanIteract -= diff;
             }
         }
 
         void EnterCombat(Unit* /*who*/){}
 
-        void ReceiveEmote(Player* pPlayer, uint32 emote)
+        void ReceiveEmote(Player* player, uint32 emote)
         {
-            if (me->IsWithinLOS(pPlayer->GetPositionX(),pPlayer->GetPositionY(),pPlayer->GetPositionZ()) && me->IsWithinDistInMap(pPlayer,30.0f))
+            if (me->IsWithinLOS(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ()) && me->IsWithinDistInMap(player, 30.0f))
             {
-                me->SetInFront(pPlayer);
-                active = false;
+                me->SetInFront(player);
+                Active = false;
 
                 WorldPacket data;
                 me->BuildHeartBeatMsg(&data);
-                me->SendMessageToSet(&data,true);
-                switch(emote)
+                me->SendMessageToSet(&data, true);
+                switch (emote)
                 {
-                    case TEXTEMOTE_KISS:    me->HandleEmoteCommand(EMOTE_ONESHOT_SHY); break;
-                    case TEXTEMOTE_WAVE:    me->HandleEmoteCommand(EMOTE_ONESHOT_WAVE); break;
-                    case TEXTEMOTE_BOW:     me->HandleEmoteCommand(EMOTE_ONESHOT_BOW); break;
-                    case TEXTEMOTE_JOKE:    me->HandleEmoteCommand(EMOTE_ONESHOT_LAUGH); break;
-                    case TEXTEMOTE_DANCE:
-                    {
-                        if (!pPlayer->HasAura(SPELL_SEDUCTION))
-                            DoCast(pPlayer, SPELL_SEDUCTION, true);
-                    }
-                    break;
+                    case TEXT_EMOTE_KISS:
+                        me->HandleEmoteCommand(EMOTE_ONESHOT_SHY);
+                        break;
+                    case TEXT_EMOTE_WAVE:
+                        me->HandleEmoteCommand(EMOTE_ONESHOT_WAVE);
+                        break;
+                    case TEXT_EMOTE_BOW:
+                        me->HandleEmoteCommand(EMOTE_ONESHOT_BOW);
+                        break;
+                    case TEXT_EMOTE_JOKE:
+                        me->HandleEmoteCommand(EMOTE_ONESHOT_LAUGH);
+                        break;
+                    case TEXT_EMOTE_DANCE:
+                        if (!player->HasAura(SPELL_SEDUCTION))
+                            DoCast(player, SPELL_SEDUCTION, true);
+                        break;
                 }
             }
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_dancing_flamesAI(creature);
     }
 };
-
 
 /*######
 ## Triage quest
@@ -530,14 +545,14 @@ static Location HordeCoords[]=
 #define H_RUNTOY -3508.48f
 #define H_RUNTOZ 62.96f
 
-const uint32 AllianceSoldierId[3] =
+uint32 const AllianceSoldierId[3] =
 {
     12938,                                                  // 12938 Injured Alliance Soldier
     12936,                                                  // 12936 Badly injured Alliance Soldier
     12937                                                   // 12937 Critically injured Alliance Soldier
 };
 
-const uint32 HordeSoldierId[3] =
+uint32 const HordeSoldierId[3] =
 {
     12923,                                                  //12923 Injured Soldier
     12924,                                                  //12924 Badly injured Soldier
@@ -554,11 +569,11 @@ public:
 
     struct npc_doctorAI : public ScriptedAI
     {
-        npc_doctorAI(Creature *c) : ScriptedAI(c) {}
+        npc_doctorAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint64 PlayerGUID;
 
-        uint32 SummonPatient_Timer;
+        uint32 SummonPatientTimer;
         uint32 SummonPatientCount;
         uint32 PatientDiedCount;
         uint32 PatientSavedCount;
@@ -572,7 +587,7 @@ public:
         {
             PlayerGUID = 0;
 
-            SummonPatient_Timer = 10000;
+            SummonPatientTimer = 10000;
             SummonPatientCount = 0;
             PatientDiedCount = 0;
             PatientSavedCount = 0;
@@ -585,16 +600,16 @@ public:
             me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
         }
 
-        void BeginEvent(Player* pPlayer)
+        void BeginEvent(Player* player)
         {
-            PlayerGUID = pPlayer->GetGUID();
+            PlayerGUID = player->GetGUID();
 
-            SummonPatient_Timer = 10000;
+            SummonPatientTimer = 10000;
             SummonPatientCount = 0;
             PatientDiedCount = 0;
             PatientSavedCount = 0;
 
-            switch(me->GetEntry())
+            switch (me->GetEntry())
             {
                 case DOCTOR_ALLIANCE:
                     for (uint8 i = 0; i < ALLIANCE_COORDS; ++i)
@@ -610,36 +625,36 @@ public:
             me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
         }
 
-        void PatientDied(Location* Point)
+        void PatientDied(Location* point)
         {
-            Player* pPlayer = Unit::GetPlayer(*me, PlayerGUID);
-            if (pPlayer && ((pPlayer->GetQuestStatus(6624) == QUEST_STATUS_INCOMPLETE) || (pPlayer->GetQuestStatus(6622) == QUEST_STATUS_INCOMPLETE)))
+            Player* player = Unit::GetPlayer(*me, PlayerGUID);
+            if (player && ((player->GetQuestStatus(6624) == QUEST_STATUS_INCOMPLETE) || (player->GetQuestStatus(6622) == QUEST_STATUS_INCOMPLETE)))
             {
                 ++PatientDiedCount;
 
                 if (PatientDiedCount > 5 && Event)
                 {
-                    if (pPlayer->GetQuestStatus(6624) == QUEST_STATUS_INCOMPLETE)
-                        pPlayer->FailQuest(6624);
-                    else if (pPlayer->GetQuestStatus(6622) == QUEST_STATUS_INCOMPLETE)
-                        pPlayer->FailQuest(6622);
+                    if (player->GetQuestStatus(6624) == QUEST_STATUS_INCOMPLETE)
+                        player->FailQuest(6624);
+                    else if (player->GetQuestStatus(6622) == QUEST_STATUS_INCOMPLETE)
+                        player->FailQuest(6622);
 
                     Reset();
                     return;
                 }
 
-                Coordinates.push_back(Point);
+                Coordinates.push_back(point);
             }
             else
                 // If no player or player abandon quest in progress
                 Reset();
         }
 
-        void PatientSaved(Creature* /*soldier*/, Player* pPlayer, Location* Point)
+        void PatientSaved(Creature* /*soldier*/, Player* player, Location* point)
         {
-            if (pPlayer && PlayerGUID == pPlayer->GetGUID())
+            if (player && PlayerGUID == player->GetGUID())
             {
-                if ((pPlayer->GetQuestStatus(6624) == QUEST_STATUS_INCOMPLETE) || (pPlayer->GetQuestStatus(6622) == QUEST_STATUS_INCOMPLETE))
+                if ((player->GetQuestStatus(6624) == QUEST_STATUS_INCOMPLETE) || (player->GetQuestStatus(6622) == QUEST_STATUS_INCOMPLETE))
                 {
                     ++PatientSavedCount;
 
@@ -650,39 +665,39 @@ public:
                             std::list<uint64>::const_iterator itr;
                             for (itr = Patients.begin(); itr != Patients.end(); ++itr)
                             {
-                                if (Creature* Patient = Unit::GetCreature((*me), *itr))
-                                    Patient->setDeathState(JUST_DIED);
+                                if (Creature* patient = Unit::GetCreature((*me), *itr))
+                                    patient->setDeathState(JUST_DIED);
                             }
                         }
 
-                        if (pPlayer->GetQuestStatus(6624) == QUEST_STATUS_INCOMPLETE)
-                            pPlayer->AreaExploredOrEventHappens(6624);
-                        else if (pPlayer->GetQuestStatus(6622) == QUEST_STATUS_INCOMPLETE)
-                            pPlayer->AreaExploredOrEventHappens(6622);
+                        if (player->GetQuestStatus(6624) == QUEST_STATUS_INCOMPLETE)
+                            player->AreaExploredOrEventHappens(6624);
+                        else if (player->GetQuestStatus(6622) == QUEST_STATUS_INCOMPLETE)
+                            player->AreaExploredOrEventHappens(6622);
 
                         Reset();
                         return;
                     }
 
-                    Coordinates.push_back(Point);
+                    Coordinates.push_back(point);
                 }
             }
         }
 
-        void UpdateAI(const uint32 diff);
+        void UpdateAI(uint32 const diff);
 
         void EnterCombat(Unit* /*who*/){}
     };
 
-    bool OnQuestAccept(Player* pPlayer, Creature* pCreature, Quest const *quest)
+    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
     {
         if ((quest->GetQuestId() == 6624) || (quest->GetQuestId() == 6622))
-            CAST_AI(npc_doctor::npc_doctorAI, pCreature->AI())->BeginEvent(pPlayer);
+            CAST_AI(npc_doctor::npc_doctorAI, creature->AI())->BeginEvent(player);
 
         return true;
     }
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_doctorAI(creature);
     }
@@ -699,14 +714,14 @@ public:
 
     struct npc_injured_patientAI : public ScriptedAI
     {
-        npc_injured_patientAI(Creature *c) : ScriptedAI(c) {}
+        npc_injured_patientAI(Creature* creature) : ScriptedAI(creature) {}
 
-        uint64 Doctorguid;
+        uint64 DoctorGUID;
         Location* Coord;
 
         void Reset()
         {
-            Doctorguid = 0;
+            DoctorGUID = 0;
             Coord = NULL;
 
             //no select
@@ -739,14 +754,14 @@ public:
 
         void EnterCombat(Unit* /*who*/){}
 
-        void SpellHit(Unit *caster, const SpellEntry *spell)
+        void SpellHit(Unit* caster, SpellInfo const* spell)
         {
             if (caster->GetTypeId() == TYPEID_PLAYER && me->isAlive() && spell->Id == 20804)
             {
                 if ((CAST_PLR(caster)->GetQuestStatus(6624) == QUEST_STATUS_INCOMPLETE) || (CAST_PLR(caster)->GetQuestStatus(6622) == QUEST_STATUS_INCOMPLETE))
-                    if (Doctorguid)
-                        if (Creature* Doctor = Unit::GetCreature(*me, Doctorguid))
-                            CAST_AI(npc_doctor::npc_doctorAI, Doctor->AI())->PatientSaved(me, CAST_PLR(caster), Coord);
+                    if (DoctorGUID)
+                        if (Creature* doctor = Unit::GetCreature(*me, DoctorGUID))
+                            CAST_AI(npc_doctor::npc_doctorAI, doctor->AI())->PatientSaved(me, CAST_PLR(caster), Coord);
 
                 //make not selectable
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
@@ -757,10 +772,10 @@ public:
                 //stand up
                 me->SetUInt32Value(UNIT_FIELD_BYTES_1, UNIT_STAND_STATE_STAND);
 
-                DoScriptText(RAND(SAY_DOC1,SAY_DOC2,SAY_DOC3), me);
+                DoScriptText(RAND(SAY_DOC1, SAY_DOC2, SAY_DOC3), me);
 
                 uint32 mobId = me->GetEntry();
-                me->RemoveUnitMovementFlag(MOVEMENTFLAG_WALKING);
+                me->SetWalk(false);
 
                 switch (mobId)
                 {
@@ -778,13 +793,11 @@ public:
             }
         }
 
-        void UpdateAI(const uint32 /*diff*/)
+        void UpdateAI(uint32 const /*diff*/)
         {
             //lower HP on every world tick makes it a useful counter, not officlone though
             if (me->isAlive() && me->GetHealth() > 6)
-            {
                 me->ModifyHealth(-5);
-            }
 
             if (me->isAlive() && me->GetHealth() <= 6)
             {
@@ -793,22 +806,20 @@ public:
                 me->setDeathState(JUST_DIED);
                 me->SetFlag(UNIT_DYNAMIC_FLAGS, 32);
 
-                if (Doctorguid)
-                {
-                    if (Creature* Doctor = Unit::GetCreature((*me), Doctorguid))
-                        CAST_AI(npc_doctor::npc_doctorAI, Doctor->AI())->PatientDied(Coord);
-                }
+                if (DoctorGUID)
+                    if (Creature* doctor = Unit::GetCreature((*me), DoctorGUID))
+                        CAST_AI(npc_doctor::npc_doctorAI, doctor->AI())->PatientDied(Coord);
             }
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_injured_patientAI(creature);
     }
 };
 
-void npc_doctor::npc_doctorAI::UpdateAI(const uint32 diff)
+void npc_doctor::npc_doctorAI::UpdateAI(uint32 const diff)
 {
     if (Event && SummonPatientCount >= 20)
     {
@@ -818,42 +829,46 @@ void npc_doctor::npc_doctorAI::UpdateAI(const uint32 diff)
 
     if (Event)
     {
-        if (SummonPatient_Timer <= diff)
+        if (SummonPatientTimer <= diff)
         {
             if (Coordinates.empty())
                 return;
 
-            std::vector<Location*>::iterator itr = Coordinates.begin()+rand()%Coordinates.size();
+            std::vector<Location*>::iterator itr = Coordinates.begin() + rand() % Coordinates.size();
             uint32 patientEntry = 0;
 
-            switch(me->GetEntry())
+            switch (me->GetEntry())
             {
-            case DOCTOR_ALLIANCE: patientEntry = AllianceSoldierId[rand()%3]; break;
-            case DOCTOR_HORDE:    patientEntry = HordeSoldierId[rand()%3]; break;
-            default:
-                sLog->outError("TSCR: Invalid entry for Triage doctor. Please check your database");
-                return;
+                case DOCTOR_ALLIANCE:
+                    patientEntry = AllianceSoldierId[rand() % 3];
+                    break;
+                case DOCTOR_HORDE:
+                    patientEntry = HordeSoldierId[rand() % 3];
+                    break;
+                default:
+                    sLog->outError(LOG_FILTER_TSCR, "Invalid entry for Triage doctor. Please check your database");
+                    return;
             }
 
-            if (Location* Point = *itr)
+            if (Location* point = *itr)
             {
-                if (Creature* Patient = me->SummonCreature(patientEntry, Point->x, Point->y, Point->z, Point->o, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 5000))
+                if (Creature* Patient = me->SummonCreature(patientEntry, point->x, point->y, point->z, point->o, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 5000))
                 {
                     //303, this flag appear to be required for client side item->spell to work (TARGET_SINGLE_FRIEND)
                     Patient->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP_ATTACKABLE);
 
                     Patients.push_back(Patient->GetGUID());
-                    CAST_AI(npc_injured_patient::npc_injured_patientAI, Patient->AI())->Doctorguid = me->GetGUID();
-
-                    if (Point)
-                        CAST_AI(npc_injured_patient::npc_injured_patientAI, Patient->AI())->Coord = Point;
+                    CAST_AI(npc_injured_patient::npc_injured_patientAI, Patient->AI())->DoctorGUID = me->GetGUID();
+                    CAST_AI(npc_injured_patient::npc_injured_patientAI, Patient->AI())->Coord = point;
 
                     Coordinates.erase(itr);
                 }
             }
-            SummonPatient_Timer = 10000;
+            SummonPatientTimer = 10000;
             ++SummonPatientCount;
-        } else SummonPatient_Timer -= diff;
+        }
+        else
+            SummonPatientTimer -= diff;
     }
 }
 
@@ -880,7 +895,7 @@ enum eGarments
     ENTRY_KORJA             = 12430,
     ENTRY_DG_KEL            = 12428,
 
-    //used by 12429,12423,12427,12430,12428, but signed for 12429
+    //used by 12429, 12423, 12427, 12430, 12428, but signed for 12429
     SAY_COMMON_HEALED       = -1000164,
     SAY_DG_KEL_THANKS       = -1000165,
     SAY_DG_KEL_GOODBYE      = -1000166,
@@ -901,21 +916,21 @@ public:
 
     struct npc_garments_of_questsAI : public npc_escortAI
     {
-        npc_garments_of_questsAI(Creature *c) : npc_escortAI(c) {Reset();}
+        npc_garments_of_questsAI(Creature* creature) : npc_escortAI(creature) {Reset();}
 
-        uint64 caster;
+        uint64 CasterGUID;
 
-        bool bIsHealed;
-        bool bCanRun;
+        bool IsHealed;
+        bool CanRun;
 
         uint32 RunAwayTimer;
 
         void Reset()
         {
-            caster = 0;
+            CasterGUID = 0;
 
-            bIsHealed = false;
-            bCanRun = false;
+            IsHealed = false;
+            CanRun = false;
 
             RunAwayTimer = 5000;
 
@@ -924,9 +939,9 @@ public:
             me->SetHealth(me->CountPctFromMaxHealth(70));
         }
 
-        void EnterCombat(Unit * /*who*/) {}
+        void EnterCombat(Unit* /*who*/) {}
 
-        void SpellHit(Unit* pCaster, const SpellEntry *Spell)
+        void SpellHit(Unit* caster, SpellInfo const* Spell)
         {
             if (Spell->Id == SPELL_LESSER_HEAL_R2 || Spell->Id == SPELL_FORTITUDE_R1)
             {
@@ -935,142 +950,155 @@ public:
                     return;
 
                 //nothing to be done now
-                if (bIsHealed && bCanRun)
+                if (IsHealed && CanRun)
                     return;
 
-                if (pCaster->GetTypeId() == TYPEID_PLAYER)
+                if (Player* player = caster->ToPlayer())
                 {
-                    switch(me->GetEntry())
+                    switch (me->GetEntry())
                     {
                         case ENTRY_SHAYA:
-                            if (CAST_PLR(pCaster)->GetQuestStatus(QUEST_MOON) == QUEST_STATUS_INCOMPLETE)
+                            if (player->GetQuestStatus(QUEST_MOON) == QUEST_STATUS_INCOMPLETE)
                             {
-                                if (bIsHealed && !bCanRun && Spell->Id == SPELL_FORTITUDE_R1)
+                                if (IsHealed && !CanRun && Spell->Id == SPELL_FORTITUDE_R1)
                                 {
-                                    DoScriptText(SAY_SHAYA_THANKS,me,pCaster);
-                                    bCanRun = true;
+                                    DoScriptText(SAY_SHAYA_THANKS, me, caster);
+                                    CanRun = true;
                                 }
-                                else if (!bIsHealed && Spell->Id == SPELL_LESSER_HEAL_R2)
+                                else if (!IsHealed && Spell->Id == SPELL_LESSER_HEAL_R2)
                                 {
-                                    caster = pCaster->GetGUID();
+                                    CasterGUID = caster->GetGUID();
                                     me->SetStandState(UNIT_STAND_STATE_STAND);
-                                    DoScriptText(SAY_COMMON_HEALED,me,pCaster);
-                                    bIsHealed = true;
+                                    DoScriptText(SAY_COMMON_HEALED, me, caster);
+                                    IsHealed = true;
                                 }
                             }
                             break;
                         case ENTRY_ROBERTS:
-                            if (CAST_PLR(pCaster)->GetQuestStatus(QUEST_LIGHT_1) == QUEST_STATUS_INCOMPLETE)
+                            if (player->GetQuestStatus(QUEST_LIGHT_1) == QUEST_STATUS_INCOMPLETE)
                             {
-                                if (bIsHealed && !bCanRun && Spell->Id == SPELL_FORTITUDE_R1)
+                                if (IsHealed && !CanRun && Spell->Id == SPELL_FORTITUDE_R1)
                                 {
-                                    DoScriptText(SAY_ROBERTS_THANKS,me,pCaster);
-                                    bCanRun = true;
+                                    DoScriptText(SAY_ROBERTS_THANKS, me, caster);
+                                    CanRun = true;
                                 }
-                                else if (!bIsHealed && Spell->Id == SPELL_LESSER_HEAL_R2)
+                                else if (!IsHealed && Spell->Id == SPELL_LESSER_HEAL_R2)
                                 {
-                                    caster = pCaster->GetGUID();
+                                    CasterGUID = caster->GetGUID();
                                     me->SetStandState(UNIT_STAND_STATE_STAND);
-                                    DoScriptText(SAY_COMMON_HEALED,me,pCaster);
-                                    bIsHealed = true;
+                                    DoScriptText(SAY_COMMON_HEALED, me, caster);
+                                    IsHealed = true;
                                 }
                             }
                             break;
                         case ENTRY_DOLF:
-                            if (CAST_PLR(pCaster)->GetQuestStatus(QUEST_LIGHT_2) == QUEST_STATUS_INCOMPLETE)
+                            if (player->GetQuestStatus(QUEST_LIGHT_2) == QUEST_STATUS_INCOMPLETE)
                             {
-                                if (bIsHealed && !bCanRun && Spell->Id == SPELL_FORTITUDE_R1)
+                                if (IsHealed && !CanRun && Spell->Id == SPELL_FORTITUDE_R1)
                                 {
-                                    DoScriptText(SAY_DOLF_THANKS,me,pCaster);
-                                    bCanRun = true;
+                                    DoScriptText(SAY_DOLF_THANKS, me, caster);
+                                    CanRun = true;
                                 }
-                                else if (!bIsHealed && Spell->Id == SPELL_LESSER_HEAL_R2)
+                                else if (!IsHealed && Spell->Id == SPELL_LESSER_HEAL_R2)
                                 {
-                                    caster = pCaster->GetGUID();
+                                    CasterGUID = caster->GetGUID();
                                     me->SetStandState(UNIT_STAND_STATE_STAND);
-                                    DoScriptText(SAY_COMMON_HEALED,me,pCaster);
-                                    bIsHealed = true;
+                                    DoScriptText(SAY_COMMON_HEALED, me, caster);
+                                    IsHealed = true;
                                 }
                             }
                             break;
                         case ENTRY_KORJA:
-                            if (CAST_PLR(pCaster)->GetQuestStatus(QUEST_SPIRIT) == QUEST_STATUS_INCOMPLETE)
+                            if (player->GetQuestStatus(QUEST_SPIRIT) == QUEST_STATUS_INCOMPLETE)
                             {
-                                if (bIsHealed && !bCanRun && Spell->Id == SPELL_FORTITUDE_R1)
+                                if (IsHealed && !CanRun && Spell->Id == SPELL_FORTITUDE_R1)
                                 {
-                                    DoScriptText(SAY_KORJA_THANKS,me,pCaster);
-                                    bCanRun = true;
+                                    DoScriptText(SAY_KORJA_THANKS, me, caster);
+                                    CanRun = true;
                                 }
-                                else if (!bIsHealed && Spell->Id == SPELL_LESSER_HEAL_R2)
+                                else if (!IsHealed && Spell->Id == SPELL_LESSER_HEAL_R2)
                                 {
-                                    caster = pCaster->GetGUID();
+                                    CasterGUID = caster->GetGUID();
                                     me->SetStandState(UNIT_STAND_STATE_STAND);
-                                    DoScriptText(SAY_COMMON_HEALED,me,pCaster);
-                                    bIsHealed = true;
+                                    DoScriptText(SAY_COMMON_HEALED, me, caster);
+                                    IsHealed = true;
                                 }
                             }
                             break;
                         case ENTRY_DG_KEL:
-                            if (CAST_PLR(pCaster)->GetQuestStatus(QUEST_DARKNESS) == QUEST_STATUS_INCOMPLETE)
+                            if (player->GetQuestStatus(QUEST_DARKNESS) == QUEST_STATUS_INCOMPLETE)
                             {
-                                if (bIsHealed && !bCanRun && Spell->Id == SPELL_FORTITUDE_R1)
+                                if (IsHealed && !CanRun && Spell->Id == SPELL_FORTITUDE_R1)
                                 {
-                                    DoScriptText(SAY_DG_KEL_THANKS,me,pCaster);
-                                    bCanRun = true;
+                                    DoScriptText(SAY_DG_KEL_THANKS, me, caster);
+                                    CanRun = true;
                                 }
-                                else if (!bIsHealed && Spell->Id == SPELL_LESSER_HEAL_R2)
+                                else if (!IsHealed && Spell->Id == SPELL_LESSER_HEAL_R2)
                                 {
-                                    caster = pCaster->GetGUID();
+                                    CasterGUID = caster->GetGUID();
                                     me->SetStandState(UNIT_STAND_STATE_STAND);
-                                    DoScriptText(SAY_COMMON_HEALED,me,pCaster);
-                                    bIsHealed = true;
+                                    DoScriptText(SAY_COMMON_HEALED, me, caster);
+                                    IsHealed = true;
                                 }
                             }
                             break;
                     }
 
                     //give quest credit, not expect any special quest objectives
-                    if (bCanRun)
-                        CAST_PLR(pCaster)->TalkedToCreature(me->GetEntry(),me->GetGUID());
+                    if (CanRun)
+                        player->TalkedToCreature(me->GetEntry(), me->GetGUID());
                 }
             }
         }
 
-        void WaypointReached(uint32 /*uiPoint*/)
+        void WaypointReached(uint32 /*waypointId*/)
         {
+
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
-            if (bCanRun && !me->isInCombat())
+            if (CanRun && !me->isInCombat())
             {
                 if (RunAwayTimer <= diff)
                 {
-                    if (Unit *pUnit = Unit::GetUnit(*me,caster))
+                    if (Unit* unit = Unit::GetUnit(*me, CasterGUID))
                     {
-                        switch(me->GetEntry())
+                        switch (me->GetEntry())
                         {
-                            case ENTRY_SHAYA: DoScriptText(SAY_SHAYA_GOODBYE,me,pUnit); break;
-                            case ENTRY_ROBERTS: DoScriptText(SAY_ROBERTS_GOODBYE,me,pUnit); break;
-                            case ENTRY_DOLF: DoScriptText(SAY_DOLF_GOODBYE,me,pUnit); break;
-                            case ENTRY_KORJA: DoScriptText(SAY_KORJA_GOODBYE,me,pUnit); break;
-                            case ENTRY_DG_KEL: DoScriptText(SAY_DG_KEL_GOODBYE,me,pUnit); break;
+                            case ENTRY_SHAYA:
+                                DoScriptText(SAY_SHAYA_GOODBYE, me, unit);
+                                break;
+                            case ENTRY_ROBERTS:
+                                DoScriptText(SAY_ROBERTS_GOODBYE, me, unit);
+                                break;
+                            case ENTRY_DOLF:
+                                DoScriptText(SAY_DOLF_GOODBYE, me, unit);
+                                break;
+                            case ENTRY_KORJA:
+                                DoScriptText(SAY_KORJA_GOODBYE, me, unit);
+                                break;
+                            case ENTRY_DG_KEL:
+                                DoScriptText(SAY_DG_KEL_GOODBYE, me, unit);
+                                break;
                         }
 
-                        Start(false,true,true);
+                        Start(false, true, true);
                     }
                     else
                         EnterEvadeMode();                       //something went wrong
 
                     RunAwayTimer = 30000;
-                } else RunAwayTimer -= diff;
+                }
+                else
+                    RunAwayTimer -= diff;
             }
 
             npc_escortAI::UpdateAI(diff);
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_garments_of_questsAI(creature);
     }
@@ -1089,18 +1117,18 @@ public:
 
     struct npc_guardianAI : public ScriptedAI
     {
-        npc_guardianAI(Creature *c) : ScriptedAI(c) {}
+        npc_guardianAI(Creature* creature) : ScriptedAI(creature) {}
 
         void Reset()
         {
             me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
         }
 
-        void UpdateAI(const uint32 /*diff*/)
+        void UpdateAI(uint32 const /*diff*/)
         {
             if (!UpdateVictim())
                 return;
@@ -1113,53 +1141,9 @@ public:
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_guardianAI(creature);
-    }
-};
-
-/*######
-## npc_kingdom_of_dalaran_quests
-######*/
-
-enum eKingdomDalaran
-{
-    SPELL_TELEPORT_DALARAN  = 53360,
-    ITEM_KT_SIGNET          = 39740,
-    QUEST_MAGICAL_KINGDOM_A = 12794,
-    QUEST_MAGICAL_KINGDOM_H = 12791,
-    QUEST_MAGICAL_KINGDOM_N = 12796
-};
-
-#define GOSSIP_ITEM_TELEPORT_TO "I am ready to be teleported to Dalaran."
-
-class npc_kingdom_of_dalaran_quests : public CreatureScript
-{
-public:
-    npc_kingdom_of_dalaran_quests() : CreatureScript("npc_kingdom_of_dalaran_quests") { }
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
-    {
-        if (pCreature->isQuestGiver())
-            pPlayer->PrepareQuestMenu(pCreature->GetGUID());
-
-        if (pPlayer->HasItemCount(ITEM_KT_SIGNET,1) && (!pPlayer->GetQuestRewardStatus(QUEST_MAGICAL_KINGDOM_A) ||
-            !pPlayer->GetQuestRewardStatus(QUEST_MAGICAL_KINGDOM_H) || !pPlayer->GetQuestRewardStatus(QUEST_MAGICAL_KINGDOM_N)))
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_TELEPORT_TO, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-
-        pPlayer->SEND_GOSSIP_MENU(pPlayer->GetGossipTextId(pCreature), pCreature->GetGUID());
-        return true;
-    }
-
-    bool OnGossipSelect(Player* pPlayer, Creature* /*pCreature*/, uint32 /*uiSender*/, uint32 uiAction)
-    {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        if (uiAction == GOSSIP_ACTION_INFO_DEF+1)
-        {
-            pPlayer->CLOSE_GOSSIP_MENU();
-            pPlayer->CastSpell(pPlayer,SPELL_TELEPORT_DALARAN,false);
-        }
-        return true;
     }
 };
 
@@ -1172,15 +1156,14 @@ class npc_mount_vendor : public CreatureScript
 public:
     npc_mount_vendor() : CreatureScript("npc_mount_vendor") { }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (pCreature->isQuestGiver())
-            pPlayer->PrepareQuestMenu(pCreature->GetGUID());
+        if (creature->isQuestGiver())
+            player->PrepareQuestMenu(creature->GetGUID());
 
-        bool canBuy;
-        canBuy = false;
-        uint32 vendor = pCreature->GetEntry();
-        uint8 race = pPlayer->getRace();
+        bool canBuy = false;
+        uint32 vendor = creature->GetEntry();
+        uint8 race = player->getRace();
 
         switch (vendor)
         {
@@ -1188,71 +1171,71 @@ public:
             case 1460:                                          //Unger Statforth
             case 2357:                                          //Merideth Carlson
             case 4885:                                          //Gregor MacVince
-                if (pPlayer->GetReputationRank(72) != REP_EXALTED && race != RACE_HUMAN)
-                    pPlayer->SEND_GOSSIP_MENU(5855, pCreature->GetGUID());
+                if (player->GetReputationRank(72) != REP_EXALTED && race != RACE_HUMAN)
+                    player->SEND_GOSSIP_MENU(5855, creature->GetGUID());
                 else canBuy = true;
                 break;
             case 1261:                                          //Veron Amberstill
-                if (pPlayer->GetReputationRank(47) != REP_EXALTED && race != RACE_DWARF)
-                    pPlayer->SEND_GOSSIP_MENU(5856, pCreature->GetGUID());
+                if (player->GetReputationRank(47) != REP_EXALTED && race != RACE_DWARF)
+                    player->SEND_GOSSIP_MENU(5856, creature->GetGUID());
                 else canBuy = true;
                 break;
             case 3362:                                          //Ogunaro Wolfrunner
-                if (pPlayer->GetReputationRank(76) != REP_EXALTED && race != RACE_ORC)
-                    pPlayer->SEND_GOSSIP_MENU(5841, pCreature->GetGUID());
+                if (player->GetReputationRank(76) != REP_EXALTED && race != RACE_ORC)
+                    player->SEND_GOSSIP_MENU(5841, creature->GetGUID());
                 else canBuy = true;
                 break;
             case 3685:                                          //Harb Clawhoof
-                if (pPlayer->GetReputationRank(81) != REP_EXALTED && race != RACE_TAUREN)
-                    pPlayer->SEND_GOSSIP_MENU(5843, pCreature->GetGUID());
+                if (player->GetReputationRank(81) != REP_EXALTED && race != RACE_TAUREN)
+                    player->SEND_GOSSIP_MENU(5843, creature->GetGUID());
                 else canBuy = true;
                 break;
             case 4730:                                          //Lelanai
-                if (pPlayer->GetReputationRank(69) != REP_EXALTED && race != RACE_NIGHTELF)
-                    pPlayer->SEND_GOSSIP_MENU(5844, pCreature->GetGUID());
+                if (player->GetReputationRank(69) != REP_EXALTED && race != RACE_NIGHTELF)
+                    player->SEND_GOSSIP_MENU(5844, creature->GetGUID());
                 else canBuy = true;
                 break;
             case 4731:                                          //Zachariah Post
-                if (pPlayer->GetReputationRank(68) != REP_EXALTED && race != RACE_UNDEAD_PLAYER)
-                    pPlayer->SEND_GOSSIP_MENU(5840, pCreature->GetGUID());
+                if (player->GetReputationRank(68) != REP_EXALTED && race != RACE_UNDEAD_PLAYER)
+                    player->SEND_GOSSIP_MENU(5840, creature->GetGUID());
                 else canBuy = true;
                 break;
             case 7952:                                          //Zjolnir
-                if (pPlayer->GetReputationRank(530) != REP_EXALTED && race != RACE_TROLL)
-                    pPlayer->SEND_GOSSIP_MENU(5842, pCreature->GetGUID());
+                if (player->GetReputationRank(530) != REP_EXALTED && race != RACE_TROLL)
+                    player->SEND_GOSSIP_MENU(5842, creature->GetGUID());
                 else canBuy = true;
                 break;
             case 7955:                                          //Milli Featherwhistle
-                if (pPlayer->GetReputationRank(54) != REP_EXALTED && race != RACE_GNOME)
-                    pPlayer->SEND_GOSSIP_MENU(5857, pCreature->GetGUID());
+                if (player->GetReputationRank(54) != REP_EXALTED && race != RACE_GNOME)
+                    player->SEND_GOSSIP_MENU(5857, creature->GetGUID());
                 else canBuy = true;
                 break;
             case 16264:                                         //Winaestra
-                if (pPlayer->GetReputationRank(911) != REP_EXALTED && race != RACE_BLOODELF)
-                    pPlayer->SEND_GOSSIP_MENU(10305, pCreature->GetGUID());
+                if (player->GetReputationRank(911) != REP_EXALTED && race != RACE_BLOODELF)
+                    player->SEND_GOSSIP_MENU(10305, creature->GetGUID());
                 else canBuy = true;
                 break;
             case 17584:                                         //Torallius the Pack Handler
-                if (pPlayer->GetReputationRank(930) != REP_EXALTED && race != RACE_DRAENEI)
-                    pPlayer->SEND_GOSSIP_MENU(10239, pCreature->GetGUID());
+                if (player->GetReputationRank(930) != REP_EXALTED && race != RACE_DRAENEI)
+                    player->SEND_GOSSIP_MENU(10239, creature->GetGUID());
                 else canBuy = true;
                 break;
         }
 
         if (canBuy)
         {
-            if (pCreature->isVendor())
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_VENDOR, GOSSIP_TEXT_BROWSE_GOODS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
-            pPlayer->SEND_GOSSIP_MENU(pPlayer->GetGossipTextId(pCreature), pCreature->GetGUID());
+            if (creature->isVendor())
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_VENDOR, GOSSIP_TEXT_BROWSE_GOODS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
+            player->SEND_GOSSIP_MENU(player->GetGossipTextId(creature), creature->GetGUID());
         }
         return true;
     }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 /*uiSender*/, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        if (uiAction == GOSSIP_ACTION_TRADE)
-            pPlayer->SEND_VENDORLIST(pCreature->GetGUID());
+        player->PlayerTalkClass->ClearMenus();
+        if (action == GOSSIP_ACTION_TRADE)
+            player->GetSession()->SendListInventory(creature->GetGUID());
 
         return true;
     }
@@ -1271,66 +1254,66 @@ class npc_rogue_trainer : public CreatureScript
 public:
     npc_rogue_trainer() : CreatureScript("npc_rogue_trainer") { }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (pCreature->isQuestGiver())
-            pPlayer->PrepareQuestMenu(pCreature->GetGUID());
+        if (creature->isQuestGiver())
+            player->PrepareQuestMenu(creature->GetGUID());
 
-        if (pCreature->isTrainer())
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_TRAINER, GOSSIP_TEXT_TRAIN, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRAIN);
+        if (creature->isTrainer())
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_TRAINER, GOSSIP_TEXT_TRAIN, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRAIN);
 
-        if (pCreature->isCanTrainingAndResetTalentsOf(pPlayer))
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_TRAINER, GOSSIP_HELLO_ROGUE1, GOSSIP_SENDER_MAIN, GOSSIP_OPTION_UNLEARNTALENTS);
+        if (creature->isCanTrainingAndResetTalentsOf(player))
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_TRAINER, GOSSIP_HELLO_ROGUE1, GOSSIP_SENDER_MAIN, GOSSIP_OPTION_UNLEARNTALENTS);
 
-        if (!(pPlayer->GetSpecsCount() == 1 && pCreature->isCanTrainingAndResetTalentsOf(pPlayer) && !(pPlayer->getLevel() < sWorld->getIntConfig(CONFIG_MIN_DUALSPEC_LEVEL))))
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_TRAINER, GOSSIP_HELLO_ROGUE3, GOSSIP_SENDER_MAIN, GOSSIP_OPTION_LEARNDUALSPEC);
+        if (player->GetSpecsCount() == 1 && creature->isCanTrainingAndResetTalentsOf(player) && player->getLevel() >= sWorld->getIntConfig(CONFIG_MIN_DUALSPEC_LEVEL))
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_TRAINER, GOSSIP_HELLO_ROGUE3, GOSSIP_SENDER_MAIN, GOSSIP_OPTION_LEARNDUALSPEC);
 
-        if (pPlayer->getClass() == CLASS_ROGUE && pPlayer->getLevel() >= 24 && !pPlayer->HasItemCount(17126,1) && !pPlayer->GetQuestRewardStatus(6681))
+        if (player->getClass() == CLASS_ROGUE && player->getLevel() >= 24 && !player->HasItemCount(17126, 1) && !player->GetQuestRewardStatus(6681))
         {
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HELLO_ROGUE2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-            pPlayer->SEND_GOSSIP_MENU(5996, pCreature->GetGUID());
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HELLO_ROGUE2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+            player->SEND_GOSSIP_MENU(5996, creature->GetGUID());
         } else
-            pPlayer->SEND_GOSSIP_MENU(pPlayer->GetGossipTextId(pCreature), pCreature->GetGUID());
+            player->SEND_GOSSIP_MENU(player->GetGossipTextId(creature), creature->GetGUID());
 
         return true;
     }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 /*uiSender*/, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        switch(uiAction)
+        player->PlayerTalkClass->ClearMenus();
+        switch (action)
         {
-            case GOSSIP_ACTION_INFO_DEF+1:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer,21100,false);
+            case GOSSIP_ACTION_INFO_DEF + 1:
+                player->CLOSE_GOSSIP_MENU();
+                player->CastSpell(player, 21100, false);
                 break;
             case GOSSIP_ACTION_TRAIN:
-                pPlayer->SEND_TRAINERLIST(pCreature->GetGUID());
+                player->GetSession()->SendTrainerList(creature->GetGUID());
                 break;
             case GOSSIP_OPTION_UNLEARNTALENTS:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->SendTalentWipeConfirm(pCreature->GetGUID());
+                player->CLOSE_GOSSIP_MENU();
+                player->SendTalentWipeConfirm(creature->GetGUID());
                 break;
             case GOSSIP_OPTION_LEARNDUALSPEC:
-                if (pPlayer->GetSpecsCount() == 1 && !(pPlayer->getLevel() < sWorld->getIntConfig(CONFIG_MIN_DUALSPEC_LEVEL)))
+                if (player->GetSpecsCount() == 1 && !(player->getLevel() < sWorld->getIntConfig(CONFIG_MIN_DUALSPEC_LEVEL)))
                 {
-                    if (!pPlayer->HasEnoughMoney(10000000))
+                    if (!player->HasEnoughMoney(10000000))
                     {
-                        pPlayer->SendBuyError(BUY_ERR_NOT_ENOUGHT_MONEY, 0, 0, 0);
-                        pPlayer->PlayerTalkClass->CloseGossip();
+                        player->SendBuyError(BUY_ERR_NOT_ENOUGHT_MONEY, 0, 0, 0);
+                        player->PlayerTalkClass->SendCloseGossip();
                         break;
                     }
                     else
                     {
-                        pPlayer->ModifyMoney(-10000000);
+                        player->ModifyMoney(-10000000);
 
                         // Cast spells that teach dual spec
                         // Both are also ImplicitTarget self and must be cast by player
-                        pPlayer->CastSpell(pPlayer,63680,true,NULL,NULL,pPlayer->GetGUID());
-                        pPlayer->CastSpell(pPlayer,63624,true,NULL,NULL,pPlayer->GetGUID());
+                        player->CastSpell(player, 63680, true, NULL, NULL, player->GetGUID());
+                        player->CastSpell(player, 63624, true, NULL, NULL, player->GetGUID());
 
                         // Should show another Gossip text with "Congratulations..."
-                        pPlayer->PlayerTalkClass->CloseGossip();
+                        player->PlayerTalkClass->SendCloseGossip();
                     }
                 }
                 break;
@@ -1377,122 +1360,122 @@ class npc_sayge : public CreatureScript
 public:
     npc_sayge() : CreatureScript("npc_sayge") { }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (pCreature->isQuestGiver())
-            pPlayer->PrepareQuestMenu(pCreature->GetGUID());
+        if (creature->isQuestGiver())
+            player->PrepareQuestMenu(creature->GetGUID());
 
-        if (pPlayer->HasSpellCooldown(SPELL_INT) ||
-            pPlayer->HasSpellCooldown(SPELL_ARM) ||
-            pPlayer->HasSpellCooldown(SPELL_DMG) ||
-            pPlayer->HasSpellCooldown(SPELL_RES) ||
-            pPlayer->HasSpellCooldown(SPELL_STR) ||
-            pPlayer->HasSpellCooldown(SPELL_AGI) ||
-            pPlayer->HasSpellCooldown(SPELL_STM) ||
-            pPlayer->HasSpellCooldown(SPELL_SPI))
-            pPlayer->SEND_GOSSIP_MENU(7393, pCreature->GetGUID());
+        if (player->HasSpellCooldown(SPELL_INT) ||
+            player->HasSpellCooldown(SPELL_ARM) ||
+            player->HasSpellCooldown(SPELL_DMG) ||
+            player->HasSpellCooldown(SPELL_RES) ||
+            player->HasSpellCooldown(SPELL_STR) ||
+            player->HasSpellCooldown(SPELL_AGI) ||
+            player->HasSpellCooldown(SPELL_STM) ||
+            player->HasSpellCooldown(SPELL_SPI))
+            player->SEND_GOSSIP_MENU(7393, creature->GetGUID());
         else
         {
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HELLO_SAYGE, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-            pPlayer->SEND_GOSSIP_MENU(7339, pCreature->GetGUID());
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HELLO_SAYGE, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+            player->SEND_GOSSIP_MENU(7339, creature->GetGUID());
         }
 
         return true;
     }
 
-    void SendAction(Player* pPlayer, Creature* pCreature, uint32 uiAction)
+    void SendAction(Player* player, Creature* creature, uint32 action)
     {
-        switch(uiAction)
+        switch (action)
         {
-            case GOSSIP_ACTION_INFO_DEF+1:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE1,            GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE2,            GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+3);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE3,            GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+4);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE4,            GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+5);
-                pPlayer->SEND_GOSSIP_MENU(7340, pCreature->GetGUID());
+            case GOSSIP_ACTION_INFO_DEF + 1:
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE1,            GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE2,            GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE3,            GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 4);
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE4,            GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 5);
+                player->SEND_GOSSIP_MENU(7340, creature->GetGUID());
                 break;
-            case GOSSIP_ACTION_INFO_DEF+2:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE5,            GOSSIP_SENDER_MAIN+1, GOSSIP_ACTION_INFO_DEF);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE6,            GOSSIP_SENDER_MAIN+2, GOSSIP_ACTION_INFO_DEF);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE7,            GOSSIP_SENDER_MAIN+3, GOSSIP_ACTION_INFO_DEF);
-                pPlayer->SEND_GOSSIP_MENU(7341, pCreature->GetGUID());
+            case GOSSIP_ACTION_INFO_DEF + 2:
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE5,            GOSSIP_SENDER_MAIN + 1, GOSSIP_ACTION_INFO_DEF);
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE6,            GOSSIP_SENDER_MAIN + 2, GOSSIP_ACTION_INFO_DEF);
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE7,            GOSSIP_SENDER_MAIN + 3, GOSSIP_ACTION_INFO_DEF);
+                player->SEND_GOSSIP_MENU(7341, creature->GetGUID());
                 break;
-            case GOSSIP_ACTION_INFO_DEF+3:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE8,            GOSSIP_SENDER_MAIN+4, GOSSIP_ACTION_INFO_DEF);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE9,            GOSSIP_SENDER_MAIN+5, GOSSIP_ACTION_INFO_DEF);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE10,           GOSSIP_SENDER_MAIN+2, GOSSIP_ACTION_INFO_DEF);
-                pPlayer->SEND_GOSSIP_MENU(7361, pCreature->GetGUID());
+            case GOSSIP_ACTION_INFO_DEF + 3:
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE8,            GOSSIP_SENDER_MAIN + 4, GOSSIP_ACTION_INFO_DEF);
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE9,            GOSSIP_SENDER_MAIN + 5, GOSSIP_ACTION_INFO_DEF);
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE10,           GOSSIP_SENDER_MAIN + 2, GOSSIP_ACTION_INFO_DEF);
+                player->SEND_GOSSIP_MENU(7361, creature->GetGUID());
                 break;
-            case GOSSIP_ACTION_INFO_DEF+4:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE11,           GOSSIP_SENDER_MAIN+6, GOSSIP_ACTION_INFO_DEF);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE12,           GOSSIP_SENDER_MAIN+7, GOSSIP_ACTION_INFO_DEF);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE13,           GOSSIP_SENDER_MAIN+8, GOSSIP_ACTION_INFO_DEF);
-                pPlayer->SEND_GOSSIP_MENU(7362, pCreature->GetGUID());
+            case GOSSIP_ACTION_INFO_DEF + 4:
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE11,           GOSSIP_SENDER_MAIN + 6, GOSSIP_ACTION_INFO_DEF);
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE12,           GOSSIP_SENDER_MAIN + 7, GOSSIP_ACTION_INFO_DEF);
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE13,           GOSSIP_SENDER_MAIN + 8, GOSSIP_ACTION_INFO_DEF);
+                player->SEND_GOSSIP_MENU(7362, creature->GetGUID());
                 break;
-            case GOSSIP_ACTION_INFO_DEF+5:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE14,           GOSSIP_SENDER_MAIN+5, GOSSIP_ACTION_INFO_DEF);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE15,           GOSSIP_SENDER_MAIN+4, GOSSIP_ACTION_INFO_DEF);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE16,           GOSSIP_SENDER_MAIN+3, GOSSIP_ACTION_INFO_DEF);
-                pPlayer->SEND_GOSSIP_MENU(7363, pCreature->GetGUID());
+            case GOSSIP_ACTION_INFO_DEF + 5:
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE14,           GOSSIP_SENDER_MAIN + 5, GOSSIP_ACTION_INFO_DEF);
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE15,           GOSSIP_SENDER_MAIN + 4, GOSSIP_ACTION_INFO_DEF);
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE16,           GOSSIP_SENDER_MAIN + 3, GOSSIP_ACTION_INFO_DEF);
+                player->SEND_GOSSIP_MENU(7363, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE17,           GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+6);
-                pPlayer->SEND_GOSSIP_MENU(7364, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_SENDACTION_SAYGE17,           GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 6);
+                player->SEND_GOSSIP_MENU(7364, creature->GetGUID());
                 break;
-            case GOSSIP_ACTION_INFO_DEF+6:
-                pCreature->CastSpell(pPlayer, SPELL_FORTUNE, false);
-                pPlayer->SEND_GOSSIP_MENU(7365, pCreature->GetGUID());
+            case GOSSIP_ACTION_INFO_DEF + 6:
+                creature->CastSpell(player, SPELL_FORTUNE, false);
+                player->SEND_GOSSIP_MENU(7365, creature->GetGUID());
                 break;
         }
     }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 uiSender, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        switch(uiSender)
+        player->PlayerTalkClass->ClearMenus();
+        switch (sender)
         {
             case GOSSIP_SENDER_MAIN:
-                SendAction(pPlayer, pCreature, uiAction);
+                SendAction(player, creature, action);
                 break;
-            case GOSSIP_SENDER_MAIN+1:
-                pCreature->CastSpell(pPlayer, SPELL_DMG, false);
-                pPlayer->AddSpellCooldown(SPELL_DMG,0,time(NULL) + 7200);
-                SendAction(pPlayer, pCreature, uiAction);
+            case GOSSIP_SENDER_MAIN + 1:
+                creature->CastSpell(player, SPELL_DMG, false);
+                player->AddSpellCooldown(SPELL_DMG, 0, time(NULL) + 7200);
+                SendAction(player, creature, action);
                 break;
-            case GOSSIP_SENDER_MAIN+2:
-                pCreature->CastSpell(pPlayer, SPELL_RES, false);
-                pPlayer->AddSpellCooldown(SPELL_RES,0,time(NULL) + 7200);
-                SendAction(pPlayer, pCreature, uiAction);
+            case GOSSIP_SENDER_MAIN + 2:
+                creature->CastSpell(player, SPELL_RES, false);
+                player->AddSpellCooldown(SPELL_RES, 0, time(NULL) + 7200);
+                SendAction(player, creature, action);
                 break;
-            case GOSSIP_SENDER_MAIN+3:
-                pCreature->CastSpell(pPlayer, SPELL_ARM, false);
-                pPlayer->AddSpellCooldown(SPELL_ARM,0,time(NULL) + 7200);
-                SendAction(pPlayer, pCreature, uiAction);
+            case GOSSIP_SENDER_MAIN + 3:
+                creature->CastSpell(player, SPELL_ARM, false);
+                player->AddSpellCooldown(SPELL_ARM, 0, time(NULL) + 7200);
+                SendAction(player, creature, action);
                 break;
-            case GOSSIP_SENDER_MAIN+4:
-                pCreature->CastSpell(pPlayer, SPELL_SPI, false);
-                pPlayer->AddSpellCooldown(SPELL_SPI,0,time(NULL) + 7200);
-                SendAction(pPlayer, pCreature, uiAction);
+            case GOSSIP_SENDER_MAIN + 4:
+                creature->CastSpell(player, SPELL_SPI, false);
+                player->AddSpellCooldown(SPELL_SPI, 0, time(NULL) + 7200);
+                SendAction(player, creature, action);
                 break;
-            case GOSSIP_SENDER_MAIN+5:
-                pCreature->CastSpell(pPlayer, SPELL_INT, false);
-                pPlayer->AddSpellCooldown(SPELL_INT,0,time(NULL) + 7200);
-                SendAction(pPlayer, pCreature, uiAction);
+            case GOSSIP_SENDER_MAIN + 5:
+                creature->CastSpell(player, SPELL_INT, false);
+                player->AddSpellCooldown(SPELL_INT, 0, time(NULL) + 7200);
+                SendAction(player, creature, action);
                 break;
-            case GOSSIP_SENDER_MAIN+6:
-                pCreature->CastSpell(pPlayer, SPELL_STM, false);
-                pPlayer->AddSpellCooldown(SPELL_STM,0,time(NULL) + 7200);
-                SendAction(pPlayer, pCreature, uiAction);
+            case GOSSIP_SENDER_MAIN + 6:
+                creature->CastSpell(player, SPELL_STM, false);
+                player->AddSpellCooldown(SPELL_STM, 0, time(NULL) + 7200);
+                SendAction(player, creature, action);
                 break;
-            case GOSSIP_SENDER_MAIN+7:
-                pCreature->CastSpell(pPlayer, SPELL_STR, false);
-                pPlayer->AddSpellCooldown(SPELL_STR,0,time(NULL) + 7200);
-                SendAction(pPlayer, pCreature, uiAction);
+            case GOSSIP_SENDER_MAIN + 7:
+                creature->CastSpell(player, SPELL_STR, false);
+                player->AddSpellCooldown(SPELL_STR, 0, time(NULL) + 7200);
+                SendAction(player, creature, action);
                 break;
-            case GOSSIP_SENDER_MAIN+8:
-                pCreature->CastSpell(pPlayer, SPELL_AGI, false);
-                pPlayer->AddSpellCooldown(SPELL_AGI,0,time(NULL) + 7200);
-                SendAction(pPlayer, pCreature, uiAction);
+            case GOSSIP_SENDER_MAIN + 8:
+                creature->CastSpell(player, SPELL_AGI, false);
+                player->AddSpellCooldown(SPELL_AGI, 0, time(NULL) + 7200);
+                SendAction(player, creature, action);
                 break;
         }
         return true;
@@ -1506,10 +1489,10 @@ public:
 
     struct npc_steam_tonkAI : public ScriptedAI
     {
-        npc_steam_tonkAI(Creature *c) : ScriptedAI(c) {}
+        npc_steam_tonkAI(Creature* creature) : ScriptedAI(creature) {}
 
         void Reset() {}
-        void EnterCombat(Unit * /*who*/) {}
+        void EnterCombat(Unit* /*who*/) {}
 
         void OnPossess(bool apply)
         {
@@ -1524,10 +1507,9 @@ public:
             else
                 me->SetReactState(REACT_AGGRESSIVE);
         }
-
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_steam_tonkAI(creature);
     }
@@ -1542,7 +1524,7 @@ public:
 
     struct npc_tonk_mineAI : public ScriptedAI
     {
-        npc_tonk_mineAI(Creature *c) : ScriptedAI(c)
+        npc_tonk_mineAI(Creature* creature) : ScriptedAI(creature)
         {
             me->SetReactState(REACT_PASSIVE);
         }
@@ -1554,22 +1536,23 @@ public:
             ExplosionTimer = 3000;
         }
 
-        void EnterCombat(Unit * /*who*/) {}
-        void AttackStart(Unit * /*who*/) {}
-        void MoveInLineOfSight(Unit * /*who*/) {}
+        void EnterCombat(Unit* /*who*/) {}
+        void AttackStart(Unit* /*who*/) {}
+        void MoveInLineOfSight(Unit* /*who*/) {}
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
             if (ExplosionTimer <= diff)
             {
                 DoCast(me, SPELL_TONK_MINE_DETONATE, true);
                 me->setDeathState(DEAD); // unsummon it
-            } else
+            }
+            else
                 ExplosionTimer -= diff;
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_tonk_mineAI(creature);
     }
@@ -1586,18 +1569,18 @@ public:
 
     struct npc_brewfest_revelerAI : public ScriptedAI
     {
-        npc_brewfest_revelerAI(Creature* c) : ScriptedAI(c) {}
-        void ReceiveEmote(Player* pPlayer, uint32 emote)
+        npc_brewfest_revelerAI(Creature* creature) : ScriptedAI(creature) {}
+        void ReceiveEmote(Player* player, uint32 emote)
         {
             if (!IsHolidayActive(HOLIDAY_BREWFEST))
                 return;
 
-            if (emote == TEXTEMOTE_DANCE)
-                me->CastSpell(pPlayer, 41586, false);
+            if (emote == TEXT_EMOTE_DANCE)
+                me->CastSpell(player, 41586, false);
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_brewfest_revelerAI(creature);
     }
@@ -1607,40 +1590,44 @@ public:
 ## npc_winter_reveler
 ####*/
 
+enum WinterReveler
+{
+    SPELL_MISTLETOE_DEBUFF       = 26218,
+    SPELL_CREATE_MISTLETOE       = 26206,
+    SPELL_CREATE_HOLLY           = 26207,
+    SPELL_CREATE_SNOWFLAKES      = 45036,
+};
+
 class npc_winter_reveler : public CreatureScript
 {
-public:
-    npc_winter_reveler() : CreatureScript("npc_winter_reveler") { }
+    public:
+        npc_winter_reveler() : CreatureScript("npc_winter_reveler") { }
 
-    struct npc_winter_revelerAI : public ScriptedAI
-    {
-        npc_winter_revelerAI(Creature* c) : ScriptedAI(c) {}
-        void ReceiveEmote(Player* pPlayer, uint32 emote)
+        struct npc_winter_revelerAI : public ScriptedAI
         {
-            if (!IsHolidayActive(HOLIDAY_FEAST_OF_WINTER_VEIL))
-                return;
-            //TODO: check auralist.
-            if (pPlayer->HasAura(26218))
-                return;
+            npc_winter_revelerAI(Creature* creature) : ScriptedAI(creature) {}
 
-            if (emote == TEXTEMOTE_KISS)
+            void ReceiveEmote(Player* player, uint32 emote)
             {
-                me->CastSpell(me, 26218, false);
-                pPlayer->CastSpell(pPlayer, 26218, false);
-                switch (urand(0,2))
+                if (player->HasAura(SPELL_MISTLETOE_DEBUFF))
+                    return;
+
+                if (!IsHolidayActive(HOLIDAY_FEAST_OF_WINTER_VEIL))
+                    return;
+
+                if (emote == TEXT_EMOTE_KISS)
                 {
-                    case 0: me->CastSpell(pPlayer, 26207, false); break;
-                    case 1: me->CastSpell(pPlayer, 26206, false); break;
-                    case 2: me->CastSpell(pPlayer, 45036, false); break;
+                    uint32 spellId = RAND<uint32>(SPELL_CREATE_MISTLETOE, SPELL_CREATE_HOLLY, SPELL_CREATE_SNOWFLAKES);
+                    me->CastSpell(player, spellId, false);
+                    me->CastSpell(player, SPELL_MISTLETOE_DEBUFF, false);
                 }
             }
-        }
-    };
+        };
 
-    CreatureAI *GetAI(Creature *creature) const
-    {
-        return new npc_winter_revelerAI(creature);
-    }
+        CreatureAI* GetAI(Creature* creature) const
+        {
+            return new npc_winter_revelerAI(creature);
+        }
 };
 
 /*####
@@ -1656,8 +1643,6 @@ public:
 
 #define C_VIPER 19921
 
-#define RAND 5
-
 class npc_snake_trap : public CreatureScript
 {
 public:
@@ -1665,41 +1650,38 @@ public:
 
     struct npc_snake_trap_serpentsAI : public ScriptedAI
     {
-        npc_snake_trap_serpentsAI(Creature *c) : ScriptedAI(c) {}
+        npc_snake_trap_serpentsAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 SpellTimer;
         bool IsViper;
 
-        void EnterCombat(Unit * /*who*/) {}
+        void EnterCombat(Unit* /*who*/) {}
 
         void Reset()
         {
             SpellTimer = 0;
 
-            CreatureInfo const *Info = me->GetCreatureInfo();
+            CreatureTemplate const* Info = me->GetCreatureTemplate();
 
-            if (Info->Entry == C_VIPER)
-                IsViper = true;
-            else
-                IsViper = false;
+            IsViper = Info->Entry == C_VIPER ? true : false;
 
             me->SetMaxHealth(uint32(107 * (me->getLevel() - 40) * 0.025f));
             //Add delta to make them not all hit the same time
             uint32 delta = (rand() % 7) * 100;
             me->SetStatFloatValue(UNIT_FIELD_BASEATTACKTIME, float(Info->baseattacktime + delta));
-            me->SetStatFloatValue(UNIT_FIELD_RANGED_ATTACK_POWER , float(Info->attackpower));
+            me->SetStatFloatValue(UNIT_FIELD_RANGED_ATTACK_POWER, float(Info->attackpower));
 
             // Start attacking attacker of owner on first ai update after spawn - move in line of sight may choose better target
             if (!me->getVictim() && me->isSummon())
-                if (Unit * Owner = CAST_SUM(me)->GetSummoner())
+                if (Unit* Owner = me->ToTempSummon()->GetSummoner())
                     if (Owner->getAttackerForHelper())
                         AttackStart(Owner->getAttackerForHelper());
         }
 
         //Redefined for random target selection:
-        void MoveInLineOfSight(Unit *who)
+        void MoveInLineOfSight(Unit* who)
         {
-            if (!me->getVictim() && who->isTargetableForAttack() && (me->IsHostileTo(who)) && who->isInAccessiblePlaceFor(me))
+            if (!me->getVictim() && me->canCreatureAttack(who))
             {
                 if (me->GetDistanceZ(who) > CREATURE_Z_ATTACK_RANGE)
                     return;
@@ -1707,7 +1689,7 @@ public:
                 float attackRadius = me->GetAttackDistance(who);
                 if (me->IsWithinDistInMap(who, attackRadius) && me->IsWithinLOSInMap(who))
                 {
-                    if (!(rand() % RAND))
+                    if (!(rand() % 5))
                     {
                         me->setAttackTimer(BASE_ATTACK, (rand() % 10) * 100);
                         SpellTimer = (rand() % 10) * 100;
@@ -1717,19 +1699,25 @@ public:
             }
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
             if (!UpdateVictim())
                 return;
+
+            if (me->getVictim()->HasBreakableByDamageCrowdControlAura(me))
+            {
+                me->InterruptNonMeleeSpells(false);
+                return;
+            }
 
             if (SpellTimer <= diff)
             {
                 if (IsViper) //Viper
                 {
-                    if (urand(0,2) == 0) //33% chance to cast
+                    if (urand(0, 2) == 0) //33% chance to cast
                     {
                         uint32 spell;
-                        if (urand(0,1) == 0)
+                        if (urand(0, 1) == 0)
                             spell = SPELL_MIND_NUMBING_POISON;
                         else
                             spell = SPELL_CRIPPLING_POISON;
@@ -1741,16 +1729,19 @@ public:
                 }
                 else //Venomous Snake
                 {
-                    if (urand(0,2) == 0) //33% chance to cast
+                    if (urand(0, 2) == 0) //33% chance to cast
                         DoCast(me->getVictim(), SPELL_DEADLY_POISON);
-                    SpellTimer = VENOMOUS_SNAKE_TIMER + (rand() %5)*100;
+                    SpellTimer = VENOMOUS_SNAKE_TIMER + (rand() % 5) * 100;
                 }
-            } else SpellTimer -= diff;
+            }
+            else
+                SpellTimer -= diff;
+
             DoMeleeAttackIfReady();
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_snake_trap_serpentsAI(creature);
     }
@@ -1773,7 +1764,7 @@ public:
 
     struct mob_mojoAI : public ScriptedAI
     {
-        mob_mojoAI(Creature *c) : ScriptedAI(c) {Reset();}
+        mob_mojoAI(Creature* creature) : ScriptedAI(creature) {Reset();}
         uint32 hearts;
         uint64 victimGUID;
         void Reset()
@@ -1781,10 +1772,12 @@ public:
             victimGUID = 0;
             hearts = 15000;
             if (Unit* own = me->GetOwner())
-                me->GetMotionMaster()->MoveFollow(own,0,0);
+                me->GetMotionMaster()->MoveFollow(own, 0, 0);
         }
-        void EnterCombat(Unit * /*who*/){}
-        void UpdateAI(const uint32 diff)
+
+        void EnterCombat(Unit* /*who*/){}
+
+        void UpdateAI(uint32 const diff)
         {
             if (me->HasAura(20372))
             {
@@ -1795,47 +1788,60 @@ public:
                 } hearts -= diff;
             }
         }
-        void ReceiveEmote(Player* pPlayer, uint32 emote)
+
+        void ReceiveEmote(Player* player, uint32 emote)
         {
             me->HandleEmoteCommand(emote);
             Unit* own = me->GetOwner();
-            if (!own || own->GetTypeId() != TYPEID_PLAYER || CAST_PLR(own)->GetTeam() != pPlayer->GetTeam())
+            if (!own || own->GetTypeId() != TYPEID_PLAYER || CAST_PLR(own)->GetTeam() != player->GetTeam())
                 return;
-            if (emote == TEXTEMOTE_KISS)
+            if (emote == TEXT_EMOTE_KISS)
             {
                 std::string whisp = "";
-                switch (rand()%8)
+                switch (rand() % 8)
                 {
-                    case 0:whisp.append(SAY_RANDOM_MOJO0);break;
-                    case 1:whisp.append(SAY_RANDOM_MOJO1);break;
-                    case 2:whisp.append(SAY_RANDOM_MOJO2);break;
-                    case 3:whisp.append(SAY_RANDOM_MOJO3);break;
-                    case 4:whisp.append(SAY_RANDOM_MOJO4);break;
-                    case 5:whisp.append(SAY_RANDOM_MOJO5);break;
+                    case 0:
+                        whisp.append(SAY_RANDOM_MOJO0);
+                        break;
+                    case 1:
+                        whisp.append(SAY_RANDOM_MOJO1);
+                        break;
+                    case 2:
+                        whisp.append(SAY_RANDOM_MOJO2);
+                        break;
+                    case 3:
+                        whisp.append(SAY_RANDOM_MOJO3);
+                        break;
+                    case 4:
+                        whisp.append(SAY_RANDOM_MOJO4);
+                        break;
+                    case 5:
+                        whisp.append(SAY_RANDOM_MOJO5);
+                        break;
                     case 6:
                         whisp.append(SAY_RANDOM_MOJO6a);
-                        whisp.append(pPlayer->GetName());
+                        whisp.append(player->GetName());
                         whisp.append(SAY_RANDOM_MOJO6b);
                         break;
-                    case 7:whisp.append(SAY_RANDOM_MOJO7);break;
+                    case 7:
+                        whisp.append(SAY_RANDOM_MOJO7);
+                        break;
                 }
-                me->MonsterWhisper(whisp.c_str(),pPlayer->GetGUID());
+
+                me->MonsterWhisper(whisp.c_str(), player->GetGUID());
                 if (victimGUID)
-                {
-                    Player* victim = Unit::GetPlayer(*me, victimGUID);
-                    if (victim)
+                    if (Player* victim = Unit::GetPlayer(*me, victimGUID))
                         victim->RemoveAura(43906);//remove polymorph frog thing
-                }
-                me->AddAura(43906,pPlayer);//add polymorph frog thing
-                victimGUID = pPlayer->GetGUID();
+                me->AddAura(43906, player);//add polymorph frog thing
+                victimGUID = player->GetGUID();
                 DoCast(me, 20372, true);//tag.hearts
-                me->GetMotionMaster()->MoveFollow(pPlayer,0,0);
+                me->GetMotionMaster()->MoveFollow(player, 0, 0);
                 hearts = 15000;
             }
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new mob_mojoAI(creature);
     }
@@ -1848,12 +1854,12 @@ public:
 
     struct npc_mirror_imageAI : CasterAI
     {
-        npc_mirror_imageAI(Creature *c) : CasterAI(c) {}
+        npc_mirror_imageAI(Creature* creature) : CasterAI(creature) {}
 
         void InitializeAI()
         {
             CasterAI::InitializeAI();
-            Unit * owner = me->GetOwner();
+            Unit* owner = me->GetOwner();
             if (!owner)
                 return;
             // Inherit Master's Threat List (not yet implemented)
@@ -1870,10 +1876,10 @@ public:
             if (me->IsInEvadeMode() || !me->isAlive())
                 return;
 
-            Unit *owner = me->GetCharmerOrOwner();
+            Unit* owner = me->GetCharmerOrOwner();
 
             me->CombatStop(true);
-            if (owner && !me->HasUnitState(UNIT_STAT_FOLLOW))
+            if (owner && !me->HasUnitState(UNIT_STATE_FOLLOW))
             {
                 me->GetMotionMaster()->Clear(false);
                 me->GetMotionMaster()->MoveFollow(owner, PET_FOLLOW_DIST, me->GetFollowAngle(), MOTION_SLOT_ACTIVE);
@@ -1881,7 +1887,7 @@ public:
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_mirror_imageAI(creature);
     }
@@ -1894,15 +1900,15 @@ public:
 
     struct npc_ebon_gargoyleAI : CasterAI
     {
-        npc_ebon_gargoyleAI(Creature *c) : CasterAI(c) {}
+        npc_ebon_gargoyleAI(Creature* creature) : CasterAI(creature) {}
 
         uint32 despawnTimer;
 
         void InitializeAI()
         {
             CasterAI::InitializeAI();
-            Unit * owner = me->GetOwner();
-            if (!owner)
+            uint64 ownerGuid = me->GetOwnerGUID();
+            if (!ownerGuid)
                 return;
             // Not needed to be despawned now
             despawnTimer = 0;
@@ -1912,27 +1918,27 @@ public:
             Trinity::UnitListSearcher<Trinity::AnyUnfriendlyUnitInObjectRangeCheck> searcher(me, targets, u_check);
             me->VisitNearbyObject(30, searcher);
             for (std::list<Unit*>::const_iterator iter = targets.begin(); iter != targets.end(); ++iter)
-                if ((*iter)->GetAura(49206,owner->GetGUID()))
+                if ((*iter)->GetAura(49206, ownerGuid))
                 {
-                    me->Attack((*iter),false);
+                    me->Attack((*iter), false);
                     break;
                 }
         }
 
-        void JustDied(Unit * /*killer*/)
+        void JustDied(Unit* /*killer*/)
         {
             // Stop Feeding Gargoyle when it dies
-            if (Unit *owner = me->GetOwner())
+            if (Unit* owner = me->GetOwner())
                 owner->RemoveAurasDueToSpell(50514);
         }
 
         // Fly away when dismissed
-        void SpellHit(Unit *source, const SpellEntry *spell)
+        void SpellHit(Unit* source, SpellInfo const* spell)
         {
             if (spell->Id != 50515 || !me->isAlive())
                 return;
 
-            Unit *owner = me->GetOwner();
+            Unit* owner = me->GetOwner();
 
             if (!owner || owner != source)
                 return;
@@ -1943,6 +1949,7 @@ public:
             me->CastSpell(me, 54661, true);
             me->SetReactState(REACT_PASSIVE);
 
+            //! HACK: Creature's can't have MOVEMENTFLAG_FLYING
             // Fly Away
             me->AddUnitMovementFlag(MOVEMENTFLAG_CAN_FLY|MOVEMENTFLAG_ASCENDING|MOVEMENTFLAG_FLYING);
             me->SetSpeed(MOVE_FLIGHT, 0.75f, true);
@@ -1964,16 +1971,14 @@ public:
                 if (despawnTimer > diff)
                     despawnTimer -= diff;
                 else
-                {
-                    me->ForcedDespawn();
-                }
+                    me->DespawnOrUnsummon();
                 return;
             }
             CasterAI::UpdateAI(diff);
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_ebon_gargoyleAI(creature);
     }
@@ -1981,23 +1986,31 @@ public:
 
 class npc_lightwell : public CreatureScript
 {
-public:
-    npc_lightwell() : CreatureScript("npc_lightwell") { }
+    public:
+        npc_lightwell() : CreatureScript("npc_lightwell") { }
 
-    struct npc_lightwellAI : public PassiveAI
-    {
-        npc_lightwellAI(Creature *c) : PassiveAI(c) {}
-
-        void Reset()
+        struct npc_lightwellAI : public PassiveAI
         {
-            DoCast(me, 59907, false); // Spell for Lightwell Charges
-        }
-    };
+            npc_lightwellAI(Creature* creature) : PassiveAI(creature)
+            {
+                DoCast(me, 59907, false);
+            }
 
-    CreatureAI *GetAI(Creature *creature) const
-    {
-        return new npc_lightwellAI(creature);
-    }
+            void EnterEvadeMode()
+            {
+                if (!me->isAlive())
+                    return;
+
+                me->DeleteThreatList();
+                me->CombatStop(true);
+                me->ResetPlayerDamageReq();
+            }
+        };
+
+        CreatureAI* GetAI(Creature* creature) const
+        {
+            return new npc_lightwellAI(creature);
+        }
 };
 
 enum eTrainingDummy
@@ -2013,22 +2026,22 @@ public:
 
     struct npc_training_dummyAI : Scripted_NoMovementAI
     {
-        npc_training_dummyAI(Creature* pCreature) : Scripted_NoMovementAI(pCreature)
+        npc_training_dummyAI(Creature* creature) : Scripted_NoMovementAI(creature)
         {
-            uiEntry = pCreature->GetEntry();
+            entry = creature->GetEntry();
         }
 
-        uint32 uiEntry;
-        uint32 uiResetTimer;
-        uint32 uiDespawnTimer;
+        uint32 entry;
+        uint32 resetTimer;
+        uint32 despawnTimer;
 
         void Reset()
         {
-            me->SetControlled(true,UNIT_STAT_STUNNED);//disable rotate
+            me->SetControlled(true, UNIT_STATE_STUNNED);//disable rotate
             me->ApplySpellImmune(0, IMMUNITY_EFFECT, SPELL_EFFECT_KNOCK_BACK, true);//imune to knock aways like blast wave
 
-            uiResetTimer = 5000;
-            uiDespawnTimer = 15000;
+            resetTimer = 5000;
+            despawnTimer = 15000;
         }
 
         void EnterEvadeMode()
@@ -2039,51 +2052,51 @@ public:
             Reset();
         }
 
-        void DamageTaken(Unit * /*done_by*/, uint32 &damage)
+        void DamageTaken(Unit* /*doneBy*/, uint32& damage)
         {
-            uiResetTimer = 5000;
+            resetTimer = 5000;
             damage = 0;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
-            if (uiEntry != NPC_ADVANCED_TARGET_DUMMY && uiEntry != NPC_TARGET_DUMMY)
+            if (entry != NPC_ADVANCED_TARGET_DUMMY && entry != NPC_TARGET_DUMMY)
                 return;
         }
 
-        void UpdateAI(const uint32 uiDiff)
+        void UpdateAI(uint32 const diff)
         {
             if (!UpdateVictim())
                 return;
 
-            if (!me->HasUnitState(UNIT_STAT_STUNNED))
-                me->SetControlled(true,UNIT_STAT_STUNNED);//disable rotate
+            if (!me->HasUnitState(UNIT_STATE_STUNNED))
+                me->SetControlled(true, UNIT_STATE_STUNNED);//disable rotate
 
-            if (uiEntry != NPC_ADVANCED_TARGET_DUMMY && uiEntry != NPC_TARGET_DUMMY)
+            if (entry != NPC_ADVANCED_TARGET_DUMMY && entry != NPC_TARGET_DUMMY)
             {
-                if (uiResetTimer <= uiDiff)
+                if (resetTimer <= diff)
                 {
                     EnterEvadeMode();
-                    uiResetTimer = 5000;
+                    resetTimer = 5000;
                 }
                 else
-                    uiResetTimer -= uiDiff;
+                    resetTimer -= diff;
                 return;
             }
             else
             {
-                if (uiDespawnTimer <= uiDiff)
-                    me->ForcedDespawn();
+                if (despawnTimer <= diff)
+                    me->DespawnOrUnsummon();
                 else
-                    uiDespawnTimer -= uiDiff;
+                    despawnTimer -= diff;
             }
         }
-        void MoveInLineOfSight(Unit * /*who*/){return;}
+        void MoveInLineOfSight(Unit* /*who*/){return;}
     };
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_training_dummyAI(pCreature);
+        return new npc_training_dummyAI(creature);
     }
 };
 
@@ -2095,33 +2108,142 @@ public:
 
 class npc_shadowfiend : public CreatureScript
 {
-public:
-    npc_shadowfiend() : CreatureScript("npc_shadowfiend") { }
+    public:
+        npc_shadowfiend() : CreatureScript("npc_shadowfiend") { }
 
-    struct npc_shadowfiendAI : public ScriptedAI
-    {
-        npc_shadowfiendAI(Creature* pCreature) : ScriptedAI(pCreature) {}
-
-        void DamageTaken(Unit* /*pKiller*/, uint32 &damage)
+        struct npc_shadowfiendAI : public PetAI
         {
-            if (me->isSummon())
-                if (Unit* pOwner = CAST_SUM(me)->GetSummoner())
-                {
-                    if (pOwner->HasAura(GLYPH_OF_SHADOWFIEND))
-                        if (damage >= me->GetHealth())
-                            pOwner->CastSpell(pOwner,GLYPH_OF_SHADOWFIEND_MANA,true);
-                }
+            npc_shadowfiendAI(Creature* creature) : PetAI(creature) {}
+
+            void JustDied(Unit* killer)
+            {
+                if (me->isSummon())
+                    if (Unit* owner = me->ToTempSummon()->GetSummoner())
+                        if (owner->HasAura(GLYPH_OF_SHADOWFIEND))
+                            owner->CastSpell(owner, GLYPH_OF_SHADOWFIEND_MANA, true);
+
+                PetAI::JustDied(killer);
+            }
+        };
+
+        CreatureAI* GetAI(Creature* creature) const
+        {
+            return new npc_shadowfiendAI(creature);
+        }
+};
+
+/*######
+# npc_fire_elemental
+######*/
+#define SPELL_FIRENOVA        12470
+#define SPELL_FIRESHIELD      13376
+#define SPELL_FIREBLAST       57984
+
+class npc_fire_elemental : public CreatureScript
+{
+public:
+    npc_fire_elemental() : CreatureScript("npc_fire_elemental") { }
+
+    struct npc_fire_elementalAI : public ScriptedAI
+    {
+        npc_fire_elementalAI(Creature* creature) : ScriptedAI(creature) {}
+
+        uint32 FireNova_Timer;
+        uint32 FireShield_Timer;
+        uint32 FireBlast_Timer;
+
+        void Reset()
+        {
+            FireNova_Timer = 5000 + rand() % 15000; // 5-20 sec cd
+            FireBlast_Timer = 5000 + rand() % 15000; // 5-20 sec cd
+            FireShield_Timer = 0;
+            me->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_FIRE, true);
         }
 
-        void UpdateAI(const uint32 /*diff*/)
+        void UpdateAI(const uint32 diff)
         {
+            if (!UpdateVictim())
+                return;
+
+            if (me->HasUnitState(UNIT_STATE_CASTING))
+                return;
+
+            if (FireShield_Timer <= diff)
+            {
+                DoCast(me->getVictim(), SPELL_FIRESHIELD);
+                FireShield_Timer = 2 * IN_MILLISECONDS;
+            }
+            else
+                FireShield_Timer -= diff;
+
+            if (FireBlast_Timer <= diff)
+            {
+                DoCast(me->getVictim(), SPELL_FIREBLAST);
+                FireBlast_Timer = 5000 + rand() % 15000; // 5-20 sec cd
+            }
+            else
+                FireBlast_Timer -= diff;
+
+            if (FireNova_Timer <= diff)
+            {
+                DoCast(me->getVictim(), SPELL_FIRENOVA);
+                FireNova_Timer = 5000 + rand() % 15000; // 5-20 sec cd
+            }
+            else
+                FireNova_Timer -= diff;
+
             DoMeleeAttackIfReady();
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_shadowfiendAI(creature);
+        return new npc_fire_elementalAI(creature);
+    }
+};
+
+/*######
+# npc_earth_elemental
+######*/
+#define SPELL_ANGEREDEARTH        36213
+
+class npc_earth_elemental : public CreatureScript
+{
+public:
+    npc_earth_elemental() : CreatureScript("npc_earth_elemental") { }
+
+    struct npc_earth_elementalAI : public ScriptedAI
+    {
+        npc_earth_elementalAI(Creature* creature) : ScriptedAI(creature) {}
+
+        uint32 AngeredEarth_Timer;
+
+        void Reset()
+        {
+            AngeredEarth_Timer = 0;
+            me->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_NATURE, true);
+        }
+
+        void UpdateAI(const uint32 diff)
+        {
+            if (!UpdateVictim())
+                return;
+
+            if (AngeredEarth_Timer <= diff)
+            {
+                DoCast(me->getVictim(), SPELL_ANGEREDEARTH);
+                AngeredEarth_Timer = 5000 + rand() % 15000; // 5-20 sec cd
+            }
+            else
+                AngeredEarth_Timer -= diff;
+
+            DoMeleeAttackIfReady();
+        }
+    };
+
+    CreatureAI* GetAI(Creature* creature) const
+    {
+        return new npc_earth_elementalAI(creature);
     }
 };
 
@@ -2129,78 +2251,111 @@ public:
 # npc_wormhole
 ######*/
 
-#define GOSSIP_ENGINEERING1   "Borean Tundra."
-#define GOSSIP_ENGINEERING2   "Howling Fjord."
-#define GOSSIP_ENGINEERING3   "Sholazar Basin."
-#define GOSSIP_ENGINEERING4   "Icecrown."
-#define GOSSIP_ENGINEERING5   "Storm Peaks."
+#define GOSSIP_ENGINEERING1   "Borean Tundra"
+#define GOSSIP_ENGINEERING2   "Howling Fjord"
+#define GOSSIP_ENGINEERING3   "Sholazar Basin"
+#define GOSSIP_ENGINEERING4   "Icecrown"
+#define GOSSIP_ENGINEERING5   "Storm Peaks"
+#define GOSSIP_ENGINEERING6   "Underground..."
 
-enum eWormhole
+enum WormholeSpells
 {
-    SPELL_HOWLING_FJORD         = 67838,
+    SPELL_BOREAN_TUNDRA         = 67834,
     SPELL_SHOLAZAR_BASIN        = 67835,
     SPELL_ICECROWN              = 67836,
     SPELL_STORM_PEAKS           = 67837,
+    SPELL_HOWLING_FJORD         = 67838,
+    SPELL_UNDERGROUND           = 68081,
 
-    TEXT_WORMHOLE               = 907
+    TEXT_WORMHOLE               = 907,
+
+    DATA_SHOW_UNDERGROUND       = 1,
 };
 
 class npc_wormhole : public CreatureScript
 {
-public:
-    npc_wormhole() : CreatureScript("npc_wormhole") { }
+    public:
+        npc_wormhole() : CreatureScript("npc_wormhole") {}
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
-    {
-        if (pCreature->isSummon())
+        struct npc_wormholeAI : public PassiveAI
         {
-            if (pPlayer == CAST_SUM(pCreature)->GetSummoner())
+            npc_wormholeAI(Creature* creature) : PassiveAI(creature) {}
+
+            void InitializeAI()
             {
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ENGINEERING1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ENGINEERING2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ENGINEERING3, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+3);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ENGINEERING4, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+4);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ENGINEERING5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+5);
-
-                pPlayer->PlayerTalkClass->SendGossipMenu(TEXT_WORMHOLE, pCreature->GetGUID());
+                _showUnderground = urand(0, 100) == 0; // Guessed value, it is really rare though
             }
-        }
-        return true;
-    }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* /*pCreature*/, uint32 /*uiSender*/, uint32 uiAction)
-    {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        bool roll = urand(0,1);
+            uint32 GetData(uint32 type)
+            {
+                return (type == DATA_SHOW_UNDERGROUND && _showUnderground) ? 1 : 0;
+            }
 
-        switch(uiAction)
+        private:
+            bool _showUnderground;
+        };
+
+        bool OnGossipHello(Player* player, Creature* creature)
         {
-            case GOSSIP_ACTION_INFO_DEF + 1: //Borean Tundra
-                pPlayer->CLOSE_GOSSIP_MENU();
-                if (roll) //At the moment we don't have chance on spell_target_position table so we hack this
-                    pPlayer->TeleportTo(571, 4305.505859f, 5450.839844f, 63.005806f, 0.627286f);
-                else
-                    pPlayer->TeleportTo(571, 3201.936279f, 5630.123535f, 133.658798f, 3.855272f);
-                break;
-            case GOSSIP_ACTION_INFO_DEF + 2: //Howling Fjord
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_HOWLING_FJORD, true);
-                break;
-            case GOSSIP_ACTION_INFO_DEF + 3: //Sholazar Basin
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_SHOLAZAR_BASIN, true);
-                break;
-            case GOSSIP_ACTION_INFO_DEF + 4: //Icecrown
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_ICECROWN, true);
-                break;
-            case GOSSIP_ACTION_INFO_DEF + 5: //Storm peaks
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_STORM_PEAKS, true);
-                break;
+            if (creature->isSummon())
+            {
+                if (player == creature->ToTempSummon()->GetSummoner())
+                {
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ENGINEERING1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ENGINEERING2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ENGINEERING3, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ENGINEERING4, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 4);
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ENGINEERING5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 5);
+
+                    if (creature->AI()->GetData(DATA_SHOW_UNDERGROUND))
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ENGINEERING6, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 6);
+
+                    player->PlayerTalkClass->SendGossipMenu(TEXT_WORMHOLE, creature->GetGUID());
+                }
+            }
+
+            return true;
         }
-        return true;
-    }
+
+        bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
+        {
+            player->PlayerTalkClass->ClearMenus();
+
+            switch (action)
+            {
+                case GOSSIP_ACTION_INFO_DEF + 1: // Borean Tundra
+                    player->CLOSE_GOSSIP_MENU();
+                    creature->CastSpell(player, SPELL_BOREAN_TUNDRA, false);
+                    break;
+                case GOSSIP_ACTION_INFO_DEF + 2: // Howling Fjord
+                    player->CLOSE_GOSSIP_MENU();
+                    creature->CastSpell(player, SPELL_HOWLING_FJORD, false);
+                    break;
+                case GOSSIP_ACTION_INFO_DEF + 3: // Sholazar Basin
+                    player->CLOSE_GOSSIP_MENU();
+                    creature->CastSpell(player, SPELL_SHOLAZAR_BASIN, false);
+                    break;
+                case GOSSIP_ACTION_INFO_DEF + 4: // Icecrown
+                    player->CLOSE_GOSSIP_MENU();
+                    creature->CastSpell(player, SPELL_ICECROWN, false);
+                    break;
+                case GOSSIP_ACTION_INFO_DEF + 5: // Storm peaks
+                    player->CLOSE_GOSSIP_MENU();
+                    creature->CastSpell(player, SPELL_STORM_PEAKS, false);
+                    break;
+                case GOSSIP_ACTION_INFO_DEF + 6: // Underground
+                    player->CLOSE_GOSSIP_MENU();
+                    creature->CastSpell(player, SPELL_UNDERGROUND, false);
+                    break;
+            }
+
+            return true;
+        }
+
+        CreatureAI* GetAI(Creature* creature) const
+        {
+            return new npc_wormholeAI(creature);
+        }
 };
 
 /*######
@@ -2224,42 +2379,42 @@ class npc_pet_trainer : public CreatureScript
 public:
     npc_pet_trainer() : CreatureScript("npc_pet_trainer") { }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (pCreature->isQuestGiver())
-            pPlayer->PrepareQuestMenu(pCreature->GetGUID());
+        if (creature->isQuestGiver())
+            player->PrepareQuestMenu(creature->GetGUID());
 
-        if (pPlayer->getClass() == CLASS_HUNTER)
+        if (player->getClass() == CLASS_HUNTER)
         {
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_PET1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-            if (pPlayer->GetPet() && pPlayer->GetPet()->getPetType() == HUNTER_PET)
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_PET2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_PET1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+            if (player->GetPet() && player->GetPet()->getPetType() == HUNTER_PET)
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_PET2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
 
-            pPlayer->PlayerTalkClass->SendGossipMenu(TEXT_ISHUNTER, pCreature->GetGUID());
+            player->PlayerTalkClass->SendGossipMenu(TEXT_ISHUNTER, creature->GetGUID());
             return true;
         }
-        pPlayer->PlayerTalkClass->SendGossipMenu(TEXT_NOTHUNTER, pCreature->GetGUID());
+        player->PlayerTalkClass->SendGossipMenu(TEXT_NOTHUNTER, creature->GetGUID());
         return true;
     }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 /*uiSender*/, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        switch(uiAction)
+        player->PlayerTalkClass->ClearMenus();
+        switch (action)
         {
             case GOSSIP_ACTION_INFO_DEF + 1:
-                pPlayer->PlayerTalkClass->SendGossipMenu(TEXT_PETINFO, pCreature->GetGUID());
+                player->PlayerTalkClass->SendGossipMenu(TEXT_PETINFO, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF + 2:
                 {
-                    pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_PET_CONFIRM, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+3);
-                    pPlayer->PlayerTalkClass->SendGossipMenu(TEXT_CONFIRM, pCreature->GetGUID());
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_PET_CONFIRM, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
+                    player->PlayerTalkClass->SendGossipMenu(TEXT_CONFIRM, creature->GetGUID());
                 }
                 break;
             case GOSSIP_ACTION_INFO_DEF + 3:
                 {
-                    pPlayer->ResetPetTalents();
-                    pPlayer->CLOSE_GOSSIP_MENU();
+                    player->ResetPetTalents();
+                    player->CLOSE_GOSSIP_MENU();
                 }
                 break;
         }
@@ -2281,6 +2436,9 @@ enum eLockSmith
     QUEST_HOTTER_THAN_HELL_H              = 10764,
     QUEST_RETURN_TO_KHAGDAR               = 9837,
     QUEST_CONTAINMENT                     = 13159,
+    QUEST_ETERNAL_VIGILANCE               = 11011,
+    QUEST_KEY_TO_THE_FOCUSING_IRIS        = 13372,
+    QUEST_HC_KEY_TO_THE_FOCUSING_IRIS     = 13375,
 
     ITEM_ARCATRAZ_KEY                     = 31084,
     ITEM_SHADOWFORGE_KEY                  = 11000,
@@ -2288,254 +2446,119 @@ enum eLockSmith
     ITEM_SHATTERED_HALLS_KEY              = 28395,
     ITEM_THE_MASTERS_KEY                  = 24490,
     ITEM_VIOLET_HOLD_KEY                  = 42482,
+    ITEM_ESSENCE_INFUSED_MOONSTONE        = 32449,
+    ITEM_KEY_TO_THE_FOCUSING_IRIS         = 44582,
+    ITEM_HC_KEY_TO_THE_FOCUSING_IRIS      = 44581,
 
     SPELL_ARCATRAZ_KEY                    = 54881,
     SPELL_SHADOWFORGE_KEY                 = 54882,
     SPELL_SKELETON_KEY                    = 54883,
     SPELL_SHATTERED_HALLS_KEY             = 54884,
     SPELL_THE_MASTERS_KEY                 = 54885,
-    SPELL_VIOLET_HOLD_KEY                 = 67253
+    SPELL_VIOLET_HOLD_KEY                 = 67253,
+    SPELL_ESSENCE_INFUSED_MOONSTONE       = 40173,
 };
 
-#define GOSSIP_LOST_ARCATRAZ_KEY         "I've lost my key to the Arcatraz."
-#define GOSSIP_LOST_SHADOWFORGE_KEY      "I've lost my key to the Blackrock Depths."
-#define GOSSIP_LOST_SKELETON_KEY         "I've lost my key to the Scholomance."
-#define GOSSIP_LOST_SHATTERED_HALLS_KEY  "I've lost my key to the Shattered Halls."
-#define GOSSIP_LOST_THE_MASTERS_KEY      "I've lost my key to the Karazhan."
-#define GOSSIP_LOST_VIOLET_HOLD_KEY      "I've lost my key to the Violet Hold."
+#define GOSSIP_LOST_ARCATRAZ_KEY                "I've lost my key to the Arcatraz."
+#define GOSSIP_LOST_SHADOWFORGE_KEY             "I've lost my key to the Blackrock Depths."
+#define GOSSIP_LOST_SKELETON_KEY                "I've lost my key to the Scholomance."
+#define GOSSIP_LOST_SHATTERED_HALLS_KEY         "I've lost my key to the Shattered Halls."
+#define GOSSIP_LOST_THE_MASTERS_KEY             "I've lost my key to the Karazhan."
+#define GOSSIP_LOST_VIOLET_HOLD_KEY             "I've lost my key to the Violet Hold."
+#define GOSSIP_LOST_ESSENCE_INFUSED_MOONSTONE   "I've lost my Essence-Infused Moonstone."
+#define GOSSIP_LOST_KEY_TO_THE_FOCUSING_IRIS    "I've lost my Key to the Focusing Iris."
+#define GOSSIP_LOST_HC_KEY_TO_THE_FOCUSING_IRIS "I've lost my Heroic Key to the Focusing Iris."
 
 class npc_locksmith : public CreatureScript
 {
 public:
     npc_locksmith() : CreatureScript("npc_locksmith") { }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
         // Arcatraz Key
-        if (pPlayer->GetQuestRewardStatus(QUEST_HOW_TO_BRAKE_IN_TO_THE_ARCATRAZ) && !pPlayer->HasItemCount(ITEM_ARCATRAZ_KEY, 1, true))
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_ARCATRAZ_KEY, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF +1);
+        if (player->GetQuestRewardStatus(QUEST_HOW_TO_BRAKE_IN_TO_THE_ARCATRAZ) && !player->HasItemCount(ITEM_ARCATRAZ_KEY, 1, true))
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_ARCATRAZ_KEY, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
 
         // Shadowforge Key
-        if (pPlayer->GetQuestRewardStatus(QUEST_DARK_IRON_LEGACY) && !pPlayer->HasItemCount(ITEM_SHADOWFORGE_KEY, 1, true))
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_SHADOWFORGE_KEY, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF +2);
+        if (player->GetQuestRewardStatus(QUEST_DARK_IRON_LEGACY) && !player->HasItemCount(ITEM_SHADOWFORGE_KEY, 1, true))
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_SHADOWFORGE_KEY, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
 
         // Skeleton Key
-        if ((pPlayer->GetQuestRewardStatus(QUEST_THE_KEY_TO_SCHOLOMANCE_A) || pPlayer->GetQuestRewardStatus(QUEST_THE_KEY_TO_SCHOLOMANCE_H)) &&
-            !pPlayer->HasItemCount(ITEM_SKELETON_KEY, 1, true))
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_SKELETON_KEY, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF +3);
+        if ((player->GetQuestRewardStatus(QUEST_THE_KEY_TO_SCHOLOMANCE_A) || player->GetQuestRewardStatus(QUEST_THE_KEY_TO_SCHOLOMANCE_H)) &&
+            !player->HasItemCount(ITEM_SKELETON_KEY, 1, true))
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_SKELETON_KEY, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
 
         // Shatered Halls Key
-        if ((pPlayer->GetQuestRewardStatus(QUEST_HOTTER_THAN_HELL_A) || pPlayer->GetQuestRewardStatus(QUEST_HOTTER_THAN_HELL_H)) &&
-            !pPlayer->HasItemCount(ITEM_SHATTERED_HALLS_KEY, 1, true))
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_SHATTERED_HALLS_KEY, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF +4);
+        if ((player->GetQuestRewardStatus(QUEST_HOTTER_THAN_HELL_A) || player->GetQuestRewardStatus(QUEST_HOTTER_THAN_HELL_H)) &&
+            !player->HasItemCount(ITEM_SHATTERED_HALLS_KEY, 1, true))
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_SHATTERED_HALLS_KEY, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 4);
 
         // Master's Key
-        if (pPlayer->GetQuestRewardStatus(QUEST_RETURN_TO_KHAGDAR) && !pPlayer->HasItemCount(ITEM_THE_MASTERS_KEY, 1, true))
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_THE_MASTERS_KEY, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF +5);
+        if (player->GetQuestRewardStatus(QUEST_RETURN_TO_KHAGDAR) && !player->HasItemCount(ITEM_THE_MASTERS_KEY, 1, true))
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_THE_MASTERS_KEY, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 5);
 
         // Violet Hold Key
-        if (pPlayer->GetQuestRewardStatus(QUEST_CONTAINMENT) && !pPlayer->HasItemCount(ITEM_VIOLET_HOLD_KEY, 1, true))
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_VIOLET_HOLD_KEY, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF +6);
+        if (player->GetQuestRewardStatus(QUEST_CONTAINMENT) && !player->HasItemCount(ITEM_VIOLET_HOLD_KEY, 1, true))
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_VIOLET_HOLD_KEY, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 6);
 
-        pPlayer->SEND_GOSSIP_MENU(pPlayer->GetGossipTextId(pCreature), pCreature->GetGUID());
+        // Essence-Infused Moonstone
+        if (player->GetQuestRewardStatus(QUEST_ETERNAL_VIGILANCE) && !player->HasItemCount(ITEM_ESSENCE_INFUSED_MOONSTONE, 1, true))
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_ESSENCE_INFUSED_MOONSTONE, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 7);
 
-        return true;
-    }
+        // Key to the Focusing Iris
+        if (player->GetQuestRewardStatus(QUEST_KEY_TO_THE_FOCUSING_IRIS) && !player->HasItemCount(ITEM_KEY_TO_THE_FOCUSING_IRIS, 1, true))
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_KEY_TO_THE_FOCUSING_IRIS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 8);
 
-    bool OnGossipSelect(Player* pPlayer, Creature* /*pCreature*/, uint32 /*uiSender*/, uint32 uiAction)
-    {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        switch(uiAction)
-        {
-            case GOSSIP_ACTION_INFO_DEF+1:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_ARCATRAZ_KEY, false);
-                break;
-            case GOSSIP_ACTION_INFO_DEF+2:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_SHADOWFORGE_KEY, false);
-                break;
-            case GOSSIP_ACTION_INFO_DEF+3:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_SKELETON_KEY, false);
-                break;
-            case GOSSIP_ACTION_INFO_DEF+4:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_SHATTERED_HALLS_KEY, false);
-                break;
-            case GOSSIP_ACTION_INFO_DEF+5:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_THE_MASTERS_KEY, false);
-                break;
-            case GOSSIP_ACTION_INFO_DEF+6:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_VIOLET_HOLD_KEY, false);
-                break;
-        }
-        return true;
-    }
-};
+        // Heroic Key to the Focusing Iris
+        if (player->GetQuestRewardStatus(QUEST_HC_KEY_TO_THE_FOCUSING_IRIS) && !player->HasItemCount(ITEM_HC_KEY_TO_THE_FOCUSING_IRIS, 1, true))
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_HC_KEY_TO_THE_FOCUSING_IRIS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 9);
 
-/*######
-## npc_tabard_vendor
-######*/
-
-enum
-{
-    QUEST_TRUE_MASTERS_OF_LIGHT = 9737,
-    QUEST_THE_UNWRITTEN_PROPHECY = 9762,
-    QUEST_INTO_THE_BREACH = 10259,
-    QUEST_BATTLE_OF_THE_CRIMSON_WATCH = 10781,
-    QUEST_SHARDS_OF_AHUNE = 11972,
-
-    ACHIEVEMENT_EXPLORE_NORTHREND = 45,
-    ACHIEVEMENT_TWENTYFIVE_TABARDS = 1021,
-    ACHIEVEMENT_THE_LOREMASTER_A = 1681,
-    ACHIEVEMENT_THE_LOREMASTER_H = 1682,
-
-    ITEM_TABARD_OF_THE_HAND = 24344,
-    ITEM_TABARD_OF_THE_BLOOD_KNIGHT = 25549,
-    ITEM_TABARD_OF_THE_PROTECTOR = 28788,
-    ITEM_OFFERING_OF_THE_SHATAR = 31408,
-    ITEM_GREEN_TROPHY_TABARD_OF_THE_ILLIDARI = 31404,
-    ITEM_PURPLE_TROPHY_TABARD_OF_THE_ILLIDARI = 31405,
-    ITEM_TABARD_OF_THE_SUMMER_SKIES = 35279,
-    ITEM_TABARD_OF_THE_SUMMER_FLAMES = 35280,
-    ITEM_TABARD_OF_THE_ACHIEVER = 40643,
-    ITEM_LOREMASTERS_COLORS = 43300,
-    ITEM_TABARD_OF_THE_EXPLORER = 43348,
-
-    SPELL_TABARD_OF_THE_BLOOD_KNIGHT = 54974,
-    SPELL_TABARD_OF_THE_HAND = 54976,
-    SPELL_GREEN_TROPHY_TABARD_OF_THE_ILLIDARI = 54977,
-    SPELL_PURPLE_TROPHY_TABARD_OF_THE_ILLIDARI = 54982,
-    SPELL_TABARD_OF_THE_ACHIEVER = 55006,
-    SPELL_TABARD_OF_THE_PROTECTOR = 55008,
-    SPELL_LOREMASTERS_COLORS = 58194,
-    SPELL_TABARD_OF_THE_EXPLORER = 58224,
-    SPELL_TABARD_OF_SUMMER_SKIES = 62768,
-    SPELL_TABARD_OF_SUMMER_FLAMES = 62769
-};
-
-#define GOSSIP_LOST_TABARD_OF_BLOOD_KNIGHT "I've lost my Tabard of Blood Knight."
-#define GOSSIP_LOST_TABARD_OF_THE_HAND "I've lost my Tabard of the Hand."
-#define GOSSIP_LOST_TABARD_OF_THE_PROTECTOR "I've lost my Tabard of the Protector."
-#define GOSSIP_LOST_GREEN_TROPHY_TABARD_OF_THE_ILLIDARI "I've lost my Green Trophy Tabard of the Illidari."
-#define GOSSIP_LOST_PURPLE_TROPHY_TABARD_OF_THE_ILLIDARI "I've lost my Purple Trophy Tabard of the Illidari."
-#define GOSSIP_LOST_TABARD_OF_SUMMER_SKIES "I've lost my Tabard of Summer Skies."
-#define GOSSIP_LOST_TABARD_OF_SUMMER_FLAMES "I've lost my Tabard of Summer Flames."
-#define GOSSIP_LOST_LOREMASTERS_COLORS "I've lost my Loremaster's Colors."
-#define GOSSIP_LOST_TABARD_OF_THE_EXPLORER "I've lost my Tabard of the Explorer."
-#define GOSSIP_LOST_TABARD_OF_THE_ACHIEVER "I've lost my Tabard of the Achiever."
-
-class npc_tabard_vendor : public CreatureScript
-{
-public:
-    npc_tabard_vendor() : CreatureScript("npc_tabard_vendor") { }
-
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
-    {
-        bool m_bLostBloodKnight = false;
-        bool m_bLostHand = false;
-        bool m_bLostProtector = false;
-        bool m_bLostIllidari = false;
-        bool m_bLostSummer = false;
-
-        //Tabard of the Blood Knight
-        if (pPlayer->GetQuestRewardStatus(QUEST_TRUE_MASTERS_OF_LIGHT) && !pPlayer->HasItemCount(ITEM_TABARD_OF_THE_BLOOD_KNIGHT, 1, true))
-            m_bLostBloodKnight = true;
-
-        //Tabard of the Hand
-        if (pPlayer->GetQuestRewardStatus(QUEST_THE_UNWRITTEN_PROPHECY) && !pPlayer->HasItemCount(ITEM_TABARD_OF_THE_HAND, 1, true))
-            m_bLostHand = true;
-
-        //Tabard of the Protector
-        if (pPlayer->GetQuestRewardStatus(QUEST_INTO_THE_BREACH) && !pPlayer->HasItemCount(ITEM_TABARD_OF_THE_PROTECTOR, 1, true))
-            m_bLostProtector = true;
-
-        //Green Trophy Tabard of the Illidari
-        //Purple Trophy Tabard of the Illidari
-        if (pPlayer->GetQuestRewardStatus(QUEST_BATTLE_OF_THE_CRIMSON_WATCH) &&
-            (!pPlayer->HasItemCount(ITEM_GREEN_TROPHY_TABARD_OF_THE_ILLIDARI, 1, true) &&
-            !pPlayer->HasItemCount(ITEM_PURPLE_TROPHY_TABARD_OF_THE_ILLIDARI, 1, true) &&
-            !pPlayer->HasItemCount(ITEM_OFFERING_OF_THE_SHATAR, 1, true)))
-            m_bLostIllidari = true;
-
-        //Tabard of Summer Skies
-        //Tabard of Summer Flames
-        if (pPlayer->GetQuestRewardStatus(QUEST_SHARDS_OF_AHUNE) &&
-            !pPlayer->HasItemCount(ITEM_TABARD_OF_THE_SUMMER_SKIES, 1, true) &&
-            !pPlayer->HasItemCount(ITEM_TABARD_OF_THE_SUMMER_FLAMES, 1, true))
-            m_bLostSummer = true;
-
-        if (m_bLostBloodKnight || m_bLostHand || m_bLostProtector || m_bLostIllidari || m_bLostSummer)
-        {
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_VENDOR, GOSSIP_TEXT_BROWSE_GOODS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
-
-            if (m_bLostBloodKnight)
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_TABARD_OF_BLOOD_KNIGHT, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF +1);
-
-            if (m_bLostHand)
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_TABARD_OF_THE_HAND, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF +2);
-
-            if (m_bLostProtector)
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_TABARD_OF_THE_PROTECTOR, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+3);
-
-            if (m_bLostIllidari)
-            {
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_GREEN_TROPHY_TABARD_OF_THE_ILLIDARI, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+4);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_PURPLE_TROPHY_TABARD_OF_THE_ILLIDARI, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+5);
-            }
-
-            if (m_bLostSummer)
-            {
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_TABARD_OF_SUMMER_SKIES, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+6);
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_LOST_TABARD_OF_SUMMER_FLAMES, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+7);
-            }
-
-            pPlayer->SEND_GOSSIP_MENU(13583, pCreature->GetGUID());
-        }
-        else
-            pPlayer->SEND_VENDORLIST(pCreature->GetGUID());
+        player->SEND_GOSSIP_MENU(player->GetGossipTextId(creature), creature->GetGUID());
 
         return true;
     }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 /*uiSender*/, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        switch(uiAction)
+        player->PlayerTalkClass->ClearMenus();
+        switch (action)
         {
-            case GOSSIP_ACTION_TRADE:
-                pPlayer->SEND_VENDORLIST(pCreature->GetGUID());
+            case GOSSIP_ACTION_INFO_DEF + 1:
+                player->CLOSE_GOSSIP_MENU();
+                player->CastSpell(player, SPELL_ARCATRAZ_KEY, false);
                 break;
-            case GOSSIP_ACTION_INFO_DEF+1:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_TABARD_OF_THE_BLOOD_KNIGHT, false);
+            case GOSSIP_ACTION_INFO_DEF + 2:
+                player->CLOSE_GOSSIP_MENU();
+                player->CastSpell(player, SPELL_SHADOWFORGE_KEY, false);
                 break;
-            case GOSSIP_ACTION_INFO_DEF+2:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_TABARD_OF_THE_HAND, false);
+            case GOSSIP_ACTION_INFO_DEF + 3:
+                player->CLOSE_GOSSIP_MENU();
+                player->CastSpell(player, SPELL_SKELETON_KEY, false);
                 break;
-            case GOSSIP_ACTION_INFO_DEF+3:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_TABARD_OF_THE_PROTECTOR, false);
+            case GOSSIP_ACTION_INFO_DEF + 4:
+                player->CLOSE_GOSSIP_MENU();
+                player->CastSpell(player, SPELL_SHATTERED_HALLS_KEY, false);
                 break;
-            case GOSSIP_ACTION_INFO_DEF+4:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_GREEN_TROPHY_TABARD_OF_THE_ILLIDARI, false);
+            case GOSSIP_ACTION_INFO_DEF + 5:
+                player->CLOSE_GOSSIP_MENU();
+                player->CastSpell(player, SPELL_THE_MASTERS_KEY, false);
                 break;
-            case GOSSIP_ACTION_INFO_DEF+5:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_PURPLE_TROPHY_TABARD_OF_THE_ILLIDARI, false);
+            case GOSSIP_ACTION_INFO_DEF + 6:
+                player->CLOSE_GOSSIP_MENU();
+                player->CastSpell(player, SPELL_VIOLET_HOLD_KEY, false);
                 break;
-            case GOSSIP_ACTION_INFO_DEF+6:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_TABARD_OF_SUMMER_SKIES, false);
+            case GOSSIP_ACTION_INFO_DEF + 7:
+                player->CLOSE_GOSSIP_MENU();
+                player->CastSpell(player, SPELL_ESSENCE_INFUSED_MOONSTONE, false);
                 break;
-            case GOSSIP_ACTION_INFO_DEF+7:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->CastSpell(pPlayer, SPELL_TABARD_OF_SUMMER_FLAMES, false);
+            case GOSSIP_ACTION_INFO_DEF + 8:
+                player->CLOSE_GOSSIP_MENU();
+                player->AddItem(ITEM_KEY_TO_THE_FOCUSING_IRIS,1);
+                break;
+            case GOSSIP_ACTION_INFO_DEF + 9:
+                player->CLOSE_GOSSIP_MENU();
+                player->AddItem(ITEM_HC_KEY_TO_THE_FOCUSING_IRIS,1);
                 break;
         }
         return true;
@@ -2546,31 +2569,31 @@ public:
 ## npc_experience
 ######*/
 
-#define EXP_COST                100000//10 00 00 copper (10golds)
+#define EXP_COST                100000 //10 00 00 copper (10golds)
 #define GOSSIP_TEXT_EXP         14736
-#define GOSSIP_XP_OFF            "I no longer wish to gain experience."
-#define GOSSIP_XP_ON           "I wish to start gaining experience again."
+#define GOSSIP_XP_OFF           "I no longer wish to gain experience."
+#define GOSSIP_XP_ON            "I wish to start gaining experience again."
 
 class npc_experience : public CreatureScript
 {
 public:
     npc_experience() : CreatureScript("npc_experience") { }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_XP_OFF, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-        pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_XP_ON, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
-        pPlayer->PlayerTalkClass->SendGossipMenu(GOSSIP_TEXT_EXP, pCreature->GetGUID());
+        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_XP_OFF, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_XP_ON, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
+        player->PlayerTalkClass->SendGossipMenu(GOSSIP_TEXT_EXP, creature->GetGUID());
         return true;
     }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* /*pCreature*/, uint32 /*uiSender*/, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        bool noXPGain = pPlayer->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_NO_XP_GAIN);
+        player->PlayerTalkClass->ClearMenus();
+        bool noXPGain = player->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_NO_XP_GAIN);
         bool doSwitch = false;
 
-        switch(uiAction)
+        switch (action)
         {
             case GOSSIP_ACTION_INFO_DEF + 1://xp off
                 {
@@ -2587,53 +2610,453 @@ public:
         }
         if (doSwitch)
         {
-            if (!pPlayer->HasEnoughMoney(EXP_COST))
-                pPlayer->SendBuyError(BUY_ERR_NOT_ENOUGHT_MONEY, 0, 0, 0);
+            if (!player->HasEnoughMoney(EXP_COST))
+                player->SendBuyError(BUY_ERR_NOT_ENOUGHT_MONEY, 0, 0, 0);
             else if (noXPGain)
             {
-                pPlayer->ModifyMoney(-EXP_COST);
-                pPlayer->RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_NO_XP_GAIN);
+                player->ModifyMoney(-EXP_COST);
+                player->RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_NO_XP_GAIN);
             }
             else if (!noXPGain)
             {
-                pPlayer->ModifyMoney(-EXP_COST);
-                pPlayer->SetFlag(PLAYER_FLAGS, PLAYER_FLAGS_NO_XP_GAIN);
+                player->ModifyMoney(-EXP_COST);
+                player->SetFlag(PLAYER_FLAGS, PLAYER_FLAGS_NO_XP_GAIN);
             }
         }
-        pPlayer->PlayerTalkClass->CloseGossip();
+        player->PlayerTalkClass->SendCloseGossip();
         return true;
+    }
+};
+
+enum Fireworks
+{
+    NPC_OMEN                = 15467,
+    NPC_MINION_OF_OMEN      = 15466,
+    NPC_FIREWORK_BLUE       = 15879,
+    NPC_FIREWORK_GREEN      = 15880,
+    NPC_FIREWORK_PURPLE     = 15881,
+    NPC_FIREWORK_RED        = 15882,
+    NPC_FIREWORK_YELLOW     = 15883,
+    NPC_FIREWORK_WHITE      = 15884,
+    NPC_FIREWORK_BIG_BLUE   = 15885,
+    NPC_FIREWORK_BIG_GREEN  = 15886,
+    NPC_FIREWORK_BIG_PURPLE = 15887,
+    NPC_FIREWORK_BIG_RED    = 15888,
+    NPC_FIREWORK_BIG_YELLOW = 15889,
+    NPC_FIREWORK_BIG_WHITE  = 15890,
+
+    NPC_CLUSTER_BLUE        = 15872,
+    NPC_CLUSTER_RED         = 15873,
+    NPC_CLUSTER_GREEN       = 15874,
+    NPC_CLUSTER_PURPLE      = 15875,
+    NPC_CLUSTER_WHITE       = 15876,
+    NPC_CLUSTER_YELLOW      = 15877,
+    NPC_CLUSTER_BIG_BLUE    = 15911,
+    NPC_CLUSTER_BIG_GREEN   = 15912,
+    NPC_CLUSTER_BIG_PURPLE  = 15913,
+    NPC_CLUSTER_BIG_RED     = 15914,
+    NPC_CLUSTER_BIG_WHITE   = 15915,
+    NPC_CLUSTER_BIG_YELLOW  = 15916,
+    NPC_CLUSTER_ELUNE       = 15918,
+
+    GO_FIREWORK_LAUNCHER_1  = 180771,
+    GO_FIREWORK_LAUNCHER_2  = 180868,
+    GO_FIREWORK_LAUNCHER_3  = 180850,
+    GO_CLUSTER_LAUNCHER_1   = 180772,
+    GO_CLUSTER_LAUNCHER_2   = 180859,
+    GO_CLUSTER_LAUNCHER_3   = 180869,
+    GO_CLUSTER_LAUNCHER_4   = 180874,
+
+    SPELL_ROCKET_BLUE       = 26344,
+    SPELL_ROCKET_GREEN      = 26345,
+    SPELL_ROCKET_PURPLE     = 26346,
+    SPELL_ROCKET_RED        = 26347,
+    SPELL_ROCKET_WHITE      = 26348,
+    SPELL_ROCKET_YELLOW     = 26349,
+    SPELL_ROCKET_BIG_BLUE   = 26351,
+    SPELL_ROCKET_BIG_GREEN  = 26352,
+    SPELL_ROCKET_BIG_PURPLE = 26353,
+    SPELL_ROCKET_BIG_RED    = 26354,
+    SPELL_ROCKET_BIG_WHITE  = 26355,
+    SPELL_ROCKET_BIG_YELLOW = 26356,
+    SPELL_LUNAR_FORTUNE     = 26522,
+
+    ANIM_GO_LAUNCH_FIREWORK = 3,
+    ZONE_MOONGLADE          = 493,
+};
+
+Position omenSummonPos = {7558.993f, -2839.999f, 450.0214f, 4.46f};
+
+class npc_firework : public CreatureScript
+{
+public:
+    npc_firework() : CreatureScript("npc_firework") { }
+
+    struct npc_fireworkAI : public ScriptedAI
+    {
+        npc_fireworkAI(Creature* creature) : ScriptedAI(creature) {}
+
+        bool isCluster()
+        {
+            switch (me->GetEntry())
+            {
+                case NPC_FIREWORK_BLUE:
+                case NPC_FIREWORK_GREEN:
+                case NPC_FIREWORK_PURPLE:
+                case NPC_FIREWORK_RED:
+                case NPC_FIREWORK_YELLOW:
+                case NPC_FIREWORK_WHITE:
+                case NPC_FIREWORK_BIG_BLUE:
+                case NPC_FIREWORK_BIG_GREEN:
+                case NPC_FIREWORK_BIG_PURPLE:
+                case NPC_FIREWORK_BIG_RED:
+                case NPC_FIREWORK_BIG_YELLOW:
+                case NPC_FIREWORK_BIG_WHITE:
+                    return false;
+                case NPC_CLUSTER_BLUE:
+                case NPC_CLUSTER_GREEN:
+                case NPC_CLUSTER_PURPLE:
+                case NPC_CLUSTER_RED:
+                case NPC_CLUSTER_YELLOW:
+                case NPC_CLUSTER_WHITE:
+                case NPC_CLUSTER_BIG_BLUE:
+                case NPC_CLUSTER_BIG_GREEN:
+                case NPC_CLUSTER_BIG_PURPLE:
+                case NPC_CLUSTER_BIG_RED:
+                case NPC_CLUSTER_BIG_YELLOW:
+                case NPC_CLUSTER_BIG_WHITE:
+                case NPC_CLUSTER_ELUNE:
+                default:
+                    return true;
+            }
+        }
+
+        GameObject* FindNearestLauncher()
+        {
+            GameObject* launcher = NULL;
+
+            if (isCluster())
+            {
+                GameObject* launcher1 = GetClosestGameObjectWithEntry(me, GO_CLUSTER_LAUNCHER_1, 0.5f);
+                GameObject* launcher2 = GetClosestGameObjectWithEntry(me, GO_CLUSTER_LAUNCHER_2, 0.5f);
+                GameObject* launcher3 = GetClosestGameObjectWithEntry(me, GO_CLUSTER_LAUNCHER_3, 0.5f);
+                GameObject* launcher4 = GetClosestGameObjectWithEntry(me, GO_CLUSTER_LAUNCHER_4, 0.5f);
+
+                if (launcher1)
+                    launcher = launcher1;
+                else if (launcher2)
+                    launcher = launcher2;
+                else if (launcher3)
+                    launcher = launcher3;
+                else if (launcher4)
+                    launcher = launcher4;
+            }
+            else
+            {
+                GameObject* launcher1 = GetClosestGameObjectWithEntry(me, GO_FIREWORK_LAUNCHER_1, 0.5f);
+                GameObject* launcher2 = GetClosestGameObjectWithEntry(me, GO_FIREWORK_LAUNCHER_2, 0.5f);
+                GameObject* launcher3 = GetClosestGameObjectWithEntry(me, GO_FIREWORK_LAUNCHER_3, 0.5f);
+
+                if (launcher1)
+                    launcher = launcher1;
+                else if (launcher2)
+                    launcher = launcher2;
+                else if (launcher3)
+                    launcher = launcher3;
+            }
+
+            return launcher;
+        }
+
+        uint32 GetFireworkSpell(uint32 entry)
+        {
+            switch (entry)
+            {
+                case NPC_FIREWORK_BLUE:
+                    return SPELL_ROCKET_BLUE;
+                case NPC_FIREWORK_GREEN:
+                    return SPELL_ROCKET_GREEN;
+                case NPC_FIREWORK_PURPLE:
+                    return SPELL_ROCKET_PURPLE;
+                case NPC_FIREWORK_RED:
+                    return SPELL_ROCKET_RED;
+                case NPC_FIREWORK_YELLOW:
+                    return SPELL_ROCKET_YELLOW;
+                case NPC_FIREWORK_WHITE:
+                    return SPELL_ROCKET_WHITE;
+                case NPC_FIREWORK_BIG_BLUE:
+                    return SPELL_ROCKET_BIG_BLUE;
+                case NPC_FIREWORK_BIG_GREEN:
+                    return SPELL_ROCKET_BIG_GREEN;
+                case NPC_FIREWORK_BIG_PURPLE:
+                    return SPELL_ROCKET_BIG_PURPLE;
+                case NPC_FIREWORK_BIG_RED:
+                    return SPELL_ROCKET_BIG_RED;
+                case NPC_FIREWORK_BIG_YELLOW:
+                    return SPELL_ROCKET_BIG_YELLOW;
+                case NPC_FIREWORK_BIG_WHITE:
+                    return SPELL_ROCKET_BIG_WHITE;
+                default:
+                    return 0;
+            }
+        }
+
+        uint32 GetFireworkGameObjectId()
+        {
+            uint32 spellId = 0;
+
+            switch (me->GetEntry())
+            {
+                case NPC_CLUSTER_BLUE:
+                    spellId = GetFireworkSpell(NPC_FIREWORK_BLUE);
+                    break;
+                case NPC_CLUSTER_GREEN:
+                    spellId = GetFireworkSpell(NPC_FIREWORK_GREEN);
+                    break;
+                case NPC_CLUSTER_PURPLE:
+                    spellId = GetFireworkSpell(NPC_FIREWORK_PURPLE);
+                    break;
+                case NPC_CLUSTER_RED:
+                    spellId = GetFireworkSpell(NPC_FIREWORK_RED);
+                    break;
+                case NPC_CLUSTER_YELLOW:
+                    spellId = GetFireworkSpell(NPC_FIREWORK_YELLOW);
+                    break;
+                case NPC_CLUSTER_WHITE:
+                    spellId = GetFireworkSpell(NPC_FIREWORK_WHITE);
+                    break;
+                case NPC_CLUSTER_BIG_BLUE:
+                    spellId = GetFireworkSpell(NPC_FIREWORK_BIG_BLUE);
+                    break;
+                case NPC_CLUSTER_BIG_GREEN:
+                    spellId = GetFireworkSpell(NPC_FIREWORK_BIG_GREEN);
+                    break;
+                case NPC_CLUSTER_BIG_PURPLE:
+                    spellId = GetFireworkSpell(NPC_FIREWORK_BIG_PURPLE);
+                    break;
+                case NPC_CLUSTER_BIG_RED:
+                    spellId = GetFireworkSpell(NPC_FIREWORK_BIG_RED);
+                    break;
+                case NPC_CLUSTER_BIG_YELLOW:
+                    spellId = GetFireworkSpell(NPC_FIREWORK_BIG_YELLOW);
+                    break;
+                case NPC_CLUSTER_BIG_WHITE:
+                    spellId = GetFireworkSpell(NPC_FIREWORK_BIG_WHITE);
+                    break;
+                case NPC_CLUSTER_ELUNE:
+                    spellId = GetFireworkSpell(urand(NPC_FIREWORK_BLUE, NPC_FIREWORK_WHITE));
+                    break;
+            }
+
+            const SpellInfo* spellInfo = sSpellMgr->GetSpellInfo(spellId);
+
+            if (spellInfo && spellInfo->Effects[0].Effect == SPELL_EFFECT_SUMMON_OBJECT_WILD)
+                return spellInfo->Effects[0].MiscValue;
+
+            return 0;
+        }
+
+        void Reset()
+        {
+            if (GameObject* launcher = FindNearestLauncher())
+            {
+                launcher->SendCustomAnim(ANIM_GO_LAUNCH_FIREWORK);
+                me->SetOrientation(launcher->GetOrientation() + M_PI/2);
+            }
+            else
+                return;
+
+            if (isCluster())
+            {
+                // Check if we are near Elune'ara lake south, if so try to summon Omen or a minion
+                if (me->GetZoneId() == ZONE_MOONGLADE)
+                {
+                    if (!me->FindNearestCreature(NPC_OMEN, 100.0f, false) && me->GetDistance2d(omenSummonPos.GetPositionX(), omenSummonPos.GetPositionY()) <= 100.0f)
+                    {
+                        switch (urand(0,9))
+                        {
+                            case 0:
+                            case 1:
+                            case 2:
+                            case 3:
+                                if (Creature* minion = me->SummonCreature(NPC_MINION_OF_OMEN, me->GetPositionX()+frand(-5.0f, 5.0f), me->GetPositionY()+frand(-5.0f, 5.0f), me->GetPositionZ(), 0.0f, TEMPSUMMON_CORPSE_TIMED_DESPAWN, 20000))
+                                    minion->AI()->AttackStart(me->SelectNearestPlayer(20.0f));
+                                break;
+                            case 9:
+                                me->SummonCreature(NPC_OMEN, omenSummonPos);
+                                break;
+                        }
+                    }
+                }
+                if (me->GetEntry() == NPC_CLUSTER_ELUNE)
+                    DoCast(SPELL_LUNAR_FORTUNE);
+
+                float displacement = 0.7f;
+                for (uint8 i = 0; i < 4; i++)
+                    me->SummonGameObject(GetFireworkGameObjectId(), me->GetPositionX() + (i%2 == 0 ? displacement : -displacement), me->GetPositionY() + (i > 1 ? displacement : -displacement), me->GetPositionZ() + 4.0f, me->GetOrientation(), 0.0f, 0.0f, 0.0f, 0.0f, 1);
+            }
+            else
+                //me->CastSpell(me, GetFireworkSpell(me->GetEntry()), true);
+                me->CastSpell(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), GetFireworkSpell(me->GetEntry()), true);
+        }
+    };
+
+    CreatureAI* GetAI(Creature* creature) const
+    {
+        return new npc_fireworkAI(creature);
+    }
+};
+
+/*#####
+# npc_spring_rabbit
+#####*/
+
+enum rabbitSpells
+{
+    SPELL_SPRING_FLING          = 61875,
+    SPELL_SPRING_RABBIT_JUMP    = 61724,
+    SPELL_SPRING_RABBIT_WANDER  = 61726,
+    SPELL_SUMMON_BABY_BUNNY     = 61727,
+    SPELL_SPRING_RABBIT_IN_LOVE = 61728,
+    NPC_SPRING_RABBIT           = 32791
+};
+
+class npc_spring_rabbit : public CreatureScript
+{
+public:
+    npc_spring_rabbit() : CreatureScript("npc_spring_rabbit") { }
+
+    CreatureAI* GetAI(Creature* creature) const
+    {
+        return new npc_spring_rabbitAI(creature);
+    }
+
+    struct npc_spring_rabbitAI : public ScriptedAI
+    {
+        npc_spring_rabbitAI(Creature* creature) : ScriptedAI(creature) { }
+
+        bool inLove;
+        uint32 jumpTimer;
+        uint32 bunnyTimer;
+        uint32 searchTimer;
+        uint64 rabbitGUID;
+
+        void Reset()
+        {
+            inLove = false;
+            rabbitGUID = 0;
+            jumpTimer = urand(5000, 10000);
+            bunnyTimer = urand(10000, 20000);
+            searchTimer = urand(5000, 10000);
+            if (Unit* owner = me->GetOwner())
+                me->GetMotionMaster()->MoveFollow(owner, PET_FOLLOW_DIST, PET_FOLLOW_ANGLE);
+        }
+
+        void EnterCombat(Unit * /*who*/) { }
+
+        void DoAction(const int32 /*param*/)
+        {
+            inLove = true;
+            if (Unit* owner = me->GetOwner())
+                owner->CastSpell(owner, SPELL_SPRING_FLING, true);
+        }
+
+        void UpdateAI(const uint32 diff)
+        {
+            if (inLove)
+            {
+                if (jumpTimer <= diff)
+                {
+                    if (Unit* rabbit = Unit::GetUnit(*me, rabbitGUID))
+                        DoCast(rabbit, SPELL_SPRING_RABBIT_JUMP);
+                    jumpTimer = urand(5000, 10000);
+                } else jumpTimer -= diff;
+
+                if (bunnyTimer <= diff)
+                {
+                    DoCast(SPELL_SUMMON_BABY_BUNNY);
+                    bunnyTimer = urand(20000, 40000);
+                } else bunnyTimer -= diff;
+            }
+            else
+            {
+                if (searchTimer <= diff)
+                {
+                    if (Creature* rabbit = me->FindNearestCreature(NPC_SPRING_RABBIT, 10.0f))
+                    {
+                        if (rabbit == me || rabbit->HasAura(SPELL_SPRING_RABBIT_IN_LOVE))
+                            return;
+
+                        me->AddAura(SPELL_SPRING_RABBIT_IN_LOVE, me);
+                        DoAction(1);
+                        rabbit->AddAura(SPELL_SPRING_RABBIT_IN_LOVE, rabbit);
+                        rabbit->AI()->DoAction(1);
+                        rabbit->CastSpell(rabbit, SPELL_SPRING_RABBIT_JUMP, true);
+                        rabbitGUID = rabbit->GetGUID();
+                    }
+                    searchTimer = urand(5000, 10000);
+                } else searchTimer -= diff;
+            }
+        }
+    };
+};
+
+/*######
+## npc_generic_harpoon_cannon
+######*/
+
+class npc_generic_harpoon_cannon : public CreatureScript
+{
+public:
+    npc_generic_harpoon_cannon() : CreatureScript("npc_generic_harpoon_cannon") { }
+
+    struct npc_generic_harpoon_cannonAI : public ScriptedAI
+    {
+        npc_generic_harpoon_cannonAI(Creature* creature) : ScriptedAI(creature) {}
+
+        void Reset()
+        {
+            me->SetUnitMovementFlags(MOVEMENTFLAG_ROOT);
+        }
+    };
+
+    CreatureAI* GetAI(Creature* creature) const
+    {
+        return new npc_generic_harpoon_cannonAI(creature);
     }
 };
 
 void AddSC_npcs_special()
 {
-    new npc_air_force_bots;
-    new npc_lunaclaw_spirit;
-    new npc_chicken_cluck;
-    new npc_dancing_flames;
-    new npc_doctor;
-    new npc_injured_patient;
-    new npc_garments_of_quests;
-    new npc_guardian;
-    new npc_kingdom_of_dalaran_quests;
-    new npc_mount_vendor;
-    new npc_rogue_trainer;
-    new npc_sayge;
-    new npc_steam_tonk;
-    new npc_tonk_mine;
-    new npc_winter_reveler;
-    new npc_brewfest_reveler;
-    new npc_snake_trap;
-    new npc_mirror_image;
-    new npc_ebon_gargoyle;
-    new npc_lightwell;
-    new mob_mojo;
-    new npc_training_dummy;
-    new npc_shadowfiend;
-    new npc_wormhole;
-    new npc_pet_trainer;
-    new npc_locksmith;
-    new npc_tabard_vendor;
-    new npc_experience;
+    new npc_air_force_bots();
+    new npc_lunaclaw_spirit();
+    new npc_chicken_cluck();
+    new npc_dancing_flames();
+    new npc_doctor();
+    new npc_injured_patient();
+    new npc_garments_of_quests();
+    new npc_guardian();
+    new npc_mount_vendor();
+    new npc_rogue_trainer();
+    new npc_sayge();
+    new npc_steam_tonk();
+    new npc_tonk_mine();
+    new npc_winter_reveler();
+    new npc_brewfest_reveler();
+    new npc_snake_trap();
+    new npc_mirror_image();
+    new npc_ebon_gargoyle();
+    new npc_lightwell();
+    new mob_mojo();
+    new npc_training_dummy();
+    new npc_shadowfiend();
+    new npc_wormhole();
+    new npc_pet_trainer();
+    new npc_locksmith();
+    new npc_experience();
+    new npc_fire_elemental();
+    new npc_earth_elemental();
+    new npc_firework();
+    new npc_spring_rabbit();
+    new npc_generic_harpoon_cannon();
 }
-

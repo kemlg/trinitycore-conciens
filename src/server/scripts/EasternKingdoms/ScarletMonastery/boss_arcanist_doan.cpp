@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Scarlet Monastery
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 enum eEnums
 {
@@ -42,14 +43,14 @@ class boss_arcanist_doan : public CreatureScript
 public:
     boss_arcanist_doan() : CreatureScript("boss_arcanist_doan") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_arcanist_doanAI (pCreature);
+        return new boss_arcanist_doanAI (creature);
     }
 
     struct boss_arcanist_doanAI : public ScriptedAI
     {
-        boss_arcanist_doanAI(Creature *c) : ScriptedAI(c) {}
+        boss_arcanist_doanAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 Polymorph_Timer;
         uint32 AoESilence_Timer;
@@ -66,7 +67,7 @@ public:
             bShielded = false;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
         }
@@ -101,30 +102,32 @@ public:
 
             if (Polymorph_Timer <= diff)
             {
-                if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM,1))
-                    DoCast(pTarget, SPELL_POLYMORPH);
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1))
+                    DoCast(target, SPELL_POLYMORPH);
 
                 Polymorph_Timer = 20000;
-            } else Polymorph_Timer -= diff;
+            }
+            else Polymorph_Timer -= diff;
 
             //AoESilence_Timer
             if (AoESilence_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_AOESILENCE);
-                AoESilence_Timer = 15000 + rand()%5000;
-            } else AoESilence_Timer -= diff;
+                AoESilence_Timer = urand(15000, 20000);
+            }
+            else AoESilence_Timer -= diff;
 
             //ArcaneExplosion_Timer
             if (ArcaneExplosion_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_ARCANEEXPLOSION);
                 ArcaneExplosion_Timer = 8000;
-            } else ArcaneExplosion_Timer -= diff;
+            }
+            else ArcaneExplosion_Timer -= diff;
 
             DoMeleeAttackIfReady();
         }
     };
-
 };
 
 void AddSC_boss_arcanist_doan()

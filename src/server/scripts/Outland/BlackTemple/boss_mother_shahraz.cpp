@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Saber Lash missing, Fatal Attraction slightly incorrect; need to dama
 SDCategory: Black Temple
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "black_temple.h"
 
 //Speech'n'Sounds
@@ -64,7 +65,7 @@ uint32 PrismaticAuras[]=
 
 struct Locations
 {
-    float x,y,z;
+    float x, y, z;
 };
 
 static Locations TeleportPoint[]=
@@ -83,19 +84,19 @@ class boss_mother_shahraz : public CreatureScript
 public:
     boss_mother_shahraz() : CreatureScript("boss_mother_shahraz") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_shahrazAI (pCreature);
+        return new boss_shahrazAI (creature);
     }
 
     struct boss_shahrazAI : public ScriptedAI
     {
-        boss_shahrazAI(Creature *c) : ScriptedAI(c)
+        boss_shahrazAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint64 TargetGUID[3];
         uint32 BeamTimer;
@@ -114,8 +115,8 @@ public:
 
         void Reset()
         {
-            if (pInstance)
-                pInstance->SetData(DATA_MOTHERSHAHRAZEVENT, NOT_STARTED);
+            if (instance)
+                instance->SetData(DATA_MOTHERSHAHRAZEVENT, NOT_STARTED);
 
             for (uint8 i = 0; i<3; ++i)
                 TargetGUID[i] = 0;
@@ -128,31 +129,31 @@ public:
             FatalAttractionExplodeTimer = 70000;
             ShriekTimer = 30000;
             SaberTimer = 35000;
-            RandomYellTimer = 70000 + rand()%41 * 1000;
+            RandomYellTimer = urand(70, 111) * 1000;
             EnrageTimer = 600000;
             ExplosionCount = 0;
 
             Enraged = false;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
-            if (pInstance)
-                pInstance->SetData(DATA_MOTHERSHAHRAZEVENT, IN_PROGRESS);
+            if (instance)
+                instance->SetData(DATA_MOTHERSHAHRAZEVENT, IN_PROGRESS);
 
             DoZoneInCombat();
             DoScriptText(SAY_AGGRO, me);
         }
 
-        void KilledUnit(Unit * /*victim*/)
+        void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_SLAY1,SAY_SLAY2), me);
+            DoScriptText(RAND(SAY_SLAY1, SAY_SLAY2), me);
         }
 
-        void JustDied(Unit * /*victim*/)
+        void JustDied(Unit* /*killer*/)
         {
-            if (pInstance)
-                pInstance->SetData(DATA_MOTHERSHAHRAZEVENT, DONE);
+            if (instance)
+                instance->SetData(DATA_MOTHERSHAHRAZEVENT, DONE);
 
             DoScriptText(SAY_DEATH, me);
         }
@@ -165,12 +166,12 @@ public:
             float Z = TeleportPoint[random].z;
             for (uint8 i = 0; i < 3; ++i)
             {
-                Unit* pUnit = SelectUnit(SELECT_TARGET_RANDOM, 1);
-                if (pUnit && pUnit->isAlive() && (pUnit->GetTypeId() == TYPEID_PLAYER))
+                Unit* unit = SelectTarget(SELECT_TARGET_RANDOM, 1);
+                if (unit && unit->isAlive() && (unit->GetTypeId() == TYPEID_PLAYER))
                 {
-                    TargetGUID[i] = pUnit->GetGUID();
-                    pUnit->CastSpell(pUnit, SPELL_TELEPORT_VISUAL, true);
-                    DoTeleportPlayer(pUnit, X, Y, Z, pUnit->GetOrientation());
+                    TargetGUID[i] = unit->GetGUID();
+                    unit->CastSpell(unit, SPELL_TELEPORT_VISUAL, true);
+                    DoTeleportPlayer(unit, X, Y, Z, unit->GetOrientation());
                 }
             }
         }
@@ -190,25 +191,25 @@ public:
             //Randomly cast one beam.
             if (BeamTimer <= diff)
             {
-                Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0);
-                if (!pTarget || !pTarget->isAlive())
+                Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0);
+                if (!target || !target->isAlive())
                     return;
 
                 BeamTimer = 9000;
 
-                switch(CurrentBeam)
+                switch (CurrentBeam)
                 {
                     case 0:
-                        DoCast(pTarget, SPELL_BEAM_SINISTER);
+                        DoCast(target, SPELL_BEAM_SINISTER);
                         break;
                     case 1:
-                        DoCast(pTarget, SPELL_BEAM_VILE);
+                        DoCast(target, SPELL_BEAM_VILE);
                         break;
                     case 2:
-                        DoCast(pTarget, SPELL_BEAM_WICKED);
+                        DoCast(target, SPELL_BEAM_WICKED);
                         break;
                     case 3:
-                        DoCast(pTarget, SPELL_BEAM_SINFUL);
+                        DoCast(target, SPELL_BEAM_SINFUL);
                         break;
                 }
                 ++BeamCount;
@@ -235,9 +236,9 @@ public:
 
                 TeleportPlayers();
 
-                DoScriptText(RAND(SAY_SPELL2,SAY_SPELL3), me);
+                DoScriptText(RAND(SAY_SPELL2, SAY_SPELL3), me);
                 FatalAttractionExplodeTimer = 2000;
-                FatalAttractionTimer = 40000 + rand()%31 * 1000;
+                FatalAttractionTimer = urand(40, 71) * 1000;
             } else FatalAttractionTimer -= diff;
 
             if (FatalAttractionExplodeTimer <= diff)
@@ -247,12 +248,12 @@ public:
                 {
                     for (uint8 i = 0; i < 3; ++i)
                     {
-                        Unit* pUnit = NULL;
+                        Unit* unit = NULL;
                         if (TargetGUID[i])
                         {
-                            pUnit = Unit::GetUnit((*me), TargetGUID[i]);
-                            if (pUnit)
-                                pUnit->CastSpell(pUnit, SPELL_ATTRACTION, true);
+                            unit = Unit::GetUnit(*me, TargetGUID[i]);
+                            if (unit)
+                                unit->CastSpell(unit, SPELL_ATTRACTION, true);
                             TargetGUID[i] = 0;
                         }
                     }
@@ -292,8 +293,8 @@ public:
             //Random taunts
             if (RandomYellTimer <= diff)
             {
-                DoScriptText(RAND(SAY_TAUNT1,SAY_TAUNT2,SAY_TAUNT3), me);
-                RandomYellTimer = 60000 + rand()%91 * 1000;
+                DoScriptText(RAND(SAY_TAUNT1, SAY_TAUNT2, SAY_TAUNT3), me);
+                RandomYellTimer = urand(60, 151) * 1000;
             } else RandomYellTimer -= diff;
 
             DoMeleeAttackIfReady();
@@ -301,7 +302,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_mother_shahraz()
 {

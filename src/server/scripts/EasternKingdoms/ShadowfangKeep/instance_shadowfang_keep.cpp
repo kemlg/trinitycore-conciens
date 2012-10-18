@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Shadowfang Keep
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "shadowfang_keep.h"
 
 #define MAX_ENCOUNTER              4
@@ -48,25 +49,25 @@ enum eEnums
 
 const Position SpawnLocation[] =
 {
-    {-148.199f,2165.647f,128.448f,1.026f},
-    {-153.110f,2168.620f,128.448f,1.026f},
-    {-145.905f,2180.520f,128.448f,4.183f},
-    {-140.794f,2178.037f,128.448f,4.090f},
-    {-138.640f,2170.159f,136.577f,2.737f}
+    {-148.199f, 2165.647f, 128.448f, 1.026f},
+    {-153.110f, 2168.620f, 128.448f, 1.026f},
+    {-145.905f, 2180.520f, 128.448f, 4.183f},
+    {-140.794f, 2178.037f, 128.448f, 4.090f},
+    {-138.640f, 2170.159f, 136.577f, 2.737f}
 };
 class instance_shadowfang_keep : public InstanceMapScript
 {
 public:
     instance_shadowfang_keep() : InstanceMapScript("instance_shadowfang_keep", 33) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+    InstanceScript* GetInstanceScript(InstanceMap* map) const
     {
-        return new instance_shadowfang_keep_InstanceMapScript(pMap);
+        return new instance_shadowfang_keep_InstanceMapScript(map);
     }
 
     struct instance_shadowfang_keep_InstanceMapScript : public InstanceScript
     {
-        instance_shadowfang_keep_InstanceMapScript(Map* pMap) : InstanceScript(pMap) {Initialize();};
+        instance_shadowfang_keep_InstanceMapScript(Map* map) : InstanceScript(map) {}
 
         uint32 m_auiEncounter[MAX_ENCOUNTER];
         std::string str_data;
@@ -100,7 +101,7 @@ public:
 
         void OnCreatureCreate(Creature* creature)
         {
-            switch(creature->GetEntry())
+            switch (creature->GetEntry())
             {
                 case NPC_ASH: uiAshGUID = creature->GetGUID(); break;
                 case NPC_ADA: uiAdaGUID = creature->GetGUID(); break;
@@ -110,22 +111,22 @@ public:
 
         void OnGameObjectCreate(GameObject* go)
         {
-            switch(go->GetEntry())
+            switch (go->GetEntry())
             {
                 case GO_COURTYARD_DOOR:
                     DoorCourtyardGUID = go->GetGUID();
                     if (m_auiEncounter[0] == DONE)
-                        HandleGameObject(NULL, true, go);
+                        HandleGameObject(0, true, go);
                     break;
                 case GO_SORCERER_DOOR:
                     DoorSorcererGUID = go->GetGUID();
                     if (m_auiEncounter[2] == DONE)
-                        HandleGameObject(NULL, true, go);
+                        HandleGameObject(0, true, go);
                     break;
                 case GO_ARUGAL_DOOR:
                     DoorArugalGUID = go->GetGUID();
                     if (m_auiEncounter[3] == DONE)
-                        HandleGameObject(NULL, true, go);
+                        HandleGameObject(0, true, go);
                     break;
             }
         }
@@ -137,14 +138,14 @@ public:
 
             if (pAda && pAda->isAlive() && pAsh && pAsh->isAlive())
             {
-                DoScriptText(SAY_BOSS_DIE_AD,pAda);
-                DoScriptText(SAY_BOSS_DIE_AS,pAsh);
+                DoScriptText(SAY_BOSS_DIE_AD, pAda);
+                DoScriptText(SAY_BOSS_DIE_AS, pAsh);
             }
         }
 
         void SetData(uint32 type, uint32 data)
         {
-            switch(type)
+            switch (type)
             {
                 case TYPE_FREE_NPC:
                     if (data == DONE)
@@ -157,7 +158,7 @@ public:
                     m_auiEncounter[1] = data;
                     break;
                 case TYPE_FENRUS:
-                    switch(data)
+                    switch (data)
                     {
                         case DONE:
                             uiTimer = 1000;
@@ -181,7 +182,7 @@ public:
                 OUT_SAVE_INST_DATA;
 
                 std::ostringstream saveStream;
-                saveStream << m_auiEncounter[0] << " " << m_auiEncounter[1] << " " << m_auiEncounter[2] << " " << m_auiEncounter[3];
+                saveStream << m_auiEncounter[0] << ' ' << m_auiEncounter[1] << ' ' << m_auiEncounter[2] << ' ' << m_auiEncounter[3];
 
                 str_data = saveStream.str();
 
@@ -192,7 +193,7 @@ public:
 
         uint32 GetData(uint32 type)
         {
-            switch(type)
+            switch (type)
             {
                 case TYPE_FREE_NPC:
                     return m_auiEncounter[0];
@@ -239,7 +240,7 @@ public:
                 return;
 
             Creature* pArchmage = instance->GetCreature(uiArchmageArugalGUID);
-            Creature* pSummon = NULL;
+            Creature* summon = NULL;
 
             if (!pArchmage || !pArchmage->isAlive())
                 return;
@@ -248,22 +249,22 @@ public:
             {
                 if (uiTimer <= uiDiff)
                 {
-                    switch(uiPhase)
+                    switch (uiPhase)
                     {
                         case 1:
-                            pSummon = pArchmage->SummonCreature(pArchmage->GetEntry(),SpawnLocation[4],TEMPSUMMON_TIMED_DESPAWN,10000);
-                            pSummon->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
-                            pSummon->SetReactState(REACT_DEFENSIVE);
-                            pSummon->CastSpell(pSummon,SPELL_ASHCROMBE_TELEPORT,true);
-                            DoScriptText(SAY_ARCHMAGE,pSummon);
+                            summon = pArchmage->SummonCreature(pArchmage->GetEntry(), SpawnLocation[4], TEMPSUMMON_TIMED_DESPAWN, 10000);
+                            summon->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
+                            summon->SetReactState(REACT_DEFENSIVE);
+                            summon->CastSpell(summon, SPELL_ASHCROMBE_TELEPORT, true);
+                            DoScriptText(SAY_ARCHMAGE, summon);
                             uiTimer = 2000;
                             uiPhase = 2;
                             break;
                         case 2:
-                            pArchmage->SummonCreature(NPC_ARUGAL_VOIDWALKER,SpawnLocation[0],TEMPSUMMON_CORPSE_TIMED_DESPAWN,60000);
-                            pArchmage->SummonCreature(NPC_ARUGAL_VOIDWALKER,SpawnLocation[1],TEMPSUMMON_CORPSE_TIMED_DESPAWN,60000);
-                            pArchmage->SummonCreature(NPC_ARUGAL_VOIDWALKER,SpawnLocation[2],TEMPSUMMON_CORPSE_TIMED_DESPAWN,60000);
-                            pArchmage->SummonCreature(NPC_ARUGAL_VOIDWALKER,SpawnLocation[3],TEMPSUMMON_CORPSE_TIMED_DESPAWN,60000);
+                            pArchmage->SummonCreature(NPC_ARUGAL_VOIDWALKER, SpawnLocation[0], TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
+                            pArchmage->SummonCreature(NPC_ARUGAL_VOIDWALKER, SpawnLocation[1], TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
+                            pArchmage->SummonCreature(NPC_ARUGAL_VOIDWALKER, SpawnLocation[2], TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
+                            pArchmage->SummonCreature(NPC_ARUGAL_VOIDWALKER, SpawnLocation[3], TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
                             uiPhase = 0;
                             break;
 
@@ -274,7 +275,6 @@ public:
     };
 
 };
-
 
 void AddSC_instance_shadowfang_keep()
 {

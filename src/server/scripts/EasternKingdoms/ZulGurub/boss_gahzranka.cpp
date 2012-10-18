@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Massive Geyser with knockback not working. Spell buggy.
 SDCategory: Zul'Gurub
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 #define SPELL_FROSTBREATH            16099
 #define SPELL_MASSIVEGEYSER          22421                  //Not working. Cause its a summon...
@@ -32,15 +33,11 @@ EndScriptData */
 class boss_gahzranka : public CreatureScript
 {
     public:
-
-        boss_gahzranka()
-            : CreatureScript("boss_gahzranka")
-        {
-        }
+        boss_gahzranka() : CreatureScript("boss_gahzranka") { }
 
         struct boss_gahzrankaAI : public ScriptedAI
         {
-            boss_gahzrankaAI(Creature *c) : ScriptedAI(c) {}
+            boss_gahzrankaAI(Creature* creature) : ScriptedAI(creature) { }
             uint32 Frostbreath_Timer;
             uint32 MassiveGeyser_Timer;
             uint32 Slam_Timer;
@@ -52,7 +49,7 @@ class boss_gahzranka : public CreatureScript
                 Slam_Timer = 17000;
             }
 
-            void EnterCombat(Unit * /*who*/)
+            void EnterCombat(Unit* /*who*/)
             {
             }
 
@@ -66,7 +63,7 @@ class boss_gahzranka : public CreatureScript
                 if (Frostbreath_Timer <= diff)
                 {
                     DoCast(me->getVictim(), SPELL_FROSTBREATH);
-                    Frostbreath_Timer = 7000 + rand()%4000;
+                    Frostbreath_Timer = urand(7000, 11000);
                 } else Frostbreath_Timer -= diff;
 
                 //MassiveGeyser_Timer
@@ -75,14 +72,14 @@ class boss_gahzranka : public CreatureScript
                     DoCast(me->getVictim(), SPELL_MASSIVEGEYSER);
                     DoResetThreat();
 
-                    MassiveGeyser_Timer = 22000 + rand()%10000;
+                    MassiveGeyser_Timer = urand(22000, 32000);
                 } else MassiveGeyser_Timer -= diff;
 
                 //Slam_Timer
                 if (Slam_Timer <= diff)
                 {
                     DoCast(me->getVictim(), SPELL_SLAM);
-                    Slam_Timer = 12000 + rand()%8000;
+                    Slam_Timer = urand(12000, 20000);
                 } else Slam_Timer -= diff;
 
                 DoMeleeAttackIfReady();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Mind Control buggy.
 SDCategory: Temple of Ahn'Qiraj
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "temple_of_ahnqiraj.h"
 #include "Group.h"
 
@@ -38,13 +39,13 @@ EndScriptData */
 
 #define SPELL_ARCANE_EXPLOSION      25679
 #define SPELL_EARTH_SHOCK           26194
-#define SPELL_TRUE_FULFILLMENT4     26526
+#define SPELL_TRUE_FULFILLMENT      785
 #define SPELL_BLINK                 28391
 
 class ov_mycoordinates
 {
     public:
-        float x,y,z,r;
+        float x, y, z, r;
         ov_mycoordinates(float cx, float cy, float cz, float cr)
         {
             x = cx; y = cy; z = cz; r = cr;
@@ -56,14 +57,14 @@ class boss_skeram : public CreatureScript
 public:
     boss_skeram() : CreatureScript("boss_skeram") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_skeramAI (pCreature);
+        return new boss_skeramAI (creature);
     }
 
     struct boss_skeramAI : public ScriptedAI
     {
-        boss_skeramAI(Creature *c) : ScriptedAI(c)
+        boss_skeramAI(Creature* creature) : ScriptedAI(creature)
         {
             IsImage = false;
         }
@@ -82,10 +83,10 @@ public:
 
         void Reset()
         {
-            ArcaneExplosion_Timer = 6000 + rand()%6000;
+            ArcaneExplosion_Timer = urand(6000, 12000);
             EarthShock_Timer = 2000;
             FullFillment_Timer = 15000;
-            Blink_Timer = 8000 + rand()%12000;
+            Blink_Timer = urand(8000, 20000);
             Invisible_Timer = 500;
 
             Images75 = false;
@@ -102,20 +103,20 @@ public:
 
         void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_SLAY1,SAY_SLAY2,SAY_SLAY3), me);
+            DoScriptText(RAND(SAY_SLAY1, SAY_SLAY2, SAY_SLAY3), me);
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
             if (!IsImage)
                 DoScriptText(SAY_DEATH, me);
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             if (IsImage || Images75)
                 return;
-            DoScriptText(RAND(SAY_AGGRO1,SAY_AGGRO2,SAY_AGGRO3), me);
+            DoScriptText(RAND(SAY_AGGRO1, SAY_AGGRO2, SAY_AGGRO3), me);
         }
 
         void UpdateAI(const uint32 diff)
@@ -128,7 +129,7 @@ public:
             if (ArcaneExplosion_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_ARCANE_EXPLOSION);
-                ArcaneExplosion_Timer = 8000 + rand()%10000;
+                ArcaneExplosion_Timer = urand(8000, 18000);
             } else ArcaneExplosion_Timer -= diff;
 
             //If we are within range melee the target
@@ -154,24 +155,24 @@ public:
             if (Blink_Timer <= diff)
             {
                 //DoCast(me, SPELL_BLINK);
-                switch (urand(0,2))
+                switch (urand(0, 2))
                 {
                     case 0:
-                        me->GetMap()->CreatureRelocation(me, -8340.782227f,2083.814453f,125.648788f,0.0f);
+                        me->SetPosition(-8340.782227f, 2083.814453f, 125.648788f, 0.0f);
                         DoResetThreat();
                         break;
                     case 1:
-                        me->GetMap()->CreatureRelocation(me, -8341.546875f,2118.504639f,133.058151f,0.0f);
+                        me->SetPosition(-8341.546875f, 2118.504639f, 133.058151f, 0.0f);
                         DoResetThreat();
                         break;
                     case 2:
-                        me->GetMap()->CreatureRelocation(me, -8318.822266f,2058.231201f,133.058151f,0.0f);
+                        me->SetPosition(-8318.822266f, 2058.231201f, 133.058151f, 0.0f);
                         DoResetThreat();
                         break;
                 }
                 DoStopAttack();
 
-                Blink_Timer= 20000 + rand()%20000;
+                Blink_Timer= urand(20000, 40000);
             } else Blink_Timer -= diff;
 
             int procent = (int) (me->GetHealthPct() + 0.5f);
@@ -209,13 +210,13 @@ public:
         {
             DoScriptText(SAY_SPLIT, me);
 
-            ov_mycoordinates *place1 = new ov_mycoordinates(-8340.782227f,2083.814453f,125.648788f,0);
-            ov_mycoordinates *place2 = new ov_mycoordinates(-8341.546875f,2118.504639f,133.058151f,0);
-            ov_mycoordinates *place3 = new ov_mycoordinates(-8318.822266f,2058.231201f,133.058151f,0);
+            ov_mycoordinates *place1 = new ov_mycoordinates(-8340.782227f, 2083.814453f, 125.648788f, 0);
+            ov_mycoordinates *place2 = new ov_mycoordinates(-8341.546875f, 2118.504639f, 133.058151f, 0);
+            ov_mycoordinates *place3 = new ov_mycoordinates(-8318.822266f, 2058.231201f, 133.058151f, 0);
 
             ov_mycoordinates *bossc=place1, *i1=place2, *i2=place3;
 
-            switch (urand(0,2))
+            switch (urand(0, 2))
             {
                 case 0:
                     bossc=place1;
@@ -236,9 +237,9 @@ public:
 
             for (uint16 i = 0; i < 41; ++i)
             {
-                if (Player *pTarget = CAST_PLR(SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true)))
+                if (Player* target = CAST_PLR(SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true)))
                 {
-                    if (Group *pGrp = pTarget->GetGroup())
+                    if (Group* pGrp = target->GetGroup())
                         for (uint8 ico = 0; ico < TARGETICONCOUNT; ++ico)
                         {
                             //if (grp->m_targetIcons[ico] == me->GetGUID()) -- private member :(
@@ -252,7 +253,7 @@ public:
             me->RemoveAllAuras();
             me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
             me->SetVisible(false);
-            me->GetMap()->CreatureRelocation(me, bossc->x, bossc->y, bossc->z, bossc->r);
+            me->SetPosition(bossc->x, bossc->y, bossc->z, bossc->r);
             Invisible = true;
             DoResetThreat();
             DoStopAttack();
@@ -264,25 +265,25 @@ public:
                 case 25: Images25 = true; break;
             }
 
-            Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM,0);
+            Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0);
 
-            Creature *Image1 = me->SummonCreature(15263, i1->x, i1->y, i1->z, i1->r, TEMPSUMMON_CORPSE_DESPAWN, 30000);
+            Creature* Image1 = me->SummonCreature(15263, i1->x, i1->y, i1->z, i1->r, TEMPSUMMON_CORPSE_DESPAWN, 30000);
             if (Image1)
             {
                 Image1->SetMaxHealth(me->GetMaxHealth() / 5);
                 Image1->SetHealth(me->GetHealth() / 5);
-                if (pTarget)
-                    Image1->AI()->AttackStart(pTarget);
+                if (target)
+                    Image1->AI()->AttackStart(target);
                 CAST_AI(boss_skeram::boss_skeramAI, Image1->AI())->IsImage = true;
             }
 
-            Creature *Image2 = me->SummonCreature(15263,i2->x, i2->y, i2->z, i2->r, TEMPSUMMON_CORPSE_DESPAWN, 30000);
+            Creature* Image2 = me->SummonCreature(15263, i2->x, i2->y, i2->z, i2->r, TEMPSUMMON_CORPSE_DESPAWN, 30000);
             if (Image2)
             {
                 Image2->SetMaxHealth(me->GetMaxHealth() / 5);
                 Image2->SetHealth(me->GetHealth() / 5);
-                if (pTarget)
-                    Image2->AI()->AttackStart(pTarget);
+                if (target)
+                    Image2->AI()->AttackStart(target);
                 CAST_AI(boss_skeram::boss_skeramAI, Image2->AI())->IsImage = true;
             }
             Invisible = true;
@@ -294,7 +295,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_skeram()
 {

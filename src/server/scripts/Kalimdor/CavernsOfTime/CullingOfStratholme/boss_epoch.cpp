@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,7 +15,6 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 /* Script Data Start
 SDName: Boss epoch
 SDAuthor: Tartalo
@@ -24,7 +23,8 @@ SDComment: TODO: Intro, consecutive attacks to a random target durin time wrap, 
 SDCategory:
 Script Data End */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "culling_of_stratholme.h"
 
 enum Spells
@@ -54,16 +54,16 @@ class boss_epoch : public CreatureScript
 public:
     boss_epoch() : CreatureScript("boss_epoch") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_epochAI (pCreature);
+        return new boss_epochAI (creature);
     }
 
     struct boss_epochAI : public ScriptedAI
     {
-        boss_epochAI(Creature *c) : ScriptedAI(c)
+        boss_epochAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
         uint8 uiStep;
@@ -74,7 +74,7 @@ public:
         uint32 uiTimeStopTimer;
         uint32 uiCurseOfExertionTimer;
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         void Reset()
         {
@@ -85,16 +85,16 @@ public:
             uiTimeStopTimer = 21300;
             uiWoundingStrikeTimer = 5300;
 
-            if (pInstance)
-                pInstance->SetData(DATA_EPOCH_EVENT, NOT_STARTED);
+            if (instance)
+                instance->SetData(DATA_EPOCH_EVENT, NOT_STARTED);
         }
 
         void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
 
-            if (pInstance)
-                pInstance->SetData(DATA_EPOCH_EVENT, IN_PROGRESS);
+            if (instance)
+                instance->SetData(DATA_EPOCH_EVENT, IN_PROGRESS);
         }
 
         void UpdateAI(const uint32 diff)
@@ -105,8 +105,8 @@ public:
 
             if (uiCurseOfExertionTimer < diff)
             {
-                if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                    DoCast(pTarget, SPELL_CURSE_OF_EXERTION);
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                    DoCast(target, SPELL_CURSE_OF_EXERTION);
                 uiCurseOfExertionTimer = 9300;
             } else uiCurseOfExertionTimer -= diff;
 
@@ -124,7 +124,7 @@ public:
 
             if (uiTimeWarpTimer < diff)
             {
-                DoScriptText(RAND(SAY_TIME_WARP_1,SAY_TIME_WARP_2,SAY_TIME_WARP_3), me);
+                DoScriptText(RAND(SAY_TIME_WARP_1, SAY_TIME_WARP_2, SAY_TIME_WARP_3), me);
                 DoCastAOE(SPELL_TIME_WARP);
                 uiTimeWarpTimer = 25300;
             } else uiTimeWarpTimer -= diff;
@@ -136,21 +136,20 @@ public:
         {
             DoScriptText(SAY_DEATH, me);
 
-            if (pInstance)
-                pInstance->SetData(DATA_EPOCH_EVENT, DONE);
+            if (instance)
+                instance->SetData(DATA_EPOCH_EVENT, DONE);
         }
 
-        void KilledUnit(Unit * victim)
+        void KilledUnit(Unit* victim)
         {
             if (victim == me)
                 return;
 
-            DoScriptText(RAND(SAY_SLAY_1,SAY_SLAY_2,SAY_SLAY_3), me);
+            DoScriptText(RAND(SAY_SLAY_1, SAY_SLAY_2, SAY_SLAY_3), me);
         }
     };
 
 };
-
 
 void AddSC_boss_epoch()
 {

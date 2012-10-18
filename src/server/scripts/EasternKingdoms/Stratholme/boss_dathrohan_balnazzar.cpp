@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Possibly need to fix/improve summons after death
 SDCategory: Stratholme
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 enum eEnums
 {
@@ -70,14 +71,14 @@ class boss_dathrohan_balnazzar : public CreatureScript
 public:
     boss_dathrohan_balnazzar() : CreatureScript("boss_dathrohan_balnazzar") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_dathrohan_balnazzarAI (pCreature);
+        return new boss_dathrohan_balnazzarAI (creature);
     }
 
     struct boss_dathrohan_balnazzarAI : public ScriptedAI
     {
-        boss_dathrohan_balnazzarAI(Creature *c) : ScriptedAI(c) {}
+        boss_dathrohan_balnazzarAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 m_uiCrusadersHammer_Timer;
         uint32 m_uiCrusaderStrike_Timer;
@@ -105,7 +106,7 @@ public:
                 me->UpdateEntry(NPC_DATHROHAN);
         }
 
-        void JustDied(Unit* /*Victim*/)
+        void JustDied(Unit* /*killer*/)
         {
             static uint32 uiCount = sizeof(m_aSummonPoint)/sizeof(SummonDef);
 
@@ -115,7 +116,7 @@ public:
                 TEMPSUMMON_TIMED_DESPAWN, HOUR*IN_MILLISECONDS);
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
         }
 
@@ -131,7 +132,7 @@ public:
                 if (m_uiMindBlast_Timer <= uiDiff)
                 {
                     DoCast(me->getVictim(), SPELL_MINDBLAST);
-                    m_uiMindBlast_Timer = 15000 + rand()%5000;
+                    m_uiMindBlast_Timer = urand(15000, 20000);
                 } else m_uiMindBlast_Timer -= uiDiff;
 
                 //CrusadersHammer
@@ -173,7 +174,7 @@ public:
                 if (m_uiMindBlast_Timer <= uiDiff)
                 {
                     DoCast(me->getVictim(), SPELL_MINDBLAST);
-                    m_uiMindBlast_Timer = 15000 + rand()%5000;
+                    m_uiMindBlast_Timer = urand(15000, 20000);
                 } else m_uiMindBlast_Timer -= uiDiff;
 
                 //ShadowShock
@@ -186,8 +187,8 @@ public:
                 //PsychicScream
                 if (m_uiPsychicScream_Timer <= uiDiff)
                 {
-                    if (Unit* pTarget = SelectUnit(SELECT_TARGET_RANDOM,0))
-                        DoCast(pTarget, SPELL_PSYCHICSCREAM);
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                        DoCast(target, SPELL_PSYCHICSCREAM);
 
                     m_uiPsychicScream_Timer = 20000;
                 } else m_uiPsychicScream_Timer -= uiDiff;
@@ -195,8 +196,8 @@ public:
                 //DeepSleep
                 if (m_uiDeepSleep_Timer <= uiDiff)
                 {
-                    if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM,0))
-                        DoCast(pTarget, SPELL_SLEEP);
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                        DoCast(target, SPELL_SLEEP);
 
                     m_uiDeepSleep_Timer = 15000;
                 } else m_uiDeepSleep_Timer -= uiDiff;
@@ -214,7 +215,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_dathrohan_balnazzar()
 {

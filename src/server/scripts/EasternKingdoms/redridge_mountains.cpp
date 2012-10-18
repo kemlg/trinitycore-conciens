@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,7 +21,8 @@ SD%Complete: 100%
 SDComment: Support for quest 219.
 Script Data End */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "ScriptedEscortAI.h"
 
 enum eCorporalKeeshan
@@ -43,25 +44,25 @@ class npc_corporal_keeshan : public CreatureScript
 public:
     npc_corporal_keeshan() : CreatureScript("npc_corporal_keeshan") { }
 
-    bool OnQuestAccept(Player* pPlayer, Creature* pCreature, Quest const *pQuest)
+    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
     {
-        if (pQuest->GetQuestId() == QUEST_MISSING_IN_ACTION)
+        if (quest->GetQuestId() == QUEST_MISSING_IN_ACTION)
         {
-            CAST_AI(npc_corporal_keeshan::npc_corporal_keeshanAI,pCreature->AI())->Start(true, false, pPlayer->GetGUID(),pQuest);
-            DoScriptText(SAY_CORPORAL_1, pCreature);
+            CAST_AI(npc_corporal_keeshan::npc_corporal_keeshanAI, creature->AI())->Start(true, false, player->GetGUID(), quest);
+            DoScriptText(SAY_CORPORAL_1, creature);
         }
 
         return false;
     }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_corporal_keeshanAI(pCreature);
+        return new npc_corporal_keeshanAI(creature);
     }
 
     struct npc_corporal_keeshanAI : public npc_escortAI
     {
-        npc_corporal_keeshanAI(Creature* pCreature) : npc_escortAI(pCreature) {}
+        npc_corporal_keeshanAI(Creature* creature) : npc_escortAI(creature) {}
 
         uint32 uiPhase;
         uint32 uiTimer;
@@ -76,17 +77,16 @@ public:
             uiShieldBashTimer  = 8000;
         }
 
-        void WaypointReached(uint32 uiI)
+        void WaypointReached(uint32 waypointId)
         {
-            Player* pPlayer = GetPlayerForEscort();
-
-            if (!pPlayer)
+            Player* player = GetPlayerForEscort();
+            if (!player)
                 return;
 
-            if (uiI >= 65 && me->GetUnitMovementFlags() == MOVEMENTFLAG_WALKING)
-                me->RemoveUnitMovementFlag(MOVEMENTFLAG_WALKING);
+            if (waypointId >= 65 && me->GetUnitMovementFlags() == MOVEMENTFLAG_WALKING)
+                me->SetWalk(false);
 
-            switch(uiI)
+            switch (waypointId)
             {
                 case 39:
                     SetEscortPaused(true);
@@ -94,10 +94,10 @@ public:
                     uiPhase = 1;
                     break;
                 case 65:
-                    me->RemoveUnitMovementFlag(MOVEMENTFLAG_WALKING);
+                    me->SetWalk(false);
                     break;
                 case 115:
-                    pPlayer->AreaExploredOrEventHappens(QUEST_MISSING_IN_ACTION);
+                    player->AreaExploredOrEventHappens(QUEST_MISSING_IN_ACTION);
                     uiTimer = 2000;
                     uiPhase = 4;
                     break;
@@ -115,7 +115,7 @@ public:
             {
                 if (uiTimer <= uiDiff)
                 {
-                    switch(uiPhase)
+                    switch (uiPhase)
                     {
                         case 1:
                             me->SetStandState(UNIT_STAND_STATE_SIT);
@@ -123,12 +123,12 @@ public:
                             uiPhase = 2;
                             break;
                         case 2:
-                            DoScriptText(SAY_CORPORAL_2,me);
+                            DoScriptText(SAY_CORPORAL_2, me);
                             uiTimer = 15000;
                             uiPhase = 3;
                             break;
                         case 3:
-                            DoScriptText(SAY_CORPORAL_3,me);
+                            DoScriptText(SAY_CORPORAL_3, me);
                             me->SetStandState(UNIT_STAND_STATE_STAND);
                             SetEscortPaused(false);
                             uiTimer = 0;
@@ -151,23 +151,20 @@ public:
 
             if (uiMockingBlowTimer <= uiDiff)
             {
-                DoCast(me->getVictim(),SPELL_MOCKING_BLOW);
+                DoCast(me->getVictim(), SPELL_MOCKING_BLOW);
                 uiMockingBlowTimer = 5000;
             } else uiMockingBlowTimer -= uiDiff;
 
             if (uiShieldBashTimer <= uiDiff)
             {
-                DoCast(me->getVictim(),SPELL_MOCKING_BLOW);
+                DoCast(me->getVictim(), SPELL_MOCKING_BLOW);
                 uiShieldBashTimer = 8000;
             } else uiShieldBashTimer -= uiDiff;
 
             DoMeleeAttackIfReady();
         }
     };
-
 };
-
-
 
 void AddSC_redridge_mountains()
 {

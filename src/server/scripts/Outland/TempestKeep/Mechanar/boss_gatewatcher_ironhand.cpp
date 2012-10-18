@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Tempest Keep, The Mechanar
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 enum eSays
 {
@@ -58,7 +59,7 @@ class boss_gatewatcher_iron_hand : public CreatureScript
             // Gatewatcher Iron-Hand AI
             struct boss_gatewatcher_iron_handAI : public ScriptedAI
             {
-                boss_gatewatcher_iron_handAI(Creature* pCreature) : ScriptedAI(pCreature)
+                boss_gatewatcher_iron_handAI(Creature* creature) : ScriptedAI(creature)
                 {
                 }
 
@@ -73,7 +74,7 @@ class boss_gatewatcher_iron_hand : public CreatureScript
                     Stream_of_Machine_Fluid_Timer = 55000;
 
                 }
-                void EnterCombat(Unit * /*who*/)
+                void EnterCombat(Unit* /*who*/)
                 {
                     DoScriptText(SAY_AGGRO_1, me);
                 }
@@ -83,10 +84,10 @@ class boss_gatewatcher_iron_hand : public CreatureScript
                     if (rand()%2)
                         return;
 
-                    DoScriptText(RAND(SAY_SLAY_1,SAY_SLAY_2), me);
+                    DoScriptText(RAND(SAY_SLAY_1, SAY_SLAY_2), me);
                 }
 
-                void JustDied(Unit* /*Killer*/)
+                void JustDied(Unit* /*killer*/)
                 {
                     DoScriptText(SAY_DEATH_1, me);
                     //TODO: Add door check/open code
@@ -102,7 +103,7 @@ class boss_gatewatcher_iron_hand : public CreatureScript
                     if (Shadow_Power_Timer <= diff)
                     {
                         DoCast(me, SPELL_SHADOW_POWER);
-                        Shadow_Power_Timer = 20000 + rand()%8000;
+                        Shadow_Power_Timer = urand(20000, 28000);
                     }
                     else
                         Shadow_Power_Timer -= diff;
@@ -118,7 +119,7 @@ class boss_gatewatcher_iron_hand : public CreatureScript
                         if (rand()%2)
                                             return;
 
-                        DoScriptText(RAND(SAY_HAMMER_1,SAY_HAMMER_2), me);
+                        DoScriptText(RAND(SAY_HAMMER_1, SAY_HAMMER_2), me);
                         Jackhammer_Timer = 30000;
                     }
                     else
@@ -128,7 +129,7 @@ class boss_gatewatcher_iron_hand : public CreatureScript
                     if (Stream_of_Machine_Fluid_Timer <= diff)
                     {
                         DoCast(me->getVictim(), SPELL_STREAM_OF_MACHINE_FLUID);
-                        Stream_of_Machine_Fluid_Timer = 35000 + rand()%15000;
+                        Stream_of_Machine_Fluid_Timer = urand(35000, 50000);
                     }
                     else
                         Stream_of_Machine_Fluid_Timer -= diff;

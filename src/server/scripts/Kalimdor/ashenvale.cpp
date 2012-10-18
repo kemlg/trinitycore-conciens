@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -28,76 +28,82 @@ npc_torek
 npc_ruul_snowhoof
 EndContentData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "ScriptedEscortAI.h"
 
 /*####
 # npc_torek
 ####*/
 
-#define SAY_READY                   -1000106
-#define SAY_MOVE                    -1000107
-#define SAY_PREPARE                 -1000108
-#define SAY_WIN                     -1000109
-#define SAY_END                     -1000110
+enum TorekSays
+{
+    SAY_READY                  = 0,
+    SAY_MOVE                   = 1,
+    SAY_PREPARE                = 2,
+    SAY_WIN                    = 3,
+    SAY_END                    = 4,
+};
 
-#define SPELL_REND                  11977
-#define SPELL_THUNDERCLAP           8078
+enum TorekSpells
+{
+    SPELL_REND                  = 11977,
+    SPELL_THUNDERCLAP           = 8078,
+};
 
-#define QUEST_TOREK_ASSULT          6544
+enum TorekMisc
+{
+    QUEST_TOREK_ASSULT          = 6544,
 
-#define ENTRY_SPLINTERTREE_RAIDER   12859
-#define ENTRY_DURIEL                12860
-#define ENTRY_SILVERWING_SENTINEL   12896
-#define ENTRY_SILVERWING_WARRIOR    12897
+    ENTRY_SPLINTERTREE_RAIDER   = 12859,
+    ENTRY_DURIEL                = 12860,
+    ENTRY_SILVERWING_SENTINEL   = 12896,
+    ENTRY_SILVERWING_WARRIOR    = 12897,
+};
 
 class npc_torek : public CreatureScript
 {
     public:
 
-        npc_torek()
-            : CreatureScript("npc_torek")
+        npc_torek() : CreatureScript("npc_torek")
         {
         }
 
         struct npc_torekAI : public npc_escortAI
         {
-            npc_torekAI(Creature *c) : npc_escortAI(c) {}
+            npc_torekAI(Creature* creature) : npc_escortAI(creature) {}
 
             uint32 Rend_Timer;
             uint32 Thunderclap_Timer;
             bool Completed;
 
-            void WaypointReached(uint32 i)
+            void WaypointReached(uint32 waypointId)
             {
-                Player* pPlayer = GetPlayerForEscort();
-
-                if (!pPlayer)
-                    return;
-
-                switch (i)
+                if (Player* player = GetPlayerForEscort())
                 {
-                case 1:
-                    DoScriptText(SAY_MOVE, me, pPlayer);
-                    break;
-                case 8:
-                    DoScriptText(SAY_PREPARE, me, pPlayer);
-                    break;
-                case 19:
-                    //TODO: verify location and creatures amount.
-                    me->SummonCreature(ENTRY_DURIEL,1776.73f,-2049.06f,109.83f,1.54f,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,25000);
-                    me->SummonCreature(ENTRY_SILVERWING_SENTINEL,1774.64f,-2049.41f,109.83f,1.40f,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,25000);
-                    me->SummonCreature(ENTRY_SILVERWING_WARRIOR,1778.73f,-2049.50f,109.83f,1.67f,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,25000);
-                    break;
-                case 20:
-                    DoScriptText(SAY_WIN, me, pPlayer);
-                    Completed = true;
-                    if (pPlayer)
-                        pPlayer->GroupEventHappens(QUEST_TOREK_ASSULT, me);
-                    break;
-                case 21:
-                    DoScriptText(SAY_END, me, pPlayer);
-                    break;
+                    switch (waypointId)
+                    {
+                        case 1:
+                            Talk(SAY_MOVE, player->GetGUID());
+                            break;
+                        case 8:
+                            Talk(SAY_PREPARE, player->GetGUID());
+                            break;
+                        case 19:
+                            //TODO: verify location and creatures amount.
+                            me->SummonCreature(ENTRY_DURIEL, 1776.73f, -2049.06f, 109.83f, 1.54f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
+                            me->SummonCreature(ENTRY_SILVERWING_SENTINEL, 1774.64f, -2049.41f, 109.83f, 1.40f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
+                            me->SummonCreature(ENTRY_SILVERWING_WARRIOR, 1778.73f, -2049.50f, 109.83f, 1.67f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
+                            break;
+                        case 20:
+                            DoScriptText(SAY_WIN, me, player);
+                            Completed = true;
+                            player->GroupEventHappens(QUEST_TOREK_ASSULT, me);
+                            break;
+                        case 21:
+                            Talk(SAY_END, player->GetGUID());
+                            break;
+                    }
                 }
             }
 
@@ -148,7 +154,7 @@ class npc_torek : public CreatureScript
             if (quest->GetQuestId() == QUEST_TOREK_ASSULT)
             {
                 //TODO: find companions, make them follow Torek, at any time (possibly done by core/database in future?)
-                DoScriptText(SAY_READY, creature, player);
+                creature->AI()->Talk(SAY_READY, player->GetGUID());
                 creature->setFaction(113);
 
                 if (npc_escortAI* pEscortAI = CAST_AI(npc_torekAI, creature->AI()))
@@ -163,53 +169,62 @@ class npc_torek : public CreatureScript
 # npc_ruul_snowhoof
 ####*/
 
-#define QUEST_FREEDOM_TO_RUUL    6482
-#define GO_CAGE                  178147
+enum RuulSnowhoof
+{
+    NPC_THISTLEFUR_URSA         = 3921,
+    NPC_THISTLEFUR_TOTEMIC      = 3922,
+    NPC_THISTLEFUR_PATHFINDER   = 3926,
+
+    QUEST_FREEDOM_TO_RUUL       = 6482,
+
+    GO_CAGE                     = 178147
+};
+
+Position const RuulSnowhoofSummonsCoord[6] =
+{
+    {3449.218018f, -587.825073f, 174.978867f, 4.714445f},
+    {3446.384521f, -587.830872f, 175.186279f, 4.714445f},
+    {3444.218994f, -587.835327f, 175.380600f, 4.714445f},
+    {3508.344482f, -492.024261f, 186.929031f, 4.145029f},
+    {3506.265625f, -490.531006f, 186.740128f, 4.239277f},
+    {3503.682373f, -489.393799f, 186.629684f, 4.349232f}
+};
 
 class npc_ruul_snowhoof : public CreatureScript
 {
     public:
-
-        npc_ruul_snowhoof()
-            : CreatureScript("npc_ruul_snowhoof")
-        {
-        }
+        npc_ruul_snowhoof() : CreatureScript("npc_ruul_snowhoof") { }
 
         struct npc_ruul_snowhoofAI : public npc_escortAI
         {
-            npc_ruul_snowhoofAI(Creature *c) : npc_escortAI(c) {}
+            npc_ruul_snowhoofAI(Creature* creature) : npc_escortAI(creature) { }
 
-            void WaypointReached(uint32 i)
+            void WaypointReached(uint32 waypointId)
             {
-                Player* pPlayer = GetPlayerForEscort();
-
-                if (!pPlayer)
+                Player* player = GetPlayerForEscort();
+                if (!player)
                     return;
 
-                switch(i)
+                switch (waypointId)
                 {
-                case 0:    {
+                    case 0:
                         me->SetUInt32Value(UNIT_FIELD_BYTES_1, 0);
-                        GameObject* Cage = me->FindNearestGameObject(GO_CAGE, 20);
-                        if (Cage)
+                        if (GameObject* Cage = me->FindNearestGameObject(GO_CAGE, 20))
                             Cage->SetGoState(GO_STATE_ACTIVE);
-                        break;}
-                case 13:
-                        me->SummonCreature(3922, 3449.218018f, -587.825073f, 174.978867f, 4.714445f, TEMPSUMMON_DEAD_DESPAWN, 60000);
-                        me->SummonCreature(3921, 3446.384521f, -587.830872f, 175.186279f, 4.714445f, TEMPSUMMON_DEAD_DESPAWN, 60000);
-                        me->SummonCreature(3926, 3444.218994f, -587.835327f, 175.380600f, 4.714445f, TEMPSUMMON_DEAD_DESPAWN, 60000);
                         break;
-                case 19:
-                        me->SummonCreature(3922, 3508.344482f, -492.024261f, 186.929031f, 4.145029f, TEMPSUMMON_DEAD_DESPAWN, 60000);
-                        me->SummonCreature(3921, 3506.265625f, -490.531006f, 186.740128f, 4.239277f, TEMPSUMMON_DEAD_DESPAWN, 60000);
-                        me->SummonCreature(3926, 3503.682373f, -489.393799f, 186.629684f, 4.349232f, TEMPSUMMON_DEAD_DESPAWN, 60000);
+                    case 13:
+                        me->SummonCreature(NPC_THISTLEFUR_TOTEMIC, RuulSnowhoofSummonsCoord[0], TEMPSUMMON_DEAD_DESPAWN, 60000);
+                        me->SummonCreature(NPC_THISTLEFUR_URSA, RuulSnowhoofSummonsCoord[1], TEMPSUMMON_DEAD_DESPAWN, 60000);
+                        me->SummonCreature(NPC_THISTLEFUR_PATHFINDER, RuulSnowhoofSummonsCoord[2], TEMPSUMMON_DEAD_DESPAWN, 60000);
                         break;
-
-                case 21:{
-                        if (pPlayer)
-                            pPlayer->GroupEventHappens(QUEST_FREEDOM_TO_RUUL, me);
-
-                        break;  }
+                    case 19:
+                        me->SummonCreature(NPC_THISTLEFUR_TOTEMIC, RuulSnowhoofSummonsCoord[3], TEMPSUMMON_DEAD_DESPAWN, 60000);
+                        me->SummonCreature(NPC_THISTLEFUR_URSA, RuulSnowhoofSummonsCoord[4], TEMPSUMMON_DEAD_DESPAWN, 60000);
+                        me->SummonCreature(NPC_THISTLEFUR_PATHFINDER, RuulSnowhoofSummonsCoord[5], TEMPSUMMON_DEAD_DESPAWN, 60000);
+                        break;
+                    case 21:
+                        player->GroupEventHappens(QUEST_FREEDOM_TO_RUUL, me);
+                        break;
                 }
             }
 
@@ -217,8 +232,7 @@ class npc_ruul_snowhoof : public CreatureScript
 
             void Reset()
             {
-                GameObject* Cage = me->FindNearestGameObject(GO_CAGE, 20);
-                if (Cage)
+                if (GameObject* Cage = me->FindNearestGameObject(GO_CAGE, 20))
                     Cage->SetGoState(GO_STATE_READY);
             }
 
@@ -252,7 +266,7 @@ class npc_ruul_snowhoof : public CreatureScript
         }
 };
 
-enum eEnums
+enum Muglash
 {
     SAY_MUG_START1          = -1800054,
     SAY_MUG_START2          = -1800055,
@@ -281,21 +295,21 @@ enum eEnums
     NPC_MUGLASH             = 12717
 };
 
-static float m_afFirstNagaCoord[3][3]=
+Position const FirstNagaCoord[3] =
 {
-    {3603.504150f, 1122.631104f, 1.635f},                      // rider
-    {3589.293945f, 1148.664063f, 5.565f},                      // sorceress
-    {3609.925537f, 1168.759521f, -1.168f}                      // razortail
+    {3603.504150f, 1122.631104f, 1.635f, 0.0f},         // rider
+    {3589.293945f, 1148.664063f, 5.565f, 0.0f},         // sorceress
+    {3609.925537f, 1168.759521f, -1.168f, 0.0f}         // razortail
 };
 
-static float m_afSecondNagaCoord[3][3]=
+Position const SecondNagaCoord[3] =
 {
-    {3609.925537f, 1168.759521f, -1.168f},                     // witch
-    {3645.652100f, 1139.425415f, 1.322f},                      // priest
-    {3583.602051f, 1128.405762f, 2.347f}                       // myrmidon
+    {3609.925537f, 1168.759521f, -1.168f, 0.0f},        // witch
+    {3645.652100f, 1139.425415f, 1.322f, 0.0f},         // priest
+    {3583.602051f, 1128.405762f, 2.347f, 0.0f}          // myrmidon
 };
 
-static float m_fVorshaCoord[]={3633.056885f, 1172.924072f, -5.388f};
+Position const VorshaCoord = {3633.056885f, 1172.924072f, -5.388f, 0.0f};
 
 class npc_muglash : public CreatureScript
 {
@@ -304,98 +318,90 @@ class npc_muglash : public CreatureScript
 
         struct npc_muglashAI : public npc_escortAI
         {
-            npc_muglashAI(Creature* pCreature) : npc_escortAI(pCreature) { }
+            npc_muglashAI(Creature* creature) : npc_escortAI(creature) { }
 
-            uint32 m_uiWaveId;
-            uint32 m_uiEventTimer;
-            bool m_bIsBrazierExtinguished;
+            uint8 WaveId;
+            uint32 EventTimer;
+            bool IsBrazierExtinguished;
 
-            void JustSummoned(Creature* pSummoned)
+            void JustSummoned(Creature* summoned)
             {
-                pSummoned->AI()->AttackStart(me);
+                summoned->AI()->AttackStart(me);
             }
 
-            void WaypointReached(uint32 i)
+            void WaypointReached(uint32 waypointId)
             {
-                Player* pPlayer = GetPlayerForEscort();
-
-                switch(i)
+                if (Player* player = GetPlayerForEscort())
                 {
-                    case 0:
-                        if (pPlayer)
-                            DoScriptText(SAY_MUG_START2, me, pPlayer);
-                        break;
-                    case 24:
-                        if (pPlayer)
-                            DoScriptText(SAY_MUG_BRAZIER, me, pPlayer);
+                    switch (waypointId)
+                    {
+                        case 0:
+                            DoScriptText(SAY_MUG_START2, me, player);
+                            break;
+                        case 24:
+                            DoScriptText(SAY_MUG_BRAZIER, me, player);
 
-                        if (GameObject* pGo = GetClosestGameObjectWithEntry(me, GO_NAGA_BRAZIER, INTERACTION_DISTANCE*2))
-                        {
-                            pGo->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_UNK1);
-                            SetEscortPaused(true);
-                        }
-                        break;
-                    case 25:
-                        DoScriptText(SAY_MUG_GRATITUDE, me);
-
-                        if (pPlayer)
-                            pPlayer->GroupEventHappens(QUEST_VORSHA, me);
-                        break;
-                    case 26:
-                        DoScriptText(SAY_MUG_PATROL, me);
-                        break;
-                    case 27:
-                        DoScriptText(SAY_MUG_RETURN, me);
-                        break;
+                            if (GameObject* go = GetClosestGameObjectWithEntry(me, GO_NAGA_BRAZIER, INTERACTION_DISTANCE*2))
+                            {
+                                go->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+                                SetEscortPaused(true);
+                            }
+                            break;
+                        case 25:
+                            DoScriptText(SAY_MUG_GRATITUDE, me);
+                            player->GroupEventHappens(QUEST_VORSHA, me);
+                            break;
+                        case 26:
+                            DoScriptText(SAY_MUG_PATROL, me);
+                            break;
+                        case 27:
+                            DoScriptText(SAY_MUG_RETURN, me);
+                            break;
+                    }
                 }
             }
 
-            void EnterCombat(Unit* /*pWho*/)
+            void EnterCombat(Unit* /*who*/)
             {
-                if (Player* pPlayer = GetPlayerForEscort())
+                if (Player* player = GetPlayerForEscort())
                     if (HasEscortState(STATE_ESCORT_PAUSED))
                     {
                         if (urand(0, 1))
-                            DoScriptText(SAY_MUG_ON_GUARD, me, pPlayer);
+                            DoScriptText(SAY_MUG_ON_GUARD, me, player);
                         return;
                     }
             }
 
             void Reset()
             {
-                m_uiEventTimer = 10000;
-                m_uiWaveId = 0;
-                m_bIsBrazierExtinguished = false;
+                EventTimer = 10000;
+                WaveId = 0;
+                IsBrazierExtinguished = false;
             }
 
-            void JustDied(Unit* /*pKiller*/)
+            void JustDied(Unit* /*killer*/)
             {
-                Player* pPlayer = GetPlayerForEscort();
                 if (HasEscortState(STATE_ESCORT_ESCORTING))
-                {
-                    if (pPlayer)
-                    {
-                        pPlayer->FailQuest(QUEST_VORSHA);
-                    }
-                }
+                    if (Player* player = GetPlayerForEscort())
+                        player->FailQuest(QUEST_VORSHA);
             }
 
             void DoWaveSummon()
             {
-                switch(m_uiWaveId)
+                switch (WaveId)
                 {
                     case 1:
-                        me->SummonCreature(NPC_WRATH_RIDER,     m_afFirstNagaCoord[0][0], m_afFirstNagaCoord[0][1], m_afFirstNagaCoord[0][2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
-                        me->SummonCreature(NPC_WRATH_SORCERESS, m_afFirstNagaCoord[1][0], m_afFirstNagaCoord[1][1], m_afFirstNagaCoord[1][2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
-                        me->SummonCreature(NPC_WRATH_RAZORTAIL, m_afFirstNagaCoord[2][0], m_afFirstNagaCoord[2][1], m_afFirstNagaCoord[2][2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
+                        me->SummonCreature(NPC_WRATH_RIDER,     FirstNagaCoord[0], TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
+                        me->SummonCreature(NPC_WRATH_SORCERESS, FirstNagaCoord[1], TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
+                        me->SummonCreature(NPC_WRATH_RAZORTAIL, FirstNagaCoord[2], TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
                         break;
                     case 2:
-                        me->SummonCreature(NPC_WRATH_PRIESTESS, m_afSecondNagaCoord[0][0], m_afSecondNagaCoord[0][1], m_afSecondNagaCoord[0][2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
-                        me->SummonCreature(NPC_WRATH_MYRMIDON,  m_afSecondNagaCoord[1][0], m_afSecondNagaCoord[1][1], m_afSecondNagaCoord[1][2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
-                        me->SummonCreature(NPC_WRATH_SEAWITCH,  m_afSecondNagaCoord[2][0], m_afSecondNagaCoord[2][1], m_afSecondNagaCoord[2][2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
+                        me->SummonCreature(NPC_WRATH_PRIESTESS, SecondNagaCoord[0], TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
+                        me->SummonCreature(NPC_WRATH_MYRMIDON,  SecondNagaCoord[1], TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
+                        me->SummonCreature(NPC_WRATH_SEAWITCH,  SecondNagaCoord[2], TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
                         break;
                     case 3:
-                        me->SummonCreature(NPC_VORSHA, m_fVorshaCoord[0], m_fVorshaCoord[1], m_fVorshaCoord[2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
+                        me->SummonCreature(NPC_VORSHA, VorshaCoord, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
                         break;
                     case 4:
                         SetEscortPaused(false);
@@ -410,16 +416,16 @@ class npc_muglash : public CreatureScript
 
                 if (!me->getVictim())
                 {
-                    if (HasEscortState(STATE_ESCORT_PAUSED) && m_bIsBrazierExtinguished)
+                    if (HasEscortState(STATE_ESCORT_PAUSED) && IsBrazierExtinguished)
                     {
-                        if (m_uiEventTimer < uiDiff)
+                        if (EventTimer < uiDiff)
                         {
-                            ++m_uiWaveId;
+                            ++WaveId;
                             DoWaveSummon();
-                            m_uiEventTimer = 10000;
+                            EventTimer = 10000;
                         }
                         else
-                            m_uiEventTimer -= uiDiff;
+                            EventTimer -= uiDiff;
                     }
                     return;
                 }
@@ -427,9 +433,9 @@ class npc_muglash : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* pCreature) const
+        CreatureAI* GetAI(Creature* creature) const
         {
-            return new npc_muglashAI(pCreature);
+            return new npc_muglashAI(creature);
         }
 
         bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
@@ -451,11 +457,7 @@ class npc_muglash : public CreatureScript
 class go_naga_brazier : public GameObjectScript
 {
     public:
-
-        go_naga_brazier()
-            : GameObjectScript("go_naga_brazier")
-        {
-        }
+        go_naga_brazier() : GameObjectScript("go_naga_brazier") { }
 
         bool OnGossipHello(Player* /*player*/, GameObject* go)
         {
@@ -465,7 +467,7 @@ class go_naga_brazier : public GameObjectScript
                 {
                     DoScriptText(SAY_MUG_BRAZIER_WAIT, creature);
 
-                    pEscortAI->m_bIsBrazierExtinguished = true;
+                    pEscortAI->IsBrazierExtinguished = true;
                     return false;
                 }
             }

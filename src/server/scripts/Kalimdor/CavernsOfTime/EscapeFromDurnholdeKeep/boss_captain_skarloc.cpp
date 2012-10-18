@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Missing adds, missing waypoints to move up to Thrall once spawned + s
 SDCategory: Caverns of Time, Old Hillsbrad Foothills
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "old_hillsbrad.h"
 
 #define SAY_ENTER                   -1560000
@@ -45,19 +46,19 @@ class boss_captain_skarloc : public CreatureScript
 public:
     boss_captain_skarloc() : CreatureScript("boss_captain_skarloc") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_captain_skarlocAI (pCreature);
+        return new boss_captain_skarlocAI (creature);
     }
 
     struct boss_captain_skarlocAI : public ScriptedAI
     {
-        boss_captain_skarlocAI(Creature *c) : ScriptedAI(c)
+        boss_captain_skarlocAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript *pInstance;
+        InstanceScript* instance;
 
         uint32 Holy_Light_Timer;
         uint32 Cleanse_Timer;
@@ -68,32 +69,32 @@ public:
 
         void Reset()
         {
-            Holy_Light_Timer = 20000 + rand()%10000;
+            Holy_Light_Timer = urand(20000, 30000);
             Cleanse_Timer = 10000;
-            HammerOfJustice_Timer = 20000 + rand()%15000;
+            HammerOfJustice_Timer = urand(20000, 35000);
             HolyShield_Timer = 240000;
             DevotionAura_Timer = 3000;
             Consecration_Timer = 8000;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             //This is not correct. Should taunt Thrall before engage in combat
             DoScriptText(SAY_TAUNT1, me);
             DoScriptText(SAY_TAUNT2, me);
         }
 
-        void KilledUnit(Unit * /*victim*/)
+        void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_SLAY1,SAY_SLAY2), me);
+            DoScriptText(RAND(SAY_SLAY1, SAY_SLAY2), me);
         }
 
-        void JustDied(Unit * /*victim*/)
+        void JustDied(Unit* /*killer*/)
         {
             DoScriptText(SAY_DEATH, me);
 
-            if (pInstance && pInstance->GetData(TYPE_THRALL_EVENT) == IN_PROGRESS)
-                pInstance->SetData(TYPE_THRALL_PART1, DONE);
+            if (instance && instance->GetData(TYPE_THRALL_EVENT) == IN_PROGRESS)
+                instance->SetData(TYPE_THRALL_PART1, DONE);
         }
 
         void UpdateAI(const uint32 diff)
@@ -134,14 +135,14 @@ public:
             if (DevotionAura_Timer <= diff)
             {
                 DoCast(me, SPELL_DEVOTION_AURA);
-                DevotionAura_Timer = 45000 + rand()%10000;
+                DevotionAura_Timer = urand(45000, 55000);
             } else DevotionAura_Timer -= diff;
 
             //Consecration
             if (Consecration_Timer <= diff)
             {
                 //DoCast(me->getVictim(), SPELL_CONSECRATION);
-                Consecration_Timer = 5000 + rand()%5000;
+                Consecration_Timer = urand(5000, 10000);
             } else Consecration_Timer -= diff;
 
             DoMeleeAttackIfReady();
@@ -149,7 +150,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_captain_skarloc()
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -27,8 +27,10 @@ class PreparedStatement;
 class Transaction
 {
     friend class TransactionTask;
+    friend class MySQLConnection;
+
     public:
-        Transaction() {}
+        Transaction() : _cleanedUp(false) {}
         ~Transaction() { Cleanup(); }
 
         void Append(PreparedStatement* statement);
@@ -39,10 +41,13 @@ class Transaction
 
     protected:
         void Cleanup();
-        std::queue<SQLElementData> m_queries;
+        std::list<SQLElementData> m_queries;
+
+    private:
+        bool _cleanedUp;
 
 };
-typedef ACE_Refcounted_Auto_Ptr<Transaction, ACE_Null_Mutex> SQLTransaction;
+typedef Trinity::AutoPtr<Transaction, ACE_Thread_Mutex> SQLTransaction;
 
 /*! Low level class*/
 class TransactionTask : public SQLOperation

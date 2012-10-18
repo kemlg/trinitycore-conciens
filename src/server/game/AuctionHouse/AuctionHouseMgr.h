@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,7 @@ class Player;
 class WorldPacket;
 
 #define MIN_AUCTION_TIME (12*HOUR)
+#define MAX_AUCTION_ITEMS 160
 
 enum AuctionError
 {
@@ -47,12 +48,24 @@ enum AuctionAction
     AUCTION_PLACE_BID = 2
 };
 
+enum MailAuctionAnswers
+{
+    AUCTION_OUTBIDDED           = 0,
+    AUCTION_WON                 = 1,
+    AUCTION_SUCCESSFUL          = 2,
+    AUCTION_EXPIRED             = 3,
+    AUCTION_CANCELLED_TO_BIDDER = 4,
+    AUCTION_CANCELED            = 5,
+    AUCTION_SALE_PENDING        = 6
+};
+
 struct AuctionEntry
 {
     uint32 Id;
     uint32 auctioneer;                                      // creature low guid
     uint32 item_guidlow;
     uint32 item_template;
+    uint32 itemCount;
     uint32 owner;
     uint32 startbid;                                        //maybe useless
     uint32 bid;
@@ -72,6 +85,10 @@ struct AuctionEntry
     void DeleteFromDB(SQLTransaction& trans) const;
     void SaveToDB(SQLTransaction& trans) const;
     bool LoadFromDB(Field* fields);
+    bool LoadFromFieldList(Field* fields);
+    std::string BuildAuctionMailSubject(MailAuctionAnswers response) const;
+    static std::string BuildAuctionMailBody(uint32 lowGuid, uint32 bid, uint32 buyout, uint32 deposit, uint32 cut);
+
 };
 
 //this class is used as auctionhouse instance
@@ -88,7 +105,7 @@ class AuctionHouseObject
 
     typedef std::map<uint32, AuctionEntry*> AuctionEntryMap;
 
-    uint32 Getcount() { return AuctionsMap.size(); }
+    uint32 Getcount() const { return AuctionsMap.size(); }
 
     AuctionEntryMap::iterator GetAuctionsBegin() {return AuctionsMap.begin();}
     AuctionEntryMap::iterator GetAuctionsEnd() {return AuctionsMap.end();}
@@ -99,9 +116,9 @@ class AuctionHouseObject
         return itr != AuctionsMap.end() ? itr->second : NULL;
     }
 
-    void AddAuction(AuctionEntry *auction);
+    void AddAuction(AuctionEntry* auction);
 
-    bool RemoveAuction(AuctionEntry *auction, uint32 item_template);
+    bool RemoveAuction(AuctionEntry* auction, uint32 item_template);
 
     void Update();
 
@@ -122,8 +139,10 @@ class AuctionHouseObject
 class AuctionHouseMgr
 {
     friend class ACE_Singleton<AuctionHouseMgr, ACE_Null_Mutex>;
-    AuctionHouseMgr();
-    ~AuctionHouseMgr();
+
+    private:
+        AuctionHouseMgr();
+        ~AuctionHouseMgr();
 
     public:
 
@@ -142,17 +161,20 @@ class AuctionHouseMgr
         }
 
         //auction messages
-        void SendAuctionWonMail(AuctionEntry * auction, SQLTransaction& trans);
-        void SendAuctionSalePendingMail(AuctionEntry * auction, SQLTransaction& trans);
-        void SendAuctionSuccessfulMail(AuctionEntry * auction, SQLTransaction& trans);
-        void SendAuctionExpiredMail(AuctionEntry * auction, SQLTransaction& trans);
-        void SendAuctionOutbiddedMail(AuctionEntry * auction, uint32 newPrice, Player* newBidder, SQLTransaction& trans);
+        void SendAuctionWonMail(AuctionEntry* auction, SQLTransaction& trans);
+        void SendAuctionSalePendingMail(AuctionEntry* auction, SQLTransaction& trans);
+        void SendAuctionSuccessfulMail(AuctionEntry* auction, SQLTransaction& trans);
+        void SendAuctionExpiredMail(AuctionEntry* auction, SQLTransaction& trans);
+        void SendAuctionOutbiddedMail(AuctionEntry* auction, uint32 newPrice, Player* newBidder, SQLTransaction& trans);
         void SendAuctionCancelledToBidderMail(AuctionEntry* auction, SQLTransaction& trans);
 
-        static uint32 GetAuctionDeposit(AuctionHouseEntry const* entry, uint32 time, Item *pItem, uint32 count);
+        static uint32 GetAuctionDeposit(AuctionHouseEntry const* entry, uint32 time, Item* pItem, uint32 count);
         static AuctionHouseEntry const* GetAuctionHouseEntry(uint32 factionTemplateId);
 
     public:
+
+        // Used primarily at server start to avoid loading a list of expired auctions
+        void DeleteExpiredAuctionsAtStartup();
 
         //load first auction items, because of check if item exists, when loading
         void LoadAuctionItems();

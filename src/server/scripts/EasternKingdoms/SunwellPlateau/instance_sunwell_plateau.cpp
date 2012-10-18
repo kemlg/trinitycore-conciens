@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: VERIFY SCRIPT
 SDCategory: Sunwell_Plateau
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "sunwell_plateau.h"
 
 #define MAX_ENCOUNTER 6
@@ -42,14 +43,14 @@ class instance_sunwell_plateau : public InstanceMapScript
 public:
     instance_sunwell_plateau() : InstanceMapScript("instance_sunwell_plateau", 580) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+    InstanceScript* GetInstanceScript(InstanceMap* map) const
     {
-        return new instance_sunwell_plateau_InstanceMapScript(pMap);
+        return new instance_sunwell_plateau_InstanceMapScript(map);
     }
 
     struct instance_sunwell_plateau_InstanceMapScript : public InstanceScript
     {
-        instance_sunwell_plateau_InstanceMapScript(Map* pMap) : InstanceScript(pMap) {Initialize();};
+        instance_sunwell_plateau_InstanceMapScript(Map* map) : InstanceScript(map) {}
 
         uint32 m_auiEncounter[MAX_ENCOUNTER];
 
@@ -128,19 +129,19 @@ public:
             {
                 for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
                 {
-                    Player* plr = itr->getSource();
-                    if (plr && !plr->HasAura(45839,0))
-                            return plr;
+                    Player* player = itr->getSource();
+                    if (player && !player->HasAura(45839, 0))
+                            return player;
                 }
             }
 
-            sLog->outDebug("TSCR: Instance Sunwell Plateau: GetPlayerInMap, but PlayerList is empty!");
+            sLog->outDebug(LOG_FILTER_TSCR, "Instance Sunwell Plateau: GetPlayerInMap, but PlayerList is empty!");
             return NULL;
         }
 
         void OnCreatureCreate(Creature* creature)
         {
-            switch(creature->GetEntry())
+            switch (creature->GetEntry())
             {
                 case 24850: Kalecgos_Dragon     = creature->GetGUID(); break;
                 case 24891: Kalecgos_Human      = creature->GetGUID(); break;
@@ -160,20 +161,20 @@ public:
 
         void OnGameObjectCreate(GameObject* go)
         {
-            switch(go->GetEntry())
+            switch (go->GetEntry())
             {
                 case 188421: ForceField     = go->GetGUID(); break;
                 case 188523: KalecgosWall[0] = go->GetGUID(); break;
                 case 188524: KalecgosWall[0] = go->GetGUID(); break;
                 case 188075:
                     if (m_auiEncounter[2] == DONE)
-                        HandleGameObject(NULL, true, go);
+                        HandleGameObject(0, true, go);
                     FireBarrier = go->GetGUID();
                     break;
                 case 187990: MurusGate[0]   = go->GetGUID(); break;
                 case 188118:
                     if (m_auiEncounter[4] == DONE)
-                        HandleGameObject(NULL, true, go);
+                        HandleGameObject(0, true, go);
                     MurusGate[1]= go->GetGUID();
                     break;
             }
@@ -181,7 +182,7 @@ public:
 
         uint32 GetData(uint32 id)
         {
-            switch(id)
+            switch (id)
             {
                 case DATA_KALECGOS_EVENT:     return m_auiEncounter[0];
                 case DATA_BRUTALLUS_EVENT:    return m_auiEncounter[1];
@@ -195,7 +196,7 @@ public:
 
         uint64 GetData64(uint32 id)
         {
-            switch(id)
+            switch (id)
             {
                 case DATA_KALECGOS_DRAGON:      return Kalecgos_Dragon;
                 case DATA_KALECGOS_HUMAN:       return Kalecgos_Human;
@@ -220,21 +221,21 @@ public:
 
         void SetData(uint32 id, uint32 data)
         {
-            switch(id)
+            switch (id)
             {
                 case DATA_KALECGOS_EVENT:
                     {
                         if (data == NOT_STARTED || data == DONE)
                         {
-                            HandleGameObject(ForceField,true);
-                            HandleGameObject(KalecgosWall[0],true);
-                            HandleGameObject(KalecgosWall[1],true);
+                            HandleGameObject(ForceField, true);
+                            HandleGameObject(KalecgosWall[0], true);
+                            HandleGameObject(KalecgosWall[1], true);
                         }
                         else if (data == IN_PROGRESS)
                         {
-                            HandleGameObject(ForceField,false);
-                            HandleGameObject(KalecgosWall[0],false);
-                            HandleGameObject(KalecgosWall[1],false);
+                            HandleGameObject(ForceField, false);
+                            HandleGameObject(KalecgosWall[0], false);
+                            HandleGameObject(KalecgosWall[1], false);
                         }
                         m_auiEncounter[0] = data;
                     }
@@ -246,7 +247,7 @@ public:
                     m_auiEncounter[2] = data; break;
                 case DATA_EREDAR_TWINS_EVENT:  m_auiEncounter[3] = data; break;
                 case DATA_MURU_EVENT:
-                    switch(data)
+                    switch (data)
                     {
                         case DONE:
                             HandleGameObject(MurusGate[0], true);
@@ -273,16 +274,11 @@ public:
         {
             OUT_SAVE_INST_DATA;
             std::ostringstream stream;
-            stream << m_auiEncounter[0] << " "  << m_auiEncounter[1] << " "  << m_auiEncounter[2] << " "  << m_auiEncounter[3] << " "
-                << m_auiEncounter[4] << " "  << m_auiEncounter[5];
-            char* out = new char[stream.str().length() + 1];
-            strcpy(out, stream.str().c_str());
-            if (out)
-            {
-                OUT_SAVE_INST_DATA_COMPLETE;
-                return out;
-            }
-            return NULL;
+            stream << m_auiEncounter[0] << ' '  << m_auiEncounter[1] << ' '  << m_auiEncounter[2] << ' '  << m_auiEncounter[3] << ' '
+                << m_auiEncounter[4] << ' '  << m_auiEncounter[5];
+
+            OUT_SAVE_INST_DATA_COMPLETE;
+            return stream.str();
         }
 
         void Load(const char* in)
@@ -305,7 +301,6 @@ public:
     };
 
 };
-
 
 void AddSC_instance_sunwell_plateau()
 {

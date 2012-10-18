@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -27,7 +27,8 @@ EndScriptData */
 npc_blood_knight_stillblade
 EndContentData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 /*#######
 # npc_blood_knight_stillblade
@@ -46,14 +47,14 @@ class npc_blood_knight_stillblade : public CreatureScript
 public:
     npc_blood_knight_stillblade() : CreatureScript("npc_blood_knight_stillblade") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_blood_knight_stillbladeAI (pCreature);
+        return new npc_blood_knight_stillbladeAI (creature);
     }
 
     struct npc_blood_knight_stillbladeAI : public ScriptedAI
     {
-        npc_blood_knight_stillbladeAI(Creature *c) : ScriptedAI(c) {}
+        npc_blood_knight_stillbladeAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 lifeTimer;
         bool spellHit;
@@ -62,15 +63,15 @@ public:
         {
             lifeTimer = 120000;
             me->SetStandState(UNIT_STAND_STATE_DEAD);
-            me->SetUInt32Value(UNIT_FIELD_BYTES_1,7);   // lay down
+            me->SetUInt32Value(UNIT_FIELD_BYTES_1, 7);   // lay down
             spellHit = false;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
         }
 
-        void MoveInLineOfSight(Unit * /*who*/)
+        void MoveInLineOfSight(Unit* /*who*/)
         {
         }
 
@@ -85,7 +86,7 @@ public:
             }
         }
 
-        void SpellHit(Unit *Hitter, const SpellEntry *Spellkind)
+        void SpellHit(Unit* Hitter, const SpellInfo* Spellkind)
         {
             if ((Spellkind->Id == SPELL_SHIMMERING_VESSEL) && !spellHit &&
                 (Hitter->GetTypeId() == TYPEID_PLAYER) && (CAST_PLR(Hitter)->IsActiveQuest(QUEST_REDEEMING_THE_DEAD)))
@@ -100,9 +101,7 @@ public:
             }
         }
     };
-
 };
-
 
 void AddSC_silvermoon_city()
 {

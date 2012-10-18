@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -28,7 +28,8 @@ boss_nexusprince_shaffar
 mob_ethereal_beacon
 EndContentData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 enum ePrince
 {
@@ -60,14 +61,14 @@ class boss_nexusprince_shaffar : public CreatureScript
 public:
     boss_nexusprince_shaffar() : CreatureScript("boss_nexusprince_shaffar") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_nexusprince_shaffarAI (pCreature);
+        return new boss_nexusprince_shaffarAI (creature);
     }
 
     struct boss_nexusprince_shaffarAI : public ScriptedAI
     {
-        boss_nexusprince_shaffarAI(Creature *c) : ScriptedAI(c), summons(me) { HasTaunted = false; }
+        boss_nexusprince_shaffarAI(Creature* creature) : ScriptedAI(creature), summons(me) { HasTaunted = false; }
 
         uint32 Blink_Timer;
         uint32 Beacon_Timer;
@@ -105,7 +106,7 @@ public:
             ScriptedAI::EnterEvadeMode();
         }
 
-        void MoveInLineOfSight(Unit *who)
+        void MoveInLineOfSight(Unit* who)
         {
             if (!HasTaunted && who->GetTypeId() == TYPEID_PLAYER && me->IsWithinDistInMap(who, 100.0f))
             {
@@ -114,38 +115,38 @@ public:
             }
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(RAND(SAY_AGGRO_1,SAY_AGGRO_2,SAY_AGGRO_3), me);
+            DoScriptText(RAND(SAY_AGGRO_1, SAY_AGGRO_2, SAY_AGGRO_3), me);
 
             DoZoneInCombat();
             summons.DoZoneInCombat();
         }
 
-        void JustSummoned(Creature *summoned)
+        void JustSummoned(Creature* summoned)
         {
             if (summoned->GetEntry() == NPC_BEACON)
             {
-                summoned->CastSpell(summoned,SPELL_ETHEREAL_BEACON_VISUAL,false);
+                summoned->CastSpell(summoned, SPELL_ETHEREAL_BEACON_VISUAL, false);
 
-                if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM,0))
-                    summoned->AI()->AttackStart(pTarget);
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                    summoned->AI()->AttackStart(target);
             }
 
             summons.Summon(summoned);
         }
 
-        void SummonedCreatureDespawn(Creature *summon)
+        void SummonedCreatureDespawn(Creature* summon)
         {
             summons.Despawn(summon);
         }
 
         void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_SLAY_1,SAY_SLAY_2), me);
+            DoScriptText(RAND(SAY_SLAY_1, SAY_SLAY_2), me);
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
             DoScriptText(SAY_DEAD, me);
             summons.DespawnAll();
@@ -162,20 +163,20 @@ public:
                     me->InterruptNonMeleeSpells(true);
 
                 DoCast(me, SPELL_FROSTNOVA);
-                FrostNova_Timer  = 17500 + rand()%7500;
+                FrostNova_Timer  = urand(17500, 25000);
                 CanBlink = true;
             } else FrostNova_Timer -= diff;
 
             if (Frostbolt_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_FROSTBOLT);
-                Frostbolt_Timer = 4500 + rand()%1500;
+                Frostbolt_Timer = urand(4500, 6000);
             } else Frostbolt_Timer -= diff;
 
             if (FireBall_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_FIREBALL);
-                FireBall_Timer = 4500 + rand()%1500;
+                FireBall_Timer = urand(4500, 6000);
             } else FireBall_Timer -= diff;
 
             if (CanBlink)
@@ -187,11 +188,11 @@ public:
 
                     //expire movement, will prevent from running right back to victim after cast
                     //(but should MoveChase be used again at a certain time or should he not move?)
-                    if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == TARGETED_MOTION_TYPE)
+                    if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE)
                         me->GetMotionMaster()->MovementExpired();
 
                     DoCast(me, SPELL_BLINK);
-                    Blink_Timer = 1000 + rand()%1500;
+                    Blink_Timer = urand(1000, 2500);
                     CanBlink = false;
                 } else Blink_Timer -= diff;
             }
@@ -201,7 +202,7 @@ public:
                 if (me->IsNonMeleeSpellCasted(false))
                     me->InterruptNonMeleeSpells(true);
 
-                if (!urand(0,3))
+                if (!urand(0, 3))
                     DoScriptText(SAY_SUMMON, me);
 
                 DoCast(me, SPELL_ETHEREAL_BEACON, true);
@@ -215,7 +216,6 @@ public:
 
 };
 
-
 enum eEnums
 {
     SPELL_ARCANE_BOLT               = 15254,
@@ -227,14 +227,14 @@ class mob_ethereal_beacon : public CreatureScript
 public:
     mob_ethereal_beacon() : CreatureScript("mob_ethereal_beacon") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_ethereal_beaconAI (pCreature);
+        return new mob_ethereal_beaconAI (creature);
     }
 
     struct mob_ethereal_beaconAI : public ScriptedAI
     {
-        mob_ethereal_beaconAI(Creature *c) : ScriptedAI(c)
+        mob_ethereal_beaconAI(Creature* creature) : ScriptedAI(creature)
         {
         }
 
@@ -254,7 +254,7 @@ public:
             Check_Timer = 1000;
         }
 
-        void EnterCombat(Unit * who)
+        void EnterCombat(Unit* who)
         {
             // Send Shaffar to fight
             Creature* Shaffar = me->FindNearestCreature(NPC_SHAFFAR, 100);
@@ -267,7 +267,7 @@ public:
                 Shaffar->AI()->AttackStart(who);
         }
 
-        void JustSummoned(Creature *summoned)
+        void JustSummoned(Creature* summoned)
         {
             summoned->AI()->AttackStart(me->getVictim());
         }
@@ -279,7 +279,7 @@ public:
 
             if (Check_Timer <= diff)
             {
-                Creature *Shaffar = me->FindNearestCreature(NPC_SHAFFAR, 100);
+                Creature* Shaffar = me->FindNearestCreature(NPC_SHAFFAR, 100);
                 if (!Shaffar || Shaffar->isDead() || !Shaffar->isInCombat())
                 {
                     KillSelf();
@@ -291,7 +291,7 @@ public:
             if (ArcaneBolt_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_ARCANE_BOLT);
-                ArcaneBolt_Timer = 2000 + rand()%2500;
+                ArcaneBolt_Timer = urand(2000, 4500);
             } else ArcaneBolt_Timer -= diff;
 
             if (Apprentice_Timer <= diff)
@@ -300,14 +300,13 @@ public:
                     me->InterruptNonMeleeSpells(true);
 
                 DoCast(me, SPELL_ETHEREAL_APPRENTICE, true);
-                me->ForcedDespawn();
+                me->DespawnOrUnsummon();
                 return;
             } else Apprentice_Timer -= diff;
         }
     };
 
 };
-
 
 enum eEthereal
 {
@@ -320,14 +319,14 @@ class mob_ethereal_apprentice : public CreatureScript
 public:
     mob_ethereal_apprentice() : CreatureScript("mob_ethereal_apprentice") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_ethereal_apprenticeAI (pCreature);
+        return new mob_ethereal_apprenticeAI (creature);
     }
 
     struct mob_ethereal_apprenticeAI : public ScriptedAI
     {
-        mob_ethereal_apprenticeAI(Creature *c) : ScriptedAI(c) {}
+        mob_ethereal_apprenticeAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 Cast_Timer;
 
@@ -360,7 +359,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_nexusprince_shaffar()
 {

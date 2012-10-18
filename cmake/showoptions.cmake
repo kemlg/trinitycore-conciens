@@ -1,9 +1,9 @@
 # output generic information about the core and buildtype chosen
-
 message("")
-message("* TrinityCore revision   : ${rev_id_str} (${rev_hash_str})")
+message("* TrinityCore rev. hash  : ${rev_hash}")
+message("* TrinityCore rev. date  : ${rev_date}")
 if( UNIX )
-  message("* Build binaries in      : ${CMAKE_BUILD_TYPE} mode")
+  message("* TrinityCore buildtype  : ${CMAKE_BUILD_TYPE}")
 endif()
 message("")
 
@@ -50,13 +50,6 @@ else()
   message("* Build scripts w/PCH    : No")
 endif()
 
-if( USE_SFMT )
-  message("* Use SFMT for RNG       : Yes")
-  add_definitions(-DUSE_SFMT_FOR_RNG)
-else()
-  message("* Use SFMT for RNG       : No  (default)")
-endif()
-
 if( WITH_WARNINGS )
   message("* Show all warnings      : Yes")
 else()
@@ -78,10 +71,10 @@ if( WIN32 )
   endif()
 endif( WIN32 )
 
-if( WITH_SQL )
-  message("* Install SQL-files      : Yes")
-else()
-  message("* Install SQL-files      : No  (default)")
+if ( NOJEM )
+  message("")
+  message("*** WARNING: jemalloc linking has been disabled!")
+  message("*** Please note that this is for DEBUGGING WITH VALGRIND only!")
+  message("*** DO NOT DISABLE IT UNLESS YOU KNOW WHAT YOU'RE DOING!")
 endif()
-
 message("")

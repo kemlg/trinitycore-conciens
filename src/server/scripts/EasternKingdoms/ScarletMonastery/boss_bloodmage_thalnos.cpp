@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Scarlet Monastery
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 enum eEnums
 {
@@ -42,14 +43,14 @@ class boss_bloodmage_thalnos : public CreatureScript
 public:
     boss_bloodmage_thalnos() : CreatureScript("boss_bloodmage_thalnos") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_bloodmage_thalnosAI (pCreature);
+        return new boss_bloodmage_thalnosAI (creature);
     }
 
     struct boss_bloodmage_thalnosAI : public ScriptedAI
     {
-        boss_bloodmage_thalnosAI(Creature *c) : ScriptedAI(c) {}
+        boss_bloodmage_thalnosAI(Creature* creature) : ScriptedAI(creature) {}
 
         bool HpYell;
         uint32 FlameShock_Timer;
@@ -66,7 +67,7 @@ public:
             FireNova_Timer = 40000;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
         }
@@ -92,36 +93,38 @@ public:
             if (FlameShock_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_FLAMESHOCK);
-                FlameShock_Timer = 10000 + rand()%5000;
-            } else FlameShock_Timer -= diff;
+                FlameShock_Timer = urand(10000, 15000);
+            }
+            else FlameShock_Timer -= diff;
 
             //FlameSpike_Timer
             if (FlameSpike_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_FLAMESPIKE);
                 FlameSpike_Timer = 30000;
-            } else FlameSpike_Timer -= diff;
+            }
+            else FlameSpike_Timer -= diff;
 
             //FireNova_Timer
             if (FireNova_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_FIRENOVA);
                 FireNova_Timer = 40000;
-            } else FireNova_Timer -= diff;
+            }
+            else FireNova_Timer -= diff;
 
             //ShadowBolt_Timer
             if (ShadowBolt_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_SHADOWBOLT);
                 ShadowBolt_Timer = 2000;
-            } else ShadowBolt_Timer -= diff;
+            }
+            else ShadowBolt_Timer -= diff;
 
             DoMeleeAttackIfReady();
         }
     };
-
 };
-
 
 void AddSC_boss_bloodmage_thalnos()
 {

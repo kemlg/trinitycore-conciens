@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Razorfen Downs
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 #define SAY_AGGRO               -1129000
 #define SAY_SUMMON60            -1129001
@@ -41,14 +42,14 @@ class boss_amnennar_the_coldbringer : public CreatureScript
 public:
     boss_amnennar_the_coldbringer() : CreatureScript("boss_amnennar_the_coldbringer") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_amnennar_the_coldbringerAI (pCreature);
+        return new boss_amnennar_the_coldbringerAI (creature);
     }
 
     struct boss_amnennar_the_coldbringerAI : public ScriptedAI
     {
-        boss_amnennar_the_coldbringerAI(Creature *c) : ScriptedAI(c) {}
+        boss_amnennar_the_coldbringerAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 AmnenarsWrath_Timer;
         uint32 FrostBolt_Timer;
@@ -61,13 +62,13 @@ public:
         {
             AmnenarsWrath_Timer = 8000;
             FrostBolt_Timer = 1000;
-            FrostNova_Timer = 10000 + rand()%5000;
+            FrostNova_Timer = urand(10000, 15000);
             Spectrals30 = false;
             Spectrals60 = false;
             Hp = false;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
         }
@@ -127,7 +128,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_amnennar_the_coldbringer()
 {

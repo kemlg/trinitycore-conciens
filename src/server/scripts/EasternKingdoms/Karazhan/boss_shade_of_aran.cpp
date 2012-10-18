@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,8 +23,8 @@ SDComment: Flame wreath missing cast animation, mods won't triggere.
 SDCategory: Karazhan
 EndScriptData */
 
-#include "ScriptPCH.h"
-#include "ScriptedSimpleAI.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "karazhan.h"
 #include "GameObject.h"
 
@@ -86,19 +86,19 @@ class boss_shade_of_aran : public CreatureScript
 public:
     boss_shade_of_aran() : CreatureScript("boss_shade_of_aran") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_aranAI (pCreature);
+        return new boss_aranAI (creature);
     }
 
     struct boss_aranAI : public ScriptedAI
     {
-        boss_aranAI(Creature *c) : ScriptedAI(c)
+        boss_aranAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 SecondarySpellTimer;
         uint32 NormalCastTimer;
@@ -149,56 +149,56 @@ public:
             Drinking = false;
             DrinkInturrupted = false;
 
-            if (pInstance)
+            if (instance)
             {
                 // Not in progress
-                pInstance->SetData(TYPE_ARAN, NOT_STARTED);
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GO_LIBRARY_DOOR), true);
+                instance->SetData(TYPE_ARAN, NOT_STARTED);
+                instance->HandleGameObject(instance->GetData64(DATA_GO_LIBRARY_DOOR), true);
             }
         }
 
-        void KilledUnit(Unit * /*victim*/)
+        void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_KILL1,SAY_KILL2), me);
+            DoScriptText(RAND(SAY_KILL1, SAY_KILL2), me);
         }
 
-        void JustDied(Unit * /*victim*/)
+        void JustDied(Unit* /*killer*/)
         {
             DoScriptText(SAY_DEATH, me);
 
-            if (pInstance)
+            if (instance)
             {
-                pInstance->SetData(TYPE_ARAN, DONE);
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GO_LIBRARY_DOOR), true);
+                instance->SetData(TYPE_ARAN, DONE);
+                instance->HandleGameObject(instance->GetData64(DATA_GO_LIBRARY_DOOR), true);
             }
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(RAND(SAY_AGGRO1,SAY_AGGRO2,SAY_AGGRO3), me);
+            DoScriptText(RAND(SAY_AGGRO1, SAY_AGGRO2, SAY_AGGRO3), me);
 
-            if (pInstance)
+            if (instance)
             {
-                pInstance->SetData(TYPE_ARAN, IN_PROGRESS);
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GO_LIBRARY_DOOR), false);
+                instance->SetData(TYPE_ARAN, IN_PROGRESS);
+                instance->HandleGameObject(instance->GetData64(DATA_GO_LIBRARY_DOOR), false);
             }
         }
 
         void FlameWreathEffect()
         {
             std::vector<Unit*> targets;
-            std::list<HostileReference *> t_list = me->getThreatManager().getThreatList();
+            std::list<HostileReference*> t_list = me->getThreatManager().getThreatList();
 
-            if (!t_list.size())
+            if (t_list.empty())
                 return;
 
             //store the threat list in a different container
-            for (std::list<HostileReference *>::const_iterator itr = t_list.begin(); itr!= t_list.end(); ++itr)
+            for (std::list<HostileReference*>::const_iterator itr = t_list.begin(); itr!= t_list.end(); ++itr)
             {
-                Unit *pTarget = Unit::GetUnit(*me, (*itr)->getUnitGuid());
+                Unit* target = Unit::GetUnit(*me, (*itr)->getUnitGuid());
                 //only on alive players
-                if (pTarget && pTarget->isAlive() && pTarget->GetTypeId() == TYPEID_PLAYER)
-                    targets.push_back(pTarget);
+                if (target && target->isAlive() && target->GetTypeId() == TYPEID_PLAYER)
+                    targets.push_back(target);
             }
 
             //cut down to size if we have more than 3 targets
@@ -228,9 +228,9 @@ public:
             {
                 if (CloseDoorTimer <= diff)
                 {
-                    if (pInstance)
+                    if (instance)
                     {
-                        pInstance->HandleGameObject(pInstance->GetData64(DATA_GO_LIBRARY_DOOR), false);
+                        instance->HandleGameObject(instance->GetData64(DATA_GO_LIBRARY_DOOR), false);
                         CloseDoorTimer = 0;
                     }
                 } else CloseDoorTimer -= diff;
@@ -309,8 +309,8 @@ public:
             {
                 if (!me->IsNonMeleeSpellCasted(false))
                 {
-                    Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true);
-                    if (!pTarget)
+                    Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true);
+                    if (!target)
                         return;
 
                     uint32 Spells[3];
@@ -337,7 +337,7 @@ public:
                     if (AvailableSpells)
                     {
                         CurrentNormalSpell = Spells[rand() % AvailableSpells];
-                        DoCast(pTarget, CurrentNormalSpell);
+                        DoCast(target, CurrentNormalSpell);
                     }
                 }
                 NormalCastTimer = 1000;
@@ -345,17 +345,17 @@ public:
 
             if (SecondarySpellTimer <= diff)
             {
-                switch (urand(0,1))
+                switch (urand(0, 1))
                 {
                     case 0:
                         DoCast(me, SPELL_AOE_CS);
                         break;
                     case 1:
-                        if (Unit* pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                            DoCast(pTarget, SPELL_CHAINSOFICE);
+                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                            DoCast(target, SPELL_CHAINSOFICE);
                         break;
                 }
-                SecondarySpellTimer = urand(5000,20000);
+                SecondarySpellTimer = urand(5000, 20000);
             } else SecondarySpellTimer -= diff;
 
             if (SuperCastTimer <= diff)
@@ -378,12 +378,12 @@ public:
                         break;
                 }
 
-                LastSuperSpell = Available[urand(0,1)];
+                LastSuperSpell = Available[urand(0, 1)];
 
                 switch (LastSuperSpell)
                 {
                     case SUPER_AE:
-                        DoScriptText(RAND(SAY_EXPLOSION1,SAY_EXPLOSION2), me);
+                        DoScriptText(RAND(SAY_EXPLOSION1, SAY_EXPLOSION2), me);
 
                         DoCast(me, SPELL_BLINK_CENTER, true);
                         DoCast(me, SPELL_PLAYERPULL, true);
@@ -392,7 +392,7 @@ public:
                         break;
 
                     case SUPER_FLAME:
-                        DoScriptText(RAND(SAY_FLAMEWREATH1,SAY_FLAMEWREATH2), me);
+                        DoScriptText(RAND(SAY_FLAMEWREATH1, SAY_FLAMEWREATH2), me);
 
                         FlameWreathTimer = 20000;
                         FlameWreathCheckTime = 500;
@@ -405,7 +405,7 @@ public:
                         break;
 
                     case SUPER_BLIZZARD:
-                        DoScriptText(RAND(SAY_BLIZZARD1,SAY_BLIZZARD2), me);
+                        DoScriptText(RAND(SAY_BLIZZARD1, SAY_BLIZZARD2), me);
 
                         if (Creature* pSpawn = me->SummonCreature(CREATURE_ARAN_BLIZZARD, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN, 25000))
                         {
@@ -415,7 +415,7 @@ public:
                         break;
                 }
 
-                SuperCastTimer = urand(35000,40000);
+                SuperCastTimer = urand(35000, 40000);
             } else SuperCastTimer -= diff;
 
             if (!ElementalsSpawned && HealthBelowPct(40))
@@ -424,10 +424,10 @@ public:
 
                 for (uint32 i = 0; i < 4; ++i)
                 {
-                    if (Creature* pUnit = me->SummonCreature(CREATURE_WATER_ELEMENTAL, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN, 90000))
+                    if (Creature* unit = me->SummonCreature(CREATURE_WATER_ELEMENTAL, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN, 90000))
                     {
-                        pUnit->Attack(me->getVictim(), true);
-                        pUnit->setFaction(me->getFaction());
+                        unit->Attack(me->getVictim(), true);
+                        unit->setFaction(me->getFaction());
                     }
                 }
 
@@ -438,10 +438,10 @@ public:
             {
                 for (uint32 i = 0; i < 5; ++i)
                 {
-                    if (Creature* pUnit = me->SummonCreature(CREATURE_SHADOW_OF_ARAN, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 5000))
+                    if (Creature* unit = me->SummonCreature(CREATURE_SHADOW_OF_ARAN, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 5000))
                     {
-                        pUnit->Attack(me->getVictim(), true);
-                        pUnit->setFaction(me->getFaction());
+                        unit->Attack(me->getVictim(), true);
+                        unit->setFaction(me->getFaction());
                     }
                 }
 
@@ -464,11 +464,11 @@ public:
                         if (!FlameWreathTarget[i])
                             continue;
 
-                        Unit* pUnit = Unit::GetUnit(*me, FlameWreathTarget[i]);
-                        if (pUnit && !pUnit->IsWithinDist2d(FWTargPosX[i], FWTargPosY[i], 3))
+                        Unit* unit = Unit::GetUnit(*me, FlameWreathTarget[i]);
+                        if (unit && !unit->IsWithinDist2d(FWTargPosX[i], FWTargPosY[i], 3))
                         {
-                            pUnit->CastSpell(pUnit, 20476, true, 0, 0, me->GetGUID());
-                            pUnit->CastSpell(pUnit, 11027, true);
+                            unit->CastSpell(unit, 20476, true, 0, 0, me->GetGUID());
+                            unit->CastSpell(unit, 11027, true);
                             FlameWreathTarget[i] = 0;
                         }
                     }
@@ -486,12 +486,12 @@ public:
                 DrinkInturrupted = true;
         }
 
-        void SpellHit(Unit* /*pAttacker*/, const SpellEntry* Spell)
+        void SpellHit(Unit* /*pAttacker*/, const SpellInfo* Spell)
         {
             //We only care about interrupt effects and only if they are durring a spell currently being casted
-            if ((Spell->Effect[0] != SPELL_EFFECT_INTERRUPT_CAST &&
-                Spell->Effect[1] != SPELL_EFFECT_INTERRUPT_CAST &&
-                Spell->Effect[2] != SPELL_EFFECT_INTERRUPT_CAST) || !me->IsNonMeleeSpellCasted(false))
+            if ((Spell->Effects[0].Effect != SPELL_EFFECT_INTERRUPT_CAST &&
+                Spell->Effects[1].Effect != SPELL_EFFECT_INTERRUPT_CAST &&
+                Spell->Effects[2].Effect != SPELL_EFFECT_INTERRUPT_CAST) || !me->IsNonMeleeSpellCasted(false))
                 return;
 
             //Interrupt effect
@@ -516,14 +516,14 @@ class mob_aran_elemental : public CreatureScript
 public:
     mob_aran_elemental() : CreatureScript("mob_aran_elemental") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new water_elementalAI (pCreature);
+        return new water_elementalAI (creature);
     }
 
     struct water_elementalAI : public ScriptedAI
     {
-        water_elementalAI(Creature *c) : ScriptedAI(c) {}
+        water_elementalAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 CastTimer;
 
@@ -542,40 +542,15 @@ public:
             if (CastTimer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_WATERBOLT);
-                CastTimer = urand(2000,5000);
+                CastTimer = urand(2000, 5000);
             } else CastTimer -= diff;
         }
     };
 
 };
 
-// CONVERT TO ACID
-class mob_shadow_of_aran : public CreatureScript
-{
-public:
-    mob_shadow_of_aran() : CreatureScript("mob_shadow_of_aran") { }
-
-    CreatureAI* GetAI(Creature* pCreature) const
-    {
-        sLog->outString("TSCR: Convert simpleAI script for Creature Entry %u to ACID", pCreature->GetEntry());
-        SimpleAI* ai = new SimpleAI (pCreature);
-
-        ai->Spell[0].Enabled = true;
-        ai->Spell[0].Spell_Id = SPELL_SHADOW_PYRO;
-        ai->Spell[0].Cooldown = 5000;
-        ai->Spell[0].First_Cast = 1000;
-        ai->Spell[0].Cast_Target_Type = CAST_HOSTILE_TARGET;
-
-        ai->EnterEvadeMode();
-
-        return ai;
-    }
-
-};
-
 void AddSC_boss_shade_of_aran()
 {
     new boss_shade_of_aran();
-    new mob_shadow_of_aran();
     new mob_aran_elemental();
 }

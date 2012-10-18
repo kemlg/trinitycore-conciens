@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Placeholder
 SDCategory: Deadmines
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "deadmines.h"
 #include "Spell.h"
 
@@ -38,25 +39,23 @@ public:
 
     bool OnUse(Player* player, Item* item, SpellCastTargets const& targets)
     {
-        InstanceScript *pInstance = player->GetInstanceScript();
+        InstanceScript* instance = player->GetInstanceScript();
 
-        if (!pInstance)
+        if (!instance)
         {
             player->GetSession()->SendNotification("Instance script not initialized");
             return true;
         }
-        if (pInstance->GetData(EVENT_STATE)!= CANNON_NOT_USED)
+
+        if (instance->GetData(EVENT_STATE) != CANNON_NOT_USED)
             return false;
-        if (targets.getGOTarget() && targets.getGOTarget()->GetTypeId() == TYPEID_GAMEOBJECT &&
-           targets.getGOTarget()->GetEntry() == GO_DEFIAS_CANNON)
-        {
-            pInstance->SetData(EVENT_STATE, CANNON_GUNPOWDER_USED);
-        }
+
+        if (targets.GetGOTarget() && targets.GetGOTarget()->GetEntry() == GO_DEFIAS_CANNON)
+            instance->SetData(EVENT_STATE, CANNON_GUNPOWDER_USED);
 
         player->DestroyItemCount(item->GetEntry(), 1, true);
         return true;
     }
-
 };
 
 void AddSC_deadmines()

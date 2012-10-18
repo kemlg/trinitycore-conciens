@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -68,6 +68,7 @@ enum LfgTeleportError
     LFG_TELEPORTERROR_OK                         = 0,      // Internal use
     LFG_TELEPORTERROR_PLAYER_DEAD                = 1,
     LFG_TELEPORTERROR_FALLING                    = 2,
+    LFG_TELEPORTERROR_DONT_REPORT                = 3,
     LFG_TELEPORTERROR_FATIGUE                    = 4,
     LFG_TELEPORTERROR_INVALID_LOCATION           = 6
 };
@@ -114,7 +115,6 @@ enum LfgAnswer
     LFG_ANSWER_DENY                              = 0,
     LFG_ANSWER_AGREE                             = 1
 };
-
 
 // Forward declaration (just to have all typedef together)
 struct LfgReward;
@@ -210,7 +210,6 @@ struct LfgProposalPlayer
     uint32 groupLowGuid;                                   ///< Original group guid (Low guid) 0 if no original group
 };
 
-
 /// Stores group data related to proposal to join
 struct LfgProposal
 {
@@ -256,65 +255,69 @@ struct LfgPlayerBoot
 class LFGMgr
 {
     friend class ACE_Singleton<LFGMgr, ACE_Null_Mutex>;
-    public:
+
+    private:
         LFGMgr();
         ~LFGMgr();
+
+    public:
         void Update(uint32 diff);
 
         // Reward
-        void LoadDungeonEncounters();
         void LoadRewards();
         void RewardDungeonDoneFor(const uint32 dungeonId, Player* player);
-        uint32 GetDungeonIdForAchievement(uint32 achievementId);
         LfgReward const* GetRandomDungeonReward(uint32 dungeon, uint8 level);
 
         // Queue
-        void Join(Player* plr, uint8 roles, const LfgDungeonSet& dungeons, const std::string& comment);
-        void Leave(Player* plr, Group* grp = NULL);
+        void Join(Player* player, uint8 roles, const LfgDungeonSet& dungeons, const std::string& comment);
+        void Leave(Player* player, Group* grp = NULL);
 
         // Role Check
-        void UpdateRoleCheck(uint64& gguid, uint64 guid = 0, uint8 roles = ROLE_NONE);
+        void UpdateRoleCheck(uint64 gguid, uint64 guid = 0, uint8 roles = ROLE_NONE);
 
         // Proposals
-        void UpdateProposal(uint32 proposalId, const uint64& guid, bool accept);
+        void UpdateProposal(uint32 proposalId, uint64 guid, bool accept);
 
         // Teleportation
-        void TeleportPlayer(Player* plr, bool out, bool fromOpcode = false);
+        void TeleportPlayer(Player* player, bool out, bool fromOpcode = false);
 
         // Vote kick
-        void InitBoot(Group* grp, const uint64& kguid, const uint64& vguid, std::string reason);
-        void UpdateBoot(Player* plr, bool accept);
+        void InitBoot(Group* grp, uint64 kguid, uint64 vguid, std::string reason);
+        void UpdateBoot(Player* player, bool accept);
         void OfferContinue(Group* grp);
 
-        void InitializeLockedDungeons(Player* plr);
+        void InitializeLockedDungeons(Player* player);
 
-        void SetComment(const uint64& guid, const std::string& comment);
-        const LfgLockMap& GetLockedDungeons(const uint64& guid);
-        LfgState GetState(const uint64& guid);
-        const LfgDungeonSet& GetSelectedDungeons(const uint64& guid);
-        uint32 GetDungeon(const uint64& guid, bool asId = true);
-        void ClearState(const uint64& guid);
-        void RemovePlayerData(const uint64& guid);
-        void RemoveGroupData(const uint64& guid);
-        uint8 GetKicksLeft(const uint64& gguid);
-        uint8 GetVotesNeeded(const uint64& gguid);
-        void SetRoles(const uint64& guid, uint8 roles);
+        void _LoadFromDB(Field* fields, uint64 guid);
+        void _SaveToDB(uint64 guid, uint32 db_guid);
+
+        void SetComment(uint64 guid, const std::string& comment);
+        const LfgLockMap& GetLockedDungeons(uint64 guid);
+        LfgState GetState(uint64 guid);
+        const LfgDungeonSet& GetSelectedDungeons(uint64 guid);
+        uint32 GetDungeon(uint64 guid, bool asId = true);
+        void SetState(uint64 guid, LfgState state);
+        void ClearState(uint64 guid);
+        void RemovePlayerData(uint64 guid);
+        void RemoveGroupData(uint64 guid);
+        uint8 GetKicksLeft(uint64 gguid);
+        uint8 GetVotesNeeded(uint64 gguid);
+        bool IsTeleported(uint64 pguid);
+        void SetRoles(uint64 guid, uint8 roles);
+        void SetSelectedDungeons(uint64 guid, const LfgDungeonSet& dungeons);
 
     private:
 
-        uint8 GetRoles(const uint64& guid);
-        const std::string& GetComment(const uint64& gguid);
-        void RestoreState(const uint64& guid);
-        void SetState(const uint64& guid, LfgState state);
-        void SetDungeon(const uint64& guid, uint32 dungeon);
-        void SetSelectedDungeons(const uint64& guid, const LfgDungeonSet& dungeons);
-        void SetLockedDungeons(const uint64& guid, const LfgLockMap& lock);
-        void DecreaseKicksLeft(const uint64& guid);
-        void NoExiste(uint8 lala);
+        uint8 GetRoles(uint64 guid);
+        const std::string& GetComment(uint64 gguid);
+        void RestoreState(uint64 guid);
+        void SetDungeon(uint64 guid, uint32 dungeon);
+        void SetLockedDungeons(uint64 guid, const LfgLockMap& lock);
+        void DecreaseKicksLeft(uint64 guid);
 
         // Queue
-        void AddToQueue(const uint64& guid, uint8 queueId);
-        bool RemoveFromQueue(const uint64& guid);
+        void AddToQueue(uint64 guid, uint8 queueId);
+        bool RemoveFromQueue(uint64 guid);
 
         // Proposals
         void RemoveProposal(LfgProposalMap::iterator itProposal, LfgUpdateType type);
@@ -348,12 +351,12 @@ class LFGMgr
         LfgDungeonMap m_CachedDungeonMap;                  ///< Stores all dungeons by groupType
         // Reward System
         LfgRewardMap m_RewardMap;                          ///< Stores rewards for random dungeons
-        std::map<uint32, uint32> m_EncountersByAchievement;///< Stores dungeon ids associated with achievements (for rewards)
         // Queue
         LfgQueueInfoMap m_QueueInfoMap;                    ///< Queued groups
         LfgGuidListMap m_currentQueue;                     ///< Ordered list. Used to find groups
         LfgGuidListMap m_newToQueue;                       ///< New groups to add to queue
         LfgCompatibleMap m_CompatibleMap;                  ///< Compatible dungeons
+        LfgGuidList m_teleport;                            ///< Players being teleported
         // Rolecheck - Proposal - Vote Kicks
         LfgRoleCheckMap m_RoleChecks;                      ///< Current Role checks
         LfgProposalMap m_Proposals;                        ///< Current Proposals

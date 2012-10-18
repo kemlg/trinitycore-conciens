@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -15,6 +15,7 @@
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 #ifndef TRINITY_MAIL_H
 #define TRINITY_MAIL_H
 
@@ -55,8 +56,9 @@ enum MailStationery
     MAIL_STATIONERY_DEFAULT = 41,
     MAIL_STATIONERY_GM      = 61,
     MAIL_STATIONERY_AUCTION = 62,
-    MAIL_STATIONERY_VAL     = 64,
-    MAIL_STATIONERY_CHR     = 65,
+    MAIL_STATIONERY_VAL     = 64,                           // Valentine
+    MAIL_STATIONERY_CHR     = 65,                           // Christmas
+    MAIL_STATIONERY_ORP     = 67,                           // Orphan
 };
 
 enum MailState
@@ -64,17 +66,6 @@ enum MailState
     MAIL_STATE_UNCHANGED = 1,
     MAIL_STATE_CHANGED   = 2,
     MAIL_STATE_DELETED   = 3
-};
-
-enum MailAuctionAnswers
-{
-    AUCTION_OUTBIDDED           = 0,
-    AUCTION_WON                 = 1,
-    AUCTION_SUCCESSFUL          = 2,
-    AUCTION_EXPIRED             = 3,
-    AUCTION_CANCELLED_TO_BIDDER = 4,
-    AUCTION_CANCELED            = 5,
-    AUCTION_SALE_PENDING        = 6
 };
 
 enum MailShowFlags
@@ -95,6 +86,7 @@ class MailSender
         }
         MailSender(Object* sender, MailStationery stationery = MAIL_STATIONERY_DEFAULT);
         MailSender(AuctionEntry* sender);
+        MailSender(Player* sender);
     public:                                                 // Accessors
         MailMessageType GetMailMessageType() const { return m_messageType; }
         uint32 GetSenderId() const { return m_senderId; }
@@ -110,7 +102,7 @@ class MailReceiver
     public:                                                 // Constructors
         explicit MailReceiver(uint32 receiver_lowguid) : m_receiver(NULL), m_receiver_lowguid(receiver_lowguid) {}
         MailReceiver(Player* receiver);
-        MailReceiver(Player* receiver,uint32 receiver_lowguid);
+        MailReceiver(Player* receiver, uint32 receiver_lowguid);
     public:                                                 // Accessors
         Player* GetPlayer() const { return m_receiver; }
         uint32  GetPlayerGUIDLow() const { return m_receiver_lowguid; }
@@ -142,7 +134,7 @@ class MailDraft
         MailDraft& AddCOD(uint32 COD) { m_COD = COD; return *this; }
 
     public:                                                 // finishers
-        void SendReturnToSender(uint32 sender_acc, uint32 sender_guid, uint32 receiver_guid);
+        void SendReturnToSender(uint32 sender_acc, uint32 sender_guid, uint32 receiver_guid, SQLTransaction& trans);
         void SendMailTo(SQLTransaction& trans, MailReceiver const& receiver, MailSender const& sender, MailCheckMask checked = MAIL_CHECK_MASK_NONE, uint32 deliver_delay = 0);
 
     private:

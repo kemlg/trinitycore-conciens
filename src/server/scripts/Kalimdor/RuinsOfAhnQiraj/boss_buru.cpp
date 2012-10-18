@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Place Holder
 SDCategory: Ruins of Ahn'Qiraj
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "ruins_of_ahnqiraj.h"
 
 enum Yells
@@ -33,42 +34,20 @@ enum Yells
 
 class boss_buru : public CreatureScript
 {
-public:
-    boss_buru() : CreatureScript("boss_buru") { }
+    public:
+        boss_buru() : CreatureScript("boss_buru") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
-    {
-        return new boss_buruAI (pCreature);
-    }
-
-    struct boss_buruAI : public ScriptedAI
-    {
-        boss_buruAI(Creature *c) : ScriptedAI(c)
+        struct boss_buruAI : public ScriptedAI
         {
-            pInstance = c->GetInstanceScript();
-        }
+            boss_buruAI(Creature* creature) : ScriptedAI(creature)
+            {
+            }
+        };
 
-        InstanceScript *pInstance;
-
-        void Reset()
+        CreatureAI* GetAI(Creature* creature) const
         {
-            if (pInstance)
-                pInstance->SetData(DATA_BURU_EVENT, NOT_STARTED);
+            return new boss_buruAI(creature);
         }
-
-        void EnterCombat(Unit * /*who*/)
-        {
-            if (pInstance)
-                pInstance->SetData(DATA_BURU_EVENT, IN_PROGRESS);
-        }
-
-        void JustDied(Unit * /*killer*/)
-        {
-            if (pInstance)
-                pInstance->SetData(DATA_BURU_EVENT, DONE);
-        }
-    };
-
 };
 
 void AddSC_boss_buru()

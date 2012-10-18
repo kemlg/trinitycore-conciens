@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,9 @@ SDComment: Oz, Hood, and RAJ event implemented. RAJ event requires more testing.
 SDCategory: Karazhan
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
+#include "ScriptedGossip.h"
 #include "karazhan.h"
 
 /***********************************/
@@ -88,16 +90,16 @@ EndScriptData */
 #define CREATURE_CYCLONE        18412
 #define CREATURE_CRONE          18168
 
-void SummonCroneIfReady(InstanceScript* pInstance, Creature* pCreature)
+void SummonCroneIfReady(InstanceScript* instance, Creature* creature)
 {
-    pInstance->SetData(DATA_OPERA_OZ_DEATHCOUNT, SPECIAL);  // Increment DeathCount
+    instance->SetData(DATA_OPERA_OZ_DEATHCOUNT, SPECIAL);  // Increment DeathCount
 
-    if (pInstance->GetData(DATA_OPERA_OZ_DEATHCOUNT) == 4)
+    if (instance->GetData(DATA_OPERA_OZ_DEATHCOUNT) == 4)
     {
-        if (Creature* pCrone = pCreature->SummonCreature(CREATURE_CRONE, -10891.96f, -1755.95f, pCreature->GetPositionZ(), 4.64f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, HOUR*2*IN_MILLISECONDS))
+        if (Creature* pCrone = creature->SummonCreature(CREATURE_CRONE, -10891.96f, -1755.95f, creature->GetPositionZ(), 4.64f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, HOUR*2*IN_MILLISECONDS))
         {
-            if (pCreature->getVictim())
-                pCrone->AI()->AttackStart(pCreature->getVictim());
+            if (creature->getVictim())
+                pCrone->AI()->AttackStart(creature->getVictim());
         }
     }
 };
@@ -107,19 +109,19 @@ class boss_dorothee : public CreatureScript
 public:
     boss_dorothee() : CreatureScript("boss_dorothee") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_dorotheeAI(pCreature);
+        return new boss_dorotheeAI(creature);
     }
 
     struct boss_dorotheeAI : public ScriptedAI
     {
-        boss_dorotheeAI(Creature* c) : ScriptedAI(c)
+        boss_dorotheeAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 AggroTimer;
 
@@ -149,7 +151,7 @@ public:
 
         void JustReachedHome()
         {
-            me->ForcedDespawn();
+            me->DespawnOrUnsummon();
         }
 
         void SummonTito();
@@ -158,8 +160,8 @@ public:
         {
             DoScriptText(SAY_DOROTHEE_DEATH, me);
 
-            if (pInstance)
-                SummonCroneIfReady(pInstance, me);
+            if (instance)
+                SummonCroneIfReady(instance, me);
         }
 
         void AttackStart(Unit* who)
@@ -194,7 +196,7 @@ public:
 
             if (WaterBoltTimer <= diff)
             {
-                DoCast(SelectUnit(SELECT_TARGET_RANDOM, 0), SPELL_WATERBOLT);
+                DoCast(SelectTarget(SELECT_TARGET_RANDOM, 0), SPELL_WATERBOLT);
                 WaterBoltTimer = TitoDied ? 1500 : 5000;
             } else WaterBoltTimer -= diff;
 
@@ -222,14 +224,14 @@ class mob_tito : public CreatureScript
 public:
     mob_tito() : CreatureScript("mob_tito") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_titoAI(pCreature);
+        return new mob_titoAI(creature);
     }
 
     struct mob_titoAI : public ScriptedAI
     {
-        mob_titoAI(Creature* c) : ScriptedAI(c) {}
+        mob_titoAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint64 DorotheeGUID;
         uint32 YipTimer;
@@ -289,19 +291,19 @@ class boss_strawman : public CreatureScript
 public:
     boss_strawman() : CreatureScript("boss_strawman") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_strawmanAI(pCreature);
+        return new boss_strawmanAI(creature);
     }
 
     struct boss_strawmanAI : public ScriptedAI
     {
-        boss_strawmanAI(Creature* c) : ScriptedAI(c)
+        boss_strawmanAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 AggroTimer;
         uint32 BrainBashTimer;
@@ -337,15 +339,15 @@ public:
 
         void JustReachedHome()
         {
-            me->ForcedDespawn();
+            me->DespawnOrUnsummon();
         }
 
-        void SpellHit(Unit* /*caster*/, const SpellEntry *Spell)
+        void SpellHit(Unit* /*caster*/, const SpellInfo* Spell)
         {
             if ((Spell->SchoolMask == SPELL_SCHOOL_MASK_FIRE) && (!(rand()%10)))
             {
                 /*
-                    if (not direct damage(aoe,dot))
+                    if (not direct damage(aoe, dot))
                         return;
                 */
 
@@ -357,8 +359,8 @@ public:
         {
             DoScriptText(SAY_STRAWMAN_DEATH, me);
 
-            if (pInstance)
-                SummonCroneIfReady(pInstance, me);
+            if (instance)
+                SummonCroneIfReady(instance, me);
         }
 
         void KilledUnit(Unit* /*victim*/)
@@ -388,8 +390,8 @@ public:
 
             if (BrainWipeTimer <= diff)
             {
-                if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                    DoCast(pTarget, SPELL_BRAIN_WIPE);
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                    DoCast(target, SPELL_BRAIN_WIPE);
                 BrainWipeTimer = 20000;
             } else BrainWipeTimer -= diff;
 
@@ -404,19 +406,19 @@ class boss_tinhead : public CreatureScript
 public:
     boss_tinhead() : CreatureScript("boss_tinhead") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_tinheadAI(pCreature);
+        return new boss_tinheadAI(creature);
     }
 
     struct boss_tinheadAI : public ScriptedAI
     {
-        boss_tinheadAI(Creature* c) : ScriptedAI(c)
+        boss_tinheadAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 AggroTimer;
         uint32 CleaveTimer;
@@ -440,7 +442,7 @@ public:
 
         void JustReachedHome()
         {
-            me->ForcedDespawn();
+            me->DespawnOrUnsummon();
         }
 
         void AttackStart(Unit* who)
@@ -463,8 +465,8 @@ public:
         {
             DoScriptText(SAY_TINHEAD_DEATH, me);
 
-            if (pInstance)
-                SummonCroneIfReady(pInstance, me);
+            if (instance)
+                SummonCroneIfReady(instance, me);
         }
 
         void KilledUnit(Unit* /*victim*/)
@@ -514,19 +516,19 @@ class boss_roar : public CreatureScript
 public:
     boss_roar() : CreatureScript("boss_roar") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_roarAI(pCreature);
+        return new boss_roarAI(creature);
     }
 
     struct boss_roarAI : public ScriptedAI
     {
-        boss_roarAI(Creature* c) : ScriptedAI(c)
+        boss_roarAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 AggroTimer;
         uint32 MangleTimer;
@@ -564,15 +566,15 @@ public:
 
         void JustReachedHome()
         {
-            me->ForcedDespawn();
+            me->DespawnOrUnsummon();
         }
 
         void JustDied(Unit* /*killer*/)
         {
             DoScriptText(SAY_ROAR_DEATH, me);
 
-            if (pInstance)
-                SummonCroneIfReady(pInstance, me);
+            if (instance)
+                SummonCroneIfReady(instance, me);
         }
 
         void KilledUnit(Unit* /*victim*/)
@@ -597,19 +599,19 @@ public:
             if (MangleTimer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_MANGLE);
-                MangleTimer = urand(5000,8000);
+                MangleTimer = urand(5000, 8000);
             } else MangleTimer -= diff;
 
             if (ShredTimer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_SHRED);
-                ShredTimer = urand(10000,15000);
+                ShredTimer = urand(10000, 15000);
             } else ShredTimer -= diff;
 
             if (ScreamTimer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_FRIGHTENED_SCREAM);
-                ScreamTimer = urand(20000,30000);
+                ScreamTimer = urand(20000, 30000);
             } else ScreamTimer -= diff;
 
             DoMeleeAttackIfReady();
@@ -623,19 +625,19 @@ class boss_crone : public CreatureScript
 public:
     boss_crone() : CreatureScript("boss_crone") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_croneAI(pCreature);
+        return new boss_croneAI(creature);
     }
 
     struct boss_croneAI : public ScriptedAI
     {
-        boss_croneAI(Creature* c) : ScriptedAI(c)
+        boss_croneAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 CycloneTimer;
         uint32 ChainLightningTimer;
@@ -648,27 +650,27 @@ public:
 
         void JustReachedHome()
         {
-            me->ForcedDespawn();
+            me->DespawnOrUnsummon();
         }
 
         void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(RAND(SAY_CRONE_AGGRO,SAY_CRONE_AGGRO2), me);
+            DoScriptText(RAND(SAY_CRONE_AGGRO, SAY_CRONE_AGGRO2), me);
             me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
         }
 
         void JustDied(Unit* /*killer*/)
         {
             DoScriptText(SAY_CRONE_DEATH, me);
 
-            if (pInstance)
+            if (instance)
             {
-                pInstance->SetData(TYPE_OPERA, DONE);
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GO_STAGEDOORLEFT), true);
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GO_STAGEDOORRIGHT), true);
+                instance->SetData(TYPE_OPERA, DONE);
+                instance->HandleGameObject(instance->GetData64(DATA_GO_STAGEDOORLEFT), true);
+                instance->HandleGameObject(instance->GetData64(DATA_GO_STAGEDOORRIGHT), true);
 
-                if (GameObject* pSideEntrance = pInstance->instance->GetGameObject(pInstance->GetData64(DATA_GO_SIDE_ENTRANCE_DOOR)))
+                if (GameObject* pSideEntrance = instance->instance->GetGameObject(instance->GetData64(DATA_GO_SIDE_ENTRANCE_DOOR)))
                     pSideEntrance->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_LOCKED);
             }
         }
@@ -683,7 +685,7 @@ public:
 
             if (CycloneTimer <= diff)
             {
-                if (Creature* Cyclone = DoSpawnCreature(CREATURE_CYCLONE, float(urand(0,9)), float(urand(0,9)), 0, 0, TEMPSUMMON_TIMED_DESPAWN, 15000))
+                if (Creature* Cyclone = DoSpawnCreature(CREATURE_CYCLONE, float(urand(0, 9)), float(urand(0, 9)), 0, 0, TEMPSUMMON_TIMED_DESPAWN, 15000))
                     Cyclone->CastSpell(Cyclone, SPELL_CYCLONE_VISUAL, true);
                 CycloneTimer = 30000;
             } else CycloneTimer -= diff;
@@ -705,14 +707,14 @@ class mob_cyclone : public CreatureScript
 public:
     mob_cyclone() : CreatureScript("mob_cyclone") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_cycloneAI(pCreature);
+        return new mob_cycloneAI(creature);
     }
 
     struct mob_cycloneAI : public ScriptedAI
     {
-        mob_cycloneAI(Creature* c) : ScriptedAI(c) {}
+        mob_cycloneAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 MoveTimer;
 
@@ -737,22 +739,15 @@ public:
                 Position pos;
                 me->GetRandomNearPosition(pos, 10);
                 me->GetMotionMaster()->MovePoint(0, pos);
-                MoveTimer = urand(5000,8000);
+                MoveTimer = urand(5000, 8000);
             } else MoveTimer -= diff;
         }
     };
 
 };
 
-
-
-
-
-
-
-
 /**************************************/
-/**** Opera Red Riding Hood Event ****/
+/**** Opera Red Riding Hood Event* ***/
 /************************************/
 
 /**** Yells for the Wolf ****/
@@ -768,7 +763,7 @@ public:
 
 #define GOSSIP_GRANDMA          "What phat lewtz you have grandmother?"
 
-/**** The Wolf's Entry ****/
+/**** The Wolf's Entry* ***/
 #define CREATURE_BIG_BAD_WOLF           17521
 
 class npc_grandmother : public CreatureScript
@@ -776,49 +771,48 @@ class npc_grandmother : public CreatureScript
 public:
     npc_grandmother() : CreatureScript("npc_grandmother") { }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 /*uiSender*/, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        if (uiAction == GOSSIP_ACTION_INFO_DEF)
+        player->PlayerTalkClass->ClearMenus();
+        if (action == GOSSIP_ACTION_INFO_DEF)
         {
-            if (Creature* pBigBadWolf = pCreature->SummonCreature(CREATURE_BIG_BAD_WOLF, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, HOUR*2*IN_MILLISECONDS))
-                pBigBadWolf->AI()->AttackStart(pPlayer);
+            if (Creature* pBigBadWolf = creature->SummonCreature(CREATURE_BIG_BAD_WOLF, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, HOUR*2*IN_MILLISECONDS))
+                pBigBadWolf->AI()->AttackStart(player);
 
-            pCreature->ForcedDespawn();
+            creature->DespawnOrUnsummon();
         }
 
         return true;
     }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_GRANDMA, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
-        pPlayer->SEND_GOSSIP_MENU(8990, pCreature->GetGUID());
+        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_GRANDMA, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
+        player->SEND_GOSSIP_MENU(8990, creature->GetGUID());
 
         return true;
     }
 
 };
 
-
 class boss_bigbadwolf : public CreatureScript
 {
 public:
     boss_bigbadwolf() : CreatureScript("boss_bigbadwolf") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_bigbadwolfAI(pCreature);
+        return new boss_bigbadwolfAI(creature);
     }
 
     struct boss_bigbadwolfAI : public ScriptedAI
     {
-        boss_bigbadwolfAI(Creature* c) : ScriptedAI(c)
+        boss_bigbadwolfAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 ChaseTimer;
         uint32 FearTimer;
@@ -832,7 +826,7 @@ public:
         void Reset()
         {
             ChaseTimer = 30000;
-            FearTimer = 25000 + rand()%10000;
+            FearTimer = urand(25000, 35000);
             SwipeTimer = 5000;
 
             HoodGUID = 0;
@@ -848,20 +842,20 @@ public:
 
         void JustReachedHome()
         {
-            me->ForcedDespawn();
+            me->DespawnOrUnsummon();
         }
 
         void JustDied(Unit* /*killer*/)
         {
             DoPlaySoundToSet(me, SOUND_WOLF_DEATH);
 
-            if (pInstance)
+            if (instance)
             {
-                pInstance->SetData(TYPE_OPERA, DONE);
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GO_STAGEDOORLEFT), true);
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GO_STAGEDOORRIGHT), true);
+                instance->SetData(TYPE_OPERA, DONE);
+                instance->HandleGameObject(instance->GetData64(DATA_GO_STAGEDOORLEFT), true);
+                instance->HandleGameObject(instance->GetData64(DATA_GO_STAGEDOORRIGHT), true);
 
-                if (GameObject* pSideEntrance = pInstance->instance->GetGameObject(pInstance->GetData64(DATA_GO_SIDE_ENTRANCE_DOOR)))
+                if (GameObject* pSideEntrance = instance->instance->GetGameObject(instance->GetData64(DATA_GO_SIDE_ENTRANCE_DOOR)))
                     pSideEntrance->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_LOCKED);
             }
         }
@@ -877,15 +871,15 @@ public:
             {
                 if (!IsChasing)
                 {
-                    if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
                     {
                         DoScriptText(SAY_WOLF_HOOD, me);
-                        DoCast(pTarget, SPELL_LITTLE_RED_RIDING_HOOD, true);
-                        TempThreat = DoGetThreat(pTarget);
+                        DoCast(target, SPELL_LITTLE_RED_RIDING_HOOD, true);
+                        TempThreat = DoGetThreat(target);
                         if (TempThreat)
-                            DoModifyThreatPercent(pTarget, -100);
-                        HoodGUID = pTarget->GetGUID();
-                        me->AddThreat(pTarget, 1000000.0f);
+                            DoModifyThreatPercent(target, -100);
+                        HoodGUID = target->GetGUID();
+                        me->AddThreat(target, 1000000.0f);
                         ChaseTimer = 20000;
                         IsChasing = true;
                     }
@@ -894,12 +888,12 @@ public:
                 {
                     IsChasing = false;
 
-                    if (Unit *pTarget = Unit::GetUnit((*me), HoodGUID))
+                    if (Unit* target = Unit::GetUnit(*me, HoodGUID))
                     {
                         HoodGUID = 0;
-                        if (DoGetThreat(pTarget))
-                            DoModifyThreatPercent(pTarget, -100);
-                        me->AddThreat(pTarget, TempThreat);
+                        if (DoGetThreat(target))
+                            DoModifyThreatPercent(target, -100);
+                        me->AddThreat(target, TempThreat);
                         TempThreat = 0;
                     }
 
@@ -913,13 +907,13 @@ public:
             if (FearTimer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_TERRIFYING_HOWL);
-                FearTimer = urand(25000,35000);
+                FearTimer = urand(25000, 35000);
             } else FearTimer -= diff;
 
             if (SwipeTimer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_WIDE_SWIPE);
-                SwipeTimer = urand(25000,30000);
+                SwipeTimer = urand(25000, 30000);
             } else SwipeTimer -= diff;
 
         }
@@ -927,9 +921,8 @@ public:
 
 };
 
-
 /**********************************************/
-/******** Opera Romeo and Juliet Event *******/
+/******** Opera Romeo and Juliet Event* ******/
 /********************************************/
 
 /**** Speech *****/
@@ -975,30 +968,30 @@ enum RAJPhase
     PHASE_BOTH          = 2,
 };
 
-void PretendToDie(Creature* pCreature)
+void PretendToDie(Creature* creature)
 {
-    pCreature->InterruptNonMeleeSpells(true);
-    pCreature->RemoveAllAuras();
-    pCreature->SetHealth(0);
-    pCreature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-    pCreature->GetMotionMaster()->MovementExpired(false);
-    pCreature->GetMotionMaster()->MoveIdle();
-    pCreature->SetStandState(UNIT_STAND_STATE_DEAD);
+    creature->InterruptNonMeleeSpells(true);
+    creature->RemoveAllAuras();
+    creature->SetHealth(0);
+    creature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+    creature->GetMotionMaster()->MovementExpired(false);
+    creature->GetMotionMaster()->MoveIdle();
+    creature->SetStandState(UNIT_STAND_STATE_DEAD);
 };
 
-void Resurrect(Creature *pTarget)
+void Resurrect(Creature* target)
 {
-    pTarget->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-    pTarget->SetFullHealth();
-    pTarget->SetStandState(UNIT_STAND_STATE_STAND);
-    pTarget->CastSpell(pTarget, SPELL_RES_VISUAL, true);
-    if (pTarget->getVictim())
+    target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+    target->SetFullHealth();
+    target->SetStandState(UNIT_STAND_STATE_STAND);
+    target->CastSpell(target, SPELL_RES_VISUAL, true);
+    if (target->getVictim())
     {
-        pTarget->GetMotionMaster()->MoveChase(pTarget->getVictim());
-        pTarget->AI()->AttackStart(pTarget->getVictim());
+        target->GetMotionMaster()->MoveChase(target->getVictim());
+        target->AI()->AttackStart(target->getVictim());
     }
         else
-            pTarget->GetMotionMaster()->Initialize();
+            target->GetMotionMaster()->Initialize();
 };
 
 class boss_julianne : public CreatureScript
@@ -1006,22 +999,22 @@ class boss_julianne : public CreatureScript
 public:
     boss_julianne() : CreatureScript("boss_julianne") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_julianneAI(pCreature);
+        return new boss_julianneAI(creature);
     }
 
     struct boss_julianneAI : public ScriptedAI
     {
-        boss_julianneAI(Creature* c) : ScriptedAI(c)
+        boss_julianneAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
             EntryYellTimer = 1000;
             AggroYellTimer = 10000;
             IsFakingDeath = false;
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 EntryYellTimer;
         uint32 AggroYellTimer;
@@ -1086,10 +1079,10 @@ public:
 
         void JustReachedHome()
         {
-            me->ForcedDespawn();
+            me->DespawnOrUnsummon();
         }
 
-        void SpellHit(Unit* /*caster*/, const SpellEntry *Spell)
+        void SpellHit(Unit* /*caster*/, const SpellInfo* Spell)
         {
             if (Spell->Id == SPELL_DRINK_POISON)
             {
@@ -1104,12 +1097,12 @@ public:
         {
             DoScriptText(SAY_JULIANNE_DEATH02, me);
 
-            if (pInstance)
+            if (instance)
             {
-                pInstance->SetData(TYPE_OPERA, DONE);
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GO_STAGEDOORLEFT), true);
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GO_STAGEDOORRIGHT), true);
-                if (GameObject* pSideEntrance = pInstance->instance->GetGameObject(pInstance->GetData64(DATA_GO_SIDE_ENTRANCE_DOOR)))
+                instance->SetData(TYPE_OPERA, DONE);
+                instance->HandleGameObject(instance->GetData64(DATA_GO_STAGEDOORLEFT), true);
+                instance->HandleGameObject(instance->GetData64(DATA_GO_STAGEDOORRIGHT), true);
+                if (GameObject* pSideEntrance = instance->instance->GetGameObject(instance->GetData64(DATA_GO_SIDE_ENTRANCE_DOOR)))
                     pSideEntrance->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_LOCKED);
             }
         }
@@ -1129,21 +1122,21 @@ class boss_romulo : public CreatureScript
 public:
     boss_romulo() : CreatureScript("boss_romulo") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_romuloAI(pCreature);
+        return new boss_romuloAI(creature);
     }
 
     struct boss_romuloAI : public ScriptedAI
     {
-        boss_romuloAI(Creature* c) : ScriptedAI(c)
+        boss_romuloAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
             EntryYellTimer = 8000;
             AggroYellTimer = 15000;
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint64 JulianneGUID;
         uint32 Phase;
@@ -1176,7 +1169,7 @@ public:
 
         void JustReachedHome()
         {
-            me->ForcedDespawn();
+            me->DespawnOrUnsummon();
         }
 
         void DamageTaken(Unit* /*done_by*/, uint32 &damage)
@@ -1230,7 +1223,7 @@ public:
                 }
             }
 
-            sLog->outError("TSCR: boss_romuloAI: DamageTaken reach end of code, that should not happen.");
+            sLog->outError(LOG_FILTER_TSCR, "boss_romuloAI: DamageTaken reach end of code, that should not happen.");
         }
 
         void EnterCombat(Unit* /*who*/)
@@ -1259,13 +1252,13 @@ public:
         {
             DoScriptText(SAY_ROMULO_DEATH, me);
 
-            if (pInstance)
+            if (instance)
             {
-                pInstance->SetData(TYPE_OPERA, DONE);
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GO_STAGEDOORLEFT), true);
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GO_STAGEDOORRIGHT), true);
+                instance->SetData(TYPE_OPERA, DONE);
+                instance->HandleGameObject(instance->GetData64(DATA_GO_STAGEDOORLEFT), true);
+                instance->HandleGameObject(instance->GetData64(DATA_GO_STAGEDOORRIGHT), true);
 
-                if (GameObject* pSideEntrance = pInstance->instance->GetGameObject(pInstance->GetData64(DATA_GO_SIDE_ENTRANCE_DOOR)))
+                if (GameObject* pSideEntrance = instance->instance->GetGameObject(instance->GetData64(DATA_GO_SIDE_ENTRANCE_DOOR)))
                     pSideEntrance->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_LOCKED);
             }
         }
@@ -1298,31 +1291,31 @@ public:
 
             if (BackwardLungeTimer <= diff)
             {
-                Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 1, 100, true);
-                if (pTarget && !me->HasInArc(M_PI, pTarget))
+                Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1, 100, true);
+                if (target && !me->HasInArc(M_PI, target))
                 {
-                    DoCast(pTarget, SPELL_BACKWARD_LUNGE);
-                    BackwardLungeTimer = urand(15000,30000);
+                    DoCast(target, SPELL_BACKWARD_LUNGE);
+                    BackwardLungeTimer = urand(15000, 30000);
                 }
             } else BackwardLungeTimer -= diff;
 
             if (DaringTimer <= diff)
             {
                 DoCast(me, SPELL_DARING);
-                DaringTimer = urand(20000,40000);
+                DaringTimer = urand(20000, 40000);
             } else DaringTimer -= diff;
 
             if (DeadlySwatheTimer <= diff)
             {
-                if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                    DoCast(pTarget, SPELL_DEADLY_SWATHE);
-                DeadlySwatheTimer = urand(15000,25000);
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                    DoCast(target, SPELL_DEADLY_SWATHE);
+                DeadlySwatheTimer = urand(15000, 25000);
             } else DeadlySwatheTimer -= diff;
 
             if (PoisonThrustTimer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_POISON_THRUST);
-                PoisonThrustTimer = urand(10000,20000);
+                PoisonThrustTimer = urand(10000, 20000);
             } else PoisonThrustTimer -= diff;
 
             DoMeleeAttackIfReady();
@@ -1419,33 +1412,33 @@ void boss_julianne::boss_julianneAI::UpdateAI(const uint32 diff)
 
     if (BlindingPassionTimer <= diff)
     {
-        if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-            DoCast(pTarget, SPELL_BLINDING_PASSION);
-        BlindingPassionTimer = urand(30000,45000);
+        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+            DoCast(target, SPELL_BLINDING_PASSION);
+        BlindingPassionTimer = urand(30000, 45000);
     } else BlindingPassionTimer -= diff;
 
     if (DevotionTimer <= diff)
     {
         DoCast(me, SPELL_DEVOTION);
-        DevotionTimer = urand(15000,45000);
+        DevotionTimer = urand(15000, 45000);
     } else DevotionTimer -= diff;
 
     if (PowerfulAttractionTimer <= diff)
     {
-        DoCast(SelectUnit(SELECT_TARGET_RANDOM, 0), SPELL_POWERFUL_ATTRACTION);
-        PowerfulAttractionTimer = urand(5000,30000);
+        DoCast(SelectTarget(SELECT_TARGET_RANDOM, 0), SPELL_POWERFUL_ATTRACTION);
+        PowerfulAttractionTimer = urand(5000, 30000);
     } else PowerfulAttractionTimer -= diff;
 
     if (EternalAffectionTimer <= diff)
     {
-        if (urand(0,1) && SummonedRomulo)
+        if (urand(0, 1) && SummonedRomulo)
         {
             Creature* Romulo = (Unit::GetCreature((*me), RomuloGUID));
             if (Romulo && Romulo->isAlive() && !RomuloDead)
                 DoCast(Romulo, SPELL_ETERNAL_AFFECTION);
         } else DoCast(me, SPELL_ETERNAL_AFFECTION);
 
-        EternalAffectionTimer = urand(45000,60000);
+        EternalAffectionTimer = urand(45000, 60000);
     } else EternalAffectionTimer -= diff;
 
     DoMeleeAttackIfReady();
@@ -1476,7 +1469,7 @@ void boss_julianne::boss_julianneAI::DamageTaken(Unit* /*done_by*/, uint32 &dama
 
     if (Phase == PHASE_ROMULO)
     {
-        sLog->outError("TSCR: boss_julianneAI: cannot take damage in PHASE_ROMULO, why was i here?");
+        sLog->outError(LOG_FILTER_TSCR, "boss_julianneAI: cannot take damage in PHASE_ROMULO, why was i here?");
         damage = 0;
         return;
     }
@@ -1510,9 +1503,8 @@ void boss_julianne::boss_julianneAI::DamageTaken(Unit* /*done_by*/, uint32 &dama
             return;
         }
     }
-    sLog->outError("TSCR: boss_julianneAI: DamageTaken reach end of code, that should not happen.");
+    sLog->outError(LOG_FILTER_TSCR, "boss_julianneAI: DamageTaken reach end of code, that should not happen.");
 }
-
 
 void AddSC_bosses_opera()
 {

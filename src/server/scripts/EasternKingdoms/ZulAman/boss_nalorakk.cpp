@@ -1,5 +1,5 @@
  /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,19 +23,22 @@ SDComment:
 SDCategory: Zul'Aman
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "zulaman.h"
 #include "GridNotifiers.h"
+#include "GridNotifiersImpl.h"
+#include "CellImpl.h"
 
 //Trash Waves
 float NalorakkWay[8][3] =
 {
-    { 18.569f, 1414.512f, 11.42f},// waypoint 1
+    { 18.569f, 1414.512f, 11.42f}, // waypoint 1
     {-17.264f, 1419.551f, 12.62f},
-    {-52.642f, 1419.357f, 27.31f},// waypoint 2
+    {-52.642f, 1419.357f, 27.31f}, // waypoint 2
     {-69.908f, 1419.721f, 27.31f},
     {-79.929f, 1395.958f, 27.31f},
-    {-80.072f, 1374.555f, 40.87f},// waypoint 3
+    {-80.072f, 1374.555f, 40.87f}, // waypoint 3
     {-80.072f, 1314.398f, 40.87f},
     {-80.072f, 1295.775f, 48.60f} // waypoint 4
 };
@@ -101,14 +104,14 @@ class boss_nalorakk : public CreatureScript
 
         struct boss_nalorakkAI : public ScriptedAI
         {
-            boss_nalorakkAI(Creature *c) : ScriptedAI(c)
+            boss_nalorakkAI(Creature* creature) : ScriptedAI(creature)
             {
                 MoveEvent = true;
                 MovePhase = 0;
-                pInstance = c->GetInstanceScript();
+                instance = creature->GetInstanceScript();
             }
 
-            InstanceScript *pInstance;
+            InstanceScript* instance;
 
             uint32 BrutalSwipe_Timer;
             uint32 Mangle_Timer;
@@ -135,36 +138,35 @@ class boss_nalorakk : public CreatureScript
                     me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
                     inMove = false;
                     waitTimer = 0;
-                    me->SetSpeed(MOVE_RUN,2);
-                    me->RemoveUnitMovementFlag(MOVEMENTFLAG_WALKING);
+                    me->SetSpeed(MOVE_RUN, 2);
+                    me->SetWalk(false);
                 }else
                 {
-                    (*me).GetMotionMaster()->MovePoint(0,NalorakkWay[7][0],NalorakkWay[7][1],NalorakkWay[7][2]);
+                    (*me).GetMotionMaster()->MovePoint(0, NalorakkWay[7][0], NalorakkWay[7][1], NalorakkWay[7][2]);
                 }
 
-                if (pInstance)
-                    pInstance->SetData(DATA_NALORAKKEVENT, NOT_STARTED);
+                if (instance)
+                    instance->SetData(DATA_NALORAKKEVENT, NOT_STARTED);
 
-                Surge_Timer = 15000 + rand()%5000;
-                BrutalSwipe_Timer = 7000 + rand()%5000;
-                Mangle_Timer = 10000 + rand()%5000;
-                ShapeShift_Timer = 45000 + rand()%5000;
+                Surge_Timer = urand(15000, 20000);
+                BrutalSwipe_Timer = urand(7000, 12000);
+                Mangle_Timer = urand(10000, 15000);
+                ShapeShift_Timer = urand(45000, 50000);
                 Berserk_Timer = 600000;
 
                 inBearForm = false;
                 // me->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 1, 5122);  // TODO: find the correct equipment id
             }
 
-            void SendAttacker(Unit *pTarget)
+            void SendAttacker(Unit* target)
             {
                 std::list<Creature*> templist;
                 float x, y, z;
                 me->GetPosition(x, y, z);
 
                 {
-                    CellPair pair(Trinity::ComputeCellPair(x, y));
+                    CellCoord pair(Trinity::ComputeCellCoord(x, y));
                     Cell cell(pair);
-                    cell.data.Part.reserved = ALL_DISTRICT;
                     cell.SetNoCreate();
 
                     Trinity::AllFriendlyCreaturesInGrid check(me);
@@ -172,18 +174,18 @@ class boss_nalorakk : public CreatureScript
 
                     TypeContainerVisitor<Trinity::CreatureListSearcher<Trinity::AllFriendlyCreaturesInGrid>, GridTypeMapContainer> cSearcher(searcher);
 
-                    cell.Visit(pair, cSearcher, *(me->GetMap()));
+                    cell.Visit(pair, cSearcher, *(me->GetMap()), *me, me->GetGridActivationRange());
                 }
 
-                if (!templist.size())
+                if (templist.empty())
                     return;
 
                 for (std::list<Creature*>::const_iterator i = templist.begin(); i != templist.end(); ++i)
                 {
-                    if ((*i) && me->IsWithinDistInMap((*i),25))
+                    if ((*i) && me->IsWithinDistInMap((*i), 25))
                     {
                         (*i)->SetNoCallAssistance(true);
-                        (*i)->AI()->AttackStart(pTarget);
+                        (*i)->AI()->AttackStart(target);
                     }
                 }
             }
@@ -194,7 +196,7 @@ class boss_nalorakk : public CreatureScript
                     ScriptedAI::AttackStart(who);
             }
 
-            void MoveInLineOfSight(Unit *who)
+            void MoveInLineOfSight(Unit* who)
             {
                 if (!MoveEvent)
                 {
@@ -206,15 +208,15 @@ class boss_nalorakk : public CreatureScript
                     {
                         if (!inMove)
                         {
-                            switch(MovePhase)
+                            switch (MovePhase)
                             {
                                 case 0:
                                     if (me->IsWithinDistInMap(who, 50))
                                     {
-                                        me->MonsterYell(YELL_NALORAKK_WAVE1, LANG_UNIVERSAL, NULL);
+                                        me->MonsterYell(YELL_NALORAKK_WAVE1, LANG_UNIVERSAL, 0);
                                         DoPlaySoundToSet(me, SOUND_NALORAKK_WAVE1);
 
-                                        (*me).GetMotionMaster()->MovePoint(1,NalorakkWay[1][0],NalorakkWay[1][1],NalorakkWay[1][2]);
+                                        (*me).GetMotionMaster()->MovePoint(1, NalorakkWay[1][0], NalorakkWay[1][1], NalorakkWay[1][2]);
                                         MovePhase ++;
                                         inMove = true;
 
@@ -224,10 +226,10 @@ class boss_nalorakk : public CreatureScript
                                 case 2:
                                     if (me->IsWithinDistInMap(who, 40))
                                     {
-                                        me->MonsterYell(YELL_NALORAKK_WAVE2, LANG_UNIVERSAL, NULL);
+                                        me->MonsterYell(YELL_NALORAKK_WAVE2, LANG_UNIVERSAL, 0);
                                         DoPlaySoundToSet(me, SOUND_NALORAKK_WAVE2);
 
-                                        (*me).GetMotionMaster()->MovePoint(3,NalorakkWay[3][0],NalorakkWay[3][1],NalorakkWay[3][2]);
+                                        (*me).GetMotionMaster()->MovePoint(3, NalorakkWay[3][0], NalorakkWay[3][1], NalorakkWay[3][2]);
                                         MovePhase ++;
                                         inMove = true;
 
@@ -237,10 +239,10 @@ class boss_nalorakk : public CreatureScript
                                 case 5:
                                     if (me->IsWithinDistInMap(who, 40))
                                     {
-                                        me->MonsterYell(YELL_NALORAKK_WAVE3, LANG_UNIVERSAL, NULL);
+                                        me->MonsterYell(YELL_NALORAKK_WAVE3, LANG_UNIVERSAL, 0);
                                         DoPlaySoundToSet(me, SOUND_NALORAKK_WAVE3);
 
-                                        (*me).GetMotionMaster()->MovePoint(6,NalorakkWay[6][0],NalorakkWay[6][1],NalorakkWay[6][2]);
+                                        (*me).GetMotionMaster()->MovePoint(6, NalorakkWay[6][0], NalorakkWay[6][1], NalorakkWay[6][2]);
                                         MovePhase ++;
                                         inMove = true;
 
@@ -252,7 +254,7 @@ class boss_nalorakk : public CreatureScript
                                     {
                                         SendAttacker(who);
 
-                                        me->MonsterYell(YELL_NALORAKK_WAVE4, LANG_UNIVERSAL, NULL);
+                                        me->MonsterYell(YELL_NALORAKK_WAVE4, LANG_UNIVERSAL, 0);
                                         DoPlaySoundToSet(me, SOUND_NALORAKK_WAVE4);
 
                                         me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
@@ -267,35 +269,35 @@ class boss_nalorakk : public CreatureScript
                 }
             }
 
-            void EnterCombat(Unit * /*who*/)
+            void EnterCombat(Unit* /*who*/)
             {
-                if (pInstance)
-                    pInstance->SetData(DATA_NALORAKKEVENT, IN_PROGRESS);
+                if (instance)
+                    instance->SetData(DATA_NALORAKKEVENT, IN_PROGRESS);
 
-                me->MonsterYell(YELL_AGGRO, LANG_UNIVERSAL, NULL);
+                me->MonsterYell(YELL_AGGRO, LANG_UNIVERSAL, 0);
                 DoPlaySoundToSet(me, SOUND_YELL_AGGRO);
                 DoZoneInCombat();
             }
 
-            void JustDied(Unit* /*Killer*/)
+            void JustDied(Unit* /*killer*/)
             {
-                if (pInstance)
-                    pInstance->SetData(DATA_NALORAKKEVENT, DONE);
+                if (instance)
+                    instance->SetData(DATA_NALORAKKEVENT, DONE);
 
-                me->MonsterYell(YELL_DEATH,LANG_UNIVERSAL,NULL);
+                me->MonsterYell(YELL_DEATH, LANG_UNIVERSAL, 0);
                 DoPlaySoundToSet(me, SOUND_YELL_DEATH);
             }
 
             void KilledUnit(Unit* /*victim*/)
             {
-                switch (urand(0,1))
+                switch (urand(0, 1))
                 {
                     case 0:
-                        me->MonsterYell(YELL_KILL_ONE, LANG_UNIVERSAL, NULL);
+                        me->MonsterYell(YELL_KILL_ONE, LANG_UNIVERSAL, 0);
                         DoPlaySoundToSet(me, SOUND_YELL_KILL_ONE);
                         break;
                     case 1:
-                        me->MonsterYell(YELL_KILL_TWO, LANG_UNIVERSAL, NULL);
+                        me->MonsterYell(YELL_KILL_TWO, LANG_UNIVERSAL, 0);
                         DoPlaySoundToSet(me, SOUND_YELL_KILL_TWO);
                         break;
                 }
@@ -314,7 +316,7 @@ class boss_nalorakk : public CreatureScript
                     if (MovePhase != id)
                         return;
 
-                    switch(MovePhase)
+                    switch (MovePhase)
                     {
                         case 2:
                             me->SetOrientation(3.1415f*2);
@@ -348,7 +350,7 @@ class boss_nalorakk : public CreatureScript
                     if (waitTimer <= diff)
                     {
                         (*me).GetMotionMaster()->MovementExpired();
-                        (*me).GetMotionMaster()->MovePoint(MovePhase,NalorakkWay[MovePhase][0],NalorakkWay[MovePhase][1],NalorakkWay[MovePhase][2]);
+                        (*me).GetMotionMaster()->MovePoint(MovePhase, NalorakkWay[MovePhase][0], NalorakkWay[MovePhase][1], NalorakkWay[MovePhase][2]);
                         waitTimer = 0;
                     } else waitTimer -= diff;
                 }
@@ -359,7 +361,7 @@ class boss_nalorakk : public CreatureScript
                 if (Berserk_Timer <= diff)
                 {
                     DoCast(me, SPELL_BERSERK, true);
-                    me->MonsterYell(YELL_BERSERK, LANG_UNIVERSAL, NULL);
+                    me->MonsterYell(YELL_BERSERK, LANG_UNIVERSAL, 0);
                     DoPlaySoundToSet(me, SOUND_YELL_BERSERK);
                     Berserk_Timer = 600000;
                 } else Berserk_Timer -= diff;
@@ -369,25 +371,25 @@ class boss_nalorakk : public CreatureScript
                     if (inBearForm)
                     {
                         // me->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 1, 5122);
-                        me->MonsterYell(YELL_SHIFTEDTOTROLL, LANG_UNIVERSAL, NULL);
+                        me->MonsterYell(YELL_SHIFTEDTOTROLL, LANG_UNIVERSAL, 0);
                         DoPlaySoundToSet(me, SOUND_YELL_TOTROLL);
                         me->RemoveAurasDueToSpell(SPELL_BEARFORM);
-                        Surge_Timer = 15000 + rand()%5000;
-                        BrutalSwipe_Timer = 7000 + rand()%5000;
-                        Mangle_Timer = 10000 + rand()%5000;
-                        ShapeShift_Timer = 45000 + rand()%5000;
+                        Surge_Timer = urand(15000, 20000);
+                        BrutalSwipe_Timer = urand(7000, 12000);
+                        Mangle_Timer = urand(10000, 15000);
+                        ShapeShift_Timer = urand(45000, 50000);
                         inBearForm = false;
                     }
                     else
                     {
                         // me->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 1, 0);
-                        me->MonsterYell(YELL_SHIFTEDTOBEAR, LANG_UNIVERSAL, NULL);
+                        me->MonsterYell(YELL_SHIFTEDTOBEAR, LANG_UNIVERSAL, 0);
                         DoPlaySoundToSet(me, SOUND_YELL_TOBEAR);
                         DoCast(me, SPELL_BEARFORM, true);
                         LaceratingSlash_Timer = 2000; // dur 18s
                         RendFlesh_Timer = 3000;  // dur 5s
-                        DeafeningRoar_Timer = 5000 + rand()%5000;  // dur 2s
-                        ShapeShift_Timer = 20000 + rand()%5000; // dur 30s
+                        DeafeningRoar_Timer = urand(5000, 10000);  // dur 2s
+                        ShapeShift_Timer = urand(20000, 25000); // dur 30s
                         inBearForm = true;
                     }
                 } else ShapeShift_Timer -= diff;
@@ -397,7 +399,7 @@ class boss_nalorakk : public CreatureScript
                     if (BrutalSwipe_Timer <= diff)
                     {
                         DoCast(me->getVictim(), SPELL_BRUTALSWIPE);
-                        BrutalSwipe_Timer = 7000 + rand()%5000;
+                        BrutalSwipe_Timer = urand(7000, 12000);
                     } else BrutalSwipe_Timer -= diff;
 
                     if (Mangle_Timer <= diff)
@@ -407,17 +409,17 @@ class boss_nalorakk : public CreatureScript
                             DoCast(me->getVictim(), SPELL_MANGLE);
                             Mangle_Timer = 1000;
                         }
-                        else Mangle_Timer = 10000 + rand()%5000;
+                        else Mangle_Timer = urand(10000, 15000);
                     } else Mangle_Timer -= diff;
 
                     if (Surge_Timer <= diff)
                     {
-                        me->MonsterYell(YELL_SURGE, LANG_UNIVERSAL, NULL);
+                        me->MonsterYell(YELL_SURGE, LANG_UNIVERSAL, 0);
                         DoPlaySoundToSet(me, SOUND_YELL_SURGE);
-                        Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 1, 45, true);
-                        if (pTarget)
-                            DoCast(pTarget, SPELL_SURGE);
-                        Surge_Timer = 15000 + rand()%5000;
+                        Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1, 45, true);
+                        if (target)
+                            DoCast(target, SPELL_SURGE);
+                        Surge_Timer = urand(15000, 20000);
                     } else Surge_Timer -= diff;
                 }
                 else
@@ -425,26 +427,25 @@ class boss_nalorakk : public CreatureScript
                     if (LaceratingSlash_Timer <= diff)
                     {
                         DoCast(me->getVictim(), SPELL_LACERATINGSLASH);
-                        LaceratingSlash_Timer = 18000 + rand()%5000;
+                        LaceratingSlash_Timer = urand(18000, 23000);
                     } else LaceratingSlash_Timer -= diff;
 
                     if (RendFlesh_Timer <= diff)
                     {
                         DoCast(me->getVictim(), SPELL_RENDFLESH);
-                        RendFlesh_Timer = 5000 + rand()%5000;
+                        RendFlesh_Timer = urand(5000, 10000);
                     } else RendFlesh_Timer -= diff;
 
                     if (DeafeningRoar_Timer <= diff)
                     {
                         DoCast(me->getVictim(), SPELL_DEAFENINGROAR);
-                        DeafeningRoar_Timer = 15000 + rand()%5000;
+                        DeafeningRoar_Timer = urand(15000, 20000);
                     } else DeafeningRoar_Timer -= diff;
                 }
 
                 DoMeleeAttackIfReady();
             }
         };
-
 
         CreatureAI* GetAI(Creature* creature) const
         {

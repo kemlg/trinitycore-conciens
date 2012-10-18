@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: currently missing info about door. instance not complete
 SDCategory: Hellfire Citadel, Shattered Halls
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "shattered_halls.h"
 
 #define MAX_ENCOUNTER  2
@@ -39,7 +40,7 @@ class instance_shattered_halls : public InstanceMapScript
         }
         struct instance_shattered_halls_InstanceMapScript : public InstanceScript
         {
-            instance_shattered_halls_InstanceMapScript(Map* pMap) : InstanceScript(pMap) {Initialize();};
+            instance_shattered_halls_InstanceMapScript(Map* map) : InstanceScript(map) {}
 
             uint32 m_auiEncounter[MAX_ENCOUNTER];
             uint64 nethekurseGUID;
@@ -55,7 +56,7 @@ class instance_shattered_halls : public InstanceMapScript
 
             void OnGameObjectCreate(GameObject* go)
             {
-                switch(go->GetEntry())
+                switch (go->GetEntry())
                 {
                     case DOOR_NETHEKURSE:
                         nethekurseDoorGUID = go->GetGUID();
@@ -65,7 +66,7 @@ class instance_shattered_halls : public InstanceMapScript
 
             void OnCreatureCreate(Creature* creature)
             {
-                switch(creature->GetEntry())
+                switch (creature->GetEntry())
                 {
                     case 16807:
                         nethekurseGUID = creature->GetGUID();
@@ -75,7 +76,7 @@ class instance_shattered_halls : public InstanceMapScript
 
             void SetData(uint32 type, uint32 data)
             {
-                switch(type)
+                switch (type)
                 {
                     case TYPE_NETHEKURSE:
                         m_auiEncounter[0] = data;
@@ -88,7 +89,7 @@ class instance_shattered_halls : public InstanceMapScript
 
             uint32 GetData(uint32 type)
             {
-                switch(type)
+                switch (type)
                 {
                     case TYPE_NETHEKURSE:
                         return m_auiEncounter[0];
@@ -100,7 +101,7 @@ class instance_shattered_halls : public InstanceMapScript
 
             uint64 GetData64(uint32 data)
             {
-                switch(data)
+                switch (data)
                 {
                     case DATA_NETHEKURSE:
                         return nethekurseGUID;
@@ -111,9 +112,9 @@ class instance_shattered_halls : public InstanceMapScript
             }
         };
 
-        InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+        InstanceScript* GetInstanceScript(InstanceMap* map) const
         {
-            return new instance_shattered_halls_InstanceMapScript(pMap);
+            return new instance_shattered_halls_InstanceMapScript(map);
         }
 };
 

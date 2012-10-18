@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Some cleanup left along with save
 SDCategory: Auchindoun, Shadow Labyrinth
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "shadow_labyrinth.h"
 
 #define MAX_ENCOUNTER 5
@@ -43,14 +44,14 @@ class instance_shadow_labyrinth : public InstanceMapScript
 public:
     instance_shadow_labyrinth() : InstanceMapScript("instance_shadow_labyrinth", 555) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+    InstanceScript* GetInstanceScript(InstanceMap* map) const
     {
-        return new instance_shadow_labyrinth_InstanceMapScript(pMap);
+        return new instance_shadow_labyrinth_InstanceMapScript(map);
     }
 
     struct instance_shadow_labyrinth_InstanceMapScript : public InstanceScript
     {
-        instance_shadow_labyrinth_InstanceMapScript(Map* pMap) : InstanceScript(pMap) {Initialize();};
+        instance_shadow_labyrinth_InstanceMapScript(Map* map) : InstanceScript(map) {}
 
         uint32 m_auiEncounter[MAX_ENCOUNTER];
         std::string str_data;
@@ -75,14 +76,15 @@ public:
         bool IsEncounterInProgress() const
         {
             for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
-                if (m_auiEncounter[i] == IN_PROGRESS) return true;
+                if (m_auiEncounter[i] == IN_PROGRESS)
+                    return true;
 
             return false;
         }
 
         void OnGameObjectCreate(GameObject* go)
         {
-            switch(go->GetEntry())
+            switch (go->GetEntry())
             {
                 case REFECTORY_DOOR:
                     m_uiRefectoryDoorGUID = go->GetGUID();
@@ -99,7 +101,7 @@ public:
 
         void OnCreatureCreate(Creature* creature)
         {
-            switch(creature->GetEntry())
+            switch (creature->GetEntry())
             {
                 case 18732:
                     m_uiGrandmasterVorpil = creature->GetGUID();
@@ -108,7 +110,7 @@ public:
                     if (creature->isAlive())
                     {
                         ++m_uiFelOverseerCount;
-                        sLog->outDebug("TSCR: Shadow Labyrinth: counting %u Fel Overseers.",m_uiFelOverseerCount);
+                        sLog->outDebug(LOG_FILTER_TSCR, "Shadow Labyrinth: counting %u Fel Overseers.", m_uiFelOverseerCount);
                     }
                     break;
             }
@@ -116,7 +118,7 @@ public:
 
         void SetData(uint32 type, uint32 uiData)
         {
-            switch(type)
+            switch (type)
             {
                 case TYPE_HELLMAW:
                     m_auiEncounter[0] = uiData;
@@ -125,7 +127,7 @@ public:
                 case TYPE_OVERSEER:
                     if (uiData != DONE)
                     {
-                        sLog->outError("TSCR: Shadow Labyrinth: TYPE_OVERSEER did not expect other data than DONE");
+                        sLog->outError(LOG_FILTER_TSCR, "Shadow Labyrinth: TYPE_OVERSEER did not expect other data than DONE");
                         return;
                     }
                     if (m_uiFelOverseerCount)
@@ -133,11 +135,11 @@ public:
                         --m_uiFelOverseerCount;
 
                         if (m_uiFelOverseerCount)
-                            sLog->outDebug("TSCR: Shadow Labyrinth: %u Fel Overseers left to kill.",m_uiFelOverseerCount);
+                            sLog->outDebug(LOG_FILTER_TSCR, "Shadow Labyrinth: %u Fel Overseers left to kill.", m_uiFelOverseerCount);
                         else
                         {
                             m_auiEncounter[1] = DONE;
-                            sLog->outDebug("TSCR: Shadow Labyrinth: TYPE_OVERSEER == DONE");
+                            sLog->outDebug(LOG_FILTER_TSCR, "Shadow Labyrinth: TYPE_OVERSEER == DONE");
                         }
                     }
                     break;
@@ -167,8 +169,8 @@ public:
                 OUT_SAVE_INST_DATA;
 
                 std::ostringstream saveStream;
-                saveStream << m_auiEncounter[0] << " " << m_auiEncounter[1] << " "
-                    << m_auiEncounter[2] << " " << m_auiEncounter[3] << " " << m_auiEncounter[4];
+                saveStream << m_auiEncounter[0] << ' ' << m_auiEncounter[1] << ' '
+                    << m_auiEncounter[2] << ' ' << m_auiEncounter[3] << ' ' << m_auiEncounter[4];
 
                 str_data = saveStream.str();
 
@@ -179,7 +181,7 @@ public:
 
         uint32 GetData(uint32 type)
         {
-            switch(type)
+            switch (type)
             {
                 case TYPE_HELLMAW: return m_auiEncounter[0];
                 case TYPE_OVERSEER: return m_auiEncounter[1];
@@ -224,7 +226,6 @@ public:
     };
 
 };
-
 
 void AddSC_instance_shadow_labyrinth()
 {

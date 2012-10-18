@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Scholomance
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "scholomance.h"
 
 #define GO_GATE_KIRTONOS    175570
@@ -42,14 +43,14 @@ class instance_scholomance : public InstanceMapScript
 public:
     instance_scholomance() : InstanceMapScript("instance_scholomance", 289) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+    InstanceScript* GetInstanceScript(InstanceMap* map) const
     {
-        return new instance_scholomance_InstanceMapScript(pMap);
+        return new instance_scholomance_InstanceMapScript(map);
     }
 
     struct instance_scholomance_InstanceMapScript : public InstanceScript
     {
-        instance_scholomance_InstanceMapScript(Map* pMap) : InstanceScript(pMap) {Initialize();};
+        instance_scholomance_InstanceMapScript(Map* map) : InstanceScript(map) {}
 
         //Lord Alexei Barov, Doctor Theolen Krastinov, The Ravenian, Lorekeeper Polkelt, Instructor Malicia and the Lady Illucia Barov.
         bool IsBossDied[6];
@@ -83,7 +84,7 @@ public:
 
         void OnGameObjectCreate(GameObject* go)
         {
-            switch(go->GetEntry())
+            switch (go->GetEntry())
             {
                 case GO_GATE_KIRTONOS:  GateKirtonosGUID = go->GetGUID(); break;
                 case GO_GATE_GANDLING:  GateGandlingGUID = go->GetGUID(); break;
@@ -98,7 +99,7 @@ public:
 
         void SetData(uint32 type, uint32 data)
         {
-            switch(type)
+            switch (type)
             {
                 case DATA_LORDALEXEIBAROV_DEATH:
                     IsBossDied[0] = true;
@@ -143,7 +144,6 @@ public:
     };
 
 };
-
 
 void AddSC_instance_scholomance()
 {

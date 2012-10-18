@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -27,7 +27,8 @@ EndScriptData */
 mob_yenniku
 EndContentData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 /*######
 ## mob_yenniku
@@ -38,14 +39,14 @@ class mob_yenniku : public CreatureScript
 public:
     mob_yenniku() : CreatureScript("mob_yenniku") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_yennikuAI (pCreature);
+        return new mob_yennikuAI (creature);
     }
 
     struct mob_yennikuAI : public ScriptedAI
     {
-        mob_yennikuAI(Creature *c) : ScriptedAI(c)
+        mob_yennikuAI(Creature* creature) : ScriptedAI(creature)
         {
             bReset = false;
         }
@@ -59,7 +60,7 @@ public:
             me->SetUInt32Value(UNIT_NPC_EMOTESTATE, EMOTE_STATE_NONE);
         }
 
-        void SpellHit(Unit *caster, const SpellEntry *spell)
+        void SpellHit(Unit* caster, const SpellInfo* spell)
         {
             if (caster->GetTypeId() == TYPEID_PLAYER)
             {
@@ -78,7 +79,7 @@ public:
             return;
         }
 
-        void EnterCombat(Unit * /*who*/) {}
+        void EnterCombat(Unit* /*who*/) {}
 
         void UpdateAI(const uint32 diff)
         {
@@ -97,7 +98,7 @@ public:
                 {
                     if (me->getVictim()->GetTypeId() == TYPEID_PLAYER)
                     {
-                        Unit *victim = me->getVictim();
+                        Unit* victim = me->getVictim();
                         if (CAST_PLR(victim)->GetTeam() == HORDE)
                         {
                             me->CombatStop();
@@ -114,7 +115,6 @@ public:
             DoMeleeAttackIfReady();
         }
     };
-
 };
 
 /*######

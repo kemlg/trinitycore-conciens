@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,7 @@
 #include "Player.h"
 #include "Unit.h"
 #include "CreatureAI.h"
+#include "Spell.h"
 
 class Player;
 //class Map;
@@ -61,7 +62,7 @@ namespace Trinity
 
     struct PlayerRelocationNotifier : public VisibleNotifier
     {
-        PlayerRelocationNotifier(Player &pl) : VisibleNotifier(pl) {}
+        PlayerRelocationNotifier(Player &player) : VisibleNotifier(player) {}
 
         template<class T> void Visit(GridRefManager<T> &m) { VisibleNotifier::Visit(m); }
         void Visit(CreatureMapType &);
@@ -81,23 +82,23 @@ namespace Trinity
     {
         Map &i_map;
         Cell &cell;
-        CellPair &p;
+        CellCoord &p;
         const float i_radius;
-        DelayedUnitRelocation(Cell &c, CellPair &pair, Map &map, float radius) :
+        DelayedUnitRelocation(Cell &c, CellCoord &pair, Map &map, float radius) :
             i_map(map), cell(c), p(pair), i_radius(radius) {}
         template<class T> void Visit(GridRefManager<T> &) {}
         void Visit(CreatureMapType &);
         void Visit(PlayerMapType   &);
     };
 
-     struct AIRelocationNotifier
-     {
+    struct AIRelocationNotifier
+    {
         Unit &i_unit;
         bool isCreature;
         explicit AIRelocationNotifier(Unit &unit) : i_unit(unit), isCreature(unit.GetTypeId() == TYPEID_UNIT)  {}
         template<class T> void Visit(GridRefManager<T> &) {}
         void Visit(CreatureMapType &);
-     };
+    };
 
     struct GridUpdater
     {
@@ -120,13 +121,13 @@ namespace Trinity
 
     struct MessageDistDeliverer
     {
-        WorldObject *i_source;
-        WorldPacket *i_message;
+        WorldObject* i_source;
+        WorldPacket* i_message;
         uint32 i_phaseMask;
         float i_distSq;
         uint32 team;
         Player const* skipped_receiver;
-        MessageDistDeliverer(WorldObject *src, WorldPacket *msg, float dist, bool own_team_only = false, Player const* skipped = NULL)
+        MessageDistDeliverer(WorldObject* src, WorldPacket* msg, float dist, bool own_team_only = false, Player const* skipped = NULL)
             : i_source(src), i_message(msg), i_phaseMask(src->GetPhaseMask()), i_distSq(dist * dist)
             , team((own_team_only && src->GetTypeId() == TYPEID_PLAYER) ? ((Player*)src)->GetTeam() : 0)
             , skipped_receiver(skipped)
@@ -137,16 +138,16 @@ namespace Trinity
         void Visit(DynamicObjectMapType &m);
         template<class SKIP> void Visit(GridRefManager<SKIP> &) {}
 
-        void SendPacket(Player* plr)
+        void SendPacket(Player* player)
         {
             // never send packet to self
-            if (plr == i_source || (team && plr->GetTeam() != team) || skipped_receiver == plr)
+            if (player == i_source || (team && player->GetTeam() != team) || skipped_receiver == player)
                 return;
 
-            if (!plr->HaveAtClient(i_source))
+            if (!player->HaveAtClient(i_source))
                 return;
 
-            if (WorldSession* session = plr->GetSession())
+            if (WorldSession* session = player->GetSession())
                 session->SendPacket(i_message);
         }
     };
@@ -154,7 +155,7 @@ namespace Trinity
     struct ObjectUpdater
     {
         uint32 i_timeDiff;
-        explicit ObjectUpdater(const uint32 &diff) : i_timeDiff(diff) {}
+        explicit ObjectUpdater(const uint32 diff) : i_timeDiff(diff) {}
         template<class T> void Visit(GridRefManager<T> &m);
         void Visit(PlayerMapType &) {}
         void Visit(CorpseMapType &) {}
@@ -168,12 +169,33 @@ namespace Trinity
     template<class Check>
     struct WorldObjectSearcher
     {
+        uint32 i_mapTypeMask;
         uint32 i_phaseMask;
         WorldObject* &i_object;
         Check &i_check;
 
-        WorldObjectSearcher(WorldObject const* searcher, WorldObject* & result, Check& check)
-            : i_phaseMask(searcher->GetPhaseMask()), i_object(result),i_check(check) {}
+        WorldObjectSearcher(WorldObject const* searcher, WorldObject* & result, Check& check, uint32 mapTypeMask = GRID_MAP_TYPE_MASK_ALL)
+            : i_mapTypeMask(mapTypeMask), i_phaseMask(searcher->GetPhaseMask()), i_object(result), i_check(check) {}
+
+        void Visit(GameObjectMapType &m);
+        void Visit(PlayerMapType &m);
+        void Visit(CreatureMapType &m);
+        void Visit(CorpseMapType &m);
+        void Visit(DynamicObjectMapType &m);
+
+        template<class NOT_INTERESTED> void Visit(GridRefManager<NOT_INTERESTED> &) {}
+    };
+
+    template<class Check>
+    struct WorldObjectLastSearcher
+    {
+        uint32 i_mapTypeMask;
+        uint32 i_phaseMask;
+        WorldObject* &i_object;
+        Check &i_check;
+
+        WorldObjectLastSearcher(WorldObject const* searcher, WorldObject* & result, Check& check, uint32 mapTypeMask = GRID_MAP_TYPE_MASK_ALL)
+            :  i_mapTypeMask(mapTypeMask), i_phaseMask(searcher->GetPhaseMask()), i_object(result), i_check(check) {}
 
         void Visit(GameObjectMapType &m);
         void Visit(PlayerMapType &m);
@@ -187,12 +209,13 @@ namespace Trinity
     template<class Check>
     struct WorldObjectListSearcher
     {
+        uint32 i_mapTypeMask;
         uint32 i_phaseMask;
         std::list<WorldObject*> &i_objects;
         Check& i_check;
 
-        WorldObjectListSearcher(WorldObject const* searcher, std::list<WorldObject*> &objects, Check & check)
-            : i_phaseMask(searcher->GetPhaseMask()), i_objects(objects),i_check(check) {}
+        WorldObjectListSearcher(WorldObject const* searcher, std::list<WorldObject*> &objects, Check & check, uint32 mapTypeMask = GRID_MAP_TYPE_MASK_ALL)
+            : i_mapTypeMask(mapTypeMask), i_phaseMask(searcher->GetPhaseMask()), i_objects(objects), i_check(check) {}
 
         void Visit(PlayerMapType &m);
         void Visit(CreatureMapType &m);
@@ -206,14 +229,17 @@ namespace Trinity
     template<class Do>
     struct WorldObjectWorker
     {
+        uint32 i_mapTypeMask;
         uint32 i_phaseMask;
         Do const& i_do;
 
-        WorldObjectWorker(WorldObject const* searcher, Do const& _do)
-            : i_phaseMask(searcher->GetPhaseMask()), i_do(_do) {}
+        WorldObjectWorker(WorldObject const* searcher, Do const& _do, uint32 mapTypeMask = GRID_MAP_TYPE_MASK_ALL)
+            : i_mapTypeMask(mapTypeMask), i_phaseMask(searcher->GetPhaseMask()), i_do(_do) {}
 
         void Visit(GameObjectMapType &m)
         {
+            if (!(i_mapTypeMask & GRID_MAP_TYPE_MASK_GAMEOBJECT))
+                return;
             for (GameObjectMapType::iterator itr=m.begin(); itr != m.end(); ++itr)
                 if (itr->getSource()->InSamePhase(i_phaseMask))
                     i_do(itr->getSource());
@@ -221,12 +247,16 @@ namespace Trinity
 
         void Visit(PlayerMapType &m)
         {
+            if (!(i_mapTypeMask & GRID_MAP_TYPE_MASK_PLAYER))
+                return;
             for (PlayerMapType::iterator itr=m.begin(); itr != m.end(); ++itr)
                 if (itr->getSource()->InSamePhase(i_phaseMask))
                     i_do(itr->getSource());
         }
         void Visit(CreatureMapType &m)
         {
+            if (!(i_mapTypeMask & GRID_MAP_TYPE_MASK_CREATURE))
+                return;
             for (CreatureMapType::iterator itr=m.begin(); itr != m.end(); ++itr)
                 if (itr->getSource()->InSamePhase(i_phaseMask))
                     i_do(itr->getSource());
@@ -234,6 +264,8 @@ namespace Trinity
 
         void Visit(CorpseMapType &m)
         {
+            if (!(i_mapTypeMask & GRID_MAP_TYPE_MASK_CORPSE))
+                return;
             for (CorpseMapType::iterator itr=m.begin(); itr != m.end(); ++itr)
                 if (itr->getSource()->InSamePhase(i_phaseMask))
                     i_do(itr->getSource());
@@ -241,6 +273,8 @@ namespace Trinity
 
         void Visit(DynamicObjectMapType &m)
         {
+            if (!(i_mapTypeMask & GRID_MAP_TYPE_MASK_DYNAMICOBJECT))
+                return;
             for (DynamicObjectMapType::iterator itr=m.begin(); itr != m.end(); ++itr)
                 if (itr->getSource()->InSamePhase(i_phaseMask))
                     i_do(itr->getSource());
@@ -259,7 +293,7 @@ namespace Trinity
         Check &i_check;
 
         GameObjectSearcher(WorldObject const* searcher, GameObject* & result, Check& check)
-            : i_phaseMask(searcher->GetPhaseMask()), i_object(result),i_check(check) {}
+            : i_phaseMask(searcher->GetPhaseMask()), i_object(result), i_check(check) {}
 
         void Visit(GameObjectMapType &m);
 
@@ -297,6 +331,26 @@ namespace Trinity
         template<class NOT_INTERESTED> void Visit(GridRefManager<NOT_INTERESTED> &) {}
     };
 
+    template<class Functor>
+    struct GameObjectWorker
+    {
+        GameObjectWorker(WorldObject const* searcher, Functor& func)
+            : _func(func), _phaseMask(searcher->GetPhaseMask()) {}
+
+        void Visit(GameObjectMapType& m)
+        {
+            for (GameObjectMapType::iterator itr = m.begin(); itr != m.end(); ++itr)
+                if (itr->getSource()->InSamePhase(_phaseMask))
+                    _func(itr->getSource());
+        }
+
+        template<class NOT_INTERESTED> void Visit(GridRefManager<NOT_INTERESTED> &) {}
+
+    private:
+        Functor& _func;
+        uint32 _phaseMask;
+    };
+
     // Unit searchers
 
     // First accepted by Check Unit if any
@@ -308,7 +362,7 @@ namespace Trinity
         Check & i_check;
 
         UnitSearcher(WorldObject const* searcher, Unit* & result, Check & check)
-            : i_phaseMask(searcher->GetPhaseMask()), i_object(result),i_check(check) {}
+            : i_phaseMask(searcher->GetPhaseMask()), i_object(result), i_check(check) {}
 
         void Visit(CreatureMapType &m);
         void Visit(PlayerMapType &m);
@@ -325,7 +379,7 @@ namespace Trinity
         Check & i_check;
 
         UnitLastSearcher(WorldObject const* searcher, Unit* & result, Check & check)
-            : i_phaseMask(searcher->GetPhaseMask()), i_object(result),i_check(check) {}
+            : i_phaseMask(searcher->GetPhaseMask()), i_object(result), i_check(check) {}
 
         void Visit(CreatureMapType &m);
         void Visit(PlayerMapType &m);
@@ -342,7 +396,7 @@ namespace Trinity
         Check& i_check;
 
         UnitListSearcher(WorldObject const* searcher, std::list<Unit*> &objects, Check & check)
-            : i_phaseMask(searcher->GetPhaseMask()), i_objects(objects),i_check(check) {}
+            : i_phaseMask(searcher->GetPhaseMask()), i_objects(objects), i_check(check) {}
 
         void Visit(PlayerMapType &m);
         void Visit(CreatureMapType &m);
@@ -360,7 +414,7 @@ namespace Trinity
         Check & i_check;
 
         CreatureSearcher(WorldObject const* searcher, Creature* & result, Check & check)
-            : i_phaseMask(searcher->GetPhaseMask()), i_object(result),i_check(check) {}
+            : i_phaseMask(searcher->GetPhaseMask()), i_object(result), i_check(check) {}
 
         void Visit(CreatureMapType &m);
 
@@ -376,7 +430,7 @@ namespace Trinity
         Check & i_check;
 
         CreatureLastSearcher(WorldObject const* searcher, Creature* & result, Check & check)
-            : i_phaseMask(searcher->GetPhaseMask()), i_object(result),i_check(check) {}
+            : i_phaseMask(searcher->GetPhaseMask()), i_object(result), i_check(check) {}
 
         void Visit(CreatureMapType &m);
 
@@ -391,7 +445,7 @@ namespace Trinity
         Check& i_check;
 
         CreatureListSearcher(WorldObject const* searcher, std::list<Creature*> &objects, Check & check)
-            : i_phaseMask(searcher->GetPhaseMask()), i_objects(objects),i_check(check) {}
+            : i_phaseMask(searcher->GetPhaseMask()), i_objects(objects), i_check(check) {}
 
         void Visit(CreatureMapType &m);
 
@@ -427,7 +481,7 @@ namespace Trinity
         Check & i_check;
 
         PlayerSearcher(WorldObject const* searcher, Player* & result, Check & check)
-            : i_phaseMask(searcher->GetPhaseMask()), i_object(result),i_check(check) {}
+            : i_phaseMask(searcher->GetPhaseMask()), i_object(result), i_check(check) {}
 
         void Visit(PlayerMapType &m);
 
@@ -442,9 +496,25 @@ namespace Trinity
         Check& i_check;
 
         PlayerListSearcher(WorldObject const* searcher, std::list<Player*> &objects, Check & check)
-            : i_phaseMask(searcher->GetPhaseMask()), i_objects(objects),i_check(check) {}
+            : i_phaseMask(searcher->GetPhaseMask()), i_objects(objects), i_check(check) {}
 
         void Visit(PlayerMapType &m);
+
+        template<class NOT_INTERESTED> void Visit(GridRefManager<NOT_INTERESTED> &) {}
+    };
+
+    template<class Check>
+    struct PlayerLastSearcher
+    {
+        uint32 i_phaseMask;
+        Player* &i_object;
+        Check& i_check;
+
+        PlayerLastSearcher(WorldObject const* searcher, Player*& result, Check& check) : i_phaseMask(searcher->GetPhaseMask()), i_object(result), i_check(check)
+        {
+        }
+
+        void Visit(PlayerMapType& m);
 
         template<class NOT_INTERESTED> void Visit(GridRefManager<NOT_INTERESTED> &) {}
     };
@@ -481,7 +551,7 @@ namespace Trinity
         void Visit(PlayerMapType &m)
         {
             for (PlayerMapType::iterator itr=m.begin(); itr != m.end(); ++itr)
-                if (itr->getSource()->InSamePhase(i_searcher) && itr->getSource()->IsWithinDist(i_searcher,i_dist))
+                if (itr->getSource()->InSamePhase(i_searcher) && itr->getSource()->IsWithinDist(i_searcher, i_dist))
                     i_do(itr->getSource());
         }
 
@@ -491,103 +561,33 @@ namespace Trinity
     // CHECKS && DO classes
 
     // WorldObject check classes
-    class RaiseDeadObjectCheck
+
+    class AnyDeadUnitObjectInRangeCheck
     {
         public:
-            RaiseDeadObjectCheck(Unit* funit, float range) : i_funit(funit), i_range(range) {}
-            bool operator()(Creature* u)
-            {
-                if (i_funit->GetTypeId() != TYPEID_PLAYER || !((Player*)i_funit)->isHonorOrXPTarget(u) ||
-                    u->getDeathState() != CORPSE || u->isDeadByDefault() || u->isInFlight() ||
-                    (u->GetCreatureTypeMask() & (1 << (CREATURE_TYPE_HUMANOID-1))) == 0 ||
-                    (u->GetDisplayId() != u->GetNativeDisplayId()))
-                    return false;
-
-                return i_funit->IsWithinDistInMap(u, i_range);
-            }
-            template<class NOT_INTERESTED> bool operator()(NOT_INTERESTED*) { return false; }
-        private:
-            Unit* const i_funit;
-            float i_range;
-    };
-
-    class ExplodeCorpseObjectCheck
-    {
-        public:
-            ExplodeCorpseObjectCheck(Unit* funit, float range) : i_funit(funit), i_range(range) {}
-            bool operator()(Player* u)
-            {
-                if (u->getDeathState() != CORPSE || u->isInFlight() ||
-                    u->HasAuraType(SPELL_AURA_GHOST) || (u->GetDisplayId() != u->GetNativeDisplayId()))
-                    return false;
-
-                return i_funit->IsWithinDistInMap(u, i_range);
-            }
-            bool operator()(Creature* u)
-            {
-                if (u->getDeathState() != CORPSE || u->isInFlight() || u->isDeadByDefault() ||
-                    (u->GetDisplayId() != u->GetNativeDisplayId()) ||
-                    (u->GetCreatureTypeMask() & CREATURE_TYPEMASK_MECHANICAL_OR_ELEMENTAL) != 0)
-                    return false;
-
-                return i_funit->IsWithinDistInMap(u, i_range);
-            }
-            template<class NOT_INTERESTED> bool operator()(NOT_INTERESTED*) { return false; }
-        private:
-            Unit* const i_funit;
-            float i_range;
-    };
-
-    class CannibalizeObjectCheck
-    {
-        public:
-            CannibalizeObjectCheck(Unit* funit, float range) : i_funit(funit), i_range(range) {}
-            bool operator()(Player* u)
-            {
-                if (i_funit->IsFriendlyTo(u) || u->isAlive() || u->isInFlight())
-                    return false;
-
-                return i_funit->IsWithinDistInMap(u, i_range);
-            }
+            AnyDeadUnitObjectInRangeCheck(Unit* searchObj, float range) : i_searchObj(searchObj), i_range(range) {}
+            bool operator()(Player* u);
             bool operator()(Corpse* u);
-            bool operator()(Creature* u)
-            {
-                if (i_funit->IsFriendlyTo(u) || u->isAlive() || u->isInFlight() ||
-                    (u->GetCreatureTypeMask() & CREATURE_TYPEMASK_HUMANOID_OR_UNDEAD) == 0)
-                    return false;
-
-                return i_funit->IsWithinDistInMap(u, i_range);
-            }
+            bool operator()(Creature* u);
             template<class NOT_INTERESTED> bool operator()(NOT_INTERESTED*) { return false; }
-        private:
-            Unit* const i_funit;
+        protected:
+            Unit const* const i_searchObj;
             float i_range;
     };
 
-    class CarrionFeederObjectCheck
+    class AnyDeadUnitSpellTargetInRangeCheck : public AnyDeadUnitObjectInRangeCheck
     {
         public:
-            CarrionFeederObjectCheck(Unit* funit, float range) : i_funit(funit), i_range(range) {}
-            bool operator()(Player* u)
-            {
-                if (i_funit->IsFriendlyTo(u) || u->isAlive() || u->isInFlight())
-                    return false;
-
-                return i_funit->IsWithinDistInMap(u, i_range);
-            }
+            AnyDeadUnitSpellTargetInRangeCheck(Unit* searchObj, float range, SpellInfo const* spellInfo, SpellTargetCheckTypes check)
+                : AnyDeadUnitObjectInRangeCheck(searchObj, range), i_spellInfo(spellInfo), i_check(searchObj, searchObj, spellInfo, check, NULL)
+            {}
+            bool operator()(Player* u);
             bool operator()(Corpse* u);
-            bool operator()(Creature* u)
-            {
-                if (i_funit->IsFriendlyTo(u) || u->isAlive() || u->isInFlight() ||
-                    (u->GetCreatureTypeMask() & CREATURE_TYPEMASK_MECHANICAL_OR_ELEMENTAL) != 0)
-                    return false;
-
-                return i_funit->IsWithinDistInMap(u, i_range);
-            }
+            bool operator()(Creature* u);
             template<class NOT_INTERESTED> bool operator()(NOT_INTERESTED*) { return false; }
-        private:
-            Unit* const i_funit;
-            float i_range;
+        protected:
+            SpellInfo const* i_spellInfo;
+            WorldObjectSpellTargetCheck i_check;
     };
 
     // WorldObject do classes
@@ -607,7 +607,7 @@ namespace Trinity
     class GameObjectFocusCheck
     {
         public:
-            GameObjectFocusCheck(Unit const* unit,uint32 focusId) : i_unit(unit), i_focusId(focusId) {}
+            GameObjectFocusCheck(Unit const* unit, uint32 focusId) : i_unit(unit), i_focusId(focusId) {}
             bool operator()(GameObject* go) const
             {
                 if (go->GetGOInfo()->type != GAMEOBJECT_TYPE_SPELL_FOCUS)
@@ -674,7 +674,7 @@ namespace Trinity
     class NearestGameObjectEntryInObjectRangeCheck
     {
         public:
-            NearestGameObjectEntryInObjectRangeCheck(WorldObject const& obj,uint32 entry, float range) : i_obj(obj), i_entry(entry), i_range(range) {}
+            NearestGameObjectEntryInObjectRangeCheck(WorldObject const& obj, uint32 entry, float range) : i_obj(obj), i_entry(entry), i_range(range) {}
             bool operator()(GameObject* go)
             {
                 if (go->GetEntry() == i_entry && i_obj.IsWithinDistInMap(go, i_range))
@@ -697,7 +697,7 @@ namespace Trinity
     class GameObjectWithDbGUIDCheck
     {
         public:
-            GameObjectWithDbGUIDCheck(WorldObject const& obj,uint32 db_guid) : i_obj(obj), i_db_guid(db_guid) {}
+            GameObjectWithDbGUIDCheck(WorldObject const& obj, uint32 db_guid) : i_obj(obj), i_db_guid(db_guid) {}
             bool operator()(GameObject const* go) const
             {
                 return go->GetDBTableGUIDLow() == i_db_guid;
@@ -735,7 +735,7 @@ namespace Trinity
             bool operator()(Unit* u)
             {
                 if (u->isAlive() && u->isInCombat() && !i_obj->IsHostileTo(u) && i_obj->IsWithinDistInMap(u, i_range) &&
-                    (u->isFeared() || u->isCharmed() || u->isFrozen() || u->HasUnitState(UNIT_STAT_STUNNED) || u->HasUnitState(UNIT_STAT_CONFUSED)))
+                    (u->isFeared() || u->isCharmed() || u->isFrozen() || u->HasUnitState(UNIT_STATE_STUNNED) || u->HasUnitState(UNIT_STATE_CONFUSED)))
                 {
                     return true;
                 }
@@ -791,7 +791,13 @@ namespace Trinity
                 if (!u->isAlive())
                     return false;
 
+                if (u->GetCreatureType() == CREATURE_TYPE_NON_COMBAT_PET)
+                    return false;
+
                 if (u->GetTypeId() == TYPEID_UNIT && ((Creature*)u)->isTotem())
+                    return false;
+
+                if (!u->isTargetableForAttack(false))
                     return false;
 
                 return i_obj->IsWithinDistInMap(u, i_range) && !i_funit->IsFriendlyTo(u);
@@ -802,21 +808,22 @@ namespace Trinity
             float i_range;
     };
 
-    class AnyUnfriendlyVisibleUnitInObjectRangeCheck
+    class AnyUnfriendlyAttackableVisibleUnitInObjectRangeCheck
     {
         public:
-            AnyUnfriendlyVisibleUnitInObjectRangeCheck(WorldObject const* obj, Unit const* funit, float range)
-                : i_obj(obj), i_funit(funit), i_range(range) {}
+            AnyUnfriendlyAttackableVisibleUnitInObjectRangeCheck(Unit const* funit, float range)
+                : i_funit(funit), i_range(range) {}
 
-            bool operator()(Unit* u)
+            bool operator()(const Unit* u)
             {
                 return u->isAlive()
-                    && i_obj->IsWithinDistInMap(u, i_range)
+                    && i_funit->IsWithinDistInMap(u, i_range)
                     && !i_funit->IsFriendlyTo(u)
-                    && u->canSeeOrDetect(i_funit);
+                    && i_funit->IsValidAttackTarget(u)
+                    && u->GetCreatureType() != CREATURE_TYPE_CRITTER
+                    && i_funit->canSeeOrDetect(u);
             }
         private:
-            WorldObject const* i_obj;
             Unit const* i_funit;
             float i_range;
     };
@@ -851,6 +858,30 @@ namespace Trinity
             float i_range;
     };
 
+    class AnyGroupedUnitInObjectRangeCheck
+    {
+        public:
+            AnyGroupedUnitInObjectRangeCheck(WorldObject const* obj, Unit const* funit, float range, bool raid) : _source(obj), _refUnit(funit), _range(range), _raid(raid) {}
+            bool operator()(Unit* u)
+            {
+                if (_raid)
+                {
+                    if (!_refUnit->IsInRaidWith(u))
+                        return false;
+                }
+                else if (!_refUnit->IsInPartyWith(u))
+                    return false;
+
+                return !_refUnit->IsHostileTo(u) && u->isAlive() && _source->IsWithinDistInMap(u, _range);
+            }
+
+        private:
+            WorldObject const* _source;
+            Unit const* _refUnit;
+            float _range;
+            bool _raid;
+    };
+
     class AnyUnitInObjectRangeCheck
     {
         public:
@@ -875,7 +906,7 @@ namespace Trinity
             bool operator()(Unit* u)
             {
                 if (u->isTargetableForAttack() && i_obj->IsWithinDistInMap(u, i_range) &&
-                    !i_funit->IsFriendlyTo(u) && u->canSeeOrDetect(i_funit))
+                    !i_funit->IsFriendlyTo(u) && i_funit->canSeeOrDetect(u))
                 {
                     i_range = i_obj->GetDistance(u);        // use found unit range as new range limit for next check
                     return true;
@@ -896,23 +927,23 @@ namespace Trinity
     {
         public:
             AnyAoETargetUnitInObjectRangeCheck(WorldObject const* obj, Unit const* funit, float range)
-                : i_obj(obj), i_funit(funit), i_range(range)
+                : i_obj(obj), i_funit(funit), _spellInfo(NULL), i_range(range)
             {
                 Unit const* check = i_funit;
                 Unit const* owner = i_funit->GetOwner();
                 if (owner)
                     check = owner;
                 i_targetForPlayer = (check->GetTypeId() == TYPEID_PLAYER);
+                if (i_obj->GetTypeId() == TYPEID_DYNAMICOBJECT)
+                    _spellInfo = sSpellMgr->GetSpellInfo(((DynamicObject*)i_obj)->GetSpellId());
             }
             bool operator()(Unit* u)
             {
                 // Check contains checks for: live, non-selectable, non-attackable flags, flight check and GM check, ignore totems
-                if (!u->isTargetableForAttack())
-                    return false;
                 if (u->GetTypeId() == TYPEID_UNIT && ((Creature*)u)->isTotem())
                     return false;
 
-                if ((i_targetForPlayer ? !i_funit->IsFriendlyTo(u) : i_funit->IsHostileTo(u))&& i_obj->IsWithinDistInMap(u, i_range))
+                if (i_funit->_IsValidAttackTarget(u, _spellInfo,i_obj->GetTypeId() == TYPEID_DYNAMICOBJECT ? i_obj : NULL) && i_obj->IsWithinDistInMap(u, i_range))
                     return true;
 
                 return false;
@@ -921,6 +952,7 @@ namespace Trinity
             bool i_targetForPlayer;
             WorldObject const* i_obj;
             Unit const* i_funit;
+            SpellInfo const* _spellInfo;
             float i_range;
     };
 
@@ -940,7 +972,7 @@ namespace Trinity
                     return;
 
                 // too far
-                if (!u->IsWithinDistInMap(i_enemy, i_range))
+                if (!u->IsWithinDistInMap(i_funit, i_range))
                     return;
 
                 // only if see assisted creature's enemy
@@ -982,7 +1014,7 @@ namespace Trinity
                 if (!me->IsWithinDistInMap(u, m_range))
                     return false;
 
-                if (!me->canAttack(u))
+                if (!me->IsValidAttackTarget(u))
                     return false;
 
                 m_range = me->GetDistance(u);   // use found unit range as new range limit for next check
@@ -990,7 +1022,7 @@ namespace Trinity
             }
 
     private:
-            Creature const *me;
+            Creature const* me;
             float m_range;
             NearestHostileUnitCheck(NearestHostileUnitCheck const&);
     };
@@ -1013,21 +1045,18 @@ namespace Trinity
 
                 if (m_force)
                 {
-                    if (!me->canAttack(u))
+                    if (!me->IsValidAttackTarget(u))
                         return false;
                 }
-                else
-                {
-                    if (!me->canStartAttack(u, false))
-                        return false;
-                }
+                else if (!me->canStartAttack(u, false))
+                    return false;
 
                 m_range = me->GetDistance(u);   // use found unit range as new range limit for next check
                 return true;
             }
             float GetLastRange() const { return m_range; }
         private:
-            Creature const *me;
+            Creature const* me;
             float m_range;
             bool m_force;
             NearestHostileUnitInAttackDistanceCheck(NearestHostileUnitInAttackDistanceCheck const&);
@@ -1074,7 +1103,7 @@ namespace Trinity
             {
                 if (u == i_obj)
                     return false;
-                if (!u->CanAssistTo(i_obj,i_enemy))
+                if (!u->CanAssistTo(i_obj, i_enemy))
                     return false;
 
                 if (!i_obj->IsWithinDistInMap(u, i_range))
@@ -1125,42 +1154,71 @@ namespace Trinity
 
     class AnyPlayerInObjectRangeCheck
     {
-    public:
-        AnyPlayerInObjectRangeCheck(WorldObject const* obj, float range) : i_obj(obj), i_range(range) {}
-        bool operator()(Player* u)
-        {
-            if (u->isAlive() && i_obj->IsWithinDistInMap(u, i_range))
-                return true;
+        public:
+            AnyPlayerInObjectRangeCheck(WorldObject const* obj, float range, bool reqAlive = true) : _obj(obj), _range(range), _reqAlive(reqAlive) {}
+            bool operator()(Player* u)
+            {
+                if (_reqAlive && !u->isAlive())
+                    return false;
 
-            return false;
-        }
-    private:
-        WorldObject const* i_obj;
-        float i_range;
+                if (!_obj->IsWithinDistInMap(u, _range))
+                    return false;
+
+                return true;
+            }
+
+        private:
+            WorldObject const* _obj;
+            float _range;
+            bool _reqAlive;
+    };
+
+    class NearestPlayerInObjectRangeCheck
+    {
+        public:
+            NearestPlayerInObjectRangeCheck(WorldObject const* obj, float range) : i_obj(obj), i_range(range)
+            {
+            }
+
+            bool operator()(Player* u)
+            {
+                if (u->isAlive() && i_obj->IsWithinDistInMap(u, i_range))
+                {
+                    i_range = i_obj->GetDistance(u);
+                    return true;
+                }
+
+                return false;
+            }
+        private:
+            WorldObject const* i_obj;
+            float i_range;
+
+            NearestPlayerInObjectRangeCheck(NearestPlayerInObjectRangeCheck const&);
     };
 
     class AllFriendlyCreaturesInGrid
     {
     public:
-        AllFriendlyCreaturesInGrid(Unit const* obj) : pUnit(obj) {}
+        AllFriendlyCreaturesInGrid(Unit const* obj) : unit(obj) {}
         bool operator() (Unit* u)
         {
-            if (u->isAlive() && u->IsVisible() && u->IsFriendlyTo(pUnit))
+            if (u->isAlive() && u->IsVisible() && u->IsFriendlyTo(unit))
                 return true;
 
             return false;
         }
     private:
-        Unit const* pUnit;
+        Unit const* unit;
     };
 
     class AllGameObjectsWithEntryInRange
     {
     public:
-        AllGameObjectsWithEntryInRange(const WorldObject* pObject, uint32 uiEntry, float fMaxRange) : m_pObject(pObject), m_uiEntry(uiEntry), m_fRange(fMaxRange) {}
-        bool operator() (GameObject* pGo)
+        AllGameObjectsWithEntryInRange(const WorldObject* object, uint32 entry, float maxRange) : m_pObject(object), m_uiEntry(entry), m_fRange(maxRange) {}
+        bool operator() (GameObject* go)
         {
-            if (pGo->GetEntry() == m_uiEntry && m_pObject->IsWithinDist(pGo,m_fRange,false))
+            if (go->GetEntry() == m_uiEntry && m_pObject->IsWithinDist(go, m_fRange, false))
                 return true;
 
             return false;
@@ -1174,10 +1232,10 @@ namespace Trinity
     class AllCreaturesOfEntryInRange
     {
         public:
-            AllCreaturesOfEntryInRange(const WorldObject* pObject, uint32 uiEntry, float fMaxRange) : m_pObject(pObject), m_uiEntry(uiEntry), m_fRange(fMaxRange) {}
-            bool operator() (Unit* pUnit)
+            AllCreaturesOfEntryInRange(const WorldObject* object, uint32 entry, float maxRange) : m_pObject(object), m_uiEntry(entry), m_fRange(maxRange) {}
+            bool operator() (Unit* unit)
             {
-                if (pUnit->GetEntry() == m_uiEntry && m_pObject->IsWithinDist(pUnit,m_fRange,false))
+                if (unit->GetEntry() == m_uiEntry && m_pObject->IsWithinDist(unit, m_fRange, false))
                     return true;
 
                 return false;
@@ -1192,18 +1250,18 @@ namespace Trinity
     class PlayerAtMinimumRangeAway
     {
     public:
-        PlayerAtMinimumRangeAway(Unit const* unit, float fMinRange) : pUnit(unit), fRange(fMinRange) {}
-        bool operator() (Player* pPlayer)
+        PlayerAtMinimumRangeAway(Unit const* unit, float fMinRange) : unit(unit), fRange(fMinRange) {}
+        bool operator() (Player* player)
         {
             //No threat list check, must be done explicit if expected to be in combat with creature
-            if (!pPlayer->isGameMaster() && pPlayer->isAlive() && !pUnit->IsWithinDist(pPlayer,fRange,false))
+            if (!player->isGameMaster() && player->isAlive() && !unit->IsWithinDist(player, fRange, false))
                 return true;
 
             return false;
         }
 
     private:
-        Unit const* pUnit;
+        Unit const* unit;
         float fRange;
     };
 
@@ -1214,7 +1272,7 @@ namespace Trinity
           x(_x), y(_y), z(_z), range(_range), entry(_entry) {}
         bool operator() (GameObject* go)
         {
-            if (!entry || (go->GetGOInfo() && go->GetGOInfo()->id == entry))
+            if (!entry || (go->GetGOInfo() && go->GetGOInfo()->entry == entry))
                 return go->IsInRange(x, y, z, range);
             else return false;
         }
@@ -1226,14 +1284,61 @@ namespace Trinity
     class AllWorldObjectsInRange
     {
     public:
-        AllWorldObjectsInRange(const WorldObject* pObject, float fMaxRange) : m_pObject(pObject), m_fRange(fMaxRange) {}
-        bool operator() (WorldObject* pGo)
+        AllWorldObjectsInRange(const WorldObject* object, float maxRange) : m_pObject(object), m_fRange(maxRange) {}
+        bool operator() (WorldObject* go)
         {
-            return m_pObject->IsWithinDist(pGo, m_fRange, false);
+            return m_pObject->IsWithinDist(go, m_fRange, false) && m_pObject->InSamePhase(go);
         }
     private:
         const WorldObject* m_pObject;
         float m_fRange;
+    };
+
+    class ObjectTypeIdCheck
+    {
+        public:
+            ObjectTypeIdCheck(TypeID typeId, bool equals) : _typeId(typeId), _equals(equals) {}
+            bool operator()(WorldObject* object)
+            {
+                return (object->GetTypeId() == _typeId) == _equals;
+            }
+
+        private:
+            TypeID _typeId;
+            bool _equals;
+    };
+
+    class ObjectGUIDCheck
+    {
+        public:
+            ObjectGUIDCheck(uint64 GUID) : _GUID(GUID) {}
+            bool operator()(WorldObject* object)
+            {
+                return object->GetGUID() == _GUID;
+            }
+
+        private:
+            uint64 _GUID;
+    };
+
+    class UnitAuraCheck
+    {
+        public:
+            UnitAuraCheck(bool present, uint32 spellId, uint64 casterGUID = 0) : _present(present), _spellId(spellId), _casterGUID(casterGUID) {}
+            bool operator()(Unit* unit) const
+            {
+                return unit->HasAura(_spellId, _casterGUID) == _present;
+            }
+
+            bool operator()(WorldObject* object) const
+            {
+                return object->ToUnit() && object->ToUnit()->HasAura(_spellId, _casterGUID) == _present;
+            }
+
+        private:
+            bool _present;
+            uint32 _spellId;
+            uint64 _casterGUID;
     };
 
     // Player checks and do

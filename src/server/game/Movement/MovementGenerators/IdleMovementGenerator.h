@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -28,7 +28,7 @@ class IdleMovementGenerator : public MovementGenerator
         void Initialize(Unit &);
         void Finalize(Unit &) {  }
         void Reset(Unit &);
-        bool Update(Unit &, const uint32 &) { return true; }
+        bool Update(Unit &, const uint32&) { return true; }
         MovementGeneratorType GetMovementGeneratorType() { return IDLE_MOTION_TYPE; }
 };
 
@@ -76,5 +76,4 @@ class AssistanceDistractMovementGenerator : public DistractMovementGenerator
 };
 
 #endif
-
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,7 +15,9 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
+#include "SpellAuras.h"
 #include "gundrak.h"
 
 //Spells
@@ -52,6 +54,7 @@ enum Creatures
 enum ConstrictorSpells
 {
     SPELL_GRIP_OF_SLAD_RAN                        = 55093,
+    SPELL_SNAKE_WRAP                              = 55126,
     SPELL_VENOMOUS_BITE                           = 54987,
     H_SPELL_VENOMOUS_BITE                         = 58996
 };
@@ -65,21 +68,23 @@ static Position SpawnLoc[]=
   {1716.76f, 635.159f, 129.282f, 0.191986f}
 };
 
+#define DATA_SNAKES_WHYD_IT_HAVE_TO_BE_SNAKES 1
+
 class boss_slad_ran : public CreatureScript
 {
 public:
     boss_slad_ran() : CreatureScript("boss_slad_ran") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_slad_ranAI (pCreature);
+        return new boss_slad_ranAI (creature);
     }
 
     struct boss_slad_ranAI : public ScriptedAI
     {
-        boss_slad_ranAI(Creature *c) : ScriptedAI(c), lSummons(me)
+        boss_slad_ranAI(Creature* creature) : ScriptedAI(creature), lSummons(me)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
         uint32 uiPoisonNovaTimer;
@@ -89,9 +94,10 @@ public:
 
         uint8 uiPhase;
 
+        std::set<uint64> lWrappedPlayers;
         SummonList lSummons;
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         void Reset()
         {
@@ -100,19 +106,20 @@ public:
             uiVenomBoltTimer = 15*IN_MILLISECONDS;
             uiSpawnTimer = 5*IN_MILLISECONDS;
             uiPhase = 0;
+            lWrappedPlayers.clear();
 
             lSummons.DespawnAll();
 
-            if (pInstance)
-                pInstance->SetData(DATA_SLAD_RAN_EVENT, NOT_STARTED);
+            if (instance)
+                instance->SetData(DATA_SLAD_RAN_EVENT, NOT_STARTED);
         }
 
         void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
 
-            if (pInstance)
-                pInstance->SetData(DATA_SLAD_RAN_EVENT, IN_PROGRESS);
+            if (instance)
+                instance->SetData(DATA_SLAD_RAN_EVENT, IN_PROGRESS);
         }
 
         void UpdateAI(const uint32 diff)
@@ -145,23 +152,23 @@ public:
                 {
                     if (uiPhase == 1)
                         for (uint8 i = 0; i < DUNGEON_MODE(3, 5); ++i)
-                            me->SummonCreature(CREATURE_SNAKE, SpawnLoc[i], TEMPSUMMON_CORPSE_TIMED_DESPAWN,20*IN_MILLISECONDS);
+                            me->SummonCreature(CREATURE_SNAKE, SpawnLoc[i], TEMPSUMMON_CORPSE_TIMED_DESPAWN, 20*IN_MILLISECONDS);
                     if (uiPhase == 2)
                         for (uint8 i = 0; i < DUNGEON_MODE(3, 5); ++i)
-                            me->SummonCreature(CREATURE_CONSTRICTORS, SpawnLoc[i], TEMPSUMMON_CORPSE_TIMED_DESPAWN,20*IN_MILLISECONDS);
+                            me->SummonCreature(CREATURE_CONSTRICTORS, SpawnLoc[i], TEMPSUMMON_CORPSE_TIMED_DESPAWN, 20*IN_MILLISECONDS);
                     uiSpawnTimer = 5*IN_MILLISECONDS;
                 } else uiSpawnTimer -= diff;
             }
 
             if (uiPhase == 0 && HealthBelowPct(30))
             {
-                DoScriptText(SAY_SUMMON_SNAKES,me);
+                DoScriptText(SAY_SUMMON_SNAKES, me);
                 uiPhase = 1;
             }
 
             if (uiPhase == 1 && HealthBelowPct(25))
             {
-                DoScriptText(SAY_SUMMON_CONSTRICTORS,me);
+                DoScriptText(SAY_SUMMON_CONSTRICTORS, me);
                 uiPhase = 2;
             }
 
@@ -171,20 +178,32 @@ public:
         void JustDied(Unit* /*killer*/)
         {
             DoScriptText(SAY_DEATH, me);
+            lSummons.DespawnAll();
 
-            if (pInstance)
-                pInstance->SetData(DATA_SLAD_RAN_EVENT, DONE);
+            if (instance)
+                instance->SetData(DATA_SLAD_RAN_EVENT, DONE);
         }
 
-        void KilledUnit(Unit * /*victim*/)
+        void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_SLAY_1,SAY_SLAY_2,SAY_SLAY_3), me);
+            DoScriptText(RAND(SAY_SLAY_1, SAY_SLAY_2, SAY_SLAY_3), me);
         }
 
         void JustSummoned(Creature* summoned)
         {
-            summoned->GetMotionMaster()->MovePoint(0,me->GetPositionX(),me->GetPositionY(),me->GetPositionZ());
+            summoned->GetMotionMaster()->MovePoint(0, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ());
             lSummons.Summon(summoned);
+        }
+
+        void SetGUID(uint64 guid, int32 type)
+        {
+            if (type == DATA_SNAKES_WHYD_IT_HAVE_TO_BE_SNAKES)
+                lWrappedPlayers.insert(guid);
+        }
+
+        bool WasWrapped(uint64 guid)
+        {
+            return lWrappedPlayers.count(guid);
         }
     };
 
@@ -195,14 +214,14 @@ class mob_slad_ran_constrictor : public CreatureScript
 public:
     mob_slad_ran_constrictor() : CreatureScript("mob_slad_ran_constrictor") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_slad_ran_constrictorAI (pCreature);
+        return new mob_slad_ran_constrictorAI (creature);
     }
 
     struct mob_slad_ran_constrictorAI : public ScriptedAI
     {
-        mob_slad_ran_constrictorAI(Creature *c) : ScriptedAI(c) {}
+        mob_slad_ran_constrictorAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 uiGripOfSladRanTimer;
 
@@ -215,14 +234,30 @@ public:
         {
             if (!UpdateVictim())
                 return;
+
             if (uiGripOfSladRanTimer <= diff)
             {
-                DoCast(me->getVictim(), SPELL_GRIP_OF_SLAD_RAN);
-                uiGripOfSladRanTimer = 5*IN_MILLISECONDS;
+                Unit* target = me->getVictim();
+
+                DoCast(target, SPELL_GRIP_OF_SLAD_RAN);
+                uiGripOfSladRanTimer = urand(3, 6)*IN_MILLISECONDS;
+
+                Aura* grip = target->GetAura(SPELL_GRIP_OF_SLAD_RAN, me->GetGUID());
+                if (grip && grip->GetStackAmount() == 5)
+                {
+                    target->RemoveAurasDueToSpell(SPELL_GRIP_OF_SLAD_RAN, me->GetGUID());
+                    target->CastSpell(target, SPELL_SNAKE_WRAP, true);
+
+                    if (TempSummon* _me = me->ToTempSummon())
+                        if (Creature* sladran = _me->GetSummoner()->ToCreature())
+                            sladran->AI()->SetGUID(target->GetGUID() ,DATA_SNAKES_WHYD_IT_HAVE_TO_BE_SNAKES);
+
+                    me->DespawnOrUnsummon();
+                }
             } else uiGripOfSladRanTimer -= diff;
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
     };
 
 };
@@ -232,18 +267,18 @@ class mob_slad_ran_viper : public CreatureScript
 public:
     mob_slad_ran_viper() : CreatureScript("mob_slad_ran_viper") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_slad_ran_viperAI (pCreature);
+        return new mob_slad_ran_viperAI (creature);
     }
 
     struct mob_slad_ran_viperAI : public ScriptedAI
     {
-        mob_slad_ran_viperAI(Creature *c) : ScriptedAI(c) {}
+        mob_slad_ran_viperAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 uiVenomousBiteTimer;
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         void Reset()
         {
@@ -265,12 +300,28 @@ public:
 
 };
 
+class achievement_snakes_whyd_it_have_to_be_snakes : public AchievementCriteriaScript
+{
+    public:
+        achievement_snakes_whyd_it_have_to_be_snakes() : AchievementCriteriaScript("achievement_snakes_whyd_it_have_to_be_snakes")
+        {
+        }
 
+        bool OnCheck(Player* player, Unit* target)
+        {
+            if (!target)
+                return false;
 
+            if (boss_slad_ran::boss_slad_ranAI* sladRanAI = CAST_AI(boss_slad_ran::boss_slad_ranAI, target->GetAI()))
+                return !sladRanAI->WasWrapped(player->GetGUID());
+            return false;
+        }
+};
 
 void AddSC_boss_slad_ran()
 {
     new boss_slad_ran();
     new mob_slad_ran_constrictor();
     new mob_slad_ran_viper();
+    new achievement_snakes_whyd_it_have_to_be_snakes();
 }

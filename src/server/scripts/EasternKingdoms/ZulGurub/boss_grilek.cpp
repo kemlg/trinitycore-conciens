@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Zul'Gurub
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "zulgurub.h"
 
 #define SPELL_AVARTAR                24646                  //The Enrage Spell
@@ -32,26 +33,22 @@ EndScriptData */
 class boss_grilek : public CreatureScript
 {
     public:
-
-        boss_grilek()
-            : CreatureScript("boss_grilek")
-        {
-        }
+        boss_grilek() : CreatureScript("boss_grilek") { }
 
         struct boss_grilekAI : public ScriptedAI
         {
-            boss_grilekAI(Creature *c) : ScriptedAI(c) {}
+            boss_grilekAI(Creature* creature) : ScriptedAI(creature) { }
 
             uint32 Avartar_Timer;
             uint32 GroundTremor_Timer;
 
             void Reset()
             {
-                Avartar_Timer = 15000 + rand()%10000;
-                GroundTremor_Timer = 8000 + rand()%8000;
+                Avartar_Timer = urand(15000, 25000);
+                GroundTremor_Timer = urand(8000, 16000);
             }
 
-            void EnterCombat(Unit * /*who*/)
+            void EnterCombat(Unit* /*who*/)
             {
             }
 
@@ -66,23 +63,23 @@ class boss_grilek : public CreatureScript
                 {
 
                     DoCast(me, SPELL_AVARTAR);
-                    Unit *pTarget = NULL;
+                    Unit* target = NULL;
 
-                    pTarget = SelectUnit(SELECT_TARGET_RANDOM,1);
+                    target = SelectTarget(SELECT_TARGET_RANDOM, 1);
 
                     if (DoGetThreat(me->getVictim()))
-                        DoModifyThreatPercent(me->getVictim(),-50);
-                    if (pTarget)
-                        AttackStart(pTarget);
+                        DoModifyThreatPercent(me->getVictim(), -50);
+                    if (target)
+                        AttackStart(target);
 
-                    Avartar_Timer = 25000 + rand()%10000;
+                    Avartar_Timer = urand(25000, 35000);
                 } else Avartar_Timer -= diff;
 
                 //GroundTremor_Timer
                 if (GroundTremor_Timer <= diff)
                 {
                     DoCast(me->getVictim(), SPELL_GROUNDTREMOR);
-                    GroundTremor_Timer = 12000 + rand()%4000;
+                    GroundTremor_Timer = urand(12000, 16000);
                 } else GroundTremor_Timer -= diff;
 
                 DoMeleeAttackIfReady();

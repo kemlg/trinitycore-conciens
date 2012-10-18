@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,7 +15,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "azjol_nerub.h"
 
 #define MAX_ENCOUNTER     3
@@ -33,7 +34,7 @@ public:
 
     struct instance_azjol_nerub_InstanceScript : public InstanceScript
     {
-        instance_azjol_nerub_InstanceScript(Map* pMap) : InstanceScript(pMap) {Initialize();};
+        instance_azjol_nerub_InstanceScript(Map* map) : InstanceScript(map) {}
 
         uint64 uiKrikthir;
         uint64 uiHadronox;
@@ -64,14 +65,15 @@ public:
         bool IsEncounterInProgress() const
         {
             for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
-                if (auiEncounter[i] == IN_PROGRESS) return true;
+                if (auiEncounter[i] == IN_PROGRESS)
+                    return true;
 
             return false;
         }
 
         void OnCreatureCreate(Creature* creature)
         {
-            switch(creature->GetEntry())
+            switch (creature->GetEntry())
             {
                 case 28684:    uiKrikthir = creature->GetGUID();        break;
                 case 28921:    uiHadronox = creature->GetGUID();        break;
@@ -89,7 +91,7 @@ public:
                 case 192395:
                     uiKrikthirDoor = go->GetGUID();
                     if (auiEncounter[0] == DONE)
-                        HandleGameObject(NULL,true,go);
+                        HandleGameObject(0, true, go);
                     break;
                 case 192396:
                     uiAnubarakDoor[0] = go->GetGUID();
@@ -103,10 +105,9 @@ public:
             }
         }
 
-
         uint64 GetData64(uint32 identifier)
         {
-            switch(identifier)
+            switch (identifier)
             {
                 case DATA_KRIKTHIR_THE_GATEWATCHER:     return uiKrikthir;
                 case DATA_HADRONOX:                     return uiHadronox;
@@ -121,12 +122,12 @@ public:
 
         void SetData(uint32 type, uint32 data)
         {
-            switch(type)
+            switch (type)
             {
             case DATA_KRIKTHIR_THE_GATEWATCHER_EVENT:
                 auiEncounter[0] = data;
                 if (data == DONE)
-                    HandleGameObject(uiKrikthirDoor,true);
+                    HandleGameObject(uiKrikthirDoor, true);
                 break;
             case DATA_HADRONOX_EVENT:
                 auiEncounter[1] = data;
@@ -150,7 +151,7 @@ public:
 
         uint32 GetData(uint32 type)
         {
-            switch(type)
+            switch (type)
             {
                 case DATA_KRIKTHIR_THE_GATEWATCHER_EVENT:   return auiEncounter[0];
                 case DATA_HADRONOX_EVENT:                   return auiEncounter[1];
@@ -165,7 +166,7 @@ public:
             OUT_SAVE_INST_DATA;
 
             std::ostringstream saveStream;
-            saveStream << "A N " << auiEncounter[0] << " " << auiEncounter[1] << " "
+            saveStream << "A N " << auiEncounter[0] << ' ' << auiEncounter[1] << ' '
                 << auiEncounter[2];
 
             OUT_SAVE_INST_DATA_COMPLETE;
@@ -183,7 +184,7 @@ public:
             OUT_LOAD_INST_DATA(in);
 
             char dataHead1, dataHead2;
-            uint16 data0,data1,data2;
+            uint16 data0, data1, data2;
 
             std::istringstream loadStream(in);
             loadStream >> dataHead1 >> dataHead2 >> data0 >> data1 >> data2;
@@ -204,7 +205,7 @@ public:
         }
     };
 
-    InstanceScript* GetInstanceScript(InstanceMap *map) const
+    InstanceScript* GetInstanceScript(InstanceMap* map) const
     {
         return new instance_azjol_nerub_InstanceScript(map);
     }

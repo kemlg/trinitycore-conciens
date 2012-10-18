@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,7 +23,8 @@ SDComment:
 SDCategory:
 Script Data End */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "utgarde_pinnacle.h"
 
 enum Spells
@@ -83,10 +84,10 @@ struct ActiveBoatStruct
 {
     uint32 npc;
     int32 say;
-    float MoveX,MoveY,MoveZ,SpawnX,SpawnY,SpawnZ,SpawnO;
+    float MoveX, MoveY, MoveZ, SpawnX, SpawnY, SpawnZ, SpawnO;
 };
 
-static ActiveBoatStruct ActiveBot[4] =
+static ActiveBoatStruct ActiveBoat[4] =
 {
     {CREATURE_BJORN_VISUAL,  SAY_SUMMON_BJORN,  404.379f, -335.335f, 104.756f, 413.594f, -335.408f, 107.995f, 3.157f},
     {CREATURE_HALDOR_VISUAL, SAY_SUMMON_HALDOR, 380.813f, -335.069f, 104.756f, 369.994f, -334.771f, 107.995f, 6.232f},
@@ -94,21 +95,23 @@ static ActiveBoatStruct ActiveBot[4] =
     {CREATURE_TORGYN_VISUAL, SAY_SUMMON_TORGYN, 404.310f, -314.761f, 104.756f, 413.992f, -314.703f, 107.995f, 3.157f}
 };
 
+#define DATA_KINGS_BANE                     2157
+
 class boss_ymiron : public CreatureScript
 {
 public:
     boss_ymiron() : CreatureScript("boss_ymiron") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_ymironAI(pCreature);
+        return new boss_ymironAI(creature);
     }
 
     struct boss_ymironAI : public ScriptedAI
     {
-        boss_ymironAI(Creature *c) : ScriptedAI(c)
+        boss_ymironAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
             for (int i = 0; i < 4; ++i)
                 m_uiActiveOrder[i] = i;
             for (int i = 0; i < 3; ++i)
@@ -118,6 +121,9 @@ public:
                 m_uiActiveOrder[i] = m_uiActiveOrder[r];
                 m_uiActiveOrder[r] = temp;
             }
+
+            m_uiActivedCreatureGUID = 0;
+            m_uiOrbGUID = 0;
         }
 
         bool m_bIsWalking;
@@ -126,6 +132,7 @@ public:
         bool m_bIsActiveWithHALDOR;
         bool m_bIsActiveWithRANULF;
         bool m_bIsActiveWithTORGYN;
+        bool kingsBane; // Achievement King's Bane
 
         uint8 m_uiActiveOrder[4];
         uint8 m_uiActivedNumber;
@@ -147,7 +154,7 @@ public:
         uint64 m_uiActivedCreatureGUID;
         uint64 m_uiOrbGUID;
 
-        InstanceScript *pInstance;
+        InstanceScript* instance;
 
         void Reset()
         {
@@ -156,6 +163,7 @@ public:
             m_bIsActiveWithHALDOR = false;
             m_bIsActiveWithRANULF = false;
             m_bIsActiveWithTORGYN = false;
+            kingsBane = true;
 
             m_uiFetidRot_Timer            = urand(8000, 13000);
             m_uiBane_Timer                = urand(18000, 23000);
@@ -175,16 +183,30 @@ public:
             DespawnBoatGhosts(m_uiActivedCreatureGUID);
             DespawnBoatGhosts(m_uiOrbGUID);
 
-            if (pInstance)
-                pInstance->SetData(DATA_KING_YMIRON_EVENT, NOT_STARTED);
+            if (instance)
+                instance->SetData(DATA_KING_YMIRON_EVENT, NOT_STARTED);
         }
 
         void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
 
-            if (pInstance)
-                pInstance->SetData(DATA_KING_YMIRON_EVENT, IN_PROGRESS);
+            if (instance)
+                instance->SetData(DATA_KING_YMIRON_EVENT, IN_PROGRESS);
+        }
+
+        void SpellHitTarget(Unit* who, SpellInfo const* spell)
+        {
+            if (who && who->GetTypeId() == TYPEID_PLAYER && spell->Id == 59302)
+                kingsBane = false;
+        }
+
+        uint32 GetData(uint32 type)
+        {
+            if (type == DATA_KINGS_BANE)
+                return kingsBane ? 1 : 0;
+
+            return 0;
         }
 
         void UpdateAI(const uint32 diff)
@@ -193,15 +215,15 @@ public:
             {
                 if (m_uiPause_Timer <= diff)
                 {
-                    DoScriptText(ActiveBot[m_uiActiveOrder[m_uiActivedNumber]].say, me);
+                    DoScriptText(ActiveBoat[m_uiActiveOrder[m_uiActivedNumber]].say, me);
                     DoCast(me, SPELL_CHANNEL_YMIRON_TO_SPIRIT); // should be on spirit
-                    if (Creature* pTemp = me->SummonCreature(ActiveBot[m_uiActiveOrder[m_uiActivedNumber]].npc, ActiveBot[m_uiActiveOrder[m_uiActivedNumber]].SpawnX, ActiveBot[m_uiActiveOrder[m_uiActivedNumber]].SpawnY, ActiveBot[m_uiActiveOrder[m_uiActivedNumber]].SpawnZ, ActiveBot[m_uiActiveOrder[m_uiActivedNumber]].SpawnO, TEMPSUMMON_CORPSE_DESPAWN, 0))
+                    if (Creature* temp = me->SummonCreature(ActiveBoat[m_uiActiveOrder[m_uiActivedNumber]].npc, ActiveBoat[m_uiActiveOrder[m_uiActivedNumber]].SpawnX, ActiveBoat[m_uiActiveOrder[m_uiActivedNumber]].SpawnY, ActiveBoat[m_uiActiveOrder[m_uiActivedNumber]].SpawnZ, ActiveBoat[m_uiActiveOrder[m_uiActivedNumber]].SpawnO, TEMPSUMMON_CORPSE_DESPAWN, 0))
                     {
-                        m_uiActivedCreatureGUID = pTemp->GetGUID();
-                        pTemp->CastSpell(me, SPELL_CHANNEL_SPIRIT_TO_YMIRON, true);
-                        pTemp->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
-                        pTemp->AddUnitMovementFlag(MOVEMENTFLAG_LEVITATING);
-                        switch(m_uiActiveOrder[m_uiActivedNumber])
+                        m_uiActivedCreatureGUID = temp->GetGUID();
+                        temp->CastSpell(me, SPELL_CHANNEL_SPIRIT_TO_YMIRON, true);
+                        temp->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+                        temp->SetDisableGravity(true);
+                        switch (m_uiActiveOrder[m_uiActivedNumber])
                         {
                             case 0: m_bIsActiveWithBJORN  = true; break;
                             case 1: m_bIsActiveWithHALDOR = true; break;
@@ -266,13 +288,13 @@ public:
                 if (m_bIsActiveWithBJORN && m_uiAbility_BJORN_Timer <= diff)
                 {
                     //DoCast(me, SPELL_SUMMON_SPIRIT_FOUNT); // works fine, but using summon has better control
-                    if (Creature* pTemp = me->SummonCreature(CREATURE_SPIRIT_FOUNT, 385.0f + rand() % 10, -330.0f + rand() % 10, 104.756f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 180000))
+                    if (Creature* temp = me->SummonCreature(CREATURE_SPIRIT_FOUNT, 385.0f + rand() % 10, -330.0f + rand() % 10, 104.756f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 180000))
                     {
-                        pTemp->SetSpeed(MOVE_RUN, 0.4f);
-                        pTemp->CastSpell(pTemp, DUNGEON_MODE(SPELL_SPIRIT_FOUNT, H_SPELL_SPIRIT_FOUNT), true);
-                        pTemp->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
-                        pTemp->SetDisplayId(11686);
-                        m_uiOrbGUID = pTemp->GetGUID();
+                        temp->SetSpeed(MOVE_RUN, 0.4f);
+                        temp->CastSpell(temp, DUNGEON_MODE(SPELL_SPIRIT_FOUNT, H_SPELL_SPIRIT_FOUNT), true);
+                        temp->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+                        temp->SetDisplayId(11686);
+                        m_uiOrbGUID = temp->GetGUID();
                     }
                     m_bIsActiveWithBJORN = false; // only one orb
                 } else m_uiAbility_BJORN_Timer -= diff;
@@ -291,19 +313,19 @@ public:
 
                 if (m_bIsActiveWithTORGYN && m_uiAbility_TORGYN_Timer <= diff)
                 {
-                    float x,y,z;
+                    float x, y, z;
                     x = me->GetPositionX()-5;
                     y = me->GetPositionY()-5;
                     z = me->GetPositionZ();
                     for (uint8 i = 0; i < 4; ++i)
                     {
                         //DoCast(me, SPELL_SUMMON_AVENGING_SPIRIT); // works fine, but using summon has better control
-                        if (Creature* pTemp = me->SummonCreature(CREATURE_AVENGING_SPIRIT, x + rand() % 10, y + rand() % 10, z, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000))
+                        if (Creature* temp = me->SummonCreature(CREATURE_AVENGING_SPIRIT, x + rand() % 10, y + rand() % 10, z, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000))
                         {
-                            if (Unit* pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0))
+                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                             {
-                                pTemp->AddThreat(pTarget, 0.0f);
-                                pTemp->AI()->AttackStart(pTarget);
+                                temp->AddThreat(target, 0.0f);
+                                temp->AI()->AttackStart(target);
                             }
                         }
                     }
@@ -321,7 +343,7 @@ public:
                     me->GetMotionMaster()->Clear();
                     me->StopMoving();
                     me->AttackStop();
-                    me->GetMotionMaster()->MovePoint(0, ActiveBot[m_uiActiveOrder[m_uiOrder]].MoveX, ActiveBot[m_uiActiveOrder[m_uiOrder]].MoveY, ActiveBot[m_uiActiveOrder[m_uiOrder]].MoveZ);
+                    me->GetMotionMaster()->MovePoint(0, ActiveBoat[m_uiActiveOrder[m_uiOrder]].MoveX, ActiveBoat[m_uiActiveOrder[m_uiOrder]].MoveY, ActiveBoat[m_uiActiveOrder[m_uiOrder]].MoveZ);
 
                     DespawnBoatGhosts(m_uiActivedCreatureGUID);
                     DespawnBoatGhosts(m_uiOrbGUID);
@@ -352,20 +374,20 @@ public:
             DespawnBoatGhosts(m_uiActivedCreatureGUID);
             DespawnBoatGhosts(m_uiOrbGUID);
 
-            if (pInstance)
-                pInstance->SetData(DATA_KING_YMIRON_EVENT, DONE);
+            if (instance)
+                instance->SetData(DATA_KING_YMIRON_EVENT, DONE);
         }
 
-        void KilledUnit(Unit * /*victim*/)
+        void KilledUnit(Unit* /*victim*/)
         {
             DoScriptText(RAND(SAY_SLAY_1, SAY_SLAY_2, SAY_SLAY_3, SAY_SLAY_4), me);
         }
 
-        void DespawnBoatGhosts(uint64& m_uiCreatureGUID)
+        void DespawnBoatGhosts(uint64 m_uiCreatureGUID)
         {
             if (m_uiCreatureGUID)
-                if (Creature* pTemp = Unit::GetCreature(*me, m_uiCreatureGUID))
-                    pTemp->DisappearAndDie();
+                if (Creature* temp = Unit::GetCreature(*me, m_uiCreatureGUID))
+                    temp->DisappearAndDie();
 
             m_uiCreatureGUID = 0;
         }
@@ -373,7 +395,28 @@ public:
 
 };
 
+class achievement_kings_bane : public AchievementCriteriaScript
+{
+    public:
+        achievement_kings_bane() : AchievementCriteriaScript("achievement_kings_bane")
+        {
+        }
+
+        bool OnCheck(Player* /*player*/, Unit* target)
+        {
+            if (!target)
+                return false;
+
+            if (Creature* Ymiron = target->ToCreature())
+                if (Ymiron->AI()->GetData(DATA_KINGS_BANE))
+                    return true;
+
+            return false;
+        }
+};
+
 void AddSC_boss_ymiron()
 {
     new boss_ymiron();
+    new achievement_kings_bane();
 }

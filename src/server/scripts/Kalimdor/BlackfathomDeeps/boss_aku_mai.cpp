@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,7 +15,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "blackfathom_deeps.h"
 
 enum Spells
@@ -29,41 +30,41 @@ class boss_aku_mai : public CreatureScript
 public:
     boss_aku_mai() : CreatureScript("boss_aku_mai") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_aku_maiAI (pCreature);
+        return new boss_aku_maiAI (creature);
     }
 
     struct boss_aku_maiAI : public ScriptedAI
     {
-        boss_aku_maiAI(Creature *c) : ScriptedAI(c)
+        boss_aku_maiAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        uint32 uiPoisonCloudTimer;
-        bool bIsEnraged;
+        uint32 poisonCloudTimer;
+        bool IsEnraged;
 
-        InstanceScript *pInstance;
+        InstanceScript* instance;
 
         void Reset()
         {
-            uiPoisonCloudTimer = urand(5000,9000);
-            bIsEnraged = false;
-            if (pInstance)
-                pInstance->SetData(TYPE_AKU_MAI, NOT_STARTED);
+            poisonCloudTimer = urand(5000, 9000);
+            IsEnraged = false;
+            if (instance)
+                instance->SetData(TYPE_AKU_MAI, NOT_STARTED);
         }
 
         void EnterCombat(Unit* /*who*/)
         {
-            if (pInstance)
-                pInstance->SetData(TYPE_AKU_MAI, IN_PROGRESS);
+            if (instance)
+                instance->SetData(TYPE_AKU_MAI, IN_PROGRESS);
         }
 
         void JustDied(Unit* /*killer*/)
         {
-            if (pInstance)
-                pInstance->SetData(TYPE_AKU_MAI, DONE);
+            if (instance)
+                instance->SetData(TYPE_AKU_MAI, DONE);
         }
 
         void UpdateAI(const uint32 diff)
@@ -71,24 +72,22 @@ public:
             if (!UpdateVictim())
                 return;
 
-            if (uiPoisonCloudTimer < diff)
+            if (poisonCloudTimer < diff)
             {
                 DoCastVictim(SPELL_POISON_CLOUD);
-                uiPoisonCloudTimer = urand(25000,50000);
-            } else uiPoisonCloudTimer -= diff;
+                poisonCloudTimer = urand(25000, 50000);
+            } else poisonCloudTimer -= diff;
 
-            if (!bIsEnraged && HealthBelowPct(30))
+            if (!IsEnraged && HealthBelowPct(30))
             {
-                DoCast(me,SPELL_FRENZIED_RAGE);
-                bIsEnraged = true;
+                DoCast(me, SPELL_FRENZIED_RAGE);
+                IsEnraged = true;
             }
 
             DoMeleeAttackIfReady();
         }
     };
-
 };
-
 
 void AddSC_boss_aku_mai()
 {

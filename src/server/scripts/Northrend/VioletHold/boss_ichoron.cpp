@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,7 +15,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "violet_hold.h"
 
 enum Spells
@@ -50,11 +51,6 @@ enum Yells
     SAY_BUBBLE                                  = -1608026
 };
 
-enum Achievements
-{
-    ACHIEVEMENT_DEHYDRATION                     = 2041,
-};
-
 enum Actions
 {
     ACTION_WATER_ELEMENT_HIT                    = 1,
@@ -72,31 +68,33 @@ static Position SpawnLoc[MAX_SPAWN_LOC]=
     {1935.50f, 796.224f, 52.492f, 4.224f},
 };
 
+#define DATA_DEHYDRATION                        1
+
 class boss_ichoron : public CreatureScript
 {
 public:
     boss_ichoron() : CreatureScript("boss_ichoron") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_ichoronAI (pCreature);
+        return new boss_ichoronAI (creature);
     }
 
     struct boss_ichoronAI : public ScriptedAI
     {
-        boss_ichoronAI(Creature* pCreature) : ScriptedAI(pCreature), m_waterElements(pCreature)
+        boss_ichoronAI(Creature* creature) : ScriptedAI(creature), m_waterElements(creature)
         {
-            pInstance  = pCreature->GetInstanceScript();
+            instance  = creature->GetInstanceScript();
         }
 
         bool bIsExploded;
         bool bIsFrenzy;
-        bool bAchievement;
+        bool dehydration;
 
         uint32 uiBubbleCheckerTimer;
         uint32 uiWaterBoltVolleyTimer;
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         SummonList m_waterElements;
 
@@ -104,54 +102,54 @@ public:
         {
             bIsExploded = false;
             bIsFrenzy = false;
-            bAchievement = true;
+            dehydration = true;
             uiBubbleCheckerTimer = 1000;
             uiWaterBoltVolleyTimer = urand(10000, 15000);
 
             me->SetVisible(true);
             DespawnWaterElements();
 
-            if (pInstance)
+            if (instance)
             {
-                if (pInstance->GetData(DATA_WAVE_COUNT) == 6)
-                    pInstance->SetData(DATA_1ST_BOSS_EVENT, NOT_STARTED);
-                else if (pInstance->GetData(DATA_WAVE_COUNT) == 12)
-                    pInstance->SetData(DATA_2ND_BOSS_EVENT, NOT_STARTED);
+                if (instance->GetData(DATA_WAVE_COUNT) == 6)
+                    instance->SetData(DATA_1ST_BOSS_EVENT, NOT_STARTED);
+                else if (instance->GetData(DATA_WAVE_COUNT) == 12)
+                    instance->SetData(DATA_2ND_BOSS_EVENT, NOT_STARTED);
             }
         }
 
-        void EnterCombat(Unit* /*pWho*/)
+        void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
 
             DoCast(me, SPELL_PROTECTIVE_BUBBLE);
 
-            if (pInstance)
+            if (instance)
             {
-                if (GameObject *pDoor = pInstance->instance->GetGameObject(pInstance->GetData64(DATA_ICHORON_CELL)))
+                if (GameObject* pDoor = instance->instance->GetGameObject(instance->GetData64(DATA_ICHORON_CELL)))
                     if (pDoor->GetGoState() == GO_STATE_READY)
                     {
                         EnterEvadeMode();
                         return;
                     }
-                if (pInstance->GetData(DATA_WAVE_COUNT) == 6)
-                    pInstance->SetData(DATA_1ST_BOSS_EVENT, IN_PROGRESS);
-                else if (pInstance->GetData(DATA_WAVE_COUNT) == 12)
-                    pInstance->SetData(DATA_2ND_BOSS_EVENT, IN_PROGRESS);
+                if (instance->GetData(DATA_WAVE_COUNT) == 6)
+                    instance->SetData(DATA_1ST_BOSS_EVENT, IN_PROGRESS);
+                else if (instance->GetData(DATA_WAVE_COUNT) == 12)
+                    instance->SetData(DATA_2ND_BOSS_EVENT, IN_PROGRESS);
             }
         }
 
-        void AttackStart(Unit* pWho)
+        void AttackStart(Unit* who)
         {
-            if (me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE) || me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE))
+            if (me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC) || me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE))
                 return;
 
-            if (me->Attack(pWho, true))
+            if (me->Attack(who, true))
             {
-                me->AddThreat(pWho, 0.0f);
-                me->SetInCombatWith(pWho);
-                pWho->SetInCombatWith(me);
-                DoStartMovement(pWho);
+                me->AddThreat(who, 0.0f);
+                me->SetInCombatWith(who);
+                who->SetInCombatWith(me);
+                DoStartMovement(who);
             }
         }
 
@@ -160,7 +158,7 @@ public:
             if (!me->isAlive())
                 return;
 
-            switch(param)
+            switch (param)
             {
                 case ACTION_WATER_ELEMENT_HIT:
                     me->ModifyHealth(int32(me->CountPctFromMaxHealth(1)));
@@ -168,7 +166,7 @@ public:
                     if (bIsExploded)
                         DoExplodeCompleted();
 
-                    bAchievement = false;
+                    dehydration = false;
                     break;
                 case ACTION_WATER_ELEMENT_KILLED:
                     uint32 damage = me->CountPctFromMaxHealth(3);
@@ -199,11 +197,18 @@ public:
             me->GetMotionMaster()->MoveChase(me->getVictim());
         }
 
-        void MoveInLineOfSight(Unit* /*pWho*/) {}
+        uint32 GetData(uint32 type)
+        {
+            if (type == DATA_DEHYDRATION)
+                return dehydration ? 1 : 0;
+
+            return 0;
+        }
+
+        void MoveInLineOfSight(Unit* /*who*/) {}
 
         void UpdateAI(const uint32 uiDiff)
         {
-            //Return since we have no target
             if (!UpdateVictim())
                 return;
 
@@ -241,8 +246,8 @@ public:
                         if (!m_waterElements.empty())
                         {
                             for (std::list<uint64>::const_iterator itr = m_waterElements.begin(); itr != m_waterElements.end(); ++itr)
-                                if (Creature* pTemp = Unit::GetCreature(*me, *itr))
-                                    if (pTemp->isAlive())
+                                if (Creature* temp = Unit::GetCreature(*me, *itr))
+                                    if (temp->isAlive())
                                     {
                                         bIsWaterElementsAlive = true;
                                         break;
@@ -282,84 +287,79 @@ public:
 
             DespawnWaterElements();
 
-            if (pInstance)
+            if (instance)
             {
-                if (IsHeroic() && bAchievement)
-                    pInstance->DoCompleteAchievement(ACHIEVEMENT_DEHYDRATION);
-
-                if (pInstance->GetData(DATA_WAVE_COUNT) == 6)
+                if (instance->GetData(DATA_WAVE_COUNT) == 6)
                 {
-                    pInstance->SetData(DATA_1ST_BOSS_EVENT, DONE);
-                    pInstance->SetData(DATA_WAVE_COUNT, 7);
+                    instance->SetData(DATA_1ST_BOSS_EVENT, DONE);
+                    instance->SetData(DATA_WAVE_COUNT, 7);
                 }
-                else if (pInstance->GetData(DATA_WAVE_COUNT) == 12)
+                else if (instance->GetData(DATA_WAVE_COUNT) == 12)
                 {
-                    pInstance->SetData(DATA_2ND_BOSS_EVENT, DONE);
-                    pInstance->SetData(DATA_WAVE_COUNT, 13);
+                    instance->SetData(DATA_2ND_BOSS_EVENT, DONE);
+                    instance->SetData(DATA_WAVE_COUNT, 13);
                 }
             }
         }
 
-        void JustSummoned(Creature* pSummoned)
+        void JustSummoned(Creature* summoned)
         {
-            if (pSummoned)
+            if (summoned)
             {
-                pSummoned->SetSpeed(MOVE_RUN, 0.3f);
-                pSummoned->GetMotionMaster()->MoveFollow(me, 0, 0);
-                m_waterElements.push_back(pSummoned->GetGUID());
-                pInstance->SetData64(DATA_ADD_TRASH_MOB,pSummoned->GetGUID());
+                summoned->SetSpeed(MOVE_RUN, 0.3f);
+                summoned->GetMotionMaster()->MoveFollow(me, 0, 0);
+                m_waterElements.push_back(summoned->GetGUID());
+                instance->SetData64(DATA_ADD_TRASH_MOB, summoned->GetGUID());
             }
         }
 
-
-        void SummonedCreatureDespawn(Creature *pSummoned)
+        void SummonedCreatureDespawn(Creature* summoned)
         {
-            if (pSummoned)
+            if (summoned)
             {
-                m_waterElements.remove(pSummoned->GetGUID());
-                pInstance->SetData64(DATA_DEL_TRASH_MOB,pSummoned->GetGUID());
+                m_waterElements.remove(summoned->GetGUID());
+                instance->SetData64(DATA_DEL_TRASH_MOB, summoned->GetGUID());
             }
         }
 
-        void KilledUnit(Unit * victim)
+        void KilledUnit(Unit* victim)
         {
             if (victim == me)
                 return;
-            DoScriptText(RAND(SAY_SLAY_1,SAY_SLAY_2,SAY_SLAY_3), me);
+            DoScriptText(RAND(SAY_SLAY_1, SAY_SLAY_2, SAY_SLAY_3), me);
         }
     };
 
 };
-
 
 class mob_ichor_globule : public CreatureScript
 {
 public:
     mob_ichor_globule() : CreatureScript("mob_ichor_globule") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_ichor_globuleAI (pCreature);
+        return new mob_ichor_globuleAI (creature);
     }
 
     struct mob_ichor_globuleAI : public ScriptedAI
     {
-        mob_ichor_globuleAI(Creature* pCreature) : ScriptedAI(pCreature)
+        mob_ichor_globuleAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = pCreature->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 uiRangeCheck_Timer;
 
         void Reset()
         {
             uiRangeCheck_Timer = 1000;
-            DoCast(me,SPELL_WATER_GLOBULE);
+            DoCast(me, SPELL_WATER_GLOBULE);
         }
 
-        void AttackStart(Unit* /*pWho*/)
+        void AttackStart(Unit* /*who*/)
         {
             return;
         }
@@ -368,15 +368,15 @@ public:
         {
             if (uiRangeCheck_Timer < uiDiff)
             {
-                if (pInstance)
+                if (instance)
                 {
-                    if (Creature* pIchoron = Unit::GetCreature(*me, pInstance->GetData64(DATA_ICHORON)))
+                    if (Creature* pIchoron = Unit::GetCreature(*me, instance->GetData64(DATA_ICHORON)))
                     {
-                        if (me->IsWithinDist(pIchoron, 2.0f , false))
+                        if (me->IsWithinDist(pIchoron, 2.0f, false))
                         {
                             if (pIchoron->AI())
                                 pIchoron->AI()->DoAction(ACTION_WATER_ELEMENT_HIT);
-                            me->ForcedDespawn();
+                            me->DespawnOrUnsummon();
                         }
                     }
                 }
@@ -385,10 +385,10 @@ public:
             else uiRangeCheck_Timer -= uiDiff;
         }
 
-        void JustDied(Unit* /*pKiller*/)
+        void JustDied(Unit* /*killer*/)
         {
             DoCast(me, SPELL_SPLASH);
-            if (Creature* pIchoron = Unit::GetCreature(*me, pInstance->GetData64(DATA_ICHORON)))
+            if (Creature* pIchoron = Unit::GetCreature(*me, instance->GetData64(DATA_ICHORON)))
                 if (pIchoron->AI())
                     pIchoron->AI()->DoAction(ACTION_WATER_ELEMENT_KILLED);
         }
@@ -396,9 +396,29 @@ public:
 
 };
 
+class achievement_dehydration : public AchievementCriteriaScript
+{
+    public:
+        achievement_dehydration() : AchievementCriteriaScript("achievement_dehydration")
+        {
+        }
+
+        bool OnCheck(Player* /*player*/, Unit* target)
+        {
+            if (!target)
+                return false;
+
+            if (Creature* Ichoron = target->ToCreature())
+                if (Ichoron->AI()->GetData(DATA_DEHYDRATION))
+                    return true;
+
+            return false;
+        }
+};
 
 void AddSC_boss_ichoron()
 {
     new boss_ichoron();
     new mob_ichor_globule();
+    new achievement_dehydration();
 }

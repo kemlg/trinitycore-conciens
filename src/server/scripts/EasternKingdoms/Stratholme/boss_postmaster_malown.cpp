@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Stratholme
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 //Spell ID to summon this guy is 24627 "Summon Postmaster Malown"
 //He should be spawned along with three other elites once the third postbox has been opened
@@ -41,14 +42,14 @@ class boss_postmaster_malown : public CreatureScript
 public:
     boss_postmaster_malown() : CreatureScript("boss_postmaster_malown") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_postmaster_malownAI (pCreature);
+        return new boss_postmaster_malownAI (creature);
     }
 
     struct boss_postmaster_malownAI : public ScriptedAI
     {
-        boss_postmaster_malownAI(Creature *c) : ScriptedAI(c) {}
+        boss_postmaster_malownAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 WailingDead_Timer;
         uint32 Backhand_Timer;
@@ -67,7 +68,7 @@ public:
             HasYelled = false;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
         }
 

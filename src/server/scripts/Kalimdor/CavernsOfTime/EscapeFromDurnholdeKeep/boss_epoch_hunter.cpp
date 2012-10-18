@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Missing spawns pre-event, missing speech to be coordinated with rest 
 SDCategory: Caverns of Time, Old Hillsbrad Foothills
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "old_hillsbrad.h"
 
 #define SAY_ENTER1                  -1560013
@@ -47,19 +48,19 @@ class boss_epoch_hunter : public CreatureScript
 public:
     boss_epoch_hunter() : CreatureScript("boss_epoch_hunter") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_epoch_hunterAI (pCreature);
+        return new boss_epoch_hunterAI (creature);
     }
 
     struct boss_epoch_hunterAI : public ScriptedAI
     {
-        boss_epoch_hunterAI(Creature *c) : ScriptedAI(c)
+        boss_epoch_hunterAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript *pInstance;
+        InstanceScript* instance;
 
         uint32 SandBreath_Timer;
         uint32 ImpendingDeath_Timer;
@@ -68,28 +69,28 @@ public:
 
         void Reset()
         {
-            SandBreath_Timer = 8000 + rand()%8000;
-            ImpendingDeath_Timer = 25000 + rand()%5000;
+            SandBreath_Timer = urand(8000, 16000);
+            ImpendingDeath_Timer = urand(25000, 30000);
             WingBuffet_Timer = 35000;
             Mda_Timer = 40000;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(RAND(SAY_AGGRO1,SAY_AGGRO2), me);
+            DoScriptText(RAND(SAY_AGGRO1, SAY_AGGRO2), me);
         }
 
-        void KilledUnit(Unit * /*victim*/)
+        void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_SLAY1,SAY_SLAY2), me);
+            DoScriptText(RAND(SAY_SLAY1, SAY_SLAY2), me);
         }
 
-        void JustDied(Unit * /*victim*/)
+        void JustDied(Unit* /*killer*/)
         {
             DoScriptText(SAY_DEATH, me);
 
-            if (pInstance && pInstance->GetData(TYPE_THRALL_EVENT) == IN_PROGRESS)
-                pInstance->SetData(TYPE_THRALL_PART4, DONE);
+            if (instance && instance->GetData(TYPE_THRALL_EVENT) == IN_PROGRESS)
+                instance->SetData(TYPE_THRALL_PART4, DONE);
         }
 
         void UpdateAI(const uint32 diff)
@@ -106,9 +107,9 @@ public:
 
                 DoCast(me->getVictim(), SPELL_SAND_BREATH);
 
-                DoScriptText(RAND(SAY_BREATH1,SAY_BREATH2), me);
+                DoScriptText(RAND(SAY_BREATH1, SAY_BREATH2), me);
 
-                SandBreath_Timer = 10000 + rand()%10000;
+                SandBreath_Timer = urand(10000, 20000);
             } else SandBreath_Timer -= diff;
 
             if (ImpendingDeath_Timer <= diff)
@@ -119,8 +120,8 @@ public:
 
             if (WingBuffet_Timer <= diff)
             {
-                if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM,0))
-                    DoCast(pTarget, SPELL_WING_BUFFET);
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                    DoCast(target, SPELL_WING_BUFFET);
                 WingBuffet_Timer = 25000+rand()%10000;
             } else WingBuffet_Timer -= diff;
 
@@ -135,7 +136,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_epoch_hunter()
 {

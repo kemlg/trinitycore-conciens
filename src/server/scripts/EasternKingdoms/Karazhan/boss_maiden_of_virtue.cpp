@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Karazhan
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 #define SAY_AGGRO               -1532018
 #define SAY_SLAY1               -1532019
@@ -44,14 +45,14 @@ class boss_maiden_of_virtue : public CreatureScript
 public:
     boss_maiden_of_virtue() : CreatureScript("boss_maiden_of_virtue") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_maiden_of_virtueAI (pCreature);
+        return new boss_maiden_of_virtueAI (creature);
     }
 
     struct boss_maiden_of_virtueAI : public ScriptedAI
     {
-        boss_maiden_of_virtueAI(Creature *c) : ScriptedAI(c) {}
+        boss_maiden_of_virtueAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 Repentance_Timer;
         uint32 Holyfire_Timer;
@@ -74,16 +75,16 @@ public:
 
         void KilledUnit(Unit* /*Victim*/)
         {
-            if (urand(0,1) == 0)
-                DoScriptText(RAND(SAY_SLAY1,SAY_SLAY2,SAY_SLAY3), me);
+            if (urand(0, 1) == 0)
+                DoScriptText(RAND(SAY_SLAY1, SAY_SLAY2, SAY_SLAY3), me);
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
             DoScriptText(SAY_DEATH, me);
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
         }
@@ -108,25 +109,25 @@ public:
             if (Repentance_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_REPENTANCE);
-                DoScriptText(RAND(SAY_REPENTANCE1,SAY_REPENTANCE2), me);
+                DoScriptText(RAND(SAY_REPENTANCE1, SAY_REPENTANCE2), me);
 
-                Repentance_Timer = urand(25000,35000);        //A little randomness on that spell
+                Repentance_Timer = urand(25000, 35000);        //A little randomness on that spell
             } else Repentance_Timer -= diff;
 
             if (Holyfire_Timer <= diff)
             {
-                if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                    DoCast(pTarget, SPELL_HOLYFIRE);
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                    DoCast(target, SPELL_HOLYFIRE);
 
-                    Holyfire_Timer = urand(8000,23000);      //Anywhere from 8 to 23 seconds, good luck having several of those in a row!
+                    Holyfire_Timer = urand(8000, 23000);      //Anywhere from 8 to 23 seconds, good luck having several of those in a row!
             } else Holyfire_Timer -= diff;
 
             if (Holywrath_Timer <= diff)
             {
-                if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                    DoCast(pTarget, SPELL_HOLYWRATH);
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                    DoCast(target, SPELL_HOLYWRATH);
 
-                Holywrath_Timer = urand(20000,25000);        //20-30 secs sounds nice
+                Holywrath_Timer = urand(20000, 25000);        //20-30 secs sounds nice
             } else Holywrath_Timer -= diff;
 
             DoMeleeAttackIfReady();
@@ -135,7 +136,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_maiden_of_virtue()
 {

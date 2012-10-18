@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -114,31 +114,31 @@ enum EP_GoSummons
 enum EP_Towers
 {
     EP_EWT = 0, // plaguelands 03
-    EP_NPT,// plaguelands 01
-    EP_PWT,// plaguelands 04
-    EP_CGT,// plaguelands 02
+    EP_NPT, // plaguelands 01
+    EP_PWT, // plaguelands 04
+    EP_CGT, // plaguelands 02
     EP_TOWER_NUM
 };
 
 const go_type EPCapturePoints[EP_TOWER_NUM] =
 {
-    {182097,0,2574.51f,-4794.89f,144.704f,-1.45003f,-0.097056f,0.095578f,-0.656229f,0.742165f},
-    {181899,0,3181.08f,-4379.36f,174.123f,-2.03472f,-0.065392f,0.119494f,-0.842275f,0.521553f},
-    {182098,0,2962.71f,-3042.31f,154.789f,2.08426f,-0.074807f,-0.113837f,0.855928f,0.49883f},
-    {182096,0,1860.85f,-3731.23f,196.716f,-2.53214f,0.033967f,-0.131914f,0.944741f,-0.298177f}
+    {182097, 0, 2574.51f, -4794.89f, 144.704f, -1.45003f, -0.097056f, 0.095578f, -0.656229f, 0.742165f},
+    {181899, 0, 3181.08f, -4379.36f, 174.123f, -2.03472f, -0.065392f, 0.119494f, -0.842275f, 0.521553f},
+    {182098, 0, 2962.71f, -3042.31f, 154.789f, 2.08426f, -0.074807f, -0.113837f, 0.855928f, 0.49883f},
+    {182096, 0, 1860.85f, -3731.23f, 196.716f, -2.53214f, 0.033967f, -0.131914f, 0.944741f, -0.298177f}
 };
 
 const go_type EPTowerFlags[EP_TOWER_NUM] =
 {
-    {182106,0,2569.60f,-4772.93f,115.399f,2.72271f,0.0f,0.0f,0.978148f,0.207912f},
-    {182106,0,3148.17f,-4365.51f,145.029f,1.53589f,0.0f,0.0f,0.694658f,0.71934f},
-    {182106,0,2992.63f,-3022.95f,125.593f,3.03687f,0.0f,0.0f,0.99863f,0.052336f},
-    {182106,0,1838.42f,-3703.56f,167.713f,0.890118f,0.0f,0.0f,0.430511f,0.902585f}
+    {182106, 0, 2569.60f, -4772.93f, 115.399f, 2.72271f, 0.0f, 0.0f, 0.978148f, 0.207912f},
+    {182106, 0, 3148.17f, -4365.51f, 145.029f, 1.53589f, 0.0f, 0.0f, 0.694658f, 0.71934f},
+    {182106, 0, 2992.63f, -3022.95f, 125.593f, 3.03687f, 0.0f, 0.0f, 0.99863f, 0.052336f},
+    {182106, 0, 1838.42f, -3703.56f, 167.713f, 0.890118f, 0.0f, 0.0f, 0.430511f, 0.902585f}
 };
 
-const uint32 EPTowerPlayerEnterEvents[EP_TOWER_NUM] = {10691,10699,10701,10705};
+const uint32 EPTowerPlayerEnterEvents[EP_TOWER_NUM] = {10691, 10699, 10701, 10705};
 
-const uint32 EPTowerPlayerLeaveEvents[EP_TOWER_NUM] = {10692,10698,10700,10704};
+const uint32 EPTowerPlayerLeaveEvents[EP_TOWER_NUM] = {10692, 10698, 10700, 10704};
 
 const uint8 EP_NUM_CREATURES = 6;
 const uint8 EP_EWT_NUM_CREATURES = 5;
@@ -147,20 +147,20 @@ const uint8 EP_EWT_NUM_CREATURES = 5;
 // should be spawned at EWT and follow a path, but trans-grid pathing isn't safe, so summon them directly at NPT
 const creature_type EP_EWT_Summons_A[EP_EWT_NUM_CREATURES] =
 {
-    {17635,469,0, 3167.61f,-4352.09f,138.20f,4.5811f},
-    {17647,469,0, 3172.74f,-4352.99f,139.14f,4.9873f},
-    {17647,469,0, 3165.89f,-4354.46f,138.67f,3.7244f},
-    {17647,469,0, 3164.65f,-4350.26f,138.22f,2.4794f},
-    {17647,469,0, 3169.91f,-4349.68f,138.37f,0.7444f}
+    {17635, 469, 0, 3167.61f, -4352.09f, 138.20f, 4.5811f},
+    {17647, 469, 0, 3172.74f, -4352.99f, 139.14f, 4.9873f},
+    {17647, 469, 0, 3165.89f, -4354.46f, 138.67f, 3.7244f},
+    {17647, 469, 0, 3164.65f, -4350.26f, 138.22f, 2.4794f},
+    {17647, 469, 0, 3169.91f, -4349.68f, 138.37f, 0.7444f}
 };
 
 const creature_type EP_EWT_Summons_H[EP_EWT_NUM_CREATURES] =
 {
-    {17995,67,0, 3167.61f,-4352.09f,138.20f,4.5811f},
-    {17996,67,0, 3172.74f,-4352.99f,139.14f,4.9873f},
-    {17996,67,0, 3165.89f,-4354.46f,138.67f,3.7244f},
-    {17996,67,0, 3164.65f,-4350.26f,138.22f,2.4794f},
-    {17996,67,0, 3169.91f,-4349.68f,138.37f,0.7444f}
+    {17995, 67, 0, 3167.61f, -4352.09f, 138.20f, 4.5811f},
+    {17996, 67, 0, 3172.74f, -4352.99f, 139.14f, 4.9873f},
+    {17996, 67, 0, 3165.89f, -4354.46f, 138.67f, 3.7244f},
+    {17996, 67, 0, 3164.65f, -4350.26f, 138.22f, 2.4794f},
+    {17996, 67, 0, 3169.91f, -4349.68f, 138.37f, 0.7444f}
 };
 
 enum EP_TowerStates
@@ -175,20 +175,18 @@ enum EP_TowerStates
 };
 
 // when spawning, pay attention at setting the faction manually!
-const creature_type EP_PWT_FlightMaster = {17209,0,0,2987.5f,-3049.11f,120.126f,5.75959f};
+const creature_type EP_PWT_FlightMaster = {17209, 0, 0, 2987.5f, -3049.11f, 120.126f, 5.75959f};
 
 // after spawning, modify the faction so that only the controller will be able to use it with SetUInt32Value(GAMEOBJECT_FACTION, faction_id);
-const go_type EP_NPT_LordaeronShrine = {181682,0,3167.72f,-4355.91f,138.785f,1.69297f,0.0f,0.0f,0.748956f,0.66262f};
+const go_type EP_NPT_LordaeronShrine = {181682, 0, 3167.72f, -4355.91f, 138.785f, 1.69297f, 0.0f, 0.0f, 0.748956f, 0.66262f};
 
 class OutdoorPvPEP;
 
 class OPvPCapturePointEP_EWT : public OPvPCapturePoint
 {
-    friend class OutdoorPvPEP;
-
     public:
 
-        OPvPCapturePointEP_EWT(OutdoorPvP * pvp);
+        OPvPCapturePointEP_EWT(OutdoorPvP* pvp);
 
         void ChangeState();
 
@@ -197,8 +195,8 @@ class OPvPCapturePointEP_EWT : public OPvPCapturePoint
         void FillInitialWorldStates(WorldPacket & data);
 
         // used when player is activated/inactivated in the area
-        bool HandlePlayerEnter(Player * plr);
-        void HandlePlayerLeave(Player * plr);
+        bool HandlePlayerEnter(Player* player);
+        void HandlePlayerLeave(Player* player);
 
     protected:
 
@@ -215,11 +213,9 @@ class OPvPCapturePointEP_EWT : public OPvPCapturePoint
 
 class OPvPCapturePointEP_NPT : public OPvPCapturePoint
 {
-    friend class OutdoorPvPEP;
-
     public:
 
-        OPvPCapturePointEP_NPT(OutdoorPvP * pvp);
+        OPvPCapturePointEP_NPT(OutdoorPvP* pvp);
 
         void ChangeState();
 
@@ -228,8 +224,8 @@ class OPvPCapturePointEP_NPT : public OPvPCapturePoint
         void FillInitialWorldStates(WorldPacket & data);
 
         // used when player is activated/inactivated in the area
-        bool HandlePlayerEnter(Player * plr);
-        void HandlePlayerLeave(Player * plr);
+        bool HandlePlayerEnter(Player* player);
+        void HandlePlayerLeave(Player* player);
 
     protected:
 
@@ -246,11 +242,9 @@ class OPvPCapturePointEP_NPT : public OPvPCapturePoint
 
 class OPvPCapturePointEP_CGT : public OPvPCapturePoint
 {
-    friend class OutdoorPvPEP;
-
     public:
 
-        OPvPCapturePointEP_CGT(OutdoorPvP * pvp);
+        OPvPCapturePointEP_CGT(OutdoorPvP* pvp);
 
         void ChangeState();
 
@@ -259,8 +253,8 @@ class OPvPCapturePointEP_CGT : public OPvPCapturePoint
         void FillInitialWorldStates(WorldPacket & data);
 
         // used when player is activated/inactivated in the area
-        bool HandlePlayerEnter(Player * plr);
-        void HandlePlayerLeave(Player * plr);
+        bool HandlePlayerEnter(Player* player);
+        void HandlePlayerLeave(Player* player);
 
     protected:
 
@@ -277,11 +271,9 @@ class OPvPCapturePointEP_CGT : public OPvPCapturePoint
 
 class OPvPCapturePointEP_PWT : public OPvPCapturePoint
 {
-    friend class OutdoorPvPEP;
-
     public:
 
-        OPvPCapturePointEP_PWT(OutdoorPvP * pvp);
+        OPvPCapturePointEP_PWT(OutdoorPvP* pvp);
 
         void ChangeState();
 
@@ -290,8 +282,8 @@ class OPvPCapturePointEP_PWT : public OPvPCapturePoint
         void FillInitialWorldStates(WorldPacket & data);
 
         // used when player is activated/inactivated in the area
-        bool HandlePlayerEnter(Player * plr);
-        void HandlePlayerLeave(Player * plr);
+        bool HandlePlayerEnter(Player* player);
+        void HandlePlayerLeave(Player* player);
 
     protected:
 
@@ -308,27 +300,24 @@ class OPvPCapturePointEP_PWT : public OPvPCapturePoint
 
 class OutdoorPvPEP : public OutdoorPvP
 {
-    friend class OPvPCapturePointEP_EWT;
-    friend class OPvPCapturePointEP_NPT;
-    friend class OPvPCapturePointEP_PWT;
-    friend class OPvPCapturePointEP_CGT;
-
     public:
 
         OutdoorPvPEP();
 
         bool SetupOutdoorPvP();
 
-        void HandlePlayerEnterZone(Player *plr, uint32 zone);
-        void HandlePlayerLeaveZone(Player *plr, uint32 zone);
+        void HandlePlayerEnterZone(Player* player, uint32 zone);
+        void HandlePlayerLeaveZone(Player* player, uint32 zone);
 
         bool Update(uint32 diff);
 
         void FillInitialWorldStates(WorldPacket &data);
 
-        void SendRemoveWorldStates(Player * plr);
+        void SendRemoveWorldStates(Player* player);
 
         void BuffTeams();
+
+        void SetControlledState(uint32 index, uint32 state);
 
     private:
 
@@ -340,4 +329,3 @@ class OutdoorPvPEP : public OutdoorPvP
 };
 
 #endif
-

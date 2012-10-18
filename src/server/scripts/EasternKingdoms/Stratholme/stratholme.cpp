@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -19,7 +19,7 @@
 /* ScriptData
 SDName: Stratholme
 SD%Complete: 100
-SDComment: Misc mobs for instance. pGo-script to apply aura and start event for quest 8945
+SDComment: Misc mobs for instance. go-script to apply aura and start event for quest 8945
 SDCategory: Stratholme
 EndScriptData */
 
@@ -30,7 +30,8 @@ mob_restless_soul
 mobs_spectral_ghostly_citizen
 EndContentData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "stratholme.h"
 #include "Group.h"
 
@@ -43,19 +44,19 @@ class go_gauntlet_gate : public GameObjectScript
 public:
     go_gauntlet_gate() : GameObjectScript("go_gauntlet_gate") { }
 
-    bool OnGossipHello(Player* pPlayer, GameObject* pGo)
+    bool OnGossipHello(Player* player, GameObject* go)
     {
-        InstanceScript* pInstance = pGo->GetInstanceScript();
+        InstanceScript* instance = go->GetInstanceScript();
 
-        if (!pInstance)
+        if (!instance)
             return false;
 
-        if (pInstance->GetData(TYPE_BARON_RUN) != NOT_STARTED)
+        if (instance->GetData(TYPE_BARON_RUN) != NOT_STARTED)
             return false;
 
-        if (Group *pGroup = pPlayer->GetGroup())
+        if (Group* group = player->GetGroup())
         {
-            for (GroupReference *itr = pGroup->GetFirstMember(); itr != NULL; itr = itr->next())
+            for (GroupReference* itr = group->GetFirstMember(); itr != NULL; itr = itr->next())
             {
                 Player* pGroupie = itr->getSource();
                 if (!pGroupie)
@@ -63,15 +64,15 @@ public:
 
                 if (pGroupie->GetQuestStatus(QUEST_DEAD_MAN_PLEA) == QUEST_STATUS_INCOMPLETE &&
                     !pGroupie->HasAura(SPELL_BARON_ULTIMATUM) &&
-                    pGroupie->GetMap() == pGo->GetMap())
-                    pGroupie->CastSpell(pGroupie,SPELL_BARON_ULTIMATUM,true);
+                    pGroupie->GetMap() == go->GetMap())
+                    pGroupie->CastSpell(pGroupie, SPELL_BARON_ULTIMATUM, true);
             }
-        } else if (pPlayer->GetQuestStatus(QUEST_DEAD_MAN_PLEA) == QUEST_STATUS_INCOMPLETE &&
-                    !pPlayer->HasAura(SPELL_BARON_ULTIMATUM) &&
-                    pPlayer->GetMap() == pGo->GetMap())
-                    pPlayer->CastSpell(pPlayer,SPELL_BARON_ULTIMATUM,true);
+        } else if (player->GetQuestStatus(QUEST_DEAD_MAN_PLEA) == QUEST_STATUS_INCOMPLETE &&
+                    !player->HasAura(SPELL_BARON_ULTIMATUM) &&
+                    player->GetMap() == go->GetMap())
+                    player->CastSpell(player, SPELL_BARON_ULTIMATUM, true);
 
-        pInstance->SetData(TYPE_BARON_RUN,IN_PROGRESS);
+        instance->SetData(TYPE_BARON_RUN, IN_PROGRESS);
         return false;
     }
 
@@ -92,25 +93,24 @@ class mob_freed_soul : public CreatureScript
 public:
     mob_freed_soul() : CreatureScript("mob_freed_soul") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_freed_soulAI (pCreature);
+        return new mob_freed_soulAI (creature);
     }
 
     struct mob_freed_soulAI : public ScriptedAI
     {
-        mob_freed_soulAI(Creature *c) : ScriptedAI(c) {}
+        mob_freed_soulAI(Creature* creature) : ScriptedAI(creature) {}
 
         void Reset()
         {
-            DoScriptText(RAND(SAY_ZAPPED0,SAY_ZAPPED1,SAY_ZAPPED2,SAY_ZAPPED3), me);
+            DoScriptText(RAND(SAY_ZAPPED0, SAY_ZAPPED1, SAY_ZAPPED2, SAY_ZAPPED3), me);
         }
 
         void EnterCombat(Unit* /*who*/) {}
     };
 
 };
-
 
 /*######
 ## mob_restless_soul
@@ -127,14 +127,14 @@ class mob_restless_soul : public CreatureScript
 public:
     mob_restless_soul() : CreatureScript("mob_restless_soul") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_restless_soulAI (pCreature);
+        return new mob_restless_soulAI (creature);
     }
 
     struct mob_restless_soulAI : public ScriptedAI
     {
-        mob_restless_soulAI(Creature *c) : ScriptedAI(c) {}
+        mob_restless_soulAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint64 Tagger;
         uint32 Die_Timer;
@@ -149,7 +149,7 @@ public:
 
         void EnterCombat(Unit* /*who*/) {}
 
-        void SpellHit(Unit *caster, const SpellEntry *spell)
+        void SpellHit(Unit* caster, const SpellInfo* spell)
         {
             if (caster->GetTypeId() == TYPEID_PLAYER)
             {
@@ -161,12 +161,12 @@ public:
             }
         }
 
-        void JustSummoned(Creature *summoned)
+        void JustSummoned(Creature* summoned)
         {
-            summoned->CastSpell(summoned,SPELL_SOUL_FREED,false);
+            summoned->CastSpell(summoned, SPELL_SOUL_FREED, false);
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
             if (Tagged)
                 me->SummonCreature(ENTRY_FREED, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), me->GetOrientation(), TEMPSUMMON_TIMED_DESPAWN, 300000);
@@ -178,9 +178,9 @@ public:
             {
                 if (Die_Timer <= diff)
                 {
-                    if (Unit* pTemp = Unit::GetUnit(*me,Tagger))
+                    if (Unit* temp = Unit::GetUnit(*me, Tagger))
                     {
-                        CAST_PLR(pTemp)->KilledMonsterCredit(ENTRY_RESTLESS, me->GetGUID());
+                        CAST_PLR(temp)->KilledMonsterCredit(ENTRY_RESTLESS, me->GetGUID());
                         me->Kill(me);
                     }
                 } else Die_Timer -= diff;
@@ -189,7 +189,6 @@ public:
     };
 
 };
-
 
 /*######
 ## mobs_spectral_ghostly_citizen
@@ -206,14 +205,14 @@ class mobs_spectral_ghostly_citizen : public CreatureScript
 public:
     mobs_spectral_ghostly_citizen() : CreatureScript("mobs_spectral_ghostly_citizen") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mobs_spectral_ghostly_citizenAI (pCreature);
+        return new mobs_spectral_ghostly_citizenAI (creature);
     }
 
     struct mobs_spectral_ghostly_citizenAI : public ScriptedAI
     {
-        mobs_spectral_ghostly_citizenAI(Creature *c) : ScriptedAI(c) {}
+        mobs_spectral_ghostly_citizenAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 Die_Timer;
         bool Tagged;
@@ -226,20 +225,20 @@ public:
 
         void EnterCombat(Unit* /*who*/) {}
 
-        void SpellHit(Unit * /*caster*/, const SpellEntry *spell)
+        void SpellHit(Unit* /*caster*/, const SpellInfo* spell)
         {
             if (!Tagged && spell->Id == SPELL_EGAN_BLASTER)
                 Tagged = true;
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
             if (Tagged)
             {
                 for (uint32 i = 1; i <= 4; ++i)
                 {
                      //100%, 50%, 33%, 25% chance to spawn
-                     if (urand(1,i) == 1)
+                     if (urand(1, i) == 1)
                          DoSummon(ENTRY_RESTLESS, me, 20.0f, 600000);
                 }
             }
@@ -260,26 +259,26 @@ public:
             DoMeleeAttackIfReady();
         }
 
-        void ReceiveEmote(Player* pPlayer, uint32 emote)
+        void ReceiveEmote(Player* player, uint32 emote)
         {
-            switch(emote)
+            switch (emote)
             {
-                case TEXTEMOTE_DANCE:
+                case TEXT_EMOTE_DANCE:
                     EnterEvadeMode();
                     break;
-                case TEXTEMOTE_RUDE:
-                    if (me->IsWithinDistInMap(pPlayer, 5))
-                        DoCast(pPlayer, SPELL_SLAP, false);
+                case TEXT_EMOTE_RUDE:
+                    if (me->IsWithinDistInMap(player, 5))
+                        DoCast(player, SPELL_SLAP, false);
                     else
                         me->HandleEmoteCommand(EMOTE_ONESHOT_RUDE);
                     break;
-                case TEXTEMOTE_WAVE:
+                case TEXT_EMOTE_WAVE:
                     me->HandleEmoteCommand(EMOTE_ONESHOT_WAVE);
                     break;
-                case TEXTEMOTE_BOW:
+                case TEXT_EMOTE_BOW:
                     me->HandleEmoteCommand(EMOTE_ONESHOT_BOW);
                     break;
-                case TEXTEMOTE_KISS:
+                case TEXT_EMOTE_KISS:
                     me->HandleEmoteCommand(EMOTE_ONESHOT_FLEX);
                     break;
             }
@@ -287,7 +286,6 @@ public:
     };
 
 };
-
 
 void AddSC_stratholme()
 {

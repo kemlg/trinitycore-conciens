@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,7 +22,8 @@ SDComment: Instance Data Scripts and functions to acquire mobs and set encounter
 SDCategory: Utgarde Keep
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "utgarde_keep.h"
 
 #define MAX_ENCOUNTER     3
@@ -53,14 +54,14 @@ class instance_utgarde_keep : public InstanceMapScript
 public:
     instance_utgarde_keep() : InstanceMapScript("instance_utgarde_keep", 574) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+    InstanceScript* GetInstanceScript(InstanceMap* map) const
     {
-       return new instance_utgarde_keep_InstanceMapScript(pMap);
+       return new instance_utgarde_keep_InstanceMapScript(map);
     }
 
     struct instance_utgarde_keep_InstanceMapScript : public InstanceScript
     {
-        instance_utgarde_keep_InstanceMapScript(Map* pMap) : InstanceScript(pMap) {Initialize();};
+        instance_utgarde_keep_InstanceMapScript(Map* map) : InstanceScript(map) {}
 
         uint64 Keleseth;
         uint64 Skarvald;
@@ -100,7 +101,8 @@ public:
         bool IsEncounterInProgress() const
         {
             for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
-                if (m_auiEncounter[i] == IN_PROGRESS) return true;
+                if (m_auiEncounter[i] == IN_PROGRESS)
+                    return true;
 
             return false;
         }
@@ -113,18 +115,18 @@ public:
             {
                 for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
                 {
-                    if (Player* plr = itr->getSource())
-                    return plr;
+                    if (Player* player = itr->getSource())
+                    return player;
                 }
             }
 
-            sLog->outDebug("TSCR: Instance Utgarde Keep: GetPlayerInMap, but PlayerList is empty!");
+            sLog->outDebug(LOG_FILTER_TSCR, "Instance Utgarde Keep: GetPlayerInMap, but PlayerList is empty!");
             return NULL;
         }
 
         void OnCreatureCreate(Creature* creature)
         {
-            switch(creature->GetEntry())
+            switch (creature->GetEntry())
             {
                 case 23953:    Keleseth = creature->GetGUID();             break;
                 case 24201:    Dalronn = creature->GetGUID();              break;
@@ -135,37 +137,37 @@ public:
 
         void OnGameObjectCreate(GameObject* go)
         {
-            switch(go->GetEntry())
+            switch (go->GetEntry())
             {
             //door and object id
             case ENTRY_BELLOW_1: forge_bellow[0] = go->GetGUID();
-            if (forge_event[0] != NOT_STARTED)HandleGameObject(NULL,true,go);break;
+            if (forge_event[0] != NOT_STARTED)HandleGameObject(0, true, go);break;
             case ENTRY_BELLOW_2: forge_bellow[1] = go->GetGUID();
-            if (forge_event[1] != NOT_STARTED)HandleGameObject(NULL,true,go);break;
+            if (forge_event[1] != NOT_STARTED)HandleGameObject(0, true, go);break;
             case ENTRY_BELLOW_3: forge_bellow[2] = go->GetGUID();
-            if (forge_event[2] != NOT_STARTED)HandleGameObject(NULL,true,go);break;
+            if (forge_event[2] != NOT_STARTED)HandleGameObject(0, true, go);break;
             case ENTRY_FORGEFIRE_1: forge_fire[0] = go->GetGUID();
-            if (forge_event[0] != NOT_STARTED)HandleGameObject(NULL,true,go);break;
+            if (forge_event[0] != NOT_STARTED)HandleGameObject(0, true, go);break;
             case ENTRY_FORGEFIRE_2: forge_fire[1] = go->GetGUID();
-            if (forge_event[1] != NOT_STARTED)HandleGameObject(NULL,true,go);break;
+            if (forge_event[1] != NOT_STARTED)HandleGameObject(0, true, go);break;
             case ENTRY_FORGEFIRE_3: forge_fire[2] = go->GetGUID();
-            if (forge_event[2] != NOT_STARTED)HandleGameObject(NULL,true,go);break;
+            if (forge_event[2] != NOT_STARTED)HandleGameObject(0, true, go);break;
             case ENTRY_GLOWING_ANVIL_1: forge_anvil[0] = go->GetGUID();
-            if (forge_event[0] != NOT_STARTED)HandleGameObject(NULL,true,go);break;
+            if (forge_event[0] != NOT_STARTED)HandleGameObject(0, true, go);break;
             case ENTRY_GLOWING_ANVIL_2: forge_anvil[1] = go->GetGUID();
-            if (forge_event[1] != NOT_STARTED)HandleGameObject(NULL,true,go);break;
+            if (forge_event[1] != NOT_STARTED)HandleGameObject(0, true, go);break;
             case ENTRY_GLOWING_ANVIL_3: forge_anvil[2] = go->GetGUID();
-            if (forge_event[2] != NOT_STARTED)HandleGameObject(NULL,true,go);break;
+            if (forge_event[2] != NOT_STARTED)HandleGameObject(0, true, go);break;
             case ENTRY_GIANT_PORTCULLIS_1: portcullis[0] = go->GetGUID();
-            if (m_auiEncounter[2] == DONE)HandleGameObject(NULL,true,go);break;
+            if (m_auiEncounter[2] == DONE)HandleGameObject(0, true, go);break;
             case ENTRY_GIANT_PORTCULLIS_2: portcullis[1] = go->GetGUID();
-            if (m_auiEncounter[2] == DONE)HandleGameObject(NULL,true,go);break;
+            if (m_auiEncounter[2] == DONE)HandleGameObject(0, true, go);break;
             }
         }
 
         uint64 GetData64(uint32 identifier)
         {
-            switch(identifier)
+            switch (identifier)
             {
                 case DATA_PRINCEKELESETH:         return Keleseth;
                 case DATA_DALRONN:                return Dalronn;
@@ -178,7 +180,7 @@ public:
 
         void SetData(uint32 type, uint32 data)
         {
-            switch(type)
+            switch (type)
             {
             case DATA_PRINCEKELESETH_EVENT:
                 m_auiEncounter[0] = data;
@@ -197,42 +199,42 @@ public:
             case EVENT_FORGE_1:
                 if (data == NOT_STARTED)
                 {
-                    HandleGameObject(forge_bellow[0],false);
-                    HandleGameObject(forge_fire[0],false);
-                    HandleGameObject(forge_anvil[0],false);
+                    HandleGameObject(forge_bellow[0], false);
+                    HandleGameObject(forge_fire[0], false);
+                    HandleGameObject(forge_anvil[0], false);
                 }else
                 {
-                    HandleGameObject(forge_bellow[0],true);
-                    HandleGameObject(forge_fire[0],true);
-                    HandleGameObject(forge_anvil[0],true);
+                    HandleGameObject(forge_bellow[0], true);
+                    HandleGameObject(forge_fire[0], true);
+                    HandleGameObject(forge_anvil[0], true);
                 }
                 forge_event[0] = data;
                 break;
             case EVENT_FORGE_2:
                 if (data == NOT_STARTED)
                 {
-                    HandleGameObject(forge_bellow[1],false);
-                    HandleGameObject(forge_fire[1],false);
-                    HandleGameObject(forge_anvil[1],false);
+                    HandleGameObject(forge_bellow[1], false);
+                    HandleGameObject(forge_fire[1], false);
+                    HandleGameObject(forge_anvil[1], false);
                 }else
                 {
-                    HandleGameObject(forge_bellow[1],true);
-                    HandleGameObject(forge_fire[1],true);
-                    HandleGameObject(forge_anvil[1],true);
+                    HandleGameObject(forge_bellow[1], true);
+                    HandleGameObject(forge_fire[1], true);
+                    HandleGameObject(forge_anvil[1], true);
                 }
                 forge_event[1] = data;
                 break;
             case EVENT_FORGE_3:
                 if (data == NOT_STARTED)
                 {
-                    HandleGameObject(forge_bellow[2],false);
-                    HandleGameObject(forge_fire[2],false);
-                    HandleGameObject(forge_anvil[2],false);
+                    HandleGameObject(forge_bellow[2], false);
+                    HandleGameObject(forge_fire[2], false);
+                    HandleGameObject(forge_anvil[2], false);
                 }else
                 {
-                    HandleGameObject(forge_bellow[2],true);
-                    HandleGameObject(forge_fire[2],true);
-                    HandleGameObject(forge_anvil[2],true);
+                    HandleGameObject(forge_bellow[2], true);
+                    HandleGameObject(forge_fire[2], true);
+                    HandleGameObject(forge_anvil[2], true);
                 }
                 forge_event[2] = data;
                 break;
@@ -246,7 +248,7 @@ public:
 
         uint32 GetData(uint32 type)
         {
-            switch(type)
+            switch (type)
             {
                 case DATA_PRINCEKELESETH_EVENT:     return m_auiEncounter[0];
                 case DATA_SKARVALD_DALRONN_EVENT:   return m_auiEncounter[1];
@@ -261,8 +263,8 @@ public:
             OUT_SAVE_INST_DATA;
 
             std::ostringstream saveStream;
-            saveStream << "U K " << m_auiEncounter[0] << " " << m_auiEncounter[1] << " "
-                << m_auiEncounter[2] << " " << forge_event[0] << " " << forge_event[1] << " " << forge_event[2];
+            saveStream << "U K " << m_auiEncounter[0] << ' ' << m_auiEncounter[1] << ' '
+                << m_auiEncounter[2] << ' ' << forge_event[0] << ' ' << forge_event[1] << ' ' << forge_event[2];
 
             str_data = saveStream.str();
 
@@ -307,7 +309,6 @@ public:
     };
 
 };
-
 
 void AddSC_instance_utgarde_keep()
 {

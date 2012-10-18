@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -25,12 +25,17 @@ EndScriptData */
 
 /* ContentData
 npc_aged_dying_ancient_kodo
+go_iruxos
+npc_dalinda_malem
+go_demon_portal
 EndContentData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
+#include "ScriptedGossip.h"
 #include "ScriptedEscortAI.h"
 
-enum eDyingKodo
+enum DyingKodo
 {
     // signed for 9999
     SAY_SMEED_HOME_1                = -1000348,
@@ -57,43 +62,43 @@ class npc_aged_dying_ancient_kodo : public CreatureScript
 public:
     npc_aged_dying_ancient_kodo() : CreatureScript("npc_aged_dying_ancient_kodo") { }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (pPlayer->HasAura(SPELL_KODO_KOMBO_PLAYER_BUFF) && pCreature->HasAura(SPELL_KODO_KOMBO_DESPAWN_BUFF))
+        if (player->HasAura(SPELL_KODO_KOMBO_PLAYER_BUFF) && creature->HasAura(SPELL_KODO_KOMBO_DESPAWN_BUFF))
         {
             //the expected quest objective
-            pPlayer->TalkedToCreature(pCreature->GetEntry(), pCreature->GetGUID());
+            player->TalkedToCreature(creature->GetEntry(), creature->GetGUID());
 
-            pPlayer->RemoveAurasDueToSpell(SPELL_KODO_KOMBO_PLAYER_BUFF);
-            pCreature->GetMotionMaster()->MoveIdle();
+            player->RemoveAurasDueToSpell(SPELL_KODO_KOMBO_PLAYER_BUFF);
+            creature->GetMotionMaster()->MoveIdle();
         }
 
-        pPlayer->SEND_GOSSIP_MENU(pPlayer->GetGossipTextId(pCreature), pCreature->GetGUID());
+        player->SEND_GOSSIP_MENU(player->GetGossipTextId(creature), creature->GetGUID());
         return true;
     }
 
-    bool EffectDummyCreature(Unit *pCaster, uint32 spellId, uint32 effIndex, Creature *pCreatureTarget)
+    bool EffectDummyCreature(Unit* pCaster, uint32 spellId, uint32 effIndex, Creature* creatureTarget)
     {
         //always check spellid and effectindex
         if (spellId == SPELL_KODO_KOMBO_ITEM && effIndex == 0)
         {
             //no effect if player/creature already have aura from spells
-            if (pCaster->HasAura(SPELL_KODO_KOMBO_PLAYER_BUFF) || pCreatureTarget->HasAura(SPELL_KODO_KOMBO_DESPAWN_BUFF))
+            if (pCaster->HasAura(SPELL_KODO_KOMBO_PLAYER_BUFF) || creatureTarget->HasAura(SPELL_KODO_KOMBO_DESPAWN_BUFF))
                 return true;
 
-            if (pCreatureTarget->GetEntry() == NPC_AGED_KODO ||
-                pCreatureTarget->GetEntry() == NPC_DYING_KODO ||
-                pCreatureTarget->GetEntry() == NPC_ANCIENT_KODO)
+            if (creatureTarget->GetEntry() == NPC_AGED_KODO ||
+                creatureTarget->GetEntry() == NPC_DYING_KODO ||
+                creatureTarget->GetEntry() == NPC_ANCIENT_KODO)
             {
-                pCaster->CastSpell(pCaster,SPELL_KODO_KOMBO_PLAYER_BUFF,true);
+                pCaster->CastSpell(pCaster, SPELL_KODO_KOMBO_PLAYER_BUFF, true);
 
-                pCreatureTarget->UpdateEntry(NPC_TAMED_KODO);
-                pCreatureTarget->CastSpell(pCreatureTarget,SPELL_KODO_KOMBO_DESPAWN_BUFF,false);
+                creatureTarget->UpdateEntry(NPC_TAMED_KODO);
+                creatureTarget->CastSpell(creatureTarget, SPELL_KODO_KOMBO_DESPAWN_BUFF, false);
 
-                if (pCreatureTarget->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
-                    pCreatureTarget->GetMotionMaster()->MoveIdle();
+                if (creatureTarget->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
+                    creatureTarget->GetMotionMaster()->MoveIdle();
 
-                pCreatureTarget->GetMotionMaster()->MoveFollow(pCaster, PET_FOLLOW_DIST,  pCreatureTarget->GetFollowAngle());
+                creatureTarget->GetMotionMaster()->MoveFollow(pCaster, PET_FOLLOW_DIST,  creatureTarget->GetFollowAngle());
             }
 
             //always return true when we are handling this spell and effect
@@ -102,32 +107,32 @@ public:
         return false;
     }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_aged_dying_ancient_kodoAI(pCreature);
+        return new npc_aged_dying_ancient_kodoAI(creature);
     }
 
     struct npc_aged_dying_ancient_kodoAI : public ScriptedAI
     {
-        npc_aged_dying_ancient_kodoAI(Creature* pCreature) : ScriptedAI(pCreature) { Reset(); }
+        npc_aged_dying_ancient_kodoAI(Creature* creature) : ScriptedAI(creature) { Reset(); }
 
-        uint32 m_uiDespawnTimer;
+        uint32 DespawnTimer;
 
         void Reset()
         {
-            m_uiDespawnTimer = 0;
+            DespawnTimer = 0;
         }
 
-        void MoveInLineOfSight(Unit* pWho)
+        void MoveInLineOfSight(Unit* who)
         {
-            if (pWho->GetEntry() == NPC_SMEED)
+            if (who->GetEntry() == NPC_SMEED)
             {
                 if (me->HasFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP))
                     return;
 
-                if (me->IsWithinDistInMap(pWho, 10.0f))
+                if (me->IsWithinDistInMap(who, 10.0f))
                 {
-                    DoScriptText(RAND(SAY_SMEED_HOME_1,SAY_SMEED_HOME_2,SAY_SMEED_HOME_3), pWho);
+                    DoScriptText(RAND(SAY_SMEED_HOME_1, SAY_SMEED_HOME_2, SAY_SMEED_HOME_3), who);
 
                     //spell have no implemented effect (dummy), so useful to notify spellHit
                     DoCast(me, SPELL_KODO_KOMBO_GOSSIP, true);
@@ -135,19 +140,19 @@ public:
             }
         }
 
-        void SpellHit(Unit* /*pCaster*/, SpellEntry const* pSpell)
+        void SpellHit(Unit* /*pCaster*/, SpellInfo const* pSpell)
         {
             if (pSpell->Id == SPELL_KODO_KOMBO_GOSSIP)
             {
                 me->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
-                m_uiDespawnTimer = 60000;
+                DespawnTimer = 60000;
             }
         }
 
         void UpdateAI(const uint32 diff)
         {
             //timer should always be == 0 unless we already updated entry of creature. Then not expect this updated to ever be in combat.
-            if (m_uiDespawnTimer && m_uiDespawnTimer <= diff)
+            if (DespawnTimer && DespawnTimer <= diff)
             {
                 if (!me->getVictim() && me->isAlive())
                 {
@@ -156,7 +161,7 @@ public:
                     me->Respawn();
                     return;
                 }
-            } else m_uiDespawnTimer -= diff;
+            } else DespawnTimer -= diff;
 
             if (!UpdateVictim())
                 return;
@@ -167,104 +172,136 @@ public:
 
 };
 
-
-
-
 /*######
-## go_iruxos. Quest 5381
+## go_iruxos
+## Hand of Iruxos
 ######*/
+
+enum Iruxos
+{
+    QUEST_HAND_IRUXOS   = 5381,
+    NPC_DEMON_SPIRIT    = 11876,
+};
 
 class go_iruxos : public GameObjectScript
 {
-public:
-    go_iruxos() : GameObjectScript("go_iruxos") { }
+    public:
+        go_iruxos() : GameObjectScript("go_iruxos") { }
 
-    bool OnGossipHello(Player *pPlayer, GameObject* /*pGO*/)
-    {
-            if (pPlayer->GetQuestStatus(5381) == QUEST_STATUS_INCOMPLETE)
-                pPlayer->SummonCreature(11876, pPlayer->GetInnPosX(),pPlayer->GetInnPosY(),pPlayer->GetInnPosZ(),0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+        bool OnGossipHello(Player* player, GameObject* go)
+        {
+            if (player->GetQuestStatus(QUEST_HAND_IRUXOS) == QUEST_STATUS_INCOMPLETE && !go->FindNearestCreature(NPC_DEMON_SPIRIT, 25.0f, true))
+                player->SummonCreature(NPC_DEMON_SPIRIT, go->GetPositionX(), go->GetPositionY(), go->GetPositionZ(), 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
 
             return true;
-    }
-
+        }
 };
 
 /*######
 ## npc_dalinda_malem. Quest 1440
 ######*/
 
-#define QUEST_RETURN_TO_VAHLARRIEL     1440
+enum Dalinda
+{
+    QUEST_RETURN_TO_VAHLARRIEL      = 1440
+};
 
 class npc_dalinda : public CreatureScript
 {
 public:
     npc_dalinda() : CreatureScript("npc_dalinda") { }
 
-    bool OnQuestAccept(Player* pPlayer, Creature* pCreature, Quest const* quest)
+    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
     {
         if (quest->GetQuestId() == QUEST_RETURN_TO_VAHLARRIEL)
        {
-            if (npc_escortAI* pEscortAI = CAST_AI(npc_dalinda::npc_dalindaAI, pCreature->AI()))
+            if (npc_escortAI* pEscortAI = CAST_AI(npc_dalinda::npc_dalindaAI, creature->AI()))
             {
-                pEscortAI->Start(true, false, pPlayer->GetGUID());
-                pCreature->setFaction(113);
+                pEscortAI->Start(true, false, player->GetGUID());
+                creature->setFaction(113);
             }
         }
         return true;
     }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_dalindaAI(pCreature);
+        return new npc_dalindaAI(creature);
     }
 
     struct npc_dalindaAI : public npc_escortAI
     {
-        npc_dalindaAI(Creature* pCreature) : npc_escortAI(pCreature) { }
+        npc_dalindaAI(Creature* creature) : npc_escortAI(creature) { }
 
-        void WaypointReached(uint32 i)
+        void WaypointReached(uint32 waypointId)
         {
-            Player* pPlayer = GetPlayerForEscort();
-            switch (i)
+            Player* player = GetPlayerForEscort();
+
+            switch (waypointId)
             {
                 case 1:
                     me->IsStandState();
                     break;
                 case 15:
-                    if (pPlayer)
-                    pPlayer->GroupEventHappens(QUEST_RETURN_TO_VAHLARRIEL, me);
+                    if (player)
+                        player->GroupEventHappens(QUEST_RETURN_TO_VAHLARRIEL, me);
                     break;
             }
         }
 
-        void EnterCombat(Unit* /*pWho*/) { }
+        void EnterCombat(Unit* /*who*/) { }
 
         void Reset() {}
 
-        void JustDied(Unit* /*pKiller*/)
+        void JustDied(Unit* /*killer*/)
         {
-            Player* pPlayer = GetPlayerForEscort();
-            if (pPlayer)
-                pPlayer->FailQuest(QUEST_RETURN_TO_VAHLARRIEL);
+            if (Player* player = GetPlayerForEscort())
+                player->FailQuest(QUEST_RETURN_TO_VAHLARRIEL);
             return;
         }
 
-        void UpdateAI(const uint32 uiDiff)
+        void UpdateAI(const uint32 Diff)
         {
-            npc_escortAI::UpdateAI(uiDiff);
+            npc_escortAI::UpdateAI(Diff);
             if (!UpdateVictim())
                 return;
             DoMeleeAttackIfReady();
         }
     };
-
 };
 
+/*######
+## go_demon_portal
+######*/
 
+enum DemonPortal
+{
+    NPC_DEMON_GUARDIAN          = 11937,
+
+    QUEST_PORTAL_OF_THE_LEGION  = 5581,
+};
+
+class go_demon_portal : public GameObjectScript
+{
+    public:
+        go_demon_portal() : GameObjectScript("go_demon_portal") { }
+
+        bool OnGossipHello(Player* player, GameObject* go)
+        {
+            if (player->GetQuestStatus(QUEST_PORTAL_OF_THE_LEGION) == QUEST_STATUS_INCOMPLETE && !go->FindNearestCreature(NPC_DEMON_GUARDIAN, 5.0f, true))
+            {
+                if (Creature* guardian = player->SummonCreature(NPC_DEMON_GUARDIAN, go->GetPositionX(), go->GetPositionY(), go->GetPositionZ(), 0.0f, TEMPSUMMON_DEAD_DESPAWN, 0))
+                    guardian->AI()->AttackStart(player);
+            }
+
+            return true;
+        }
+};
 
 void AddSC_desolace()
 {
     new npc_aged_dying_ancient_kodo();
     new go_iruxos();
     new npc_dalinda();
+    new go_demon_portal();
 }

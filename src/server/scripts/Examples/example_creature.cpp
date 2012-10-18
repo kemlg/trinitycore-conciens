@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,17 +23,19 @@ SDComment: Short custom scripting example
 SDCategory: Script Examples
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
+#include "ScriptedGossip.h"
 
 // **** This script is designed as an example for others to build on ****
 // **** Please modify whatever you'd like to as this script is only for developement ****
 
-// **** Script Info ****
+// **** Script Info* ***
 // This script is written in a way that it can be used for both friendly and hostile monsters
 // Its primary purpose is to show just how much you can really do with scripts
 // I recommend trying it out on both an agressive NPC and on friendly npc
 
-// **** Quick Info ****
+// **** Quick Info* ***
 // Functions with Handled Function marked above them are functions that are called automatically by the core
 // Functions that are marked Custom Function are functions I've created to simplify code
 
@@ -88,11 +90,11 @@ class example_creature : public CreatureScript
 
         struct example_creatureAI : public ScriptedAI
         {
-            //*** HANDLED FUNCTION ***
+            // *** HANDLED FUNCTION ***
             //This is the constructor, called only once when the Creature is first created
-            example_creatureAI(Creature *c) : ScriptedAI(c) {}
+            example_creatureAI(Creature* creature) : ScriptedAI(creature) {}
 
-            //*** CUSTOM VARIABLES ****
+            // *** CUSTOM VARIABLES ****
             //These variables are for use only by this individual script.
             //Nothing else will ever call them but us.
 
@@ -105,61 +107,61 @@ class example_creature : public CreatureScript
             uint32 m_uiPhase;                                       // The current battle phase we are in
             uint32 m_uiPhaseTimer;                                  // Timer until phase transition
 
-            //*** HANDLED FUNCTION ***
+            // *** HANDLED FUNCTION ***
             //This is called after spawn and whenever the core decides we need to evade
             void Reset()
             {
                 m_uiPhase = 1;                                      // Start in phase 1
                 m_uiPhaseTimer = 60000;                             // 60 seconds
                 m_uiSpell1Timer = 5000;                             //  5 seconds
-                m_uiSpell2Timer = urand(10000,20000);               // between 10 and 20 seconds
+                m_uiSpell2Timer = urand(10000, 20000);               // between 10 and 20 seconds
                 m_uiSpell3Timer = 19000;                            // 19 seconds
                 m_uiBeserkTimer = 120000;                           //  2 minutes
 
                 me->RestoreFaction();
             }
 
-            //*** HANDLED FUNCTION ***
+            // *** HANDLED FUNCTION ***
             // Enter Combat called once per combat
-            void EnterCombat(Unit* pWho)
+            void EnterCombat(Unit* who)
             {
                 //Say some stuff
-                DoScriptText(SAY_AGGRO, me, pWho);
+                DoScriptText(SAY_AGGRO, me, who);
             }
 
-            //*** HANDLED FUNCTION ***
+            // *** HANDLED FUNCTION ***
             // Attack Start is called when victim change (including at start of combat)
-            // By default, attack pWho and start movement toward the victim.
-            //void AttackStart(Unit* pWho)
+            // By default, attack who and start movement toward the victim.
+            //void AttackStart(Unit* who)
             //{
-            //    ScriptedAI::AttackStart(pWho);
+            //    ScriptedAI::AttackStart(who);
             //}
 
-            //*** HANDLED FUNCTION ***
+            // *** HANDLED FUNCTION ***
             // Called when going out of combat. Reset is called just after.
             void EnterEvadeMode()
             {
                 DoScriptText(SAY_EVADE, me);
             }
 
-            //*** HANDLED FUNCTION ***
+            // *** HANDLED FUNCTION ***
             //Our Receive emote function
-            void ReceiveEmote(Player* /*pPlayer*/, uint32 uiTextEmote)
+            void ReceiveEmote(Player* /*player*/, uint32 uiTextEmote)
             {
                 me->HandleEmoteCommand(uiTextEmote);
 
-                switch(uiTextEmote)
+                switch (uiTextEmote)
                 {
-                    case TEXTEMOTE_DANCE:
+                    case TEXT_EMOTE_DANCE:
                         DoScriptText(SAY_DANCE, me);
                         break;
-                    case TEXTEMOTE_SALUTE:
+                    case TEXT_EMOTE_SALUTE:
                         DoScriptText(SAY_SALUTE, me);
                         break;
                 }
              }
 
-            //*** HANDLED FUNCTION ***
+            // *** HANDLED FUNCTION ***
             //Update AI is called Every single map update (roughly once every 50ms if a player is within the grid)
             void UpdateAI(const uint32 uiDiff)
             {
@@ -170,7 +172,7 @@ class example_creature : public CreatureScript
                     if (m_uiSayTimer <= uiDiff)
                     {
                         //Random switch between 5 outcomes
-                        DoScriptText(RAND(SAY_RANDOM_0,SAY_RANDOM_1,SAY_RANDOM_2,SAY_RANDOM_3,SAY_RANDOM_4), me);
+                        DoScriptText(RAND(SAY_RANDOM_0, SAY_RANDOM_1, SAY_RANDOM_2, SAY_RANDOM_3, SAY_RANDOM_4), me);
 
                         m_uiSayTimer = 45000;                      //Say something agian in 45 seconds
                     }
@@ -258,28 +260,28 @@ class example_creature : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* pCreature) const
+        CreatureAI* GetAI(Creature* creature) const
         {
-            return new example_creatureAI(pCreature);
+            return new example_creatureAI(creature);
         }
 
-        bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+        bool OnGossipHello(Player* player, Creature* creature)
         {
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
-            pPlayer->SEND_GOSSIP_MENU(907, pCreature->GetGUID());
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+            player->SEND_GOSSIP_MENU(907, creature->GetGUID());
 
             return true;
         }
 
-        bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 /*uiSender*/, uint32 uiAction)
+        bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
         {
-            pPlayer->PlayerTalkClass->ClearMenus();
-            if (uiAction == GOSSIP_ACTION_INFO_DEF+1)
+            player->PlayerTalkClass->ClearMenus();
+            if (action == GOSSIP_ACTION_INFO_DEF+1)
             {
-                pPlayer->CLOSE_GOSSIP_MENU();
+                player->CLOSE_GOSSIP_MENU();
                 //Set our faction to hostile towards all
-                pCreature->setFaction(FACTION_WORGEN);
-                pCreature->AI()->AttackStart(pPlayer);
+                creature->setFaction(FACTION_WORGEN);
+                creature->AI()->AttackStart(player);
             }
 
             return true;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,19 +15,20 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "naxxramas.h"
 
-#define SAY_AGGRO               RAND(-1533075,-1533076,-1533077)
+#define SAY_AGGRO               RAND(-1533075, -1533076, -1533077)
 #define SAY_SUMMON              -1533078
-#define SAY_SLAY                RAND(-1533079,-1533080)
+#define SAY_SLAY                RAND(-1533079, -1533080)
 #define SAY_DEATH               -1533081
 
 #define SOUND_DEATH      8848
 
-#define SPELL_CURSE_PLAGUEBRINGER       RAID_MODE(29213,54835)
-#define SPELL_BLINK                     RAND(29208,29209,29210,29211)
-#define SPELL_CRIPPLE                   RAID_MODE(29212,54814)
+#define SPELL_CURSE_PLAGUEBRINGER       RAID_MODE(29213, 54835)
+#define SPELL_BLINK                     RAND(29208, 29209, 29210, 29211)
+#define SPELL_CRIPPLE                   RAID_MODE(29212, 54814)
 #define SPELL_TELEPORT                  29216
 
 #define MOB_WARRIOR         16984
@@ -68,14 +69,14 @@ class boss_noth : public CreatureScript
 public:
     boss_noth() : CreatureScript("boss_noth") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_nothAI (pCreature);
+        return new boss_nothAI (creature);
     }
 
     struct boss_nothAI : public BossAI
     {
-        boss_nothAI(Creature *c) : BossAI(c, BOSS_NOTH) {}
+        boss_nothAI(Creature* creature) : BossAI(creature, BOSS_NOTH) {}
 
         uint32 waveCount, balconyCount;
 
@@ -86,7 +87,7 @@ public:
             _Reset();
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             _EnterCombat();
             DoScriptText(SAY_AGGRO, me);
@@ -106,8 +107,8 @@ public:
                 events.ScheduleEvent(EVENT_BALCONY, 110000);
                 events.ScheduleEvent(EVENT_CURSE, 10000+rand()%15000);
                 events.ScheduleEvent(EVENT_WARRIOR, 30000);
-                if (getDifficulty() == RAID_DIFFICULTY_25MAN_NORMAL)
-                    events.ScheduleEvent(EVENT_BLINK, 20000 + rand()%20000);
+                if (GetDifficulty() == RAID_DIFFICULTY_25MAN_NORMAL)
+                    events.ScheduleEvent(EVENT_BLINK, urand(20000, 40000));
             }
         }
 
@@ -117,14 +118,14 @@ public:
                 DoScriptText(SAY_SLAY, me);
         }
 
-        void JustSummoned(Creature *summon)
+        void JustSummoned(Creature* summon)
         {
             summons.Summon(summon);
             summon->setActive(true);
             summon->AI()->DoZoneInCombat();
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
             _JustDied();
             DoScriptText(SAY_DEATH, me);
@@ -149,15 +150,15 @@ public:
 
             while (uint32 eventId = events.ExecuteEvent())
             {
-                switch(eventId)
+                switch (eventId)
                 {
                     case EVENT_CURSE:
                         DoCastAOE(SPELL_CURSE_PLAGUEBRINGER);
-                        events.ScheduleEvent(EVENT_CURSE, 50000 + rand()%10000);
+                        events.ScheduleEvent(EVENT_CURSE, urand(50000, 60000));
                         return;
                     case EVENT_WARRIOR:
                         DoScriptText(SAY_SUMMON, me);
-                        SummonUndead(MOB_WARRIOR, RAID_MODE(2,3));
+                        SummonUndead(MOB_WARRIOR, RAID_MODE(2, 3));
                         events.ScheduleEvent(EVENT_WARRIOR, 30000);
                         return;
                     case EVENT_BLINK:
@@ -173,22 +174,22 @@ public:
                         me->RemoveAllAuras();
                         me->NearTeleportTo(TELE_X, TELE_Y, TELE_Z, TELE_O);
                         events.Reset();
-                        events.ScheduleEvent(EVENT_WAVE, 2000 + rand()%3000);
+                        events.ScheduleEvent(EVENT_WAVE, urand(2000, 5000));
                         waveCount = 0;
                         return;
                     case EVENT_WAVE:
                         DoScriptText(SAY_SUMMON, me);
-                        switch(balconyCount)
+                        switch (balconyCount)
                         {
-                            case 0: SummonUndead(MOB_CHAMPION, RAID_MODE(2,4)); break;
-                            case 1: SummonUndead(MOB_CHAMPION, RAID_MODE(1,2));
-                                    SummonUndead(MOB_GUARDIAN, RAID_MODE(1,2)); break;
-                            case 2: SummonUndead(MOB_GUARDIAN, RAID_MODE(2,4)); break;
-                            default:SummonUndead(MOB_CHAMPION, RAID_MODE(5,10));
-                                    SummonUndead(MOB_GUARDIAN, RAID_MODE(5,10));break;
+                            case 0: SummonUndead(MOB_CHAMPION, RAID_MODE(2, 4)); break;
+                            case 1: SummonUndead(MOB_CHAMPION, RAID_MODE(1, 2));
+                                    SummonUndead(MOB_GUARDIAN, RAID_MODE(1, 2)); break;
+                            case 2: SummonUndead(MOB_GUARDIAN, RAID_MODE(2, 4)); break;
+                            default:SummonUndead(MOB_CHAMPION, RAID_MODE(5, 10));
+                                    SummonUndead(MOB_GUARDIAN, RAID_MODE(5, 10));break;
                         }
                         ++waveCount;
-                        events.ScheduleEvent(waveCount < 2 ? EVENT_WAVE : EVENT_GROUND, 30000 + rand()%15000);
+                        events.ScheduleEvent(waveCount < 2 ? EVENT_WAVE : EVENT_GROUND, urand(30000, 45000));
                         return;
                     case EVENT_GROUND:
                     {
@@ -209,7 +210,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_noth()
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Zul'Gurub
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "zulgurub.h"
 
 #define SPELL_AMBUSH            24337
@@ -42,7 +43,7 @@ class boss_renataki : public CreatureScript
 
         struct boss_renatakiAI : public ScriptedAI
         {
-            boss_renatakiAI(Creature *c) : ScriptedAI(c) {}
+            boss_renatakiAI(Creature* creature) : ScriptedAI(creature) {}
 
             uint32 Invisible_Timer;
             uint32 Ambush_Timer;
@@ -55,17 +56,17 @@ class boss_renataki : public CreatureScript
 
             void Reset()
             {
-                Invisible_Timer = 8000 + rand()%10000;
+                Invisible_Timer = urand(8000, 18000);
                 Ambush_Timer = 3000;
                 Visible_Timer = 4000;
-                Aggro_Timer = 15000 + rand()%10000;
-                ThousandBlades_Timer = 4000 + rand()%4000;
+                Aggro_Timer = urand(15000, 25000);
+                ThousandBlades_Timer = urand(4000, 8000);
 
                 Invisible = false;
                 Ambushed = false;
             }
 
-            void EnterCombat(Unit * /*who*/)
+            void EnterCombat(Unit* /*who*/)
             {
             }
 
@@ -85,19 +86,19 @@ class boss_renataki : public CreatureScript
                     me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                     Invisible = true;
 
-                    Invisible_Timer = 15000 + rand()%15000;
+                    Invisible_Timer = urand(15000, 30000);
                 } else Invisible_Timer -= diff;
 
                 if (Invisible)
                 {
                     if (Ambush_Timer <= diff)
                     {
-                        Unit *pTarget = NULL;
-                        pTarget = SelectUnit(SELECT_TARGET_RANDOM,0);
-                        if (pTarget)
+                        Unit* target = NULL;
+                        target = SelectTarget(SELECT_TARGET_RANDOM, 0);
+                        if (target)
                         {
-                            DoTeleportTo(pTarget->GetPositionX(), pTarget->GetPositionY(), pTarget->GetPositionZ());
-                            DoCast(pTarget, SPELL_AMBUSH);
+                            DoTeleportTo(target->GetPositionX(), target->GetPositionY(), target->GetPositionZ());
+                            DoCast(target, SPELL_AMBUSH);
                         }
 
                         Ambushed = true;
@@ -126,25 +127,22 @@ class boss_renataki : public CreatureScript
                 {
                     if (Aggro_Timer <= diff)
                     {
-                        Unit *pTarget = NULL;
-                        pTarget = SelectUnit(SELECT_TARGET_RANDOM,1);
+                        Unit* target = NULL;
+                        target = SelectTarget(SELECT_TARGET_RANDOM, 1);
 
                         if (DoGetThreat(me->getVictim()))
-                            DoModifyThreatPercent(me->getVictim(),-50);
+                            DoModifyThreatPercent(me->getVictim(), -50);
 
-                        if (pTarget)
-                            AttackStart(pTarget);
+                        if (target)
+                            AttackStart(target);
 
-                        Aggro_Timer = 7000 + rand()%13000;
+                        Aggro_Timer = urand(7000, 20000);
                     } else Aggro_Timer -= diff;
-                }
 
-                if (!Invisible)
-                {
                     if (ThousandBlades_Timer <= diff)
                     {
                         DoCast(me->getVictim(), SPELL_THOUSANDBLADES);
-                        ThousandBlades_Timer = 7000 + rand()%5000;
+                        ThousandBlades_Timer = urand(7000, 12000);
                     } else ThousandBlades_Timer -= diff;
                 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -20,12 +20,9 @@
 #define TRINITY_FLEEINGMOVEMENTGENERATOR_H
 
 #include "MovementGenerator.h"
-#include "DestinationHolder.h"
-#include "Traveller.h"
 
 template<class T>
-class FleeingMovementGenerator
-: public MovementGeneratorMedium< T, FleeingMovementGenerator<T> >
+class FleeingMovementGenerator : public MovementGeneratorMedium< T, FleeingMovementGenerator<T> >
 {
     public:
         FleeingMovementGenerator(uint64 fright) : i_frightGUID(fright), i_nextCheckTime(0) {}
@@ -34,7 +31,6 @@ class FleeingMovementGenerator
         void Finalize(T &);
         void Reset(T &);
         bool Update(T &, const uint32 &);
-        bool GetDestination(float &x, float &y, float &z) const;
 
         MovementGeneratorType GetMovementGeneratorType() { return FLEEING_MOTION_TYPE; }
 
@@ -56,12 +52,9 @@ class FleeingMovementGenerator
         float i_cur_angle;
         uint64 i_frightGUID;
         TimeTracker i_nextCheckTime;
-
-        DestinationHolder< Traveller<T> > i_destinationHolder;
 };
 
-class TimedFleeingMovementGenerator
-: public FleeingMovementGenerator<Creature>
+class TimedFleeingMovementGenerator : public FleeingMovementGenerator<Creature>
 {
     public:
         TimedFleeingMovementGenerator(uint64 fright, uint32 time) :
@@ -69,7 +62,7 @@ class TimedFleeingMovementGenerator
             i_totalFleeTime(time) {}
 
         MovementGeneratorType GetMovementGeneratorType() { return TIMED_FLEEING_MOTION_TYPE; }
-        bool Update(Unit &, const uint32 &);
+        bool Update(Unit &, const uint32&);
         void Finalize(Unit &);
 
     private:
@@ -77,5 +70,4 @@ class TimedFleeingMovementGenerator
 };
 
 #endif
-
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2007 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,8 +23,8 @@ SDComment: Need some cosmetics updates when archeadas door are closing (Guardian
 SDCategory: Uldaman
 EndScriptData */
 
-
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "uldaman.h"
 
 enum eSpells
@@ -43,10 +43,9 @@ class instance_uldaman : public InstanceMapScript
 
         struct instance_uldaman_InstanceMapScript : public InstanceScript
         {
-            instance_uldaman_InstanceMapScript(Map* pMap) : InstanceScript(pMap)
+            instance_uldaman_InstanceMapScript(Map* map) : InstanceScript(map)
             {
-                Initialize();
-            };
+            }
 
             void Initialize()
             {
@@ -107,15 +106,15 @@ class instance_uldaman : public InstanceMapScript
                     case GO_ALTAR_OF_THE_KEEPER_TEMPLE_DOOR:         // lock the door
                         uiAltarOfTheKeeperTempleDoor = go->GetGUID();
 
-                        if(m_auiEncounter[0] == DONE)
-                           HandleGameObject(NULL, true, go);
+                        if (m_auiEncounter[0] == DONE)
+                           HandleGameObject(0, true, go);
                         break;
 
                     case GO_ARCHAEDAS_TEMPLE_DOOR:
                         uiArchaedasTempleDoor = go->GetGUID();
 
-                        if(m_auiEncounter[0] == DONE)
-                            HandleGameObject(NULL, true, go);
+                        if (m_auiEncounter[0] == DONE)
+                            HandleGameObject(0, true, go);
                         break;
 
                     case GO_ANCIENT_VAULT_DOOR:
@@ -123,15 +122,15 @@ class instance_uldaman : public InstanceMapScript
                         go->SetUInt32Value(GAMEOBJECT_FLAGS, 33);
                         uiAncientVaultDoor = go->GetGUID();
 
-                        if(m_auiEncounter[1] == DONE)
-                            HandleGameObject(NULL, true, go);
+                        if (m_auiEncounter[1] == DONE)
+                            HandleGameObject(0, true, go);
                         break;
 
                     case GO_IRONAYA_SEAL_DOOR:
                         uiIronayaSealDoor = go->GetGUID();
 
                         if (m_auiEncounter[2] == DONE)
-                            HandleGameObject(NULL, true, go);
+                            HandleGameObject(0, true, go);
                         break;
 
                     case GO_KEYSTONE:
@@ -139,7 +138,7 @@ class instance_uldaman : public InstanceMapScript
 
                         if (m_auiEncounter[2] == DONE)
                         {
-                            HandleGameObject(NULL, true, go);
+                            HandleGameObject(0, true, go);
                             go->SetUInt32Value(GAMEOBJECT_FLAGS, GO_FLAG_INTERACT_COND);
                         }
                         break;
@@ -150,7 +149,7 @@ class instance_uldaman : public InstanceMapScript
             {
                 creature->setFaction(35);
                 creature->RemoveAllAuras();
-                //creature->RemoveFlag (UNIT_FIELD_FLAGS,UNIT_FLAG_ANIMATION_FROZEN);
+                //creature->RemoveFlag (UNIT_FIELD_FLAGS, UNIT_FLAG_ANIMATION_FROZEN);
                 creature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                 creature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);
             }
@@ -167,7 +166,7 @@ class instance_uldaman : public InstanceMapScript
             void BlockGO(uint64 guid)
             {
                 GameObject* go = instance->GetGameObject(guid);
-                if(!go)
+                if (!go)
                     return;
 
                 go->SetUInt32Value(GAMEOBJECT_FLAGS, GO_FLAG_INTERACT_COND);
@@ -177,17 +176,17 @@ class instance_uldaman : public InstanceMapScript
             {
                 for (std::vector<uint64>::const_iterator i = vStoneKeeper.begin(); i != vStoneKeeper.end(); ++i)
                 {
-                    Creature* pTarget = instance->GetCreature(*i);
-                    if (!pTarget || !pTarget->isAlive() || pTarget->getFaction() == 14)
+                    Creature* target = instance->GetCreature(*i);
+                    if (!target || !target->isAlive() || target->getFaction() == 14)
                         continue;
-                    pTarget->RemoveFlag(UNIT_FIELD_FLAGS,UNIT_FLAG_DISABLE_MOVE);
-                    pTarget->setFaction(14);
-                    pTarget->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                    target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);
+                    target->setFaction(14);
+                    target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                     return;        // only want the first one we find
                 }
                 // if we get this far than all four are dead so open the door
-                SetData (DATA_ALTAR_DOORS, DONE);
-                SetDoor (uiArchaedasTempleDoor, true); //open next the door too
+                SetData(DATA_ALTAR_DOORS, DONE);
+                SetDoor(uiArchaedasTempleDoor, true); //open next the door too
             }
 
             void ActivateWallMinions()
@@ -198,11 +197,11 @@ class instance_uldaman : public InstanceMapScript
 
                 for (std::vector<uint64>::const_iterator i = vArchaedasWallMinions.begin(); i != vArchaedasWallMinions.end(); ++i)
                 {
-                    Creature* pTarget = instance->GetCreature(*i);
-                    if (!pTarget || !pTarget->isAlive() || pTarget->getFaction() == 14)
+                    Creature* target = instance->GetCreature(*i);
+                    if (!target || !target->isAlive() || target->getFaction() == 14)
                         continue;
-                    archaedas->CastSpell(pTarget, SPELL_AWAKEN_VAULT_WALKER, true);
-                    pTarget->CastSpell(pTarget, SPELL_ARCHAEDAS_AWAKEN,true);
+                    archaedas->CastSpell(target, SPELL_AWAKEN_VAULT_WALKER, true);
+                    target->CastSpell(target, SPELL_ARCHAEDAS_AWAKEN, true);
                     return;        // only want the first one we find
                 }
             }
@@ -213,31 +212,31 @@ class instance_uldaman : public InstanceMapScript
                 // first despawn any aggroed wall minions
                 for (std::vector<uint64>::const_iterator i = vArchaedasWallMinions.begin(); i != vArchaedasWallMinions.end(); ++i)
                 {
-                    Creature* pTarget = instance->GetCreature(*i);
-                    if (!pTarget || pTarget->isDead() || pTarget->getFaction() != 14)
+                    Creature* target = instance->GetCreature(*i);
+                    if (!target || target->isDead() || target->getFaction() != 14)
                         continue;
-                    pTarget->setDeathState(JUST_DIED);
-                    pTarget->RemoveCorpse();
+                    target->setDeathState(JUST_DIED);
+                    target->RemoveCorpse();
                 }
 
                 // Vault Walkers
                 for (std::vector<uint64>::const_iterator i = vVaultWalker.begin(); i != vVaultWalker.end(); ++i)
                 {
-                    Creature* pTarget = instance->GetCreature(*i);
-                    if (!pTarget || pTarget->isDead() || pTarget->getFaction() != 14)
+                    Creature* target = instance->GetCreature(*i);
+                    if (!target || target->isDead() || target->getFaction() != 14)
                         continue;
-                    pTarget->setDeathState(JUST_DIED);
-                    pTarget->RemoveCorpse();
+                    target->setDeathState(JUST_DIED);
+                    target->RemoveCorpse();
                 }
 
                 // Earthen Guardians
                 for (std::vector<uint64>::const_iterator i = vEarthenGuardian.begin(); i != vEarthenGuardian.end(); ++i)
                 {
-                    Creature* pTarget = instance->GetCreature(*i);
-                    if (!pTarget || pTarget->isDead() || pTarget->getFaction() != 14)
+                    Creature* target = instance->GetCreature(*i);
+                    if (!target || target->isDead() || target->getFaction() != 14)
                         continue;
-                    pTarget->setDeathState(JUST_DIED);
-                    pTarget->RemoveCorpse();
+                    target->setDeathState(JUST_DIED);
+                    target->RemoveCorpse();
                 }
             }
 
@@ -249,7 +248,7 @@ class instance_uldaman : public InstanceMapScript
 
                 if (Unit::GetUnit(*archaedas, target))
                 {
-                    archaedas->CastSpell(archaedas, SPELL_ARCHAEDAS_AWAKEN,false);
+                    archaedas->CastSpell(archaedas, SPELL_ARCHAEDAS_AWAKEN, false);
                     uiWhoWokeuiArchaedasGUID = target;
                 }
             }
@@ -257,11 +256,11 @@ class instance_uldaman : public InstanceMapScript
             void ActivateIronaya()
             {
                 Creature* ironaya = instance->GetCreature(uiIronayaGUID);
-                if(!ironaya)
+                if (!ironaya)
                     return;
 
                 ironaya->setFaction(415);
-                ironaya->RemoveFlag(UNIT_FIELD_FLAGS,UNIT_FLAG_DISABLE_MOVE);
+                ironaya->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);
                 ironaya->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
             }
 
@@ -270,36 +269,36 @@ class instance_uldaman : public InstanceMapScript
                 // first respawn any aggroed wall minions
                 for (std::vector<uint64>::const_iterator i = vArchaedasWallMinions.begin(); i != vArchaedasWallMinions.end(); ++i)
                 {
-                    Creature* pTarget = instance->GetCreature(*i);
-                    if (pTarget && pTarget->isDead())
+                    Creature* target = instance->GetCreature(*i);
+                    if (target && target->isDead())
                     {
-                        pTarget->Respawn();
-                        pTarget->GetMotionMaster()->MoveTargetedHome();
-                        SetFrozenState(pTarget);
+                        target->Respawn();
+                        target->GetMotionMaster()->MoveTargetedHome();
+                        SetFrozenState(target);
                     }
                 }
 
                 // Vault Walkers
                 for (std::vector<uint64>::const_iterator i = vVaultWalker.begin(); i != vVaultWalker.end(); ++i)
                 {
-                    Creature* pTarget = instance->GetCreature(*i);
-                    if (pTarget && pTarget->isDead())
+                    Creature* target = instance->GetCreature(*i);
+                    if (target && target->isDead())
                     {
-                        pTarget->Respawn();
-                        pTarget->GetMotionMaster()->MoveTargetedHome();
-                        SetFrozenState(pTarget);
+                        target->Respawn();
+                        target->GetMotionMaster()->MoveTargetedHome();
+                        SetFrozenState(target);
                     }
                 }
 
                 // Earthen Guardians
                 for (std::vector<uint64>::const_iterator i = vEarthenGuardian.begin(); i != vEarthenGuardian.end(); ++i)
                 {
-                    Creature* pTarget = instance->GetCreature(*i);
-                    if (pTarget && pTarget->isDead())
+                    Creature* target = instance->GetCreature(*i);
+                    if (target && target->isDead())
                     {
-                        pTarget->Respawn();
-                        pTarget->GetMotionMaster()->MoveTargetedHome();
-                        SetFrozenState(pTarget);
+                        target->Respawn();
+                        target->GetMotionMaster()->MoveTargetedHome();
+                        SetFrozenState(target);
                     }
                 }
             }
@@ -308,7 +307,7 @@ class instance_uldaman : public InstanceMapScript
                 if (!bKeystoneCheck)
                     return;
 
-                if(uiIronayaSealDoorTimer <= diff)
+                if (uiIronayaSealDoorTimer <= diff)
                 {
                     ActivateIronaya();
 
@@ -322,19 +321,19 @@ class instance_uldaman : public InstanceMapScript
                     uiIronayaSealDoorTimer -= diff;
             }
 
-            void SetData (uint32 type, uint32 data)
+            void SetData(uint32 type, uint32 data)
             {
-                switch(type)
+                switch (type)
                 {
                     case DATA_ALTAR_DOORS:
                         m_auiEncounter[0] = data;
-                        if(data == DONE)
+                        if (data == DONE)
                             SetDoor(uiAltarOfTheKeeperTempleDoor, true);
                         break;
 
                     case DATA_ANCIENT_DOOR:
                         m_auiEncounter[1] = data;
-                        if(data == DONE) //archeadas defeat
+                        if (data == DONE) //archeadas defeat
                         {
                             SetDoor(uiArchaedasTempleDoor, true); //re open enter door
                             SetDoor(uiAncientVaultDoor, true);
@@ -350,7 +349,7 @@ class instance_uldaman : public InstanceMapScript
                         break;
 
                     case DATA_MINIONS:
-                        switch(data)
+                        switch (data)
                         {
                             case NOT_STARTED:
                                 if (m_auiEncounter[0] == DONE) //if players opened the doors
@@ -379,7 +378,7 @@ class instance_uldaman : public InstanceMapScript
                     OUT_SAVE_INST_DATA;
 
                     std::ostringstream saveStream;
-                    saveStream << m_auiEncounter[0] << " " << m_auiEncounter[1] << " " << m_auiEncounter[2];
+                    saveStream << m_auiEncounter[0] << ' ' << m_auiEncounter[1] << ' ' << m_auiEncounter[2];
 
                     str_data = saveStream.str();
 
@@ -388,7 +387,7 @@ class instance_uldaman : public InstanceMapScript
                 }
             }
 
-            void SetData64 (uint32 type, uint64 data)
+            void SetData64(uint32 type, uint64 data)
             {
                 // Archaedas
                 if (type == 0)
@@ -427,7 +426,8 @@ class instance_uldaman : public InstanceMapScript
 
             void OnCreatureCreate(Creature* creature)
             {
-                switch (creature->GetEntry()) {
+                switch (creature->GetEntry())
+                {
                     case 4857:    // Stone Keeper
                         SetFrozenState (creature);
                         vStoneKeeper.push_back(creature->GetGUID());
@@ -448,7 +448,7 @@ class instance_uldaman : public InstanceMapScript
                     case 7228:    // Ironaya
                         uiIronayaGUID = creature->GetGUID();
 
-                        if(m_auiEncounter[2] != DONE)
+                        if (m_auiEncounter[2] != DONE)
                             SetFrozenState (creature);
                         break;
 
@@ -460,10 +460,10 @@ class instance_uldaman : public InstanceMapScript
                         uiArchaedasGUID = creature->GetGUID();
                         break;
 
-                } // end switch
-            } // end OnCreatureCreate
+                }
+            }
 
-            uint64 GetData64 (uint32 identifier)
+            uint64 GetData64(uint32 identifier)
             {
                 if (identifier == 0) return uiWhoWokeuiArchaedasGUID;
                 if (identifier == 1) return vVaultWalker[0];    // VaultWalker1
@@ -482,9 +482,9 @@ class instance_uldaman : public InstanceMapScript
             } // end GetData64
         };
 
-        InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+        InstanceScript* GetInstanceScript(InstanceMap* map) const
         {
-            return new instance_uldaman_InstanceMapScript(pMap);
+            return new instance_uldaman_InstanceMapScript(map);
         }
 };
 

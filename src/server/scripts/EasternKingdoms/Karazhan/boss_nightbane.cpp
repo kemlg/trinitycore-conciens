@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: SDComment: Timers may incorrect
 SDCategory: Karazhan
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "karazhan.h"
 
 //phase 1
@@ -48,14 +49,14 @@ EndScriptData */
 
 float IntroWay[8][3] =
 {
-    {-11053.37f,-1794.48f,149.00f},
-    {-11141.07f,-1841.40f,125.00f},
-    {-11187.28f,-1890.23f,125.00f},
-    {-11189.20f,-1931.25f,125.00f},
-    {-11153.76f,-1948.93f,125.00f},
-    {-11128.73f,-1929.75f,125.00f},
-    {-11140.00f,-1915.00f,122.00f},
-    {-11163.00f,-1903.00f,91.473f}
+    {-11053.37f, -1794.48f, 149.00f},
+    {-11141.07f, -1841.40f, 125.00f},
+    {-11187.28f, -1890.23f, 125.00f},
+    {-11189.20f, -1931.25f, 125.00f},
+    {-11153.76f, -1948.93f, 125.00f},
+    {-11128.73f, -1929.75f, 125.00f},
+    {-11140.00f, -1915.00f, 122.00f},
+    {-11163.00f, -1903.00f, 91.473f}
 };
 
 class boss_nightbane : public CreatureScript
@@ -63,20 +64,20 @@ class boss_nightbane : public CreatureScript
 public:
     boss_nightbane() : CreatureScript("boss_nightbane") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_nightbaneAI (pCreature);
+        return new boss_nightbaneAI (creature);
     }
 
     struct boss_nightbaneAI : public ScriptedAI
     {
-        boss_nightbaneAI(Creature* c) : ScriptedAI(c)
+        boss_nightbaneAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
             Intro = true;
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 Phase;
 
@@ -121,16 +122,16 @@ public:
             MovePhase = 0;
 
             me->SetSpeed(MOVE_RUN, 2.0f);
-            me->AddUnitMovementFlag(MOVEMENTFLAG_LEVITATING);
-            me->RemoveUnitMovementFlag(MOVEMENTFLAG_WALKING);
+            me->SetDisableGravity(true);
+            me->SetWalk(false);
             me->setActive(true);
 
-            if (pInstance)
+            if (instance)
             {
-                if (pInstance->GetData(TYPE_NIGHTBANE) == DONE || pInstance->GetData(TYPE_NIGHTBANE) == IN_PROGRESS)
+                if (instance->GetData(TYPE_NIGHTBANE) == DONE || instance->GetData(TYPE_NIGHTBANE) == IN_PROGRESS)
                     me->DisappearAndDie();
                 else
-                    pInstance->SetData(TYPE_NIGHTBANE, NOT_STARTED);
+                    instance->SetData(TYPE_NIGHTBANE, NOT_STARTED);
             }
 
             HandleTerraceDoors(true);
@@ -140,27 +141,27 @@ public:
 
             if (!Intro)
             {
-                me->SetHomePosition(IntroWay[7][0],IntroWay[7][1],IntroWay[7][2],0);
+                me->SetHomePosition(IntroWay[7][0], IntroWay[7][1], IntroWay[7][2], 0);
                 me->GetMotionMaster()->MoveTargetedHome();
             }
         }
 
         void HandleTerraceDoors(bool open)
         {
-            if (pInstance)
+            if (instance)
             {
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_MASTERS_TERRACE_DOOR_1), open);
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_MASTERS_TERRACE_DOOR_2), open);
+                instance->HandleGameObject(instance->GetData64(DATA_MASTERS_TERRACE_DOOR_1), open);
+                instance->HandleGameObject(instance->GetData64(DATA_MASTERS_TERRACE_DOOR_2), open);
             }
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
-            if (pInstance)
-                pInstance->SetData(TYPE_NIGHTBANE, IN_PROGRESS);
+            if (instance)
+                instance->SetData(TYPE_NIGHTBANE, IN_PROGRESS);
 
             HandleTerraceDoors(false);
-            me->MonsterYell(YELL_AGGRO, LANG_UNIVERSAL, NULL);
+            me->MonsterYell(YELL_AGGRO, LANG_UNIVERSAL, 0);
         }
 
         void AttackStart(Unit* who)
@@ -171,13 +172,13 @@ public:
 
         void JustDied(Unit* /*killer*/)
         {
-            if (pInstance)
-                pInstance->SetData(TYPE_NIGHTBANE, DONE);
+            if (instance)
+                instance->SetData(TYPE_NIGHTBANE, DONE);
 
             HandleTerraceDoors(true);
         }
 
-        void MoveInLineOfSight(Unit *who)
+        void MoveInLineOfSight(Unit* who)
         {
             if (!Intro && !Flying)
                 ScriptedAI::MoveInLineOfSight(who);
@@ -186,14 +187,14 @@ public:
         void MovementInform(uint32 type, uint32 id)
         {
             if (type != POINT_MOTION_TYPE)
-                    return;
+                return;
 
             if (Intro)
             {
                 if (id >= 8)
                 {
                     Intro = false;
-                    me->SetHomePosition(IntroWay[7][0],IntroWay[7][1],IntroWay[7][2],0);
+                    me->SetHomePosition(IntroWay[7][0], IntroWay[7][1], IntroWay[7][2], 0);
                     return;
                 }
 
@@ -229,24 +230,24 @@ public:
             }
         }
 
-        void JustSummoned(Creature *summoned)
+        void JustSummoned(Creature* summoned)
         {
             summoned->AI()->AttackStart(me->getVictim());
         }
 
         void TakeOff()
         {
-            me->MonsterYell(YELL_FLY_PHASE, LANG_UNIVERSAL, NULL);
+            me->MonsterYell(YELL_FLY_PHASE, LANG_UNIVERSAL, 0);
 
             me->InterruptSpell(CURRENT_GENERIC_SPELL);
             me->HandleEmoteCommand(EMOTE_ONESHOT_LIFTOFF);
-            me->AddUnitMovementFlag(MOVEMENTFLAG_LEVITATING);
+            me->SetDisableGravity(true);
             (*me).GetMotionMaster()->Clear(false);
-            (*me).GetMotionMaster()->MovePoint(0,IntroWay[2][0],IntroWay[2][1],IntroWay[2][2]);
+            (*me).GetMotionMaster()->MovePoint(0, IntroWay[2][0], IntroWay[2][1], IntroWay[2][2]);
 
             Flying = true;
 
-            FlyTimer = urand(45000,60000); //timer wrong between 45 and 60 seconds
+            FlyTimer = urand(45000, 60000); //timer wrong between 45 and 60 seconds
             ++FlyCount;
 
             RainofBonesTimer = 5000; //timer wrong (maybe)
@@ -263,13 +264,13 @@ public:
                 {
                     if (MovePhase >= 7)
                     {
-                        me->RemoveUnitMovementFlag(MOVEMENTFLAG_LEVITATING);
+                        me->SetLevitate(false);
                         me->HandleEmoteCommand(EMOTE_ONESHOT_LAND);
-                        me->GetMotionMaster()->MovePoint(8,IntroWay[7][0],IntroWay[7][1],IntroWay[7][2]);
+                        me->GetMotionMaster()->MovePoint(8, IntroWay[7][0], IntroWay[7][1], IntroWay[7][2]);
                     }
                     else
                     {
-                        me->GetMotionMaster()->MovePoint(MovePhase,IntroWay[MovePhase][0],IntroWay[MovePhase][1],IntroWay[MovePhase][2]);
+                        me->GetMotionMaster()->MovePoint(MovePhase, IntroWay[MovePhase][0], IntroWay[MovePhase][1], IntroWay[MovePhase][2]);
                         ++MovePhase;
                     }
                 }
@@ -277,13 +278,13 @@ public:
                 {
                     if (MovePhase >= 7)
                     {
-                        me->RemoveUnitMovementFlag(MOVEMENTFLAG_LEVITATING);
+                        me->SetLevitate(false);
                         me->HandleEmoteCommand(EMOTE_ONESHOT_LAND);
-                        me->GetMotionMaster()->MovePoint(8,IntroWay[7][0],IntroWay[7][1],IntroWay[7][2]);
+                        me->GetMotionMaster()->MovePoint(8, IntroWay[7][0], IntroWay[7][1], IntroWay[7][2]);
                     }
                     else
                     {
-                        me->GetMotionMaster()->MovePoint(MovePhase,IntroWay[MovePhase][0],IntroWay[MovePhase][1],IntroWay[MovePhase][2]);
+                        me->GetMotionMaster()->MovePoint(MovePhase, IntroWay[MovePhase][0], IntroWay[MovePhase][1], IntroWay[MovePhase][2]);
                         ++MovePhase;
                     }
                 }
@@ -310,7 +311,7 @@ public:
                 if (BellowingRoarTimer <= diff)
                 {
                     DoCast(me->getVictim(), SPELL_BELLOWING_ROAR);
-                    BellowingRoarTimer = urand(30000,40000);
+                    BellowingRoarTimer = urand(30000, 40000);
                 } else BellowingRoarTimer -= diff;
 
                 if (SmolderingBreathTimer <= diff)
@@ -321,23 +322,23 @@ public:
 
                 if (CharredEarthTimer <= diff)
                 {
-                    if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                        DoCast(pTarget, SPELL_CHARRED_EARTH);
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                        DoCast(target, SPELL_CHARRED_EARTH);
                     CharredEarthTimer = 20000;
                 } else CharredEarthTimer -= diff;
 
                 if (TailSweepTimer <= diff)
                 {
-                    if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                        if (!me->HasInArc(M_PI, pTarget))
-                            DoCast(pTarget, SPELL_TAIL_SWEEP);
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                        if (!me->HasInArc(M_PI, target))
+                            DoCast(target, SPELL_TAIL_SWEEP);
                     TailSweepTimer = 15000;
                 } else TailSweepTimer -= diff;
 
                 if (SearingCindersTimer <= diff)
                 {
-                    if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                        DoCast(pTarget, SPELL_SEARING_CINDERS);
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                        DoCast(target, SPELL_SEARING_CINDERS);
                     SearingCindersTimer = 10000;
                 } else SearingCindersTimer -= diff;
 
@@ -378,8 +379,8 @@ public:
 
                     if (DistractingAshTimer <= diff)
                     {
-                        if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                            DoCast(pTarget, SPELL_DISTRACTING_ASH);
+                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                            DoCast(target, SPELL_DISTRACTING_ASH);
                         DistractingAshTimer = 2000; //timer wrong
                     } else DistractingAshTimer -= diff;
                 }
@@ -395,17 +396,17 @@ public:
 
                 if (FireballBarrageTimer <= diff)
                 {
-                    if (Unit *pTarget = SelectUnit(SELECT_TARGET_FARTHEST, 0))
-                        DoCast(pTarget, SPELL_FIREBALL_BARRAGE);
+                    if (Unit* target = SelectTarget(SELECT_TARGET_FARTHEST, 0))
+                        DoCast(target, SPELL_FIREBALL_BARRAGE);
                     FireballBarrageTimer = 20000;
                 } else FireballBarrageTimer -= diff;
 
                 if (FlyTimer <= diff) //landing
                 {
-                    me->MonsterYell(RAND(*YELL_LAND_PHASE_1,*YELL_LAND_PHASE_2), LANG_UNIVERSAL, NULL);
+                    me->MonsterYell(RAND(*YELL_LAND_PHASE_1, *YELL_LAND_PHASE_2), LANG_UNIVERSAL, 0);
 
                     me->GetMotionMaster()->Clear(false);
-                    me->GetMotionMaster()->MovePoint(3,IntroWay[3][0],IntroWay[3][1],IntroWay[3][2]);
+                    me->GetMotionMaster()->MovePoint(3, IntroWay[3][0], IntroWay[3][1], IntroWay[3][2]);
 
                     Flying = true;
                 } else FlyTimer -= diff;
@@ -414,7 +415,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_nightbane()
 {

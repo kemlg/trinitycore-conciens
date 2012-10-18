@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Some details and adjustments left to do, probably nothing major. Spaw
 SDCategory: Coilfang Resevoir, Serpent Shrine Cavern
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "serpent_shrine.h"
 
 #define SAY_AGGRO                   -1548000
@@ -81,19 +82,19 @@ class boss_hydross_the_unstable : public CreatureScript
 public:
     boss_hydross_the_unstable() : CreatureScript("boss_hydross_the_unstable") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_hydross_the_unstableAI (pCreature);
+        return new boss_hydross_the_unstableAI (creature);
     }
 
     struct boss_hydross_the_unstableAI : public ScriptedAI
     {
-        boss_hydross_the_unstableAI(Creature *c) : ScriptedAI(c), Summons(me)
+        boss_hydross_the_unstableAI(Creature* creature) : ScriptedAI(creature), Summons(me)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint64 beams[2];
         uint32 PosCheck_Timer;
@@ -129,26 +130,26 @@ public:
 
             me->SetDisplayId(MODEL_CLEAN);
 
-            if (pInstance)
-                pInstance->SetData(DATA_HYDROSSTHEUNSTABLEEVENT, NOT_STARTED);
+            if (instance)
+                instance->SetData(DATA_HYDROSSTHEUNSTABLEEVENT, NOT_STARTED);
             beam = false;
             Summons.DespawnAll();
         }
 
         void SummonBeams()
         {
-            Creature* beamer = me->SummonCreature(ENTRY_BEAM_DUMMY,-258.333f,-356.34f,22.0499f,5.90835f,TEMPSUMMON_CORPSE_DESPAWN,0);
+            Creature* beamer = me->SummonCreature(ENTRY_BEAM_DUMMY, -258.333f, -356.34f, 22.0499f, 5.90835f, TEMPSUMMON_CORPSE_DESPAWN, 0);
             if (beamer)
             {
-                beamer->CastSpell(me,SPELL_BLUE_BEAM,true);
+                beamer->CastSpell(me, SPELL_BLUE_BEAM, true);
                 beamer->SetDisplayId(11686);  //invisible
                 beamer->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                 beams[0]=beamer->GetGUID();
             }
-            beamer = me->SummonCreature(ENTRY_BEAM_DUMMY,-219.918f,-371.308f,22.0042f,2.73072f,TEMPSUMMON_CORPSE_DESPAWN,0);
+            beamer = me->SummonCreature(ENTRY_BEAM_DUMMY, -219.918f, -371.308f, 22.0042f, 2.73072f, TEMPSUMMON_CORPSE_DESPAWN, 0);
             if (beamer)
             {
-                beamer->CastSpell(me,SPELL_BLUE_BEAM,true);
+                beamer->CastSpell(me, SPELL_BLUE_BEAM, true);
                 beamer->SetDisplayId(11686);  //invisible
                 beamer->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                 beams[1]=beamer->GetGUID();
@@ -158,7 +159,7 @@ public:
         {
             for (uint8 i=0; i<2; ++i)
             {
-                Creature* mob = Unit::GetCreature(*me,beams[i]);
+                Creature* mob = Unit::GetCreature(*me, beams[i]);
                 if (mob)
                 {
                     mob->setDeathState(DEAD);
@@ -166,24 +167,20 @@ public:
                 }
             }
         }
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
 
-            if (pInstance)
-                pInstance->SetData(DATA_HYDROSSTHEUNSTABLEEVENT, IN_PROGRESS);
+            if (instance)
+                instance->SetData(DATA_HYDROSSTHEUNSTABLEEVENT, IN_PROGRESS);
         }
 
-        void KilledUnit(Unit * /*victim*/)
+        void KilledUnit(Unit* /*victim*/)
         {
             if (CorruptedForm)
-            {
-                DoScriptText(RAND(SAY_CORRUPT_SLAY1,SAY_CORRUPT_SLAY2), me);
-            }
+                DoScriptText(RAND(SAY_CORRUPT_SLAY1, SAY_CORRUPT_SLAY2), me);
             else
-            {
-                DoScriptText(RAND(SAY_CLEAN_SLAY1,SAY_CLEAN_SLAY2), me);
-            }
+                DoScriptText(RAND(SAY_CLEAN_SLAY1, SAY_CLEAN_SLAY2), me);
         }
 
         void JustSummoned(Creature* summoned)
@@ -191,31 +188,31 @@ public:
             if (summoned->GetEntry() == ENTRY_PURE_SPAWN)
             {
                 summoned->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_FROST, true);
-                summoned->CastSpell(summoned,SPELL_ELEMENTAL_SPAWNIN,true);
+                summoned->CastSpell(summoned, SPELL_ELEMENTAL_SPAWNIN, true);
                 Summons.Summon(summoned);
             }
             if (summoned->GetEntry() == ENTRY_TAINTED_SPAWN)
             {
                 summoned->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_NATURE, true);
-                summoned->CastSpell(summoned,SPELL_ELEMENTAL_SPAWNIN,true);
+                summoned->CastSpell(summoned, SPELL_ELEMENTAL_SPAWNIN, true);
                 Summons.Summon(summoned);
             }
         }
 
-        void SummonedCreatureDespawn(Creature *summon)
+        void SummonedCreatureDespawn(Creature* summon)
         {
             Summons.Despawn(summon);
         }
 
-        void JustDied(Unit * /*victim*/)
+        void JustDied(Unit* /*killer*/)
         {
             if (CorruptedForm)
                 DoScriptText(SAY_CORRUPT_DEATH, me);
             else
                 DoScriptText(SAY_CLEAN_DEATH, me);
 
-            if (pInstance)
-                pInstance->SetData(DATA_HYDROSSTHEUNSTABLEEVENT, DONE);
+            if (instance)
+                instance->SetData(DATA_HYDROSSTHEUNSTABLEEVENT, DONE);
             Summons.DespawnAll();
         }
 
@@ -242,12 +239,29 @@ public:
 
                         switch (MarkOfCorruption_Count)
                         {
-                            case 0: mark_spell = SPELL_MARK_OF_CORRUPTION1; break;
-                            case 1: mark_spell = SPELL_MARK_OF_CORRUPTION2; break;
-                            case 2: mark_spell = SPELL_MARK_OF_CORRUPTION3; break;
-                            case 3: mark_spell = SPELL_MARK_OF_CORRUPTION4; break;
-                            case 4: mark_spell = SPELL_MARK_OF_CORRUPTION5; break;
-                            case 5: mark_spell = SPELL_MARK_OF_CORRUPTION6; break;
+                            case 0:
+                                mark_spell = SPELL_MARK_OF_CORRUPTION1;
+                                break;
+
+                            case 1:
+                                mark_spell = SPELL_MARK_OF_CORRUPTION2;
+                                break;
+
+                            case 2:
+                                mark_spell = SPELL_MARK_OF_CORRUPTION3;
+                                break;
+
+                            case 3:
+                                mark_spell = SPELL_MARK_OF_CORRUPTION4;
+                                break;
+
+                            case 4:
+                                mark_spell = SPELL_MARK_OF_CORRUPTION5;
+                                break;
+
+                            case 5:
+                                mark_spell = SPELL_MARK_OF_CORRUPTION6;
+                                break;
                         }
 
                         DoCast(me->getVictim(), mark_spell);
@@ -262,9 +276,9 @@ public:
                 //VileSludge_Timer
                 if (VileSludge_Timer <= diff)
                 {
-                    Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0);
-                    if (pTarget)
-                        DoCast(pTarget, SPELL_VILE_SLUDGE);
+                    Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0);
+                    if (target)
+                        DoCast(target, SPELL_VILE_SLUDGE);
 
                     VileSludge_Timer = 15000;
                 } else VileSludge_Timer -= diff;
@@ -305,16 +319,33 @@ public:
                 {
                     if (MarkOfHydross_Count <= 5)
                     {
-                        uint32 mark_spell = NULL;
+                        uint32 mark_spell = 0;
 
-                        switch(MarkOfHydross_Count)
+                        switch (MarkOfHydross_Count)
                         {
-                            case 0:  mark_spell = SPELL_MARK_OF_HYDROSS1; break;
-                            case 1:  mark_spell = SPELL_MARK_OF_HYDROSS2; break;
-                            case 2:  mark_spell = SPELL_MARK_OF_HYDROSS3; break;
-                            case 3:  mark_spell = SPELL_MARK_OF_HYDROSS4; break;
-                            case 4:  mark_spell = SPELL_MARK_OF_HYDROSS5; break;
-                            case 5:  mark_spell = SPELL_MARK_OF_HYDROSS6; break;
+                            case 0:
+                                mark_spell = SPELL_MARK_OF_HYDROSS1;
+                                break;
+
+                            case 1:
+                                mark_spell = SPELL_MARK_OF_HYDROSS2;
+                                break;
+
+                            case 2:
+                                mark_spell = SPELL_MARK_OF_HYDROSS3;
+                                break;
+
+                            case 3:
+                                mark_spell = SPELL_MARK_OF_HYDROSS4;
+                                break;
+
+                            case 4:
+                                mark_spell = SPELL_MARK_OF_HYDROSS5;
+                                break;
+
+                            case 5:
+                                mark_spell = SPELL_MARK_OF_HYDROSS6;
+                                break;
                         }
 
                         DoCast(me->getVictim(), mark_spell);
@@ -329,9 +360,9 @@ public:
                 //WaterTomb_Timer
                 if (WaterTomb_Timer <= diff)
                 {
-                    Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true);
-                    if (pTarget)
-                        DoCast(pTarget, SPELL_WATER_TOMB);
+                    Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true);
+                    if (target)
+                        DoCast(target, SPELL_WATER_TOMB);
 
                     WaterTomb_Timer = 7000;
                 } else WaterTomb_Timer -= diff;
@@ -375,7 +406,6 @@ public:
             DoMeleeAttackIfReady();
         }
     };
-
 };
 
 void AddSC_boss_hydross_the_unstable()

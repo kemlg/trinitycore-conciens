@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -37,7 +37,8 @@ enum Data64
     DATA_MOORABI_STATUE,
     DATA_DRAKKARI_COLOSSUS_STATUE,
     DATA_DRAKKARI_COLOSSUS,
-    DATA_RUIN_DWELLER_DIED
+    DATA_RUIN_DWELLER_DIED,
+    DATA_STATUE_ACTIVATE,
 };
 
 enum mainCreatures

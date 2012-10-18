@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -29,22 +29,36 @@ npc_highborne_lamenter
 npc_parqual_fintallas
 EndContentData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
+#include "ScriptedGossip.h"
 
 /*######
 ## npc_lady_sylvanas_windrunner
 ######*/
 
-#define SAY_LAMENT_END              -1000196
-#define EMOTE_LAMENT_END            -1000197
+enum Sylvanas
+{
+    QUEST_JOURNEY_TO_UNDERCITY  = 9180,
+    SAY_LAMENT_END              = -1000196,
+    EMOTE_LAMENT_END            = -1000197,
 
-#define SOUND_CREDIT                10896
-#define ENTRY_HIGHBORNE_LAMENTER    21628
-#define ENTRY_HIGHBORNE_BUNNY       21641
+    SOUND_CREDIT                = 10896,
+    ENTRY_HIGHBORNE_LAMENTER    = 21628,
+    ENTRY_HIGHBORNE_BUNNY       = 21641,
 
-#define SPELL_HIGHBORNE_AURA        37090
-#define SPELL_SYLVANAS_CAST         36568
-#define SPELL_RIBBON_OF_SOULS       34432                   //the real one to use might be 37099
+    SPELL_HIGHBORNE_AURA        = 37090,
+    SPELL_SYLVANAS_CAST         = 36568,
+    SPELL_RIBBON_OF_SOULS       = 34432, // the real one to use might be 37099
+
+    // Combat spells
+    SPELL_BLACK_ARROW           = 59712,
+    SPELL_FADE                  = 20672,
+    SPELL_FADE_BLINK            = 29211,
+    SPELL_MULTI_SHOT            = 59713,
+    SPELL_SHOT                  = 59710,
+    SPELL_SUMMON_SKELETON       = 59711
+};
 
 float HighborneLoc[4][3]=
 {
@@ -62,55 +76,67 @@ class npc_lady_sylvanas_windrunner : public CreatureScript
 public:
     npc_lady_sylvanas_windrunner() : CreatureScript("npc_lady_sylvanas_windrunner") { }
 
-    bool ChooseReward(Player* /*pPlayer*/, Creature* pCreature, const Quest *_Quest, uint32 /*slot*/)
+    bool OnQuestReward(Player* /*player*/, Creature* creature, const Quest *_Quest, uint32 /*slot*/)
     {
-        if (_Quest->GetQuestId() == 9180)
+        if (_Quest->GetQuestId() == QUEST_JOURNEY_TO_UNDERCITY)
         {
-            CAST_AI(npc_lady_sylvanas_windrunner::npc_lady_sylvanas_windrunnerAI, pCreature->AI())->LamentEvent = true;
-            CAST_AI(npc_lady_sylvanas_windrunner::npc_lady_sylvanas_windrunnerAI, pCreature->AI())->DoPlaySoundToSet(pCreature,SOUND_CREDIT);
-            pCreature->CastSpell(pCreature,SPELL_SYLVANAS_CAST,false);
+            CAST_AI(npc_lady_sylvanas_windrunner::npc_lady_sylvanas_windrunnerAI, creature->AI())->LamentEvent = true;
+            CAST_AI(npc_lady_sylvanas_windrunner::npc_lady_sylvanas_windrunnerAI, creature->AI())->DoPlaySoundToSet(creature, SOUND_CREDIT);
+            creature->CastSpell(creature, SPELL_SYLVANAS_CAST, false);
 
             for (uint8 i = 0; i < 4; ++i)
-                pCreature->SummonCreature(ENTRY_HIGHBORNE_LAMENTER, HighborneLoc[i][0], HighborneLoc[i][1], HIGHBORNE_LOC_Y, HighborneLoc[i][2], TEMPSUMMON_TIMED_DESPAWN, 160000);
+                creature->SummonCreature(ENTRY_HIGHBORNE_LAMENTER, HighborneLoc[i][0], HighborneLoc[i][1], HIGHBORNE_LOC_Y, HighborneLoc[i][2], TEMPSUMMON_TIMED_DESPAWN, 160000);
         }
 
         return true;
     }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_lady_sylvanas_windrunnerAI (pCreature);
+        return new npc_lady_sylvanas_windrunnerAI (creature);
     }
 
     struct npc_lady_sylvanas_windrunnerAI : public ScriptedAI
     {
-        npc_lady_sylvanas_windrunnerAI(Creature *c) : ScriptedAI(c) {}
+        npc_lady_sylvanas_windrunnerAI(Creature* creature) : ScriptedAI(creature) {}
 
-        uint32 LamentEvent_Timer;
+        uint32 LamentEventTimer;
         bool LamentEvent;
         uint64 targetGUID;
 
+        uint32 FadeTimer;
+        uint32 SummonSkeletonTimer;
+        uint32 BlackArrowTimer;
+        uint32 ShotTimer;
+        uint32 MultiShotTimer;
+
         void Reset()
         {
-            LamentEvent_Timer = 5000;
+            LamentEventTimer = 5000;
             LamentEvent = false;
             targetGUID = 0;
+
+            FadeTimer = 30000;
+            SummonSkeletonTimer = 20000;
+            BlackArrowTimer = 15000;
+            ShotTimer = 8000;
+            MultiShotTimer = 10000;
         }
 
-        void EnterCombat(Unit * /*who*/) {}
+        void EnterCombat(Unit* /*who*/) {}
 
-        void JustSummoned(Creature *summoned)
+        void JustSummoned(Creature* summoned)
         {
             if (summoned->GetEntry() == ENTRY_HIGHBORNE_BUNNY)
             {
-                if (Unit *pTarget = Unit::GetUnit(*summoned,targetGUID))
+                if (Creature* target = Unit::GetCreature(*summoned, targetGUID))
                 {
-                    pTarget->SendMonsterMove(pTarget->GetPositionX(), pTarget->GetPositionY(), me->GetPositionZ()+15.0f,0);
-                    pTarget->GetMap()->CreatureRelocation(me, pTarget->GetPositionX(), pTarget->GetPositionY(), me->GetPositionZ()+15.0f, 0.0f);
-                    summoned->CastSpell(pTarget, SPELL_RIBBON_OF_SOULS, false);
+                    target->MonsterMoveWithSpeed(target->GetPositionX(), target->GetPositionY(), me->GetPositionZ()+15.0f, 0);
+                    target->SetPosition(target->GetPositionX(), target->GetPositionY(), me->GetPositionZ()+15.0f, 0.0f);
+                    summoned->CastSpell(target, SPELL_RIBBON_OF_SOULS, false);
                 }
 
-                summoned->AddUnitMovementFlag(MOVEMENTFLAG_LEVITATING);
+                summoned->SetDisableGravity(true);
                 targetGUID = summoned->GetGUID();
             }
         }
@@ -119,29 +145,74 @@ public:
         {
             if (LamentEvent)
             {
-                if (LamentEvent_Timer <= diff)
+                if (LamentEventTimer <= diff)
                 {
                     DoSummon(ENTRY_HIGHBORNE_BUNNY, me, 10.0f, 3000, TEMPSUMMON_TIMED_DESPAWN);
 
-                    LamentEvent_Timer = 2000;
+                    LamentEventTimer = 2000;
                     if (!me->HasAura(SPELL_SYLVANAS_CAST))
                     {
                         DoScriptText(SAY_LAMENT_END, me);
                         DoScriptText(EMOTE_LAMENT_END, me);
                         LamentEvent = false;
                     }
-                } else LamentEvent_Timer -= diff;
+                } else LamentEventTimer -= diff;
             }
 
             if (!UpdateVictim())
                 return;
 
+            // Combat spells
+
+            if (FadeTimer <= diff)
+            {
+                DoCast(me, SPELL_FADE);
+                // add a blink to simulate a stealthed movement and reappearing elsewhere
+                DoCast(me, SPELL_FADE_BLINK);
+                FadeTimer = 30000 + rand()%5000;
+                // if the victim is out of melee range she cast multi shot
+                if (Unit* victim = me->getVictim())
+                    if (me->GetDistance(victim) > 10.0f)
+                        DoCast(victim, SPELL_MULTI_SHOT);
+            } else FadeTimer -= diff;
+
+            if (SummonSkeletonTimer <= diff)
+            {
+                DoCast(me, SPELL_SUMMON_SKELETON);
+                SummonSkeletonTimer = 20000 + rand()%10000;
+            } else SummonSkeletonTimer -= diff;
+
+            if (BlackArrowTimer <= diff)
+            {
+                if (Unit* victim = me->getVictim())
+                {
+                    DoCast(victim, SPELL_BLACK_ARROW);
+                    BlackArrowTimer = 15000 + rand()%5000;
+                }
+            } else BlackArrowTimer -= diff;
+
+            if (ShotTimer <= diff)
+            {
+                if (Unit* victim = me->getVictim())
+                {
+                    DoCast(victim, SPELL_SHOT);
+                    ShotTimer = 8000 + rand()%2000;
+                }
+            } else ShotTimer -= diff;
+
+            if (MultiShotTimer <= diff)
+            {
+                if (Unit* victim = me->getVictim())
+                {
+                    DoCast(victim, SPELL_MULTI_SHOT);
+                    MultiShotTimer = 10000 + rand()%3000;
+                }
+            } else MultiShotTimer -= diff;
+
             DoMeleeAttackIfReady();
         }
     };
-
 };
-
 
 /*######
 ## npc_highborne_lamenter
@@ -152,53 +223,52 @@ class npc_highborne_lamenter : public CreatureScript
 public:
     npc_highborne_lamenter() : CreatureScript("npc_highborne_lamenter") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_highborne_lamenterAI (pCreature);
+        return new npc_highborne_lamenterAI (creature);
     }
 
     struct npc_highborne_lamenterAI : public ScriptedAI
     {
-        npc_highborne_lamenterAI(Creature *c) : ScriptedAI(c) {}
+        npc_highborne_lamenterAI(Creature* creature) : ScriptedAI(creature) {}
 
-        uint32 EventMove_Timer;
-        uint32 EventCast_Timer;
+        uint32 EventMoveTimer;
+        uint32 EventCastTimer;
         bool EventMove;
         bool EventCast;
 
         void Reset()
         {
-            EventMove_Timer = 10000;
-            EventCast_Timer = 17500;
+            EventMoveTimer = 10000;
+            EventCastTimer = 17500;
             EventMove = true;
             EventCast = true;
         }
 
-        void EnterCombat(Unit * /*who*/) {}
+        void EnterCombat(Unit* /*who*/) {}
 
         void UpdateAI(const uint32 diff)
         {
             if (EventMove)
             {
-                if (EventMove_Timer <= diff)
+                if (EventMoveTimer <= diff)
                 {
-                    me->AddUnitMovementFlag(MOVEMENTFLAG_LEVITATING);
-                    me->SendMonsterMoveWithSpeed(me->GetPositionX(),me->GetPositionY(),HIGHBORNE_LOC_Y_NEW,5000);
-                    me->GetMap()->CreatureRelocation(me,me->GetPositionX(),me->GetPositionY(),HIGHBORNE_LOC_Y_NEW,me->GetOrientation());
+                    me->SetDisableGravity(true);
+                    me->MonsterMoveWithSpeed(me->GetPositionX(), me->GetPositionY(), HIGHBORNE_LOC_Y_NEW, me->GetDistance(me->GetPositionX(), me->GetPositionY(), HIGHBORNE_LOC_Y_NEW) / (5000 * 0.001f));
+                    me->SetPosition(me->GetPositionX(), me->GetPositionY(), HIGHBORNE_LOC_Y_NEW, me->GetOrientation());
                     EventMove = false;
-                } else EventMove_Timer -= diff;
+                } else EventMoveTimer -= diff;
             }
             if (EventCast)
             {
-                if (EventCast_Timer <= diff)
+                if (EventCastTimer <= diff)
                 {
                     DoCast(me, SPELL_HIGHBORNE_AURA);
                     EventCast = false;
-                } else EventCast_Timer -= diff;
+                } else EventCastTimer -= diff;
             }
         }
     };
-
 };
 
 /*######
@@ -216,42 +286,40 @@ class npc_parqual_fintallas : public CreatureScript
 public:
     npc_parqual_fintallas() : CreatureScript("npc_parqual_fintallas") { }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 /*uiSender*/, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        if (uiAction == GOSSIP_ACTION_INFO_DEF+1)
+        player->PlayerTalkClass->ClearMenus();
+        if (action == GOSSIP_ACTION_INFO_DEF+1)
         {
-            pPlayer->CLOSE_GOSSIP_MENU();
-            pCreature->CastSpell(pPlayer,SPELL_MARK_OF_SHAME,false);
+            player->CLOSE_GOSSIP_MENU();
+            creature->CastSpell(player, SPELL_MARK_OF_SHAME, false);
         }
-        if (uiAction == GOSSIP_ACTION_INFO_DEF+2)
+        if (action == GOSSIP_ACTION_INFO_DEF+2)
         {
-            pPlayer->CLOSE_GOSSIP_MENU();
-            pPlayer->AreaExploredOrEventHappens(6628);
+            player->CLOSE_GOSSIP_MENU();
+            player->AreaExploredOrEventHappens(6628);
         }
         return true;
     }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (pCreature->isQuestGiver())
-            pPlayer->PrepareQuestMenu(pCreature->GetGUID());
+        if (creature->isQuestGiver())
+            player->PrepareQuestMenu(creature->GetGUID());
 
-        if (pPlayer->GetQuestStatus(6628) == QUEST_STATUS_INCOMPLETE && !pPlayer->HasAura(SPELL_MARK_OF_SHAME))
+        if (player->GetQuestStatus(6628) == QUEST_STATUS_INCOMPLETE && !player->HasAura(SPELL_MARK_OF_SHAME))
         {
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HPF1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HPF2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HPF3, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
-            pPlayer->SEND_GOSSIP_MENU(5822, pCreature->GetGUID());
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HPF1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HPF2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HPF3, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
+            player->SEND_GOSSIP_MENU(5822, creature->GetGUID());
         }
         else
-            pPlayer->SEND_GOSSIP_MENU(5821, pCreature->GetGUID());
+            player->SEND_GOSSIP_MENU(5821, creature->GetGUID());
 
         return true;
     }
-
 };
-
 
 /*######
 ## AddSC

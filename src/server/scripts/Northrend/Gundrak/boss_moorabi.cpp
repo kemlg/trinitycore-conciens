@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,7 +15,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "gundrak.h"
 
 enum eSpells
@@ -31,11 +32,6 @@ enum eSpells
     SPELL_TRANSFORMATION                          = 55098, //Periodic, The caster transforms into a powerful mammoth, increasing Physical damage done by 25% and granting immunity to Stun effects.
 };
 
-enum eArchivements
-{
-    ACHIEV_LESS_RABI                              = 2040
-};
-
 enum eSays
 {
     SAY_AGGRO                                     = -1604010,
@@ -48,24 +44,26 @@ enum eSays
     EMOTE_TRANSFORM                               = -1604017
 };
 
+#define DATA_LESS_RABI                            1
+
 class boss_moorabi : public CreatureScript
 {
 public:
     boss_moorabi() : CreatureScript("boss_moorabi") { }
 
-    CreatureAI* GetAI(Creature *pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_moorabiAI(pCreature);
+        return new boss_moorabiAI(creature);
     }
 
     struct boss_moorabiAI : public ScriptedAI
     {
-        boss_moorabiAI(Creature* pCreature) : ScriptedAI(pCreature)
+        boss_moorabiAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = pCreature->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         bool bPhase;
 
@@ -82,17 +80,17 @@ public:
             uiTransformationTImer = 12*IN_MILLISECONDS;
             bPhase = false;
 
-            if (pInstance)
-                pInstance->SetData(DATA_MOORABI_EVENT, NOT_STARTED);
+            if (instance)
+                instance->SetData(DATA_MOORABI_EVENT, NOT_STARTED);
         }
 
-        void EnterCombat(Unit* /*pWho*/)
+        void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
             DoCast(me, SPELL_MOJO_FRENZY, true);
 
-            if (pInstance)
-                pInstance->SetData(DATA_MOORABI_EVENT, IN_PROGRESS);
+            if (instance)
+                instance->SetData(DATA_MOORABI_EVENT, IN_PROGRESS);
         }
 
         void UpdateAI(const uint32 uiDiff)
@@ -146,32 +144,55 @@ public:
             DoMeleeAttackIfReady();
          }
 
-         void JustDied(Unit* /*pKiller*/)
+        uint32 GetData(uint32 type)
+        {
+            if (type == DATA_LESS_RABI)
+                return bPhase ? 0 : 1;
+
+            return 0;
+        }
+
+         void JustDied(Unit* /*killer*/)
          {
             DoScriptText(SAY_DEATH, me);
 
-            if (pInstance)
-            {
-                pInstance->SetData(DATA_MOORABI_EVENT, DONE);
-
-                if (IsHeroic() && !bPhase)
-                    pInstance->DoCompleteAchievement(ACHIEV_LESS_RABI);
-            }
+            if (instance)
+                instance->SetData(DATA_MOORABI_EVENT, DONE);
         }
 
-        void KilledUnit(Unit* pVictim)
+        void KilledUnit(Unit* victim)
         {
-            if (pVictim == me)
+            if (victim == me)
                 return;
 
-            DoScriptText(RAND(SAY_SLAY_2,SAY_SLAY_3), me);
+            DoScriptText(RAND(SAY_SLAY_2, SAY_SLAY_3), me);
         }
     };
 
 };
 
+class achievement_less_rabi : public AchievementCriteriaScript
+{
+    public:
+        achievement_less_rabi() : AchievementCriteriaScript("achievement_less_rabi")
+        {
+        }
+
+        bool OnCheck(Player* /*player*/, Unit* target)
+        {
+            if (!target)
+                return false;
+
+            if (Creature* Moorabi = target->ToCreature())
+                if (Moorabi->AI()->GetData(DATA_LESS_RABI))
+                    return true;
+
+            return false;
+        }
+};
 
 void AddSC_boss_moorabi()
 {
     new boss_moorabi();
+    new achievement_less_rabi();
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,29 +23,36 @@ SDComment:
 SDCategory: Blackwing Lair
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
-#define SAY_AGGRO               -1469000
-#define SAY_LEASH               -1469001
+enum Say
+{
+    SAY_AGGRO               = -1469000,
+    SAY_LEASH               = -1469001
+};
 
-#define SPELL_CLEAVE            26350
-#define SPELL_BLASTWAVE         23331
-#define SPELL_MORTALSTRIKE      24573
-#define SPELL_KNOCKBACK         25778
+enum Spells
+{
+    SPELL_CLEAVE            = 26350,
+    SPELL_BLASTWAVE         = 23331,
+    SPELL_MORTALSTRIKE      = 24573,
+    SPELL_KNOCKBACK         = 25778
+};
 
 class boss_broodlord : public CreatureScript
 {
 public:
     boss_broodlord() : CreatureScript("boss_broodlord") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_broodlordAI (pCreature);
+        return new boss_broodlordAI (creature);
     }
 
     struct boss_broodlordAI : public ScriptedAI
     {
-        boss_broodlordAI(Creature *c) : ScriptedAI(c) {}
+        boss_broodlordAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 Cleave_Timer;
         uint32 BlastWave_Timer;
@@ -54,13 +61,13 @@ public:
 
         void Reset()
         {
-            Cleave_Timer = 8000;                                //These times are probably wrong
+            Cleave_Timer = 8000;                                // These times are probably wrong
             BlastWave_Timer = 12000;
             MortalStrike_Timer = 20000;
             KnockBack_Timer = 30000;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
             DoZoneInCombat();
@@ -82,14 +89,14 @@ public:
             if (BlastWave_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_BLASTWAVE);
-                BlastWave_Timer = urand(8000,16000);
+                BlastWave_Timer = urand(8000, 16000);
             } else BlastWave_Timer -= diff;
 
             //MortalStrike_Timer
             if (MortalStrike_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_MORTALSTRIKE);
-                MortalStrike_Timer = urand(25000,35000);
+                MortalStrike_Timer = urand(25000, 35000);
             } else MortalStrike_Timer -= diff;
 
             if (KnockBack_Timer <= diff)
@@ -97,9 +104,9 @@ public:
                 DoCast(me->getVictim(), SPELL_KNOCKBACK);
                 //Drop 50% aggro
                 if (DoGetThreat(me->getVictim()))
-                    DoModifyThreatPercent(me->getVictim(),-50);
+                    DoModifyThreatPercent(me->getVictim(), -50);
 
-                KnockBack_Timer = urand(15000,30000);
+                KnockBack_Timer = urand(15000, 30000);
             } else KnockBack_Timer -= diff;
 
             if (EnterEvadeIfOutOfCombatArea(diff))
@@ -108,7 +115,6 @@ public:
             DoMeleeAttackIfReady();
         }
     };
-
 };
 
 void AddSC_boss_broodlord()

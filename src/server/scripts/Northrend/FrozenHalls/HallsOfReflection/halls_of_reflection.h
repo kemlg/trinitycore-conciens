@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -79,12 +79,12 @@ enum Actions
 // handled the summonList and the notification events to/from the InstanceScript
 struct boss_horAI : ScriptedAI
 {
-    boss_horAI(Creature *pCreature) : ScriptedAI(pCreature), summons(pCreature)
+    boss_horAI(Creature* creature) : ScriptedAI(creature), summons(creature)
     {
-        pInstance = me->GetInstanceScript();
+        instance = me->GetInstanceScript();
     }
 
-    InstanceScript* pInstance;
+    InstanceScript* instance;
     EventMap events;
     SummonList summons;
 
@@ -96,7 +96,7 @@ struct boss_horAI : ScriptedAI
         me->SetReactState(REACT_PASSIVE);
     }
 
-    void DamageTaken(Unit * /*pWho*/, uint32 &uiDamage)
+    void DamageTaken(Unit* /*who*/, uint32 &uiDamage)
     {
         if (me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE))
             uiDamage = 0;
@@ -104,7 +104,7 @@ struct boss_horAI : ScriptedAI
 
     void DoAction(const int32 actionID)
     {
-        switch(actionID)
+        switch (actionID)
         {
             case ACTION_ENTER_COMBAT:  // called by InstanceScript when boss shall enter in combat.
                 // Just in case. Should have been done by InstanceScript
@@ -114,42 +114,42 @@ struct boss_horAI : ScriptedAI
                 me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE|UNIT_FLAG_NOT_SELECTABLE);
                 me->SetReactState(REACT_AGGRESSIVE);
 
-                if (Unit *pUnit = me->SelectNearestTarget())
-                    AttackStart(pUnit);
+                if (Unit* unit = me->SelectNearestTarget())
+                    AttackStart(unit);
 
                 DoZoneInCombat();
                 break;
         }
     }
 
-    void JustSummoned(Creature *pSummoned)
+    void JustSummoned(Creature* summoned)
     {
-        summons.Summon(pSummoned);
+        summons.Summon(summoned);
 
-        if (Unit *pUnit = pSummoned->SelectNearestTarget())
+        if (Unit* target = summoned->SelectNearestTarget())
         {
-            if (pSummoned->AI())
-                pSummoned->AI()->AttackStart(pUnit);
+            if (summoned->AI())
+                summoned->AI()->AttackStart(target);
             else
             {
-                pSummoned->GetMotionMaster()->MoveChase(pUnit);
-                pSummoned->Attack(pUnit, true);
+                summoned->GetMotionMaster()->MoveChase(target);
+                summoned->Attack(target, true);
             }
         }
 
-        if (pSummoned->AI())
-            pSummoned->AI()->DoZoneInCombat();
+        if (summoned->AI())
+            summoned->AI()->DoZoneInCombat();
     }
 
-    void SummonedCreatureDespawn(Creature *pSummoned)
+    void SummonedCreatureDespawn(Creature* summoned)
     {
-        summons.Despawn(pSummoned);
+        summons.Despawn(summoned);
         if (summons.empty())
         {
-            if (pSummoned->isAlive())
-                pInstance->SetData(DATA_WAVE_COUNT, NOT_STARTED);
+            if (summoned->isAlive())
+                instance->SetData(DATA_WAVE_COUNT, NOT_STARTED);
             else
-                pInstance->SetData(DATA_WAVE_COUNT, SPECIAL);
+                instance->SetData(DATA_WAVE_COUNT, SPECIAL);
         }
     }
 };

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: No model for submerging. Currently just invisible.
 SDCategory: Temple of Ahn'Qiraj
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "temple_of_ahnqiraj.h"
 
 #define SPELL_SWEEP             26103
@@ -38,14 +39,14 @@ class boss_ouro : public CreatureScript
 public:
     boss_ouro() : CreatureScript("boss_ouro") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_ouroAI (pCreature);
+        return new boss_ouroAI (creature);
     }
 
     struct boss_ouroAI : public ScriptedAI
     {
-        boss_ouroAI(Creature *c) : ScriptedAI(c) {}
+        boss_ouroAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 Sweep_Timer;
         uint32 SandBlast_Timer;
@@ -59,18 +60,18 @@ public:
 
         void Reset()
         {
-            Sweep_Timer = 5000 + rand()%5000;
-            SandBlast_Timer = 20000 + rand()%15000;
-            Submerge_Timer = 90000 + rand()%60000;
-            Back_Timer = 30000 + rand()%15000;
-            ChangeTarget_Timer = 5000 + rand()%3000;
-            Spawn_Timer = 10000 + rand()%10000;
+            Sweep_Timer = urand(5000, 10000);
+            SandBlast_Timer = urand(20000, 35000);
+            Submerge_Timer = urand(90000, 150000);
+            Back_Timer = urand(30000, 45000);
+            ChangeTarget_Timer = urand(5000, 8000);
+            Spawn_Timer = urand(10000, 20000);
 
             Enrage = false;
             Submerged = false;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             DoCast(me->getVictim(), SPELL_BIRTH);
         }
@@ -85,14 +86,14 @@ public:
             if (!Submerged && Sweep_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_SWEEP);
-                Sweep_Timer = 15000 + rand()%15000;
+                Sweep_Timer = urand(15000, 30000);
             } else Sweep_Timer -= diff;
 
             //SandBlast_Timer
             if (!Submerged && SandBlast_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_SANDBLAST);
-                SandBlast_Timer = 20000 + rand()%15000;
+                SandBlast_Timer = urand(20000, 35000);
             } else SandBlast_Timer -= diff;
 
             //Submerge_Timer
@@ -105,19 +106,19 @@ public:
                 DoCast(me, SPELL_DIRTMOUND_PASSIVE);
 
                 Submerged = true;
-                Back_Timer = 30000 + rand()%15000;
+                Back_Timer = urand(30000, 45000);
             } else Submerge_Timer -= diff;
 
             //ChangeTarget_Timer
             if (Submerged && ChangeTarget_Timer <= diff)
             {
-                Unit *pTarget = NULL;
-                pTarget = SelectUnit(SELECT_TARGET_RANDOM,0);
+                Unit* target = NULL;
+                target = SelectTarget(SELECT_TARGET_RANDOM, 0);
 
-                if (pTarget)
-                    DoTeleportTo(pTarget->GetPositionX(), pTarget->GetPositionY(), pTarget->GetPositionZ());
+                if (target)
+                    DoTeleportTo(target->GetPositionX(), target->GetPositionY(), target->GetPositionZ());
 
-                ChangeTarget_Timer = 10000 + rand()%10000;
+                ChangeTarget_Timer = urand(10000, 20000);
             } else ChangeTarget_Timer -= diff;
 
             //Back_Timer
@@ -129,7 +130,7 @@ public:
                 DoCast(me->getVictim(), SPELL_GROUND_RUPTURE);
 
                 Submerged = false;
-                Submerge_Timer = 60000 + rand()%60000;
+                Submerge_Timer = urand(60000, 120000);
             } else Back_Timer -= diff;
 
             DoMeleeAttackIfReady();
@@ -137,7 +138,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_ouro()
 {

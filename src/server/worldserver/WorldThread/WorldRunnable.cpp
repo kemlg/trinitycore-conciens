@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,7 @@
 #include "MapManager.h"
 #include "Timer.h"
 #include "WorldRunnable.h"
+#include "OutdoorPvPMgr.h"
 
 #define WORLD_SLEEP_CONST 50
 
@@ -54,7 +55,7 @@ void WorldRunnable::run()
         ++World::m_worldLoopCounter;
         realCurrTime = getMSTime();
 
-        uint32 diff = getMSTimeDiff(realPrevTime,realCurrTime);
+        uint32 diff = getMSTimeDiff(realPrevTime, realCurrTime);
 
         sWorld->Update( diff );
         realPrevTime = realCurrTime;
@@ -91,5 +92,7 @@ void WorldRunnable::run()
     sWorldSocketMgr->StopNetwork();
 
     sMapMgr->UnloadAll();                     // unload all grids (including locked in memory)
-
+    sObjectAccessor->UnloadAll();             // unload 'i_player2corpse' storage and remove from world
+    sScriptMgr->Unload();
+    sOutdoorPvPMgr->Die();
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2010 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -29,21 +29,22 @@ EndScriptData */
 // Snakes - miss the 1-hitkill from emerging
 //        - visual changes between mobile and stationary models seems not to work sometimes
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "trial_of_the_crusader.h"
 
 enum Yells
 {
-    //Gormok
-    SAY_SNOBOLLED        = -1649000,
-    //Acidmaw & Dreadscale
-    SAY_SUBMERGE         = -1649010,
-    SAY_EMERGE           = -1649011,
-    SAY_BERSERK          = -1649012,
-    //Icehowl
-    SAY_TRAMPLE_STARE    = -1649020,
-    SAY_TRAMPLE_FAIL     = -1649021,
-    SAY_TRAMPLE_START    = -1649022,
+    // Gormok
+    EMOTE_SNOBOLLED         = 0,
+
+    // Acidmaw & Dreadscale
+    EMOTE_ENRAGE            = 0,
+
+    // Icehowl
+    EMOTE_TRAMPLE_START     = 0,
+    EMOTE_TRAMPLE_CRASH     = 1,
+    EMOTE_TRAMPLE_FAIL      = 2,
 };
 
 enum Equipment
@@ -95,7 +96,7 @@ enum BossSpells
     SPELL_BURNING_SPRAY     = 66902,
     SPELL_SWEEP_1           = 67646,
     SPELL_EMERGE_0          = 66947,
-    SPELL_SUBMERGE_0        = 53421,
+    SPELL_SUBMERGE_0        = 66948,
     SPELL_ENRAGE            = 68335,
     SPELL_SLIME_POOL_EFFECT = 66882, //In 60s it diameter grows from 10y to 40y (r=r+0.25 per second)
 
@@ -114,19 +115,19 @@ class boss_gormok : public CreatureScript
 public:
     boss_gormok() : CreatureScript("boss_gormok") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_gormokAI(pCreature);
+        return new boss_gormokAI(creature);
     }
 
     struct boss_gormokAI : public ScriptedAI
     {
-        boss_gormokAI(Creature* pCreature) : ScriptedAI(pCreature), Summons(me)
+        boss_gormokAI(Creature* creature) : ScriptedAI(creature), Summons(me)
         {
-            m_pInstance = (InstanceScript*)pCreature->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* m_pInstance;
+        InstanceScript* instance;
 
         uint32 m_uiImpaleTimer;
         uint32 m_uiStaggeringStompTimer;
@@ -140,8 +141,8 @@ public:
             m_uiStaggeringStompTimer = 15*IN_MILLISECONDS;
             m_uiSummonTimer = urand(15*IN_MILLISECONDS, 30*IN_MILLISECONDS);;
 
-            if (getDifficulty() == RAID_DIFFICULTY_25MAN_NORMAL ||
-                getDifficulty() == RAID_DIFFICULTY_25MAN_HEROIC)
+            if (GetDifficulty() == RAID_DIFFICULTY_25MAN_NORMAL ||
+                GetDifficulty() == RAID_DIFFICULTY_25MAN_HEROIC)
                 m_uiSummonCount = 5;
             else
                 m_uiSummonCount = 4;
@@ -149,23 +150,48 @@ public:
             Summons.DespawnAll();
         }
 
-        void JustDied(Unit* /*pKiller*/)
+        void EnterEvadeMode()
         {
-            if (m_pInstance)
-                m_pInstance->SetData(TYPE_NORTHREND_BEASTS, GORMOK_DONE);
+            instance->DoUseDoorOrButton(instance->GetData64(GO_MAIN_GATE_DOOR));
+            ScriptedAI::EnterEvadeMode();
+        }
+
+        void MovementInform(uint32 type, uint32 pointId)
+        {
+            if (type != POINT_MOTION_TYPE)
+                return;
+
+            switch (pointId)
+            {
+                case 0:
+                    instance->DoUseDoorOrButton(instance->GetData64(GO_MAIN_GATE_DOOR));
+                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+                    me->SetReactState(REACT_AGGRESSIVE);
+                    me->SetInCombatWithZone();
+                    break;
+            }
+        }
+
+        void JustDied(Unit* /*killer*/)
+        {
+            if (instance)
+                instance->SetData(TYPE_NORTHREND_BEASTS, GORMOK_DONE);
         }
 
         void JustReachedHome()
         {
-            if (m_pInstance)
-                m_pInstance->SetData(TYPE_NORTHREND_BEASTS, FAIL);
-            me->ForcedDespawn();
+            if (instance)
+            {
+                instance->DoUseDoorOrButton(instance->GetData64(GO_MAIN_GATE_DOOR));
+                instance->SetData(TYPE_NORTHREND_BEASTS, FAIL);
+            }
+            me->DespawnOrUnsummon();
         }
 
-        void EnterCombat(Unit* /*pWho*/)
+        void EnterCombat(Unit* /*who*/)
         {
             me->SetInCombatWithZone();
-            m_pInstance->SetData(TYPE_NORTHREND_BEASTS, GORMOK_IN_PROGRESS);
+            instance->SetData(TYPE_NORTHREND_BEASTS, GORMOK_IN_PROGRESS);
         }
 
         void JustSummoned(Creature* summon)
@@ -188,34 +214,35 @@ public:
             if (summon->GetEntry() == NPC_SNOBOLD_VASSAL)
                 if (summon->isAlive())
                     ++m_uiSummonCount;
+            Summons.Despawn(summon);
         }
 
-        void UpdateAI(const uint32 uiDiff)
+        void UpdateAI(uint32 const diff)
         {
             if (!UpdateVictim())
                 return;
 
-            if (m_uiImpaleTimer <= uiDiff)
+            if (m_uiImpaleTimer <= diff)
             {
-                DoCast(me->getVictim(), SPELL_IMPALE);
+                DoCastVictim(SPELL_IMPALE);
                 m_uiImpaleTimer = urand(8*IN_MILLISECONDS, 10*IN_MILLISECONDS);
-            } else m_uiImpaleTimer -= uiDiff;
+            } else m_uiImpaleTimer -= diff;
 
-            if (m_uiStaggeringStompTimer <= uiDiff)
+            if (m_uiStaggeringStompTimer <= diff)
             {
-                DoCast(me->getVictim(), SPELL_STAGGERING_STOMP);
+                DoCastVictim(SPELL_STAGGERING_STOMP);
                 m_uiStaggeringStompTimer = urand(20*IN_MILLISECONDS, 25*IN_MILLISECONDS);
-            } else m_uiStaggeringStompTimer -= uiDiff;
+            } else m_uiStaggeringStompTimer -= diff;
 
-            if (m_uiSummonTimer <= uiDiff)
+            if (m_uiSummonTimer <= diff)
             {
                 if (m_uiSummonCount > 0)
                 {
                     me->SummonCreature(NPC_SNOBOLD_VASSAL, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), 0, TEMPSUMMON_CORPSE_DESPAWN);
-                    DoScriptText(SAY_SNOBOLLED, me);
+                    Talk(EMOTE_SNOBOLLED);
                 }
                 m_uiSummonTimer = urand(15*IN_MILLISECONDS, 30*IN_MILLISECONDS);
-            } else m_uiSummonTimer -= uiDiff;
+            } else m_uiSummonTimer -= diff;
 
             DoMeleeAttackIfReady();
         }
@@ -223,27 +250,26 @@ public:
 
 };
 
-
 class mob_snobold_vassal : public CreatureScript
 {
 public:
     mob_snobold_vassal() : CreatureScript("mob_snobold_vassal") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_snobold_vassalAI(pCreature);
+        return new mob_snobold_vassalAI(creature);
     }
 
     struct mob_snobold_vassalAI : public ScriptedAI
     {
-        mob_snobold_vassalAI(Creature* pCreature) : ScriptedAI(pCreature)
+        mob_snobold_vassalAI(Creature* creature) : ScriptedAI(creature)
         {
-            m_pInstance = (InstanceScript*)pCreature->GetInstanceScript();
-            if (m_pInstance)
-                m_pInstance->SetData(DATA_SNOBOLD_COUNT, INCREASE);
+            instance = creature->GetInstanceScript();
+            if (instance)
+                instance->SetData(DATA_SNOBOLD_COUNT, INCREASE);
         }
 
-        InstanceScript* m_pInstance;
+        InstanceScript* instance;
         uint32 m_uiFireBombTimer;
         uint32 m_uiBatterTimer;
         uint32 m_uiHeadCrackTimer;
@@ -259,17 +285,23 @@ public:
 
             m_uiTargetGUID = 0;
             m_bTargetDied = false;
-            if (m_pInstance)
-                m_uiBossGUID = m_pInstance->GetData64(NPC_GORMOK);
+            if (instance)
+                m_uiBossGUID = instance->GetData64(NPC_GORMOK);
             //Workaround for Snobold
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_OOC_NOT_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
         }
 
-        void EnterCombat(Unit *pWho)
+        void EnterEvadeMode()
         {
-            m_uiTargetGUID = pWho->GetGUID();
-            me->TauntApply(pWho);
-            DoCast(pWho, SPELL_SNOBOLLED);
+            instance->DoUseDoorOrButton(instance->GetData64(GO_MAIN_GATE_DOOR));
+            ScriptedAI::EnterEvadeMode();
+        }
+
+        void EnterCombat(Unit* who)
+        {
+            m_uiTargetGUID = who->GetGUID();
+            me->TauntApply(who);
+            DoCast(who, SPELL_SNOBOLLED);
         }
 
         void DamageTaken(Unit* pDoneBy, uint32 &uiDamage)
@@ -278,84 +310,85 @@ public:
                 uiDamage = 0;
         }
 
-        void MovementInform(uint32 uiType, uint32 uiId)
+        void MovementInform(uint32 type, uint32 pointId)
         {
-            if (uiType != POINT_MOTION_TYPE) return;
+            if (type != POINT_MOTION_TYPE)
+                return;
 
-            switch (uiId)
+            switch (pointId)
             {
-                case 0: // JUMP!? Fuck! THAT'S BEEZARR! Would someone PLEASE make MotionMaster->Move* work better?
+                case 0:
                     if (m_bTargetDied)
-                        me->ForcedDespawn();
+                        me->DespawnOrUnsummon();
                     break;
             }
         }
 
-        void JustDied(Unit* /*pKiller*/)
+        void JustDied(Unit* /*killer*/)
         {
-            if (Unit *pTarget = Unit::GetPlayer(*me, m_uiTargetGUID))
-                if (pTarget->isAlive())
-                    pTarget->RemoveAurasDueToSpell(SPELL_SNOBOLLED);
-            if (m_pInstance)
-                m_pInstance->SetData(DATA_SNOBOLD_COUNT, DECREASE);
+            if (Unit* target = Unit::GetPlayer(*me, m_uiTargetGUID))
+                if (target->isAlive())
+                    target->RemoveAurasDueToSpell(SPELL_SNOBOLLED);
+            if (instance)
+                instance->SetData(DATA_SNOBOLD_COUNT, DECREASE);
         }
 
-        void UpdateAI(const uint32 uiDiff)
+        void UpdateAI(uint32 const diff)
         {
             if (m_bTargetDied || !UpdateVictim())
                 return;
 
-            if (Unit* pTarget = Unit::GetPlayer(*me, m_uiTargetGUID))
-                if (!pTarget->isAlive())
-                    if (m_pInstance)
-                        if (Unit* pGormok = Unit::GetCreature(*me, m_pInstance->GetData64(NPC_GORMOK)))
-                        {
-                            if (pGormok->isAlive())
-                            {
-                                SetCombatMovement(false);
-                                m_bTargetDied = true;
-                                me->GetMotionMaster()->MoveJump(pGormok->GetPositionX(), pGormok->GetPositionY(), pGormok->GetPositionZ(), 15.0f, 15.0f);
-                            }
-                            else
-                            {
-                                if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0))
-                                {
-                                    m_uiTargetGUID = pTarget->GetGUID();
-                                    me->GetMotionMaster()->MoveJump(pTarget->GetPositionX(), pTarget->GetPositionY(), pTarget->GetPositionZ(), 15.0f, 15.0f);
-                                }
-                            }
-                        }
-
-            if (m_uiFireBombTimer < uiDiff)
+            if (Unit* target = Unit::GetPlayer(*me, m_uiTargetGUID))
             {
-                if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0))
-                    DoCast(pTarget, SPELL_FIRE_BOMB);
+                if (!target->isAlive())
+                {
+                    if (instance)
+                    {
+                        Unit* gormok = ObjectAccessor::GetCreature(*me, instance->GetData64(NPC_GORMOK));
+                        if (gormok && gormok->isAlive())
+                        {
+                            SetCombatMovement(false);
+                            m_bTargetDied = true;
+                            me->GetMotionMaster()->MoveJump(gormok->GetPositionX(), gormok->GetPositionY(), gormok->GetPositionZ(), 15.0f, 15.0f);
+                        }
+                        else if (Unit* target2 = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                        {
+                            m_uiTargetGUID = target2->GetGUID();
+                            me->GetMotionMaster()->MoveJump(target2->GetPositionX(), target2->GetPositionY(), target2->GetPositionZ(), 15.0f, 15.0f);
+                        }
+                    }
+                }
+            }
+
+            if (m_uiFireBombTimer < diff)
+            {
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                    DoCast(target, SPELL_FIRE_BOMB);
                 m_uiFireBombTimer = 20000;
             }
-            else m_uiFireBombTimer -= uiDiff;
+            else m_uiFireBombTimer -= diff;
 
-            if (m_uiBatterTimer < uiDiff)
+            if (m_uiBatterTimer < diff)
             {
-                if (Unit *pTarget = Unit::GetPlayer(*me, m_uiTargetGUID))
-                    DoCast(pTarget, SPELL_BATTER);
+                if (Unit* target = Unit::GetPlayer(*me, m_uiTargetGUID))
+                    DoCast(target, SPELL_BATTER);
                 m_uiBatterTimer = 10000;
             }
-            else m_uiBatterTimer -= uiDiff;
+            else m_uiBatterTimer -= diff;
 
-            if (m_uiHeadCrackTimer < uiDiff)
+            if (m_uiHeadCrackTimer < diff)
             {
-                if (Unit *pTarget = Unit::GetPlayer(*me, m_uiTargetGUID))
-                    DoCast(pTarget, SPELL_HEAD_CRACK);
+                if (Unit* target = Unit::GetPlayer(*me, m_uiTargetGUID))
+                    DoCast(target, SPELL_HEAD_CRACK);
                 m_uiHeadCrackTimer = 35000;
             }
-            else m_uiHeadCrackTimer -= uiDiff;
+            else m_uiHeadCrackTimer -= diff;
 
             DoMeleeAttackIfReady();
         }
     };
 
 };
-
 
 struct boss_jormungarAI : public ScriptedAI
 {
@@ -375,7 +408,7 @@ struct boss_jormungarAI : public ScriptedAI
         sweepTimer = urand(15*IN_MILLISECONDS, 30*IN_MILLISECONDS);
     }
 
-    void JustDied(Unit* /*pKiller*/)
+    void JustDied(Unit* /*killer*/)
     {
         if (instanceScript)
         {
@@ -385,15 +418,8 @@ struct boss_jormungarAI : public ScriptedAI
                 {
                     instanceScript->SetData(TYPE_NORTHREND_BEASTS, SNAKES_DONE);
 
-                    if (TempSummon* summ = me->ToTempSummon())
-                        summ->UnSummon();
-                    else
-                        me->ForcedDespawn();
-
-                    if (TempSummon* summ = otherWorm->ToTempSummon())
-                        summ->UnSummon();
-                    else
-                        otherWorm->ForcedDespawn();
+                    me->DespawnOrUnsummon();
+                    otherWorm->DespawnOrUnsummon();
                 }
                 else
                     instanceScript->SetData(TYPE_NORTHREND_BEASTS, SNAKES_SPECIAL);
@@ -404,42 +430,41 @@ struct boss_jormungarAI : public ScriptedAI
     void JustReachedHome()
     {
         if (instanceScript && instanceScript->GetData(TYPE_NORTHREND_BEASTS) != FAIL)
+        {
             instanceScript->SetData(TYPE_NORTHREND_BEASTS, FAIL);
+        }
 
-        if (TempSummon* summ = me->ToTempSummon())
-            summ->UnSummon();
-        else
-            me->ForcedDespawn();
+        me->DespawnOrUnsummon();
     }
 
-    void KilledUnit(Unit *pWho)
+    void KilledUnit(Unit* who)
     {
-        if (pWho->GetTypeId() == TYPEID_PLAYER)
+        if (who->GetTypeId() == TYPEID_PLAYER)
         {
             if (instanceScript)
                 instanceScript->SetData(DATA_TRIBUTE_TO_IMMORTALITY_ELEGIBLE, 0);
         }
     }
 
-    void EnterCombat(Unit* /*pWho*/)
+    void EnterCombat(Unit* /*who*/)
     {
         me->SetInCombatWithZone();
         if (instanceScript)
             instanceScript->SetData(TYPE_NORTHREND_BEASTS, SNAKES_IN_PROGRESS);
     }
 
-    void UpdateAI(const uint32 uiDiff)
+    void UpdateAI(uint32 const diff)
     {
-        if (!UpdateVictim()) return;
+        if (!UpdateVictim())
+            return;
 
         if (instanceScript && instanceScript->GetData(TYPE_NORTHREND_BEASTS) == SNAKES_SPECIAL && !enraged)
         {
-            DoScriptText(SAY_EMERGE, me);
             me->RemoveAurasDueToSpell(SPELL_SUBMERGE_0);
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_OOC_NOT_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
             DoCast(SPELL_ENRAGE);
             enraged = true;
-            DoScriptText(SAY_BERSERK, me);
+            Talk(EMOTE_ENRAGE);
             switch (stage)
             {
                 case 0:
@@ -456,99 +481,94 @@ struct boss_jormungarAI : public ScriptedAI
         switch (stage)
         {
             case 0: // Mobile
-                if (biteTimer <= uiDiff)
+                if (biteTimer <= diff)
                 {
                     DoCastVictim(biteSpell);
                     biteTimer = urand(15*IN_MILLISECONDS, 30*IN_MILLISECONDS);
-                } else biteTimer -= uiDiff;
+                } else biteTimer -= diff;
 
-                if (spewTimer <= uiDiff)
+                if (spewTimer <= diff)
                 {
                     DoCastAOE(spewSpell);
                     spewTimer = urand(15*IN_MILLISECONDS, 30*IN_MILLISECONDS);
-                } else spewTimer -= uiDiff;
+                } else spewTimer -= diff;
 
-                if (slimePoolTimer <= uiDiff)
+                if (slimePoolTimer <= diff)
                 {
                     /* Spell summon has only 30s duration */
-                    //DoCast(SUMMON_SLIME_POOL);
-                    me->SummonCreature(NPC_SLIME_POOL, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), 0);
+                    DoCast(me, SUMMON_SLIME_POOL);
                     slimePoolTimer = 30*IN_MILLISECONDS;
-                } else slimePoolTimer -= uiDiff;
+                } else slimePoolTimer -= diff;
 
-                if (submergeTimer <= uiDiff && !enraged)
+                if (submergeTimer <= diff && !enraged)
                 {
                     stage = 1;
                     submergeTimer = 5*IN_MILLISECONDS;
-                } else submergeTimer -= uiDiff;
+                } else submergeTimer -= diff;
 
                 DoMeleeAttackIfReady();
                 break;
             case 1: // Submerge
-                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_OOC_NOT_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
                 DoCast(me, SPELL_SUBMERGE_0);
-                DoScriptText(SAY_SUBMERGE, me);
-                me->GetMotionMaster()->MovePoint(0, ToCCommonLoc[1].GetPositionX()+urand(0, 80)-40, ToCCommonLoc[1].GetPositionY()+urand(0, 80)-40, ToCCommonLoc[1].GetPositionZ());
+                me->GetMotionMaster()->MovePoint(0, ToCCommonLoc[1].GetPositionX()+ frand(-40.0f, 40.0f), ToCCommonLoc[1].GetPositionY() + frand(-40.0f, 40.0f), ToCCommonLoc[1].GetPositionZ());
                 stage = 2;
             case 2: // Wait til emerge
-                if (submergeTimer <= uiDiff)
+                if (submergeTimer <= diff)
                 {
                     stage = 3;
                     submergeTimer = 50*IN_MILLISECONDS;
-                } else submergeTimer -= uiDiff;
+                } else submergeTimer -= diff;
                 break;
             case 3: // Emerge
                 me->SetDisplayId(modelStationary);
-                DoScriptText(SAY_EMERGE, me);
                 me->RemoveAurasDueToSpell(SPELL_SUBMERGE_0);
                 DoCast(me, SPELL_EMERGE_0);
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_OOC_NOT_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);
                 SetCombatMovement(false);
                 me->GetMotionMaster()->MoveIdle();
                 stage = 4;
                 break;
             case 4: // Stationary
-                if (sprayTimer <= uiDiff)
+                if (sprayTimer <= diff)
                 {
-                    if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0))
-                        DoCast(pTarget, spraySpell);
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                        DoCast(target, spraySpell);
                     sprayTimer = urand(15*IN_MILLISECONDS, 30*IN_MILLISECONDS);
-                } else sprayTimer -= uiDiff;
+                } else sprayTimer -= diff;
 
-                if (sweepTimer <= uiDiff)
+                if (sweepTimer <= diff)
                 {
                     DoCastAOE(SPELL_SWEEP_0);
                     sweepTimer = urand(15*IN_MILLISECONDS, 30*IN_MILLISECONDS);
-                } else sweepTimer -= uiDiff;
+                } else sweepTimer -= diff;
 
-                if (submergeTimer <= uiDiff)
+                if (submergeTimer <= diff)
                 {
                     stage = 5;
                     submergeTimer = 10*IN_MILLISECONDS;
-                } else submergeTimer -= uiDiff;
+                } else submergeTimer -= diff;
 
                 DoSpellAttackIfReady(spitSpell);
                 break;
             case 5: // Submerge
-                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_OOC_NOT_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
                 DoCast(me, SPELL_SUBMERGE_0);
-                DoScriptText(SAY_SUBMERGE, me);
-                me->GetMotionMaster()->MovePoint(0, ToCCommonLoc[1].GetPositionX()+urand(0, 80)-40, ToCCommonLoc[1].GetPositionY()+urand(0, 80)-40, ToCCommonLoc[1].GetPositionZ());
+                me->GetMotionMaster()->MovePoint(0, ToCCommonLoc[1].GetPositionX() + frand(-40.0f, 40.0f), ToCCommonLoc[1].GetPositionY() + frand(-40.0f, 40.0f), ToCCommonLoc[1].GetPositionZ());
                 stage = 6;
             case 6: // Wait til emerge
-                if (submergeTimer <= uiDiff)
+                if (submergeTimer <= diff)
                 {
                     stage = 7;
                     submergeTimer = 45*IN_MILLISECONDS;
-                } else submergeTimer -= uiDiff;
+                } else submergeTimer -= diff;
                 break;
             case 7: // Emerge
                 me->SetDisplayId(modelMobile);
-                DoScriptText(SAY_EMERGE, me);
                 me->RemoveAurasDueToSpell(SPELL_SUBMERGE_0);
                 DoCast(me, SPELL_EMERGE_0);
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_OOC_NOT_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
                 me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);
                 SetCombatMovement(true);
                 me->GetMotionMaster()->MoveChase(me->getVictim());
@@ -580,7 +600,6 @@ struct boss_jormungarAI : public ScriptedAI
     bool   enraged;
 };
 
-
 class boss_acidmaw : public CreatureScript
 {
     public:
@@ -588,7 +607,7 @@ class boss_acidmaw : public CreatureScript
 
     struct boss_acidmawAI : public boss_jormungarAI
     {
-        boss_acidmawAI(Creature* pCreature) : boss_jormungarAI(pCreature) { }
+        boss_acidmawAI(Creature* creature) : boss_jormungarAI(creature) { }
 
         void Reset()
         {
@@ -613,7 +632,6 @@ class boss_acidmaw : public CreatureScript
     }
 };
 
-
 class boss_dreadscale : public CreatureScript
 {
 public:
@@ -621,7 +639,12 @@ public:
 
     struct boss_dreadscaleAI : public boss_jormungarAI
     {
-        boss_dreadscaleAI(Creature* pCreature) : boss_jormungarAI(pCreature) { }
+        boss_dreadscaleAI(Creature* creature) : boss_jormungarAI(creature)
+        {
+            instanceScript = creature->GetInstanceScript();
+        }
+
+        InstanceScript* instanceScript;
 
         void Reset()
         {
@@ -637,28 +660,64 @@ public:
             submergeTimer = 45 * IN_MILLISECONDS;
             stage = 0;
         }
+
+        void MovementInform(uint32 type, uint32 pointId)
+        {
+            if (type != POINT_MOTION_TYPE)
+                return;
+
+            switch (pointId)
+            {
+                case 0:
+                    instanceScript->DoUseDoorOrButton(instanceScript->GetData64(GO_MAIN_GATE_DOOR));
+                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+                    me->SetReactState(REACT_AGGRESSIVE);
+                    me->SetInCombatWithZone();
+                    if (Creature* otherWorm = Unit::GetCreature(*me, instanceScript->GetData64(otherWormEntry)))
+                    {
+                        otherWorm->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+                        otherWorm->SetReactState(REACT_AGGRESSIVE);
+                        otherWorm->SetVisible(true);
+                        otherWorm->SetInCombatWithZone();
+                    }
+                    break;
+            }
+        }
+
+        void EnterEvadeMode()
+        {
+            instanceScript->DoUseDoorOrButton(instanceScript->GetData64(GO_MAIN_GATE_DOOR));
+            boss_jormungarAI::EnterEvadeMode();
+        }
+
+        void JustReachedHome()
+        {
+            if (instanceScript)
+                instanceScript->DoUseDoorOrButton(instanceScript->GetData64(GO_MAIN_GATE_DOOR));
+
+            boss_jormungarAI::JustReachedHome();
+        }
     };
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_dreadscaleAI(pCreature);
+        return new boss_dreadscaleAI(creature);
     }
 };
-
 
 class mob_slime_pool : public CreatureScript
 {
 public:
     mob_slime_pool() : CreatureScript("mob_slime_pool") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_slime_poolAI(pCreature);
+        return new mob_slime_poolAI(creature);
     }
 
     struct mob_slime_poolAI : public ScriptedAI
     {
-        mob_slime_poolAI(Creature *pCreature) : ScriptedAI(pCreature)
+        mob_slime_poolAI(Creature* creature) : ScriptedAI(creature)
         {
         }
 
@@ -667,10 +726,9 @@ public:
         {
             casted = false;
             me->SetReactState(REACT_PASSIVE);
-            me->ForcedDespawn(60*IN_MILLISECONDS);
         }
 
-        void UpdateAI(const uint32 /*uiDiff*/)
+        void UpdateAI(uint32 const /*diff*/)
         {
             if (!casted)
             {
@@ -687,19 +745,19 @@ class boss_icehowl : public CreatureScript
 public:
     boss_icehowl() : CreatureScript("boss_icehowl") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_icehowlAI(pCreature);
+        return new boss_icehowlAI(creature);
     }
 
     struct boss_icehowlAI : public ScriptedAI
     {
-        boss_icehowlAI(Creature* pCreature) : ScriptedAI(pCreature)
+        boss_icehowlAI(Creature* creature) : ScriptedAI(creature)
         {
-            m_pInstance = (InstanceScript*)pCreature->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* m_pInstance;
+        InstanceScript* instance;
 
         uint32 m_uiFerociousButtTimer;
         uint32 m_uiArticBreathTimer;
@@ -712,7 +770,7 @@ public:
         bool   m_bMovementFinish;
         bool   m_bTrampleCasted;
         uint8  m_uiStage;
-        Unit*  pTarget;
+        Unit*  target;
 
         void Reset()
         {
@@ -731,19 +789,20 @@ public:
             m_uiStage = 0;
         }
 
-        void JustDied(Unit* /*pKiller*/)
+        void JustDied(Unit* /*killer*/)
         {
-            if (m_pInstance)
-                m_pInstance->SetData(TYPE_NORTHREND_BEASTS, ICEHOWL_DONE);
+            if (instance)
+                instance->SetData(TYPE_NORTHREND_BEASTS, ICEHOWL_DONE);
         }
 
-        void MovementInform(uint32 uiType, uint32 uiId)
+        void MovementInform(uint32 type, uint32 pointId)
         {
-            if (uiType != POINT_MOTION_TYPE) return;
+            if (type != POINT_MOTION_TYPE && type != EFFECT_MOTION_TYPE)
+                return;
 
-            switch (uiId)
+            switch (pointId)
             {
-                case 0: // JUMP!? Fuck! THAT'S BEEZARR! Would someone PLEASE make MotionMaster->Move* work better?
+                case 0:
                     if (me->GetDistance2d(ToCCommonLoc[1].GetPositionX(), ToCCommonLoc[1].GetPositionY()) < 6.0f)
                     {
                         // Middle of the room
@@ -755,39 +814,56 @@ public:
                         if (Unit::GetPlayer(*me, m_uiTrampleTargetGUID))
                         {
                             m_uiStage = 4;
-                        } else m_uiStage = 6;
+                        }
+                        else
+                            m_uiStage = 6;
                     }
                     break;
                 case 1: // Finish trample
                     m_bMovementFinish = true;
                     break;
+                case 2:
+                    instance->DoUseDoorOrButton(instance->GetData64(GO_MAIN_GATE_DOOR));
+                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+                    me->SetReactState(REACT_AGGRESSIVE);
+                    me->SetInCombatWithZone();
+                    break;
             }
+        }
+
+        void EnterEvadeMode()
+        {
+            instance->DoUseDoorOrButton(instance->GetData64(GO_MAIN_GATE_DOOR));
+            ScriptedAI::EnterEvadeMode();
         }
 
         void JustReachedHome()
         {
-            if (m_pInstance)
-                m_pInstance->SetData(TYPE_NORTHREND_BEASTS, FAIL);
-            me->ForcedDespawn();
+            if (instance)
+            {
+                instance->DoUseDoorOrButton(instance->GetData64(GO_MAIN_GATE_DOOR));
+                instance->SetData(TYPE_NORTHREND_BEASTS, FAIL);
+            }
+            me->DespawnOrUnsummon();
         }
 
-        void KilledUnit(Unit *pWho)
+        void KilledUnit(Unit* who)
         {
-            if (pWho->GetTypeId() == TYPEID_PLAYER)
+            if (who->GetTypeId() == TYPEID_PLAYER)
             {
-                if (m_pInstance)
-                    m_pInstance->SetData(DATA_TRIBUTE_TO_IMMORTALITY_ELEGIBLE, 0);
+                if (instance)
+                    instance->SetData(DATA_TRIBUTE_TO_IMMORTALITY_ELEGIBLE, 0);
             }
         }
 
-        void EnterCombat(Unit* /*pWho*/)
+        void EnterCombat(Unit* /*who*/)
         {
-            if (m_pInstance)
-                m_pInstance->SetData(TYPE_NORTHREND_BEASTS, ICEHOWL_IN_PROGRESS);
+            if (instance)
+                instance->SetData(TYPE_NORTHREND_BEASTS, ICEHOWL_IN_PROGRESS);
             me->SetInCombatWithZone();
         }
 
-        void SpellHitTarget(Unit* target, const SpellEntry* spell)
+        void SpellHitTarget(Unit* target, SpellInfo const* spell)
         {
             if (spell->Id == SPELL_TRAMPLE && target->GetTypeId() == TYPEID_PLAYER)
             {
@@ -799,7 +875,7 @@ public:
             }
         }
 
-        void UpdateAI(const uint32 uiDiff)
+        void UpdateAI(uint32 const diff)
         {
             if (!UpdateVictim())
                 return;
@@ -807,31 +883,31 @@ public:
             switch (m_uiStage)
             {
                 case 0:
-                    if (m_uiFerociousButtTimer <= uiDiff)
+                    if (m_uiFerociousButtTimer <= diff)
                     {
                         DoCastVictim(SPELL_FEROCIOUS_BUTT);
                         m_uiFerociousButtTimer = urand(15*IN_MILLISECONDS, 30*IN_MILLISECONDS);
-                    } else m_uiFerociousButtTimer -= uiDiff;
+                    } else m_uiFerociousButtTimer -= diff;
 
-                    if (m_uiArticBreathTimer <= uiDiff)
+                    if (m_uiArticBreathTimer <= diff)
                     {
-                        if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0))
-                            DoCast(pTarget, SPELL_ARCTIC_BREATH);
+                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                            DoCast(target, SPELL_ARCTIC_BREATH);
                         m_uiArticBreathTimer = urand(25*IN_MILLISECONDS, 40*IN_MILLISECONDS);
-                    } else m_uiArticBreathTimer -= uiDiff;
+                    } else m_uiArticBreathTimer -= diff;
 
-                    if (m_uiWhirlTimer <= uiDiff)
+                    if (m_uiWhirlTimer <= diff)
                     {
                         DoCastAOE(SPELL_WHIRL);
                         m_uiWhirlTimer = urand(15*IN_MILLISECONDS, 30*IN_MILLISECONDS);
-                    } else m_uiWhirlTimer -= uiDiff;
+                    } else m_uiWhirlTimer -= diff;
 
-                    if (m_uiMassiveCrashTimer <= uiDiff)
+                    if (m_uiMassiveCrashTimer <= diff)
                     {
                         me->GetMotionMaster()->MoveJump(ToCCommonLoc[1].GetPositionX(), ToCCommonLoc[1].GetPositionY(), ToCCommonLoc[1].GetPositionZ(), 10.0f, 20.0f); // 1: Middle of the room
                         m_uiStage = 7; //Invalid (Do nothing more than move)
                         m_uiMassiveCrashTimer = 30*IN_MILLISECONDS;
-                    } else m_uiMassiveCrashTimer -= uiDiff;
+                    } else m_uiMassiveCrashTimer -= diff;
 
                     DoMeleeAttackIfReady();
                     break;
@@ -840,11 +916,10 @@ public:
                     m_uiStage = 2;
                     break;
                 case 2:
-                    if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0))
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 0, true))
                     {
-                        m_uiTrampleTargetGUID = pTarget->GetGUID();
-                        me->SetUInt64Value(UNIT_FIELD_TARGET, m_uiTrampleTargetGUID);
-                        DoScriptText(SAY_TRAMPLE_STARE, me, pTarget);
+                        m_uiTrampleTargetGUID = target->GetGUID();
+                        me->SetTarget(m_uiTrampleTargetGUID);
                         m_bTrampleCasted = false;
                         SetCombatMovement(false);
                         me->GetMotionMaster()->MoveIdle();
@@ -854,57 +929,62 @@ public:
                     } else m_uiStage = 6;
                     break;
                 case 3:
-                    if (m_uiTrampleTimer <= uiDiff)
+                    if (m_uiTrampleTimer <= diff)
                     {
-                        if (Unit* pTarget = Unit::GetPlayer(*me, m_uiTrampleTargetGUID))
+                        if (Unit* target = Unit::GetPlayer(*me, m_uiTrampleTargetGUID))
                         {
                             m_bTrampleCasted = false;
                             m_bMovementStarted = true;
-                            m_fTrampleTargetX = pTarget->GetPositionX();
-                            m_fTrampleTargetY = pTarget->GetPositionY();
-                            m_fTrampleTargetZ = pTarget->GetPositionZ();
+                            m_fTrampleTargetX = target->GetPositionX();
+                            m_fTrampleTargetY = target->GetPositionY();
+                            m_fTrampleTargetZ = target->GetPositionZ();
                             me->GetMotionMaster()->MoveJump(2*me->GetPositionX()-m_fTrampleTargetX,
                                 2*me->GetPositionY()-m_fTrampleTargetY,
                                 me->GetPositionZ(),
                                 10.0f, 20.0f); // 2: Hop Backwards
                             m_uiStage = 7; //Invalid (Do nothing more than move)
                         } else m_uiStage = 6;
-                    } else m_uiTrampleTimer -= uiDiff;
+                    } else m_uiTrampleTimer -= diff;
                     break;
                 case 4:
-                    DoScriptText(SAY_TRAMPLE_START, me);
+                    Talk(EMOTE_TRAMPLE_START, m_uiTrampleTargetGUID);
                     me->GetMotionMaster()->MoveCharge(m_fTrampleTargetX, m_fTrampleTargetY, m_fTrampleTargetZ+2, 42, 1);
-                    me->SetUInt64Value(UNIT_FIELD_TARGET, 0);
+                    me->SetTarget(0);
                     m_uiStage = 5;
                     break;
                 case 5:
                     if (m_bMovementFinish)
                     {
-                        if (m_uiTrampleTimer <= uiDiff) DoCastAOE(SPELL_TRAMPLE);
+                        if (m_uiTrampleTimer <= diff) DoCastAOE(SPELL_TRAMPLE);
                         m_bMovementFinish = false;
                         m_uiStage = 6;
                         return;
                     }
-                    if (m_uiTrampleTimer <= uiDiff)
+                    if (m_uiTrampleTimer <= diff)
                     {
                         Map::PlayerList const &lPlayers = me->GetMap()->GetPlayers();
                         for (Map::PlayerList::const_iterator itr = lPlayers.begin(); itr != lPlayers.end(); ++itr)
                         {
-                            if (Unit* pPlayer = itr->getSource())
-                                if (pPlayer->isAlive() && pPlayer->IsWithinDistInMap(me, 6.0f))
+                            if (Unit* player = itr->getSource())
+                                if (player->isAlive() && player->IsWithinDistInMap(me, 6.0f))
                                 {
                                     DoCastAOE(SPELL_TRAMPLE);
                                     m_uiTrampleTimer = IN_MILLISECONDS;
                                     break;
                                 }
                         }
-                    } else m_uiTrampleTimer -= uiDiff;
+                    } else m_uiTrampleTimer -= diff;
                     break;
                 case 6:
                     if (!m_bTrampleCasted)
                     {
                         DoCast(me, SPELL_STAGGERED_DAZE);
-                        DoScriptText(SAY_TRAMPLE_FAIL, me);
+                        Talk(EMOTE_TRAMPLE_CRASH);
+                    }
+                    else
+                    {
+                        DoCast(me, SPELL_FROTHING_RAGE, true);
+                        Talk(EMOTE_TRAMPLE_FAIL);
                     }
                     m_bMovementStarted = false;
                     me->GetMotionMaster()->MovementExpired();
@@ -918,7 +998,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_northrend_beasts()
 {

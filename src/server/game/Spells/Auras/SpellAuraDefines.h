@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -22,27 +22,32 @@
 
 enum AURA_FLAGS
 {
-    AFLAG_NONE              = 0x00,
-    AFLAG_EFF_INDEX_0       = 0x01,
-    AFLAG_EFF_INDEX_1       = 0x02,
-    AFLAG_EFF_INDEX_2       = 0x04,
-    AFLAG_CASTER            = 0x08,
-    AFLAG_POSITIVE          = 0x10,
-    AFLAG_DURATION          = 0x20,
-    AFLAG_UNK2              = 0x40,
-    AFLAG_NEGATIVE          = 0x80
+    AFLAG_NONE                   = 0x00,
+    AFLAG_EFF_INDEX_0            = 0x01,
+    AFLAG_EFF_INDEX_1            = 0x02,
+    AFLAG_EFF_INDEX_2            = 0x04,
+    AFLAG_CASTER                 = 0x08,
+    AFLAG_POSITIVE               = 0x10,
+    AFLAG_DURATION               = 0x20,
+    AFLAG_ANY_EFFECT_AMOUNT_SENT = 0x40, // used with AFLAG_EFF_INDEX_0/1/2
+    AFLAG_NEGATIVE               = 0x80
 };
+
+// these are modes, in which aura effect handler may be called
 
 enum AuraEffectHandleModes
 {
     AURA_EFFECT_HANDLE_DEFAULT = 0x0,
-    AURA_EFFECT_HANDLE_REAL = 0x01,
-    AURA_EFFECT_HANDLE_SEND_FOR_CLIENT = 0x02,
-    AURA_EFFECT_HANDLE_CHANGE_AMOUNT = 0x04,
-    AURA_EFFECT_HANDLE_STAT = 0x08,
-    AURA_EFFECT_HANDLE_SEND_FOR_CLIENT_MASK = (AURA_EFFECT_HANDLE_SEND_FOR_CLIENT | AURA_EFFECT_HANDLE_REAL),
-    AURA_EFFECT_HANDLE_CHANGE_AMOUNT_MASK = (AURA_EFFECT_HANDLE_CHANGE_AMOUNT | AURA_EFFECT_HANDLE_REAL),
+    AURA_EFFECT_HANDLE_REAL = 0x01, // handler applies/removes effect from unit
+    AURA_EFFECT_HANDLE_SEND_FOR_CLIENT = 0x02, // handler sends apply/remove packet to unit
+    AURA_EFFECT_HANDLE_CHANGE_AMOUNT = 0x04, // handler updates effect on target after effect amount change
+    AURA_EFFECT_HANDLE_REAPPLY = 0x08, // handler updates effect on target after aura is reapplied on target
+    AURA_EFFECT_HANDLE_STAT = 0x10, // handler updates effect on target when stat removal/apply is needed for calculations by core
+    AURA_EFFECT_HANDLE_SKILL = 0x20, // handler updates effect on target when skill removal/apply is needed for calculations by core
+    AURA_EFFECT_HANDLE_SEND_FOR_CLIENT_MASK = (AURA_EFFECT_HANDLE_SEND_FOR_CLIENT | AURA_EFFECT_HANDLE_REAL), // any case handler need to send packet
+    AURA_EFFECT_HANDLE_CHANGE_AMOUNT_MASK = (AURA_EFFECT_HANDLE_CHANGE_AMOUNT | AURA_EFFECT_HANDLE_REAL), // any case handler applies effect depending on amount
     AURA_EFFECT_HANDLE_CHANGE_AMOUNT_SEND_FOR_CLIENT_MASK = (AURA_EFFECT_HANDLE_CHANGE_AMOUNT_MASK | AURA_EFFECT_HANDLE_SEND_FOR_CLIENT_MASK),
+    AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK = (AURA_EFFECT_HANDLE_REAPPLY | AURA_EFFECT_HANDLE_REAL),
 };
 
 //m_schoolAbsorb
@@ -74,7 +79,7 @@ enum AuraType
     SPELL_AURA_MOD_STEALTH_DETECT = 17,
     SPELL_AURA_MOD_INVISIBILITY = 18,
     SPELL_AURA_MOD_INVISIBILITY_DETECT = 19,
-    SPELL_AURA_OBS_MOD_HEALTH = 20,                         //20,21 unofficial
+    SPELL_AURA_OBS_MOD_HEALTH = 20,                         //20, 21 unofficial
     SPELL_AURA_OBS_MOD_POWER = 21,
     SPELL_AURA_MOD_RESISTANCE = 22,
     SPELL_AURA_PERIODIC_TRIGGER_SPELL = 23,
@@ -216,8 +221,8 @@ enum AuraType
     SPELL_AURA_NO_PVP_CREDIT = 159,
     SPELL_AURA_MOD_AOE_AVOIDANCE = 160,
     SPELL_AURA_MOD_HEALTH_REGEN_IN_COMBAT = 161,
-    SPELL_AURA_POWER_BURN_MANA = 162,
-    SPELL_AURA_MOD_CRIT_DAMAGE_BONUS_MELEE = 163,
+    SPELL_AURA_POWER_BURN = 162,
+    SPELL_AURA_MOD_CRIT_DAMAGE_BONUS = 163,
     SPELL_AURA_164 = 164,
     SPELL_AURA_MELEE_ATTACK_POWER_ATTACKER_BONUS = 165,
     SPELL_AURA_MOD_ATTACK_POWER_PCT = 166,
@@ -271,7 +276,7 @@ enum AuraType
     SPELL_AURA_214 = 214,
     SPELL_AURA_ARENA_PREPARATION = 215,
     SPELL_AURA_HASTE_SPELLS = 216,
-    SPELL_AURA_217 = 217,
+    SPELL_AURA_MOD_MELEE_HASTE_2 = 217,                     // NYI
     SPELL_AURA_HASTE_RANGED = 218,
     SPELL_AURA_MOD_MANA_REGEN_FROM_STAT = 219,
     SPELL_AURA_MOD_RATING_FROM_STAT = 220,
@@ -287,7 +292,7 @@ enum AuraType
     SPELL_AURA_230 = 230,
     SPELL_AURA_PROC_TRIGGER_SPELL_WITH_VALUE = 231,
     SPELL_AURA_MECHANIC_DURATION_MOD = 232,
-    SPELL_AURA_233 = 233,
+    SPELL_AURA_CHANGE_MODEL_FOR_ALL_HUMANOIDS = 233,        // client-side only
     SPELL_AURA_MECHANIC_DURATION_MOD_NOT_STACK = 234,
     SPELL_AURA_MOD_DISPEL_RESIST = 235,
     SPELL_AURA_CONTROL_VEHICLE = 236,
@@ -330,7 +335,7 @@ enum AuraType
     SPELL_AURA_X_RAY = 273,
     SPELL_AURA_ABILITY_CONSUME_NO_AMMO = 274,
     SPELL_AURA_MOD_IGNORE_SHAPESHIFT = 275,
-    SPELL_AURA_276 = 276,                                   // Only "Test Mod Damage % Mechanic" spell, possible mod damage done
+    SPELL_AURA_MOD_DAMAGE_DONE_FOR_MECHANIC = 276,          // NYI
     SPELL_AURA_MOD_MAX_AFFECTED_TARGETS = 277,
     SPELL_AURA_MOD_DISARM_RANGED = 278,
     SPELL_AURA_INITIALIZE_IMAGES = 279,
@@ -362,13 +367,13 @@ enum AuraType
     SPELL_AURA_MOD_MINIMUM_SPEED = 305,
     SPELL_AURA_306 = 306,
     SPELL_AURA_HEAL_ABSORB_TEST = 307,
-    SPELL_AURA_308 = 308,
+    SPELL_AURA_MOD_CRIT_CHANCE_FOR_CASTER = 308,            // NYI
     SPELL_AURA_309 = 309,
     SPELL_AURA_MOD_CREATURE_AOE_DAMAGE_AVOIDANCE = 310,
     SPELL_AURA_311 = 311,
     SPELL_AURA_312 = 312,
     SPELL_AURA_313 = 313,
-    SPELL_AURA_PREVENT_RESSURECTION = 314,
+    SPELL_AURA_PREVENT_RESURRECTION = 314,
     SPELL_AURA_UNDERWATER_WALKING = 315,
     SPELL_AURA_PERIODIC_HASTE = 316,
     TOTAL_AURAS = 317

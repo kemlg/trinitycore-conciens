@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,63 +15,37 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* ScriptData
-SDName: Blackrock_Depths
-SD%Complete: 95
-SDComment: Quest support: 4001, 4342, 7604, 4322. Vendor Lokhtos Darkbargainer. Need to rewrite the Jail Break support
-SDCategory: Blackrock Depths
-EndScriptData */
-
-/* ContentData
-go_shadowforge_brazier
-at_ring_of_law
-npc_grimstone
-mob_phalanx
-npc_kharan_mighthammer
-npc_lokhtos_darkbargainer
-npc_dughal_stormwing
-npc_marshal_windsor
-npc_marshal_reginald_windsor
-npc_tobias_seecher
-npc_rocknot
-EndContentData */
-
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "ScriptedEscortAI.h"
+#include "ScriptedGossip.h"
 #include "blackrock_depths.h"
 
-/*######
-+## go_shadowforge_brazier
-+######*/
-
+//go_shadowforge_brazier
 class go_shadowforge_brazier : public GameObjectScript
 {
 public:
     go_shadowforge_brazier() : GameObjectScript("go_shadowforge_brazier") { }
 
-    bool OnGossipHello(Player* /*pPlayer*/, GameObject* pGo)
+    bool OnGossipHello(Player* /*player*/, GameObject* go)
     {
-        if (InstanceScript* pInstance = pGo->GetInstanceScript())
+        if (InstanceScript* instance = go->GetInstanceScript())
         {
-            if (pInstance->GetData(TYPE_LYCEUM) == IN_PROGRESS)
-                pInstance->SetData(TYPE_LYCEUM, DONE);
+            if (instance->GetData(TYPE_LYCEUM) == IN_PROGRESS)
+                instance->SetData(TYPE_LYCEUM, DONE);
             else
-                pInstance->SetData(TYPE_LYCEUM, IN_PROGRESS);
+                instance->SetData(TYPE_LYCEUM, IN_PROGRESS);
             // If used brazier open linked doors (North or South)
-            if (pGo->GetGUID() == pInstance->GetData64(DATA_SF_BRAZIER_N))
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GOLEM_DOOR_N), true);
-            else if (pGo->GetGUID() == pInstance->GetData64(DATA_SF_BRAZIER_S))
-                pInstance->HandleGameObject(pInstance->GetData64(DATA_GOLEM_DOOR_S), true);
+            if (go->GetGUID() == instance->GetData64(DATA_SF_BRAZIER_N))
+                instance->HandleGameObject(instance->GetData64(DATA_GOLEM_DOOR_N), true);
+            else if (go->GetGUID() == instance->GetData64(DATA_SF_BRAZIER_S))
+                instance->HandleGameObject(instance->GetData64(DATA_GOLEM_DOOR_S), true);
         }
         return false;
     }
-
 };
 
-/*######
-## npc_grimstone
-######*/
-
+// npc_grimstone
 enum eGrimstone
 {
     NPC_GRIMSTONE                                          = 10096,
@@ -106,35 +80,31 @@ class at_ring_of_law : public AreaTriggerScript
 public:
     at_ring_of_law() : AreaTriggerScript("at_ring_of_law") { }
 
-    bool OnTrigger(Player* pPlayer, const AreaTriggerEntry * /*at*/)
+    bool OnTrigger(Player* player, const AreaTriggerEntry* /*at*/)
     {
-        if (InstanceScript* pInstance = pPlayer->GetInstanceScript())
+        if (InstanceScript* instance = player->GetInstanceScript())
         {
-            if (pInstance->GetData(TYPE_RING_OF_LAW) == IN_PROGRESS || pInstance->GetData(TYPE_RING_OF_LAW) == DONE)
+            if (instance->GetData(TYPE_RING_OF_LAW) == IN_PROGRESS || instance->GetData(TYPE_RING_OF_LAW) == DONE)
                 return false;
 
-            pInstance->SetData(TYPE_RING_OF_LAW,IN_PROGRESS);
-            pPlayer->SummonCreature(NPC_GRIMSTONE,625.559f,-205.618f,-52.735f,2.609f,TEMPSUMMON_DEAD_DESPAWN,0);
+            instance->SetData(TYPE_RING_OF_LAW, IN_PROGRESS);
+            player->SummonCreature(NPC_GRIMSTONE, 625.559f, -205.618f, -52.735f, 2.609f, TEMPSUMMON_DEAD_DESPAWN, 0);
 
             return false;
         }
         return false;
     }
-
 };
 
-/*######
-## npc_grimstone
-######*/
-
+// npc_grimstone
 enum GrimstoneTexts
 {
-    SCRIPT_TEXT1                                           = -1000000,
-    SCRIPT_TEXT2                                           = -1000001,
-    SCRIPT_TEXT3                                           = -1000002,
-    SCRIPT_TEXT4                                           = -1000003,
-    SCRIPT_TEXT5                                           = -1000004,
-    SCRIPT_TEXT6                                           = -1000005
+    SCRIPT_TEXT1          = -1230003,
+    SCRIPT_TEXT2          = -1230004,
+    SCRIPT_TEXT3          = -1230005,
+    SCRIPT_TEXT4          = -1230006,
+    SCRIPT_TEXT5          = -1230007,
+    SCRIPT_TEXT6          = -1230008
 };
 
 //TODO: implement quest part of event (different end boss)
@@ -143,20 +113,20 @@ class npc_grimstone : public CreatureScript
 public:
     npc_grimstone() : CreatureScript("npc_grimstone") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_grimstoneAI(pCreature);
+        return new npc_grimstoneAI(creature);
     }
 
     struct npc_grimstoneAI : public npc_escortAI
     {
-        npc_grimstoneAI(Creature *c) : npc_escortAI(c)
+        npc_grimstoneAI(Creature* creature) : npc_escortAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
             MobSpawnId = rand()%6;
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint8 EventPhase;
         uint32 Event_Timer;
@@ -191,7 +161,7 @@ public:
         //TODO: move them to center
         void SummonRingMob()
         {
-            if (Creature* tmp = me->SummonCreature(RingMob[MobSpawnId],608.960f,-235.322f,-53.907f,1.857f,TEMPSUMMON_DEAD_DESPAWN,0))
+            if (Creature* tmp = me->SummonCreature(RingMob[MobSpawnId], 608.960f, -235.322f, -53.907f, 1.857f, TEMPSUMMON_DEAD_DESPAWN, 0))
                 RingMobGUID[MobCount] = tmp->GetGUID();
 
             ++MobCount;
@@ -203,55 +173,56 @@ public:
         //TODO: move them to center
         void SummonRingBoss()
         {
-            if (Creature* tmp = me->SummonCreature(RingBoss[rand()%6],644.300f,-175.989f,-53.739f,3.418f,TEMPSUMMON_DEAD_DESPAWN,0))
+            if (Creature* tmp = me->SummonCreature(RingBoss[rand()%6], 644.300f, -175.989f, -53.739f, 3.418f, TEMPSUMMON_DEAD_DESPAWN, 0))
                 RingBossGUID = tmp->GetGUID();
 
             MobDeath_Timer = 2500;
         }
 
-        void WaypointReached(uint32 i)
+        void WaypointReached(uint32 waypointId)
         {
-            switch(i)
+            switch (waypointId)
             {
-            case 0:
-                DoScriptText(SCRIPT_TEXT1, me);//2
-                CanWalk = false;
-                Event_Timer = 5000;
-                break;
-            case 1:
-                DoScriptText(SCRIPT_TEXT2, me);//4
-                CanWalk = false;
-                Event_Timer = 5000;
-                break;
-            case 2:
-                CanWalk = false;
-                break;
-            case 3:
-                DoScriptText(SCRIPT_TEXT3, me);//5
-                break;
-            case 4:
-                DoScriptText(SCRIPT_TEXT4, me);//6
-                CanWalk = false;
-                Event_Timer = 5000;
-                break;
-            case 5:
-                if (pInstance)
-                {
-                    pInstance->SetData(TYPE_RING_OF_LAW,DONE);
-                    sLog->outDebug("TSCR: npc_grimstone: event reached end and set complete.");
-                }
-                break;
+                case 0:
+                    DoScriptText(SCRIPT_TEXT1, me);//2
+                    CanWalk = false;
+                    Event_Timer = 5000;
+                    break;
+                case 1:
+                    DoScriptText(SCRIPT_TEXT2, me);//4
+                    CanWalk = false;
+                    Event_Timer = 5000;
+                    break;
+                case 2:
+                    CanWalk = false;
+                    break;
+                case 3:
+                    DoScriptText(SCRIPT_TEXT3, me);//5
+                    break;
+                case 4:
+                    DoScriptText(SCRIPT_TEXT4, me);//6
+                    CanWalk = false;
+                    Event_Timer = 5000;
+                    break;
+                case 5:
+                    if (instance)
+                    {
+                        instance->UpdateEncounterState(ENCOUNTER_CREDIT_KILL_CREATURE, NPC_GRIMSTONE, me);
+                        instance->SetData(TYPE_RING_OF_LAW, DONE);
+                        sLog->outDebug(LOG_FILTER_TSCR, "npc_grimstone: event reached end and set complete.");
+                    }
+                    break;
             }
         }
 
         void HandleGameObject(uint32 id, bool open)
         {
-            pInstance->HandleGameObject(pInstance->GetData64(id), open);
+            instance->HandleGameObject(instance->GetData64(id), open);
         }
 
         void UpdateAI(const uint32 diff)
         {
-            if (!pInstance)
+            if (!instance)
                 return;
 
             if (MobDeath_Timer)
@@ -262,7 +233,7 @@ public:
 
                     if (RingBossGUID)
                     {
-                        Creature *boss = Unit::GetCreature(*me,RingBossGUID);
+                        Creature* boss = Unit::GetCreature(*me, RingBossGUID);
                         if (boss && !boss->isAlive() && boss->isDead())
                         {
                             RingBossGUID = 0;
@@ -275,7 +246,7 @@ public:
 
                     for (uint8 i = 0; i < MAX_MOB_AMOUNT; ++i)
                     {
-                        Creature *mob = Unit::GetCreature(*me,RingMobGUID[i]);
+                        Creature* mob = Unit::GetCreature(*me, RingMobGUID[i]);
                         if (mob && !mob->isAlive() && mob->isDead())
                         {
                             RingMobGUID[i] = 0;
@@ -296,7 +267,7 @@ public:
             {
                 if (Event_Timer <= diff)
                 {
-                    switch(EventPhase)
+                    switch (EventPhase)
                     {
                     case 0:
                         DoScriptText(SCRIPT_TEXT5, me);//1
@@ -364,19 +335,14 @@ public:
                 npc_escortAI::UpdateAI(diff);
            }
     };
-
 };
 
-
-/*######
-## mob_phalanx
-######*/
-
+// mob_phalanx
 enum PhalanxSpells
 {
-    SPELL_THUNDERCLAP                                      = 8732,
-    SPELL_FIREBALLVOLLEY                                   = 22425,
-    SPELL_MIGHTYBLOW                                       = 14099
+    SPELL_THUNDERCLAP                   = 8732,
+    SPELL_FIREBALLVOLLEY                = 22425,
+    SPELL_MIGHTYBLOW                    = 14099
 };
 
 class mob_phalanx : public CreatureScript
@@ -384,14 +350,14 @@ class mob_phalanx : public CreatureScript
 public:
     mob_phalanx() : CreatureScript("mob_phalanx") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_phalanxAI (pCreature);
+        return new mob_phalanxAI (creature);
     }
 
     struct mob_phalanxAI : public ScriptedAI
     {
-        mob_phalanxAI(Creature *c) : ScriptedAI(c) {}
+        mob_phalanxAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 ThunderClap_Timer;
         uint32 FireballVolley_Timer;
@@ -400,7 +366,7 @@ public:
         void Reset()
         {
             ThunderClap_Timer = 12000;
-            FireballVolley_Timer =0;
+            FireballVolley_Timer = 0;
             MightyBlow_Timer = 15000;
         }
 
@@ -437,22 +403,17 @@ public:
             DoMeleeAttackIfReady();
         }
     };
-
 };
 
-/*######
-## npc_kharan_mighthammer
-######*/
-
+// npc_kharan_mighthammer
 enum KharamQuests
 {
-    QUEST_4001                                             = 4001,
-    QUEST_4342                                             = 4342
+    QUEST_4001                          = 4001,
+    QUEST_4342                          = 4342
 };
 
 #define GOSSIP_ITEM_KHARAN_1    "I need to know where the princess are, Kharan!"
 #define GOSSIP_ITEM_KHARAN_2    "All is not lost, Kharan!"
-
 #define GOSSIP_ITEM_KHARAN_3    "Gor'shak is my friend, you can trust me."
 #define GOSSIP_ITEM_KHARAN_4    "Not enough, you need to tell me more."
 #define GOSSIP_ITEM_KHARAN_5    "So what happened?"
@@ -467,81 +428,76 @@ class npc_kharan_mighthammer : public CreatureScript
 public:
     npc_kharan_mighthammer() : CreatureScript("npc_kharan_mighthammer") { }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 /*uiSender*/, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        switch (uiAction)
+        player->PlayerTalkClass->ClearMenus();
+        switch (action)
         {
             case GOSSIP_ACTION_INFO_DEF+1:
-                 pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_3, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
-                pPlayer->SEND_GOSSIP_MENU(2475, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_3, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
+                player->SEND_GOSSIP_MENU(2475, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+2:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_4, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+3);
-                pPlayer->SEND_GOSSIP_MENU(2476, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_4, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+3);
+                player->SEND_GOSSIP_MENU(2476, creature->GetGUID());
                 break;
 
             case GOSSIP_ACTION_INFO_DEF+3:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+4);
-                pPlayer->SEND_GOSSIP_MENU(2477, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+4);
+                player->SEND_GOSSIP_MENU(2477, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+4:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_6, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+5);
-                pPlayer->SEND_GOSSIP_MENU(2478, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_6, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+5);
+                player->SEND_GOSSIP_MENU(2478, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+5:
-                 pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_7, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+6);
-                pPlayer->SEND_GOSSIP_MENU(2479, pCreature->GetGUID());
+                 player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_7, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+6);
+                player->SEND_GOSSIP_MENU(2479, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+6:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_8, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+7);
-                pPlayer->SEND_GOSSIP_MENU(2480, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_8, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+7);
+                player->SEND_GOSSIP_MENU(2480, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+7:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_9, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+8);
-                pPlayer->SEND_GOSSIP_MENU(2481, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_9, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+8);
+                player->SEND_GOSSIP_MENU(2481, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+8:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_10, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+9);
-                pPlayer->SEND_GOSSIP_MENU(2482, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_10, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+9);
+                player->SEND_GOSSIP_MENU(2482, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+9:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                if (pPlayer->GetTeam() == HORDE)
-                    pPlayer->AreaExploredOrEventHappens(QUEST_4001);
+                player->CLOSE_GOSSIP_MENU();
+                if (player->GetTeam() == HORDE)
+                    player->AreaExploredOrEventHappens(QUEST_4001);
                 else
-                    pPlayer->AreaExploredOrEventHappens(QUEST_4342);
+                    player->AreaExploredOrEventHappens(QUEST_4342);
                 break;
         }
         return true;
     }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (pCreature->isQuestGiver())
-            pPlayer->PrepareQuestMenu(pCreature->GetGUID());
+        if (creature->isQuestGiver())
+            player->PrepareQuestMenu(creature->GetGUID());
 
-        if (pPlayer->GetQuestStatus(QUEST_4001) == QUEST_STATUS_INCOMPLETE)
-             pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
+        if (player->GetQuestStatus(QUEST_4001) == QUEST_STATUS_INCOMPLETE)
+             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
 
-        if (pPlayer->GetQuestStatus(4342) == QUEST_STATUS_INCOMPLETE)
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+3);
+        if (player->GetQuestStatus(4342) == QUEST_STATUS_INCOMPLETE)
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_KHARAN_2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+3);
 
-        if (pPlayer->GetTeam() == HORDE)
-            pPlayer->SEND_GOSSIP_MENU(2473, pCreature->GetGUID());
+        if (player->GetTeam() == HORDE)
+            player->SEND_GOSSIP_MENU(2473, creature->GetGUID());
         else
-            pPlayer->SEND_GOSSIP_MENU(2474, pCreature->GetGUID());
+            player->SEND_GOSSIP_MENU(2474, creature->GetGUID());
 
         return true;
     }
-
 };
 
-
-/*######
-## npc_lokhtos_darkbargainer
-######*/
-
+// npc_lokhtos_darkbargainer
 enum LokhtosItems
 {
     ITEM_THRORIUM_BROTHERHOOD_CONTRACT                     = 18628,
@@ -566,53 +522,48 @@ class npc_lokhtos_darkbargainer : public CreatureScript
 public:
     npc_lokhtos_darkbargainer() : CreatureScript("npc_lokhtos_darkbargainer") { }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 /*uiSender*/, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        if (uiAction == GOSSIP_ACTION_INFO_DEF + 1)
+        player->PlayerTalkClass->ClearMenus();
+        if (action == GOSSIP_ACTION_INFO_DEF + 1)
         {
-            pPlayer->CLOSE_GOSSIP_MENU();
-            pPlayer->CastSpell(pPlayer, SPELL_CREATE_THORIUM_BROTHERHOOD_CONTRACT_DND, false);
+            player->CLOSE_GOSSIP_MENU();
+            player->CastSpell(player, SPELL_CREATE_THORIUM_BROTHERHOOD_CONTRACT_DND, false);
         }
-        if (uiAction == GOSSIP_ACTION_TRADE)
-            pPlayer->SEND_VENDORLIST(pCreature->GetGUID());
+        if (action == GOSSIP_ACTION_TRADE)
+            player->GetSession()->SendListInventory(creature->GetGUID());
 
         return true;
     }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (pCreature->isQuestGiver())
-            pPlayer->PrepareQuestMenu(pCreature->GetGUID());
+        if (creature->isQuestGiver())
+            player->PrepareQuestMenu(creature->GetGUID());
 
-        if (pCreature->isVendor() && pPlayer->GetReputationRank(59) >= REP_FRIENDLY)
-              pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_VENDOR, GOSSIP_ITEM_SHOW_ACCESS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
+        if (creature->isVendor() && player->GetReputationRank(59) >= REP_FRIENDLY)
+              player->ADD_GOSSIP_ITEM(GOSSIP_ICON_VENDOR, GOSSIP_ITEM_SHOW_ACCESS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
 
-        if (pPlayer->GetQuestRewardStatus(QUEST_A_BINDING_CONTRACT) != 1 &&
-            !pPlayer->HasItemCount(ITEM_THRORIUM_BROTHERHOOD_CONTRACT, 1, true) &&
-            pPlayer->HasItemCount(ITEM_SULFURON_INGOT, 1))
+        if (player->GetQuestRewardStatus(QUEST_A_BINDING_CONTRACT) != 1 &&
+            !player->HasItemCount(ITEM_THRORIUM_BROTHERHOOD_CONTRACT, 1, true) &&
+            player->HasItemCount(ITEM_SULFURON_INGOT, 1))
         {
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_GET_CONTRACT, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_GET_CONTRACT, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
         }
 
-        if (pPlayer->GetReputationRank(59) < REP_FRIENDLY)
-            pPlayer->SEND_GOSSIP_MENU(3673, pCreature->GetGUID());
+        if (player->GetReputationRank(59) < REP_FRIENDLY)
+            player->SEND_GOSSIP_MENU(3673, creature->GetGUID());
         else
-            pPlayer->SEND_GOSSIP_MENU(3677, pCreature->GetGUID());
+            player->SEND_GOSSIP_MENU(3677, creature->GetGUID());
 
         return true;
     }
-
 };
 
-
-/*######
-## npc_dughal_stormwing
-######*/
-
+// npc_dughal_stormwing
 enum DughalQuests
 {
-    QUEST_JAIL_BREAK                                       = 4322
+    QUEST_JAIL_BREAK                      = 4322
 };
 
 #define SAY_DUGHAL_FREE         "Thank you, $N! I'm free!!!"
@@ -624,56 +575,60 @@ class npc_dughal_stormwing : public CreatureScript
 public:
     npc_dughal_stormwing() : CreatureScript("npc_dughal_stormwing") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        npc_dughal_stormwingAI* dughal_stormwingAI = new npc_dughal_stormwingAI(pCreature);
+        npc_dughal_stormwingAI* dughal_stormwingAI = new npc_dughal_stormwingAI(creature);
 
-        dughal_stormwingAI->AddWaypoint(0, 280.42f,-82.86f, -77.12f,0);
-        dughal_stormwingAI->AddWaypoint(1, 287.64f,-87.01f, -76.79f,0);
-        dughal_stormwingAI->AddWaypoint(2, 354.63f,-64.95f, -67.53f,0);
+        dughal_stormwingAI->AddWaypoint(0, 280.42f, -82.86f, -77.12f, 0);
+        dughal_stormwingAI->AddWaypoint(1, 287.64f, -87.01f, -76.79f, 0);
+        dughal_stormwingAI->AddWaypoint(2, 354.63f, -64.95f, -67.53f, 0);
 
         return dughal_stormwingAI;
     }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 uiSender, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        if (uiAction == GOSSIP_ACTION_INFO_DEF + 1)
+        player->PlayerTalkClass->ClearMenus();
+        if (action == GOSSIP_ACTION_INFO_DEF + 1)
         {
-            pPlayer->CLOSE_GOSSIP_MENU();
-            CAST_AI(npc_escort::npc_escortAI, (pCreature->AI()))->Start(false, true, pPlayer->GetGUID());
-            pCreature->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
-            pInstance->SetData(DATA_QUEST_JAIL_BREAK,ENCOUNTER_STATE_IN_PROGRESS);
+            player->CLOSE_GOSSIP_MENU();
+            CAST_AI(npc_escort::npc_escortAI, (creature->AI()))->Start(false, true, player->GetGUID());
+            creature->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+            instance->SetData(DATA_QUEST_JAIL_BREAK, ENCOUNTER_STATE_IN_PROGRESS);
         }
         return true;
     }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (pPlayer->GetQuestStatus(QUEST_JAIL_BREAK) == QUEST_STATUS_INCOMPLETE && pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_IN_PROGRESS)
+        if (player->GetQuestStatus(QUEST_JAIL_BREAK) == QUEST_STATUS_INCOMPLETE && instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_IN_PROGRESS)
         {
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_DUGHAL, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
-            pPlayer->SEND_GOSSIP_MENU(2846, pCreature->GetGUID());
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_DUGHAL, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+            player->SEND_GOSSIP_MENU(2846, creature->GetGUID());
         }
         return true;
     }
 
     struct npc_dughal_stormwingAI : public npc_escortAI
     {
-        npc_dughal_stormwingAI(Creature *c) : npc_escortAI(c) {}
+        npc_dughal_stormwingAI(Creature* creature) : npc_escortAI(creature) {}
 
-        void WaypointReached(uint32 i)
+        void WaypointReached(uint32 waypointId)
         {
-        switch(i)
+            switch (waypointId)
             {
-            case 0:me->Say(SAY_DUGHAL_FREE, LANG_UNIVERSAL, PlayerGUID); break;
-            case 1:pInstance->SetData(DATA_DUGHAL,ENCOUNTER_STATE_OBJECTIVE_COMPLETED);break;
-            case 2:
-                me->SetVisibility(VISIBILITY_OFF);
-                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
-                pInstance->SetData(DATA_DUGHAL,ENCOUNTER_STATE_ENDED);
-                break;
+                case 0:
+                    me->Say(SAY_DUGHAL_FREE, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 1:
+                    instance->SetData(DATA_DUGHAL, ENCOUNTER_STATE_OBJECTIVE_COMPLETED);
+                    break;
+                case 2:
+                    me->SetVisible(false);
+                    me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                    me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                    instance->SetData(DATA_DUGHAL, ENCOUNTER_STATE_ENDED);
+                    break;
             }
         }
 
@@ -684,39 +639,36 @@ public:
         {
             if (IsBeingEscorted && killer == me)
             {
-                me->SetVisibility(VISIBILITY_OFF);
+                me->SetVisible(false);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
-                pInstance->SetData(DATA_DUGHAL,ENCOUNTER_STATE_ENDED);
+                instance->SetData(DATA_DUGHAL, ENCOUNTER_STATE_ENDED);
             }
         }
 
         void UpdateAI(const uint32 diff)
         {
-            if (pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_NOT_STARTED) return;
-            if ((pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_IN_PROGRESS || pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_FAILED || pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_ENDED)&& pInstance->GetData(DATA_DUGHAL) == ENCOUNTER_STATE_ENDED)
+            if (instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_NOT_STARTED) return;
+            if ((instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_IN_PROGRESS || instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_FAILED || instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_ENDED)&& instance->GetData(DATA_DUGHAL) == ENCOUNTER_STATE_ENDED)
             {
-                me->SetVisibility(VISIBILITY_OFF);
+                me->SetVisible(false);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
             }
             else
             {
-                me->SetVisibility(VISIBILITY_ON);
+                me->SetVisible(true);
                 me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                 me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
             }
             npc_escortAI::UpdateAI(diff);
         }
     };
-
 };
 
  */
-/*######
-## npc_marshal_windsor
-######*/
 
+// npc_marshal_windsor
 #define SAY_WINDSOR_AGGRO1          "You locked up the wrong Marshal. Prepare to be destroyed!"
 #define SAY_WINDSOR_AGGRO2          "I bet you're sorry now, aren't you !?!!"
 #define SAY_WINDSOR_AGGRO3          "You better hold me back $N or they are going to feel some prison house beatings."
@@ -728,163 +680,169 @@ public:
 #define SAY_WINDSOR_9               "Ah, there it is!"
 #define MOB_ENTRY_REGINALD_WINDSOR  9682
 
-Player* pPlayerStart;
 /*
+Player* playerStart;
 class npc_marshal_windsor : public CreatureScript
 {
 public:
     npc_marshal_windsor() : CreatureScript("npc_marshal_windsor") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        npc_marshal_windsorAI* marshal_windsorAI = new npc_marshal_windsorAI(pCreature);
+        npc_marshal_windsorAI* marshal_windsorAI = new npc_marshal_windsorAI(creature);
 
-        marshal_windsorAI->AddWaypoint(0, 316.336f,-225.528f, -77.7258f,7000);
-        marshal_windsorAI->AddWaypoint(1, 316.336f,-225.528f, -77.7258f,2000);
-        marshal_windsorAI->AddWaypoint(2, 322.96f,-207.13f, -77.87f,0);
-        marshal_windsorAI->AddWaypoint(3, 281.05f,-172.16f, -75.12f,0);
-        marshal_windsorAI->AddWaypoint(4, 272.19f,-139.14f, -70.61f,0);
-        marshal_windsorAI->AddWaypoint(5, 283.62f,-116.09f, -70.21f,0);
-        marshal_windsorAI->AddWaypoint(6, 296.18f,-94.30f, -74.08f,0);
-        marshal_windsorAI->AddWaypoint(7, 294.57f,-93.11f, -74.08f,0);
-        marshal_windsorAI->AddWaypoint(8, 314.31f,-74.31f, -76.09f,0);
-        marshal_windsorAI->AddWaypoint(9, 360.22f,-62.93f, -66.77f,0);
-        marshal_windsorAI->AddWaypoint(10, 383.38f,-69.40f, -63.25f,0);
-        marshal_windsorAI->AddWaypoint(11, 389.99f,-67.86f, -62.57f,0);
-        marshal_windsorAI->AddWaypoint(12, 400.98f,-72.01f, -62.31f,0);
-        marshal_windsorAI->AddWaypoint(13, 404.22f,-62.30f, -63.50f,2300);
-        marshal_windsorAI->AddWaypoint(14, 404.22f,-62.30f, -63.50f,1500);
-        marshal_windsorAI->AddWaypoint(15, 407.65f,-51.86f, -63.96f,0);
-        marshal_windsorAI->AddWaypoint(16, 403.61f,-51.71f, -63.92f,1000);
-        marshal_windsorAI->AddWaypoint(17, 403.61f,-51.71f, -63.92f,2000);
-        marshal_windsorAI->AddWaypoint(18, 403.61f,-51.71f, -63.92f,1000);
-        marshal_windsorAI->AddWaypoint(19, 403.61f,-51.71f, -63.92f,0);
+        marshal_windsorAI->AddWaypoint(0, 316.336f, -225.528f, -77.7258f, 7000);
+        marshal_windsorAI->AddWaypoint(1, 316.336f, -225.528f, -77.7258f, 2000);
+        marshal_windsorAI->AddWaypoint(2, 322.96f, -207.13f, -77.87f, 0);
+        marshal_windsorAI->AddWaypoint(3, 281.05f, -172.16f, -75.12f, 0);
+        marshal_windsorAI->AddWaypoint(4, 272.19f, -139.14f, -70.61f, 0);
+        marshal_windsorAI->AddWaypoint(5, 283.62f, -116.09f, -70.21f, 0);
+        marshal_windsorAI->AddWaypoint(6, 296.18f, -94.30f, -74.08f, 0);
+        marshal_windsorAI->AddWaypoint(7, 294.57f, -93.11f, -74.08f, 0);
+        marshal_windsorAI->AddWaypoint(8, 314.31f, -74.31f, -76.09f, 0);
+        marshal_windsorAI->AddWaypoint(9, 360.22f, -62.93f, -66.77f, 0);
+        marshal_windsorAI->AddWaypoint(10, 383.38f, -69.40f, -63.25f, 0);
+        marshal_windsorAI->AddWaypoint(11, 389.99f, -67.86f, -62.57f, 0);
+        marshal_windsorAI->AddWaypoint(12, 400.98f, -72.01f, -62.31f, 0);
+        marshal_windsorAI->AddWaypoint(13, 404.22f, -62.30f, -63.50f, 2300);
+        marshal_windsorAI->AddWaypoint(14, 404.22f, -62.30f, -63.50f, 1500);
+        marshal_windsorAI->AddWaypoint(15, 407.65f, -51.86f, -63.96f, 0);
+        marshal_windsorAI->AddWaypoint(16, 403.61f, -51.71f, -63.92f, 1000);
+        marshal_windsorAI->AddWaypoint(17, 403.61f, -51.71f, -63.92f, 2000);
+        marshal_windsorAI->AddWaypoint(18, 403.61f, -51.71f, -63.92f, 1000);
+        marshal_windsorAI->AddWaypoint(19, 403.61f, -51.71f, -63.92f, 0);
 
         return marshal_windsorAI;
     }
 
-    bool OnQuestAccept(Player* pPlayer, Creature* pCreature, Quest const *quest)
+    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
     {
         if (quest->GetQuestId() == 4322)
-            {PlayerStart = player;
-            if (pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_NOT_STARTED)
+        {
+            PlayerStart = player;
+            if (instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_NOT_STARTED)
             {
-                    CAST_AI(npc_escort::npc_escortAI, (pCreature->AI()))->Start(true, false, pPlayer->GetGUID());
-                    pInstance->SetData(DATA_QUEST_JAIL_BREAK,ENCOUNTER_STATE_IN_PROGRESS);
-                    pCreature->setFaction(11);
+                CAST_AI(npc_escort::npc_escortAI, (creature->AI()))->Start(true, false, player->GetGUID());
+                instance->SetData(DATA_QUEST_JAIL_BREAK, ENCOUNTER_STATE_IN_PROGRESS);
+                creature->setFaction(11);
             }
-
-            }
+        }
         return false;
     }
 
     struct npc_marshal_windsorAI : public npc_escortAI
     {
-        npc_marshal_windsorAI(Creature *c) : npc_escortAI(c)
+        npc_marshal_windsorAI(Creature* creature) : npc_escortAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        void WaypointReached(uint32 i)
+        void WaypointReached(uint32 waypointId)
         {
-        switch(i)
+            switch (waypointId)
             {
-            case 1:
-                me->Say(SAY_WINDSOR_1, LANG_UNIVERSAL, PlayerGUID);
-                break;
-            case 7:
-                me->HandleEmoteCommand(EMOTE_STATE_POINT);
-                me->Say(SAY_WINDSOR_4_1, LANG_UNIVERSAL, PlayerGUID);
-                IsOnHold=true;
-                break;
-            case 10:
-                me->setFaction(534);
-                break;
-            case 12:
-                me->Say(SAY_WINDSOR_6, LANG_UNIVERSAL, PlayerGUID);
-                pInstance->SetData(DATA_SUPPLY_ROOM, ENCOUNTER_STATE_IN_PROGRESS);
-                break;
-            case 13:
-                me->HandleEmoteCommand(EMOTE_STATE_USESTANDING);//EMOTE_STATE_WORK
-                break;
-            case 14:
-                pInstance->SetData(DATA_GATE_SR,0);
-                me->setFaction(11);
-                break;
-            case 16:
-                me->Say(SAY_WINDSOR_9, LANG_UNIVERSAL, PlayerGUID);
-                break;
-            case 17:
-                me->HandleEmoteCommand(EMOTE_STATE_USESTANDING);//EMOTE_STATE_WORK
-                break;
-            case 18:
-                pInstance->SetData(DATA_GATE_SC,0);
-                break;
-            case 19:
-                me->SetVisibility(VISIBILITY_OFF);
-                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
-                me->SummonCreature(MOB_ENTRY_REGINALD_WINDSOR,403.61f,-51.71f,-63.92f,3.600434f,TEMPSUMMON_DEAD_DESPAWN ,0);
-                pInstance->SetData(DATA_SUPPLY_ROOM, ENCOUNTER_STATE_ENDED);
-                break;
+                case 1:
+                    me->Say(SAY_WINDSOR_1, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 7:
+                    me->HandleEmoteCommand(EMOTE_STATE_POINT);
+                    me->Say(SAY_WINDSOR_4_1, LANG_UNIVERSAL, PlayerGUID);
+                    IsOnHold = true;
+                    break;
+                case 10:
+                    me->setFaction(534);
+                    break;
+                case 12:
+                    me->Say(SAY_WINDSOR_6, LANG_UNIVERSAL, PlayerGUID);
+                    instance->SetData(DATA_SUPPLY_ROOM, ENCOUNTER_STATE_IN_PROGRESS);
+                    break;
+                case 13:
+                    me->HandleEmoteCommand(EMOTE_STATE_USESTANDING);//EMOTE_STATE_WORK
+                    break;
+                case 14:
+                    instance->SetData(DATA_GATE_SR, 0);
+                    me->setFaction(11);
+                    break;
+                case 16:
+                    me->Say(SAY_WINDSOR_9, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 17:
+                    me->HandleEmoteCommand(EMOTE_STATE_USESTANDING);//EMOTE_STATE_WORK
+                    break;
+                case 18:
+                    instance->SetData(DATA_GATE_SC, 0);
+                    break;
+                case 19:
+                    me->SetVisible(false);
+                    me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                    me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                    me->SummonCreature(MOB_ENTRY_REGINALD_WINDSOR, 403.61f, -51.71f, -63.92f, 3.600434f, TEMPSUMMON_DEAD_DESPAWN, 0);
+                    instance->SetData(DATA_SUPPLY_ROOM, ENCOUNTER_STATE_ENDED);
+                    break;
             }
         }
 
         void EnterCombat(Unit* who)
+        {
+            switch (urand(0, 2))
             {
-            switch (urand(0,2))
-            {
-                case 0: me->Say(SAY_WINDSOR_AGGRO1, LANG_UNIVERSAL, PlayerGUID); break;
-                case 1: me->Say(SAY_WINDSOR_AGGRO2, LANG_UNIVERSAL, PlayerGUID); break;
-                case 2: me->Say(SAY_WINDSOR_AGGRO3, LANG_UNIVERSAL, PlayerGUID); break;
+                case 0:
+                    me->Say(SAY_WINDSOR_AGGRO1, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 1:
+                    me->Say(SAY_WINDSOR_AGGRO2, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 2:
+                    me->Say(SAY_WINDSOR_AGGRO3, LANG_UNIVERSAL, PlayerGUID);
+                    break;
             }
-            }
+        }
 
         void Reset() {}
 
-        void JustDied(Unit *slayer)
+        void JustDied(Unit* slayer)
         {
-            pInstance->SetData(DATA_QUEST_JAIL_BREAK,ENCOUNTER_STATE_FAILED);
+            instance->SetData(DATA_QUEST_JAIL_BREAK, ENCOUNTER_STATE_FAILED);
         }
 
         void UpdateAI(const uint32 diff)
         {
-            if (pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_NOT_STARTED) return;
-            if (pInstance->GetData(DATA_DUGHAL) == ENCOUNTER_STATE_OBJECTIVE_COMPLETED)
+            if (instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_NOT_STARTED)
+                return;
+
+            if (instance->GetData(DATA_DUGHAL) == ENCOUNTER_STATE_OBJECTIVE_COMPLETED)
                 SetEscortPaused(false);
-            if (!pInstance->GetData(DATA_GATE_D) && pInstance->GetData(DATA_DUGHAL) == ENCOUNTER_STATE_NOT_STARTED)
-                {
-                me->Say(SAY_WINDSOR_4_2, LANG_UNIVERSAL, PlayerGUID);
-                pInstance->SetData(DATA_DUGHAL, ENCOUNTER_STATE_BEFORE_START);
-                }
-            if (pInstance->GetData(DATA_DUGHAL) == ENCOUNTER_STATE_OBJECTIVE_COMPLETED)
-                {
-                me->Say(SAY_WINDSOR_4_3, LANG_UNIVERSAL, PlayerGUID);
-                pInstance->SetData(DATA_DUGHAL, ENCOUNTER_STATE_ENDED);
-                }
-            if ((pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_IN_PROGRESS || pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_FAILED || pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_ENDED)&& pInstance->GetData(DATA_SUPPLY_ROOM) == ENCOUNTER_STATE_ENDED)
+
+            if (!instance->GetData(DATA_GATE_D) && instance->GetData(DATA_DUGHAL) == ENCOUNTER_STATE_NOT_STARTED)
             {
-                me->SetVisibility(VISIBILITY_OFF);
+                me->Say(SAY_WINDSOR_4_2, LANG_UNIVERSAL, PlayerGUID);
+                instance->SetData(DATA_DUGHAL, ENCOUNTER_STATE_BEFORE_START);
+            }
+            if (instance->GetData(DATA_DUGHAL) == ENCOUNTER_STATE_OBJECTIVE_COMPLETED)
+            {
+                me->Say(SAY_WINDSOR_4_3, LANG_UNIVERSAL, PlayerGUID);
+                instance->SetData(DATA_DUGHAL, ENCOUNTER_STATE_ENDED);
+            }
+            if ((instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_IN_PROGRESS || instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_FAILED || instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_ENDED)&& instance->GetData(DATA_SUPPLY_ROOM) == ENCOUNTER_STATE_ENDED)
+            {
+                me->SetVisible(false);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
             }
             else
             {
-                me->SetVisibility(VISIBILITY_ON);
+                me->SetVisible(true);
                 me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                 me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
             }
             npc_escortAI::UpdateAI(diff);
         }
     };
-
 };
 
   */
-/*######
-## npc_marshal_reginald_windsor
-######*/
 
+// npc_marshal_reginald_windsor
 #define SAY_REGINALD_WINDSOR_0_1    "Can you feel the power, $N??? It's time to ROCK!"
 #define SAY_REGINALD_WINDSOR_0_2    "Now we just have to free Tobias and we can get out of here. This way!"
 #define SAY_REGINALD_WINDSOR_5_1    "Open it."
@@ -902,121 +860,121 @@ public:
 #define MOB_ENTRY_SHILL_DINGER      9678
 #define MOB_ENTRY_CREST_KILLER      9680
 
-int wp = 0;
 /*
+int wp = 0;
 class npc_marshal_reginald_windsor : public CreatureScript
 {
 public:
     npc_marshal_reginald_windsor() : CreatureScript("npc_marshal_reginald_windsor") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        npc_marshal_reginald_windsorAI* marshal_reginald_windsorAI = new npc_marshal_reginald_windsorAI(pCreature);
+        npc_marshal_reginald_windsorAI* marshal_reginald_windsorAI = new npc_marshal_reginald_windsorAI(creature);
 
-        marshal_reginald_windsorAI->AddWaypoint(0, 403.61f,-52.71f, -63.92f,4000);
-        marshal_reginald_windsorAI->AddWaypoint(1, 403.61f,-52.71f, -63.92f,4000);
-        marshal_reginald_windsorAI->AddWaypoint(2, 406.33f,-54.87f, -63.95f,0);
-        marshal_reginald_windsorAI->AddWaypoint(3, 407.99f,-73.91f, -62.26f,0);
-        marshal_reginald_windsorAI->AddWaypoint(4, 557.03f,-119.71f, -61.83f,0);
-        marshal_reginald_windsorAI->AddWaypoint(5, 573.40f,-124.39f, -65.07f,0);
-        marshal_reginald_windsorAI->AddWaypoint(6, 593.91f,-130.29f, -69.25f,0);
-        marshal_reginald_windsorAI->AddWaypoint(7, 593.21f,-132.16f, -69.25f,0);
-        marshal_reginald_windsorAI->AddWaypoint(8, 593.21f,-132.16f, -69.25f,3000);
-        marshal_reginald_windsorAI->AddWaypoint(9, 622.81f,-135.55f, -71.92f,0);
-        marshal_reginald_windsorAI->AddWaypoint(10, 634.68f,-151.29f, -70.32f,0);
-        marshal_reginald_windsorAI->AddWaypoint(11, 635.06f,-153.25f, -70.32f,0);
-        marshal_reginald_windsorAI->AddWaypoint(12, 635.06f,-153.25f, -70.32f,3000);
-        marshal_reginald_windsorAI->AddWaypoint(13, 635.06f,-153.25f, -70.32f,1500);
-        marshal_reginald_windsorAI->AddWaypoint(14, 655.25f,-172.39f, -73.72f,0);
-        marshal_reginald_windsorAI->AddWaypoint(15, 654.79f,-226.30f, -83.06f,0);
-        marshal_reginald_windsorAI->AddWaypoint(16, 622.85f,-268.85f, -83.96f,0);
-        marshal_reginald_windsorAI->AddWaypoint(17, 579.45f,-275.56f, -80.44f,0);
-        marshal_reginald_windsorAI->AddWaypoint(18, 561.19f,-266.85f, -75.59f,0);
-        marshal_reginald_windsorAI->AddWaypoint(19, 547.91f,-253.92f, -70.34f,0);
-        marshal_reginald_windsorAI->AddWaypoint(20, 549.20f,-252.40f, -70.34f,0);
-        marshal_reginald_windsorAI->AddWaypoint(21, 549.20f,-252.40f, -70.34f,4000);
-        marshal_reginald_windsorAI->AddWaypoint(22, 555.33f,-269.16f, -74.40f,0);
-        marshal_reginald_windsorAI->AddWaypoint(23, 554.31f,-270.88f, -74.40f,0);
-        marshal_reginald_windsorAI->AddWaypoint(24, 554.31f,-270.88f, -74.40f,4000);
-        marshal_reginald_windsorAI->AddWaypoint(25, 536.10f,-249.60f, -67.47f,0);
-        marshal_reginald_windsorAI->AddWaypoint(26, 520.94f,-216.65f, -59.28f,0);
-        marshal_reginald_windsorAI->AddWaypoint(27, 505.99f,-148.74f, -62.17f,0);
-        marshal_reginald_windsorAI->AddWaypoint(28, 484.21f,-56.24f, -62.43f,0);
-        marshal_reginald_windsorAI->AddWaypoint(29, 470.39f,-6.01f, -70.10f,0);
-        marshal_reginald_windsorAI->AddWaypoint(30, 451.27f,30.85f, -70.07f,0);
-        marshal_reginald_windsorAI->AddWaypoint(31, 452.45f,29.85f, -70.37f,1500);
-        marshal_reginald_windsorAI->AddWaypoint(32, 452.45f,29.85f, -70.37f,7000);
-        marshal_reginald_windsorAI->AddWaypoint(33, 452.45f,29.85f, -70.37f,10000);
-        marshal_reginald_windsorAI->AddWaypoint(34, 451.27f,31.85f, -70.07f,0);
+        marshal_reginald_windsorAI->AddWaypoint(0, 403.61f, -52.71f, -63.92f, 4000);
+        marshal_reginald_windsorAI->AddWaypoint(1, 403.61f, -52.71f, -63.92f, 4000);
+        marshal_reginald_windsorAI->AddWaypoint(2, 406.33f, -54.87f, -63.95f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(3, 407.99f, -73.91f, -62.26f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(4, 557.03f, -119.71f, -61.83f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(5, 573.40f, -124.39f, -65.07f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(6, 593.91f, -130.29f, -69.25f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(7, 593.21f, -132.16f, -69.25f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(8, 593.21f, -132.16f, -69.25f, 3000);
+        marshal_reginald_windsorAI->AddWaypoint(9, 622.81f, -135.55f, -71.92f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(10, 634.68f, -151.29f, -70.32f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(11, 635.06f, -153.25f, -70.32f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(12, 635.06f, -153.25f, -70.32f, 3000);
+        marshal_reginald_windsorAI->AddWaypoint(13, 635.06f, -153.25f, -70.32f, 1500);
+        marshal_reginald_windsorAI->AddWaypoint(14, 655.25f, -172.39f, -73.72f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(15, 654.79f, -226.30f, -83.06f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(16, 622.85f, -268.85f, -83.96f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(17, 579.45f, -275.56f, -80.44f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(18, 561.19f, -266.85f, -75.59f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(19, 547.91f, -253.92f, -70.34f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(20, 549.20f, -252.40f, -70.34f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(21, 549.20f, -252.40f, -70.34f, 4000);
+        marshal_reginald_windsorAI->AddWaypoint(22, 555.33f, -269.16f, -74.40f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(23, 554.31f, -270.88f, -74.40f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(24, 554.31f, -270.88f, -74.40f, 4000);
+        marshal_reginald_windsorAI->AddWaypoint(25, 536.10f, -249.60f, -67.47f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(26, 520.94f, -216.65f, -59.28f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(27, 505.99f, -148.74f, -62.17f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(28, 484.21f, -56.24f, -62.43f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(29, 470.39f, -6.01f, -70.10f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(30, 451.27f, 30.85f, -70.07f, 0);
+        marshal_reginald_windsorAI->AddWaypoint(31, 452.45f, 29.85f, -70.37f, 1500);
+        marshal_reginald_windsorAI->AddWaypoint(32, 452.45f, 29.85f, -70.37f, 7000);
+        marshal_reginald_windsorAI->AddWaypoint(33, 452.45f, 29.85f, -70.37f, 10000);
+        marshal_reginald_windsorAI->AddWaypoint(34, 451.27f, 31.85f, -70.07f, 0);
 
         return marshal_reginald_windsorAI;
     }
 
     struct npc_marshal_reginald_windsorAI : public npc_escortAI
     {
-        npc_marshal_reginald_windsorAI(Creature *c) : npc_escortAI(c)
+        npc_marshal_reginald_windsorAI(Creature* creature) : npc_escortAI(creature)
         {
         }
 
-        void WaypointReached(uint32 i)
+        void WaypointReached(uint32 waypointId)
         {
-        wp=i;
-        switch(i)
+            wp = waypointId;
+            switch (waypointId)
             {
-            case 0:
-                me->setFaction(11);
-                me->Say(SAY_REGINALD_WINDSOR_0_1, LANG_UNIVERSAL, PlayerGUID);
-                break;
-            case 1:
-                me->Say(SAY_REGINALD_WINDSOR_0_2, LANG_UNIVERSAL, PlayerGUID);
-                break;
-            case 7:
-                me->HandleEmoteCommand(EMOTE_STATE_POINT);
-                me->Say(SAY_REGINALD_WINDSOR_5_1, LANG_UNIVERSAL, PlayerGUID);
-                IsOnHold=true;
-                break;
-            case 8:
-                me->Say(SAY_REGINALD_WINDSOR_5_2, LANG_UNIVERSAL, PlayerGUID);
-                break;
-            case 11:
-                me->HandleEmoteCommand(EMOTE_STATE_POINT);
-                me->Say(SAY_REGINALD_WINDSOR_7_1, LANG_UNIVERSAL, PlayerGUID);
-                IsOnHold=true;
-                break;
-            case 12:
-                me->Say(SAY_REGINALD_WINDSOR_7_2, LANG_UNIVERSAL, PlayerGUID);
-                break;
-            case 13:
-                me->Say(SAY_REGINALD_WINDSOR_7_3, LANG_UNIVERSAL, PlayerGUID);
-                break;
-            case 20:
-                me->HandleEmoteCommand(EMOTE_STATE_POINT);
-                me->Say(SAY_REGINALD_WINDSOR_13_1, LANG_UNIVERSAL, PlayerGUID);
-                IsOnHold=true;
-                break;
-            case 21:
-                me->Say(SAY_REGINALD_WINDSOR_13_3, LANG_UNIVERSAL, PlayerGUID);
-                break;
-            case 23:
-                me->HandleEmoteCommand(EMOTE_STATE_POINT);
-                me->Say(SAY_REGINALD_WINDSOR_14_1, LANG_UNIVERSAL, PlayerGUID);
-                IsOnHold=true;
-                break;
-            case 24:
-                me->Say(SAY_REGINALD_WINDSOR_14_2, LANG_UNIVERSAL, PlayerGUID);
-                break;
-            case 31:
-                me->Say(SAY_REGINALD_WINDSOR_20_1, LANG_UNIVERSAL, PlayerGUID);
-                break;
-            case 32:
-                me->Say(SAY_REGINALD_WINDSOR_20_2, LANG_UNIVERSAL, PlayerGUID);
-                PlayerStart->GroupEventHappens(QUEST_JAIL_BREAK, me);
-                pInstance->SetData(DATA_SHILL, ENCOUNTER_STATE_ENDED);
-                break;
+                case 0:
+                    me->setFaction(11);
+                    me->Say(SAY_REGINALD_WINDSOR_0_1, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 1:
+                    me->Say(SAY_REGINALD_WINDSOR_0_2, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 7:
+                    me->HandleEmoteCommand(EMOTE_STATE_POINT);
+                    me->Say(SAY_REGINALD_WINDSOR_5_1, LANG_UNIVERSAL, PlayerGUID);
+                    IsOnHold=true;
+                    break;
+                case 8:
+                    me->Say(SAY_REGINALD_WINDSOR_5_2, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 11:
+                    me->HandleEmoteCommand(EMOTE_STATE_POINT);
+                    me->Say(SAY_REGINALD_WINDSOR_7_1, LANG_UNIVERSAL, PlayerGUID);
+                    IsOnHold=true;
+                    break;
+                case 12:
+                    me->Say(SAY_REGINALD_WINDSOR_7_2, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 13:
+                    me->Say(SAY_REGINALD_WINDSOR_7_3, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 20:
+                    me->HandleEmoteCommand(EMOTE_STATE_POINT);
+                    me->Say(SAY_REGINALD_WINDSOR_13_1, LANG_UNIVERSAL, PlayerGUID);
+                    IsOnHold=true;
+                    break;
+                case 21:
+                    me->Say(SAY_REGINALD_WINDSOR_13_3, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 23:
+                    me->HandleEmoteCommand(EMOTE_STATE_POINT);
+                    me->Say(SAY_REGINALD_WINDSOR_14_1, LANG_UNIVERSAL, PlayerGUID);
+                    IsOnHold=true;
+                    break;
+                case 24:
+                    me->Say(SAY_REGINALD_WINDSOR_14_2, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 31:
+                    me->Say(SAY_REGINALD_WINDSOR_20_1, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 32:
+                    me->Say(SAY_REGINALD_WINDSOR_20_2, LANG_UNIVERSAL, PlayerGUID);
+                    PlayerStart->GroupEventHappens(QUEST_JAIL_BREAK, me);
+                    instance->SetData(DATA_SHILL, ENCOUNTER_STATE_ENDED);
+                    break;
             }
         }
 
-        void MoveInLineOfSight(Unit *who)
+        void MoveInLineOfSight(Unit* who)
         {
             if (HasEscortState(STATE_ESCORT_ESCORTING))
                 return;
@@ -1036,85 +994,91 @@ public:
         }
 
         void EnterCombat(Unit* who)
+        {
+            switch (urand(0, 2))
             {
-            switch (urand(0,2))
-            {
-                case 0: me->Say(SAY_WINDSOR_AGGRO1, LANG_UNIVERSAL, PlayerGUID); break;
-                case 1: me->Say(SAY_WINDSOR_AGGRO2, LANG_UNIVERSAL, PlayerGUID); break;
-                case 2: me->Say(SAY_WINDSOR_AGGRO3, LANG_UNIVERSAL, PlayerGUID); break;
+                case 0:
+                    me->Say(SAY_WINDSOR_AGGRO1, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 1:
+                    me->Say(SAY_WINDSOR_AGGRO2, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 2:
+                    me->Say(SAY_WINDSOR_AGGRO3, LANG_UNIVERSAL, PlayerGUID);
+                    break;
             }
-            }
+        }
         void Reset() {}
 
-        void JustDied(Unit *slayer)
+        void JustDied(Unit* slayer)
         {
-            pInstance->SetData(DATA_QUEST_JAIL_BREAK,ENCOUNTER_STATE_FAILED);
+            instance->SetData(DATA_QUEST_JAIL_BREAK, ENCOUNTER_STATE_FAILED);
         }
 
         void UpdateAI(const uint32 diff)
         {
-            if (pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_NOT_STARTED) return;
+            if (instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_NOT_STARTED)
+                return;
+
             if (wp == 7)
+            {
+                if (!instance->GetData(DATA_GATE_J) && instance->GetData(DATA_JAZ) == ENCOUNTER_STATE_NOT_STARTED)
                 {
-                if (!pInstance->GetData(DATA_GATE_J) && pInstance->GetData(DATA_JAZ) == ENCOUNTER_STATE_NOT_STARTED)
-                    {
-                        pInstance->SetData(DATA_CREATURE_JAZ,1);
-                        pInstance->SetData(DATA_JAZ,ENCOUNTER_STATE_IN_PROGRESS);
-                    }
-                if (pInstance->GetData(DATA_CREATURE_JAZ) && pInstance->GetData(DATA_CREATURE_OGRABISI) && pInstance->GetData(DATA_JAZ) == ENCOUNTER_STATE_IN_PROGRESS)
-                    {
-                        SetEscortPaused(false);
-                        pInstance->SetData(DATA_JAZ,ENCOUNTER_STATE_ENDED);
-                    }
+                    instance->SetData(DATA_CREATURE_JAZ, 1);
+                    instance->SetData(DATA_JAZ, ENCOUNTER_STATE_IN_PROGRESS);
                 }
+                if (instance->GetData(DATA_CREATURE_JAZ) && instance->GetData(DATA_CREATURE_OGRABISI) && instance->GetData(DATA_JAZ) == ENCOUNTER_STATE_IN_PROGRESS)
+                {
+                    SetEscortPaused(false);
+                    instance->SetData(DATA_JAZ, ENCOUNTER_STATE_ENDED);
+                }
+            }
             else if (wp == 11)
+            {
+                if (!instance->GetData(DATA_GATE_S) && instance->GetData(DATA_SHILL) == ENCOUNTER_STATE_NOT_STARTED)
                 {
-                if (!pInstance->GetData(DATA_GATE_S) && pInstance->GetData(DATA_SHILL) == ENCOUNTER_STATE_NOT_STARTED)
-                    {
-                        pInstance->SetData(DATA_CREATURE_SHILL,1);
-                        pInstance->SetData(DATA_SHILL,ENCOUNTER_STATE_IN_PROGRESS);
-                    }
-                if (pInstance->GetData(DATA_CREATURE_SHILL) && pInstance->GetData(DATA_SHILL) == ENCOUNTER_STATE_IN_PROGRESS)
-                    {
-                        pInstance->SetData(DATA_SHILL,ENCOUNTER_STATE_ENDED);
-                        SetEscortPaused(false);
-                    }
+                    instance->SetData(DATA_CREATURE_SHILL, 1);
+                    instance->SetData(DATA_SHILL, ENCOUNTER_STATE_IN_PROGRESS);
                 }
+                if (instance->GetData(DATA_CREATURE_SHILL) && instance->GetData(DATA_SHILL) == ENCOUNTER_STATE_IN_PROGRESS)
+                {
+                    instance->SetData(DATA_SHILL, ENCOUNTER_STATE_ENDED);
+                    SetEscortPaused(false);
+                }
+            }
             else if (wp == 20)
+            {
+                if (!instance->GetData(DATA_GATE_C) && instance->GetData(DATA_CREST) == ENCOUNTER_STATE_NOT_STARTED)
                 {
-                if (!pInstance->GetData(DATA_GATE_C) && pInstance->GetData(DATA_CREST) == ENCOUNTER_STATE_NOT_STARTED)
-                    {
-                        pInstance->SetData(DATA_CREATURE_CREST,1);
-                        me->Say(SAY_REGINALD_WINDSOR_13_2, LANG_UNIVERSAL, PlayerGUID);
-                        pInstance->SetData(DATA_CREST,ENCOUNTER_STATE_IN_PROGRESS);
-                    }
-                if (pInstance->GetData(DATA_CREATURE_CREST) && pInstance->GetData(DATA_CREST) == ENCOUNTER_STATE_IN_PROGRESS)
-                    {
-                        SetEscortPaused(false);
-                        pInstance->SetData(DATA_CREST,ENCOUNTER_STATE_ENDED);
-                    }
+                    instance->SetData(DATA_CREATURE_CREST, 1);
+                    me->Say(SAY_REGINALD_WINDSOR_13_2, LANG_UNIVERSAL, PlayerGUID);
+                    instance->SetData(DATA_CREST, ENCOUNTER_STATE_IN_PROGRESS);
                 }
-            if (pInstance->GetData(DATA_TOBIAS) == ENCOUNTER_STATE_OBJECTIVE_COMPLETED) SetEscortPaused(false);
+                if (instance->GetData(DATA_CREATURE_CREST) && instance->GetData(DATA_CREST) == ENCOUNTER_STATE_IN_PROGRESS)
+                {
+                    SetEscortPaused(false);
+                    instance->SetData(DATA_CREST, ENCOUNTER_STATE_ENDED);
+                }
+            }
+            if (instance->GetData(DATA_TOBIAS) == ENCOUNTER_STATE_OBJECTIVE_COMPLETED) SetEscortPaused(false);
             npc_escortAI::UpdateAI(diff);
         }
     };
-
 };
 */
-/*######
-## npc_tobias_seecher
-######*/
 
+// npc_tobias_seecher
 #define SAY_TOBIAS_FREE         "Thank you! I will run for safety immediately!"
+
 /*
 class npc_tobias_seecher : public CreatureScript
 {
 public:
     npc_tobias_seecher() : CreatureScript("npc_tobias_seecher") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        npc_tobias_seecherAI* tobias_seecherAI = new npc_tobias_seecherAI(pCreature);
+        npc_tobias_seecherAI* tobias_seecherAI = new npc_tobias_seecherAI(creature);
 
         tobias_seecherAI->AddWaypoint(0, 549.21f, -281.07f, -75.27f);
         tobias_seecherAI->AddWaypoint(1, 554.39f, -267.39f, -73.68f);
@@ -1125,32 +1089,32 @@ public:
         return tobias_seecherAI;
     }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 uiSender, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        if (uiAction == GOSSIP_ACTION_INFO_DEF + 1)
+        player->PlayerTalkClass->ClearMenus();
+        if (action == GOSSIP_ACTION_INFO_DEF + 1)
         {
-            pPlayer->CLOSE_GOSSIP_MENU();
-            CAST_AI(npc_escort::npc_escortAI, (pCreature->AI()))->Start(false, true, pPlayer->GetGUID());
-            pCreature->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
-            pInstance->SetData(DATA_TOBIAS,ENCOUNTER_STATE_IN_PROGRESS);
+            player->CLOSE_GOSSIP_MENU();
+            CAST_AI(npc_escort::npc_escortAI, (creature->AI()))->Start(false, true, player->GetGUID());
+            creature->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+            instance->SetData(DATA_TOBIAS, ENCOUNTER_STATE_IN_PROGRESS);
         }
         return true;
     }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (pPlayer->GetQuestStatus(QUEST_JAIL_BREAK) == QUEST_STATUS_INCOMPLETE && pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_IN_PROGRESS)
+        if (player->GetQuestStatus(QUEST_JAIL_BREAK) == QUEST_STATUS_INCOMPLETE && instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_IN_PROGRESS)
         {
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Get out of here, Tobias, you're free!", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
-            pPlayer->SEND_GOSSIP_MENU(2847, pCreature->GetGUID());
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Get out of here, Tobias, you're free!", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+            player->SEND_GOSSIP_MENU(2847, creature->GetGUID());
         }
         return true;
     }
 
     struct npc_tobias_seecherAI : public npc_escortAI
     {
-        npc_tobias_seecherAI(Creature *c) :npc_escortAI(c) {}
+        npc_tobias_seecherAI(Creature* creature) : npc_escortAI(creature) {}
 
         void EnterCombat(Unit* who) {}
         void Reset() {}
@@ -1159,71 +1123,70 @@ public:
         {
             if (IsBeingEscorted && killer == me)
             {
-                me->SetVisibility(VISIBILITY_OFF);
+                me->SetVisible(false);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
-                pInstance->SetData(DATA_TOBIAS,ENCOUNTER_STATE_ENDED);
+                instance->SetData(DATA_TOBIAS, ENCOUNTER_STATE_ENDED);
             }
         }
 
-        void WaypointReached(uint32 i)
+        void WaypointReached(uint32 waypointId)
         {
-        switch(i)
+            switch (waypointId)
             {
-            case 0:me->Say(SAY_TOBIAS_FREE, LANG_UNIVERSAL, PlayerGUID); break;
-            case 2:
-                pInstance->SetData(DATA_TOBIAS,ENCOUNTER_STATE_OBJECTIVE_COMPLETED);break;
-            case 4:
-                me->SetVisibility(VISIBILITY_OFF);
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
-                pInstance->SetData(DATA_TOBIAS,ENCOUNTER_STATE_ENDED);
-                break;
+                case 0:
+                    me->Say(SAY_TOBIAS_FREE, LANG_UNIVERSAL, PlayerGUID);
+                    break;
+                case 2:
+                    instance->SetData(DATA_TOBIAS, ENCOUNTER_STATE_OBJECTIVE_COMPLETED);
+                    break;
+                case 4:
+                    me->SetVisible(false);
+                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                    instance->SetData(DATA_TOBIAS, ENCOUNTER_STATE_ENDED);
+                    break;
             }
         }
 
         void UpdateAI(const uint32 diff)
         {
-            if (pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_NOT_STARTED) return;
-            if ((pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_IN_PROGRESS || pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_FAILED || pInstance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_ENDED)&& pInstance->GetData(DATA_TOBIAS) == ENCOUNTER_STATE_ENDED)
+            if (instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_NOT_STARTED)
+                return;
+
+            if ((instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_IN_PROGRESS || instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_FAILED || instance->GetData(DATA_QUEST_JAIL_BREAK) == ENCOUNTER_STATE_ENDED)&& instance->GetData(DATA_TOBIAS) == ENCOUNTER_STATE_ENDED)
             {
-                me->SetVisibility(VISIBILITY_OFF);
+                me->SetVisible(false);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
             }
             else
             {
-                me->SetVisibility(VISIBILITY_ON);
+                me->SetVisible(true);
                 me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                 me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
             }
             npc_escortAI::UpdateAI(diff);
         }
     };
-
 };
-
-
 
 */
 
-/*######
-## npc_rocknot
-######*/
-
+// npc_rocknot
 enum RocknotSays
 {
-    SAY_GOT_BEER                                           = -1230000
+    SAY_GOT_BEER                       = -1230000
 };
 
 enum RocknotSpells
 {
-    SPELL_DRUNKEN_RAGE                                     = 14872
+    SPELL_DRUNKEN_RAGE                 = 14872
 };
 
 enum RocknotQuests
 {
-    QUEST_ALE                                              = 4295
+    QUEST_ALE                          = 4295
 };
 
 class npc_rocknot : public CreatureScript
@@ -1231,49 +1194,49 @@ class npc_rocknot : public CreatureScript
 public:
     npc_rocknot() : CreatureScript("npc_rocknot") { }
 
-    bool ChooseReward(Player* /*pPlayer*/, Creature* pCreature, const Quest *_Quest, uint32 /*item*/)
+    bool OnQuestReward(Player* /*player*/, Creature* creature, Quest const* quest, uint32 /*item*/)
     {
-        InstanceScript* pInstance = pCreature->GetInstanceScript();
-
-        if (!pInstance)
+        InstanceScript* instance = creature->GetInstanceScript();
+        if (!instance)
             return true;
 
-        if (pInstance->GetData(TYPE_BAR) == DONE || pInstance->GetData(TYPE_BAR) == SPECIAL)
+        if (instance->GetData(TYPE_BAR) == DONE || instance->GetData(TYPE_BAR) == SPECIAL)
             return true;
 
-        if (_Quest->GetQuestId() == QUEST_ALE)
+        if (quest->GetQuestId() == QUEST_ALE)
         {
-            if (pInstance->GetData(TYPE_BAR) != IN_PROGRESS)
-                pInstance->SetData(TYPE_BAR,IN_PROGRESS);
+            if (instance->GetData(TYPE_BAR) != IN_PROGRESS)
+                instance->SetData(TYPE_BAR, IN_PROGRESS);
 
-            pInstance->SetData(TYPE_BAR,SPECIAL);
+            instance->SetData(TYPE_BAR, SPECIAL);
 
             //keep track of amount in instance script, returns SPECIAL if amount ok and event in progress
-            if (pInstance->GetData(TYPE_BAR) == SPECIAL)
+            if (instance->GetData(TYPE_BAR) == SPECIAL)
             {
-                DoScriptText(SAY_GOT_BEER, pCreature);
-                pCreature->CastSpell(pCreature,SPELL_DRUNKEN_RAGE,false);
-                if (npc_escortAI* pEscortAI = CAST_AI(npc_rocknot::npc_rocknotAI, pCreature->AI()))
-                    pEscortAI->Start(false, false);
+                DoScriptText(SAY_GOT_BEER, creature);
+                creature->CastSpell(creature, SPELL_DRUNKEN_RAGE, false);
+
+                if (npc_escortAI* escortAI = CAST_AI(npc_rocknot::npc_rocknotAI, creature->AI()))
+                    escortAI->Start(false, false);
             }
         }
 
         return true;
     }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_rocknotAI(pCreature);
+        return new npc_rocknotAI(creature);
     }
 
     struct npc_rocknotAI : public npc_escortAI
     {
-        npc_rocknotAI(Creature *c) : npc_escortAI(c)
+        npc_rocknotAI(Creature* creature) : npc_escortAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 BreakKeg_Timer;
         uint32 BreakDoor_Timer;
@@ -1289,46 +1252,46 @@ public:
 
         void DoGo(uint32 id, uint32 state)
         {
-            if (GameObject* pGo = pInstance->instance->GetGameObject(pInstance->GetData64(id)))
-                pGo->SetGoState((GOState)state);
+            if (GameObject* go = instance->instance->GetGameObject(instance->GetData64(id)))
+                go->SetGoState((GOState)state);
         }
 
-        void WaypointReached(uint32 i)
+        void WaypointReached(uint32 waypointId)
         {
-            if (!pInstance)
+            if (!instance)
                 return;
 
-            switch(i)
+            switch (waypointId)
             {
-            case 1:
-                me->HandleEmoteCommand(EMOTE_ONESHOT_KICK);
-                break;
-            case 2:
-                me->HandleEmoteCommand(EMOTE_ONESHOT_ATTACKUNARMED);
-                break;
-            case 3:
-                me->HandleEmoteCommand(EMOTE_ONESHOT_ATTACKUNARMED);
-                break;
-            case 4:
-                me->HandleEmoteCommand(EMOTE_ONESHOT_KICK);
-                break;
-            case 5:
-                me->HandleEmoteCommand(EMOTE_ONESHOT_KICK);
-                BreakKeg_Timer = 2000;
-                break;
+                case 1:
+                    me->HandleEmoteCommand(EMOTE_ONESHOT_KICK);
+                    break;
+                case 2:
+                    me->HandleEmoteCommand(EMOTE_ONESHOT_ATTACK_UNARMED);
+                    break;
+                case 3:
+                    me->HandleEmoteCommand(EMOTE_ONESHOT_ATTACK_UNARMED);
+                    break;
+                case 4:
+                    me->HandleEmoteCommand(EMOTE_ONESHOT_KICK);
+                    break;
+                case 5:
+                    me->HandleEmoteCommand(EMOTE_ONESHOT_KICK);
+                    BreakKeg_Timer = 2000;
+                    break;
             }
         }
 
         void UpdateAI(const uint32 diff)
         {
-            if (!pInstance)
+            if (!instance)
                 return;
 
             if (BreakKeg_Timer)
             {
                 if (BreakKeg_Timer <= diff)
                 {
-                    DoGo(DATA_GO_BAR_KEG,0);
+                    DoGo(DATA_GO_BAR_KEG, 0);
                     BreakKeg_Timer = 0;
                     BreakDoor_Timer = 1000;
                 } else BreakKeg_Timer -= diff;
@@ -1338,16 +1301,16 @@ public:
             {
                 if (BreakDoor_Timer <= diff)
                 {
-                    DoGo(DATA_GO_BAR_DOOR,2);
-                    DoGo(DATA_GO_BAR_KEG_TRAP,0);               //doesn't work very well, leaving code here for future
+                    DoGo(DATA_GO_BAR_DOOR, 2);
+                    DoGo(DATA_GO_BAR_KEG_TRAP, 0);               //doesn't work very well, leaving code here for future
                     //spell by trap has effect61, this indicate the bar go hostile
 
-                    if (Unit *tmp = Unit::GetUnit(*me,pInstance->GetData64(DATA_PHALANX)))
+                    if (Unit* tmp = Unit::GetUnit(*me, instance->GetData64(DATA_PHALANX)))
                         tmp->setFaction(14);
 
                     //for later, this event(s) has alot more to it.
                     //optionally, DONE can trigger bar to go hostile.
-                    pInstance->SetData(TYPE_BAR,DONE);
+                    instance->SetData(TYPE_BAR, DONE);
 
                     BreakDoor_Timer = 0;
                 } else BreakDoor_Timer -= diff;
@@ -1356,12 +1319,7 @@ public:
             npc_escortAI::UpdateAI(diff);
         }
     };
-
 };
-
-/*######
-##
-######*/
 
 void AddSC_blackrock_depths()
 {
@@ -1371,9 +1329,11 @@ void AddSC_blackrock_depths()
     new mob_phalanx();
     new npc_kharan_mighthammer();
     new npc_lokhtos_darkbargainer();
-    //new npc_dughal_stormwing();
-    //new npc_tobias_seecher();
-    //new npc_marshal_windsor();
-    //new npc_marshal_reginald_windsor();
     new npc_rocknot();
+    // Fix us
+    /*new npc_dughal_stormwing();
+      new npc_tobias_seecher();
+      new npc_marshal_windsor();
+      new npc_marshal_reginald_windsor();
+    */
 }

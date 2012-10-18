@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Zul'Gurub
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "zulgurub.h"
 
 #define SPELL_LIGHTNINGCLOUD         25033
@@ -40,18 +41,18 @@ class boss_wushoolay : public CreatureScript
 
         struct boss_wushoolayAI : public ScriptedAI
         {
-            boss_wushoolayAI(Creature *c) : ScriptedAI(c) {}
+            boss_wushoolayAI(Creature* creature) : ScriptedAI(creature) {}
 
             uint32 LightningCloud_Timer;
             uint32 LightningWave_Timer;
 
             void Reset()
             {
-                LightningCloud_Timer = 5000 + rand()%5000;
-                LightningWave_Timer = 8000 + rand()%8000;
+                LightningCloud_Timer = urand(5000, 10000);
+                LightningWave_Timer = urand(8000, 16000);
             }
 
-            void EnterCombat(Unit * /*who*/)
+            void EnterCombat(Unit* /*who*/)
             {
             }
 
@@ -64,17 +65,17 @@ class boss_wushoolay : public CreatureScript
                 if (LightningCloud_Timer <= diff)
                 {
                     DoCast(me->getVictim(), SPELL_LIGHTNINGCLOUD);
-                    LightningCloud_Timer = 15000 + rand()%5000;
+                    LightningCloud_Timer = urand(15000, 20000);
                 } else LightningCloud_Timer -= diff;
 
                 //LightningWave_Timer
                 if (LightningWave_Timer <= diff)
                 {
-                    Unit *pTarget = NULL;
-                    pTarget = SelectUnit(SELECT_TARGET_RANDOM,0);
-                    if (pTarget) DoCast(pTarget, SPELL_LIGHTNINGWAVE);
+                    Unit* target = NULL;
+                    target = SelectTarget(SELECT_TARGET_RANDOM, 0);
+                    if (target) DoCast(target, SPELL_LIGHTNINGWAVE);
 
-                    LightningWave_Timer = 12000 + rand()%4000;
+                    LightningWave_Timer = urand(12000, 16000);
                 } else LightningWave_Timer -= diff;
 
                 DoMeleeAttackIfReady();

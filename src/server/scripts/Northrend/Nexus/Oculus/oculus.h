@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -37,15 +37,41 @@ enum Data64
 
 enum Bosses
 {
-    CREATURE_DRAKOS        = 27654,
-    CREATURE_VAROS         = 27447,
-    CREATURE_UROM          = 27655,
-    CREATURE_EREGOS        = 27656
+    NPC_DRAKOS                  = 27654,
+    NPC_VAROS                   = 27447,
+    NPC_UROM                    = 27655,
+    NPC_EREGOS                  = 27656,
+
+    NPC_AZURE_RING_GUARDIAN     = 28236,
+    NPC_CENTRIFUGE_CONSTRUCT    = 27641,
 };
 
 enum GameObjects
 {
-    GO_DRAGON_CAGE_DOOR                           = 193995
+    GO_DRAGON_CAGE_DOOR                           = 193995,
+    GO_EREGOS_CACHE_N                             = 191349,
+    GO_EREGOS_CACHE_H                             = 193603
 };
 
+enum SpellEvents
+{
+    EVENT_CALL_DRAGON = 12229
+};
+
+enum CreatureActions
+{
+    ACTION_CALL_DRAGON_EVENT = 1
+};
+
+enum OculusWorldStates
+{
+    WORLD_STATE_CENTRIFUGE_CONSTRUCT_SHOW   = 3524,
+    WORLD_STATE_CENTRIFUGE_CONSTRUCT_AMOUNT = 3486
+};
+
+enum OculusSpells
+{
+    SPELL_CENTRIFUGE_SHIELD = 50053,
+    SPELL_DEATH_SPELL       = 50415
+};
 #endif

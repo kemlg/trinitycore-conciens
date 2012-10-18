@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -28,13 +28,15 @@ npc_shenthul
 npc_thrall_warchief
 EndContentData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
+#include "ScriptedGossip.h"
 
 /*######
 ## npc_shenthul
 ######*/
 
-enum eShenthul
+enum Shenthul
 {
     QUEST_SHATTERED_SALUTE  = 2460
 };
@@ -44,37 +46,37 @@ class npc_shenthul : public CreatureScript
 public:
     npc_shenthul() : CreatureScript("npc_shenthul") { }
 
-    bool OnQuestAccept(Player* pPlayer, Creature* pCreature, Quest const* quest)
+    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
     {
         if (quest->GetQuestId() == QUEST_SHATTERED_SALUTE)
         {
-            CAST_AI(npc_shenthul::npc_shenthulAI, pCreature->AI())->CanTalk = true;
-            CAST_AI(npc_shenthul::npc_shenthulAI, pCreature->AI())->PlayerGUID = pPlayer->GetGUID();
+            CAST_AI(npc_shenthul::npc_shenthulAI, creature->AI())->CanTalk = true;
+            CAST_AI(npc_shenthul::npc_shenthulAI, creature->AI())->PlayerGUID = player->GetGUID();
         }
         return true;
     }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_shenthulAI (pCreature);
+        return new npc_shenthulAI (creature);
     }
 
     struct npc_shenthulAI : public ScriptedAI
     {
-        npc_shenthulAI(Creature* c) : ScriptedAI(c) {}
+        npc_shenthulAI(Creature* creature) : ScriptedAI(creature) {}
 
         bool CanTalk;
         bool CanEmote;
-        uint32 Salute_Timer;
-        uint32 Reset_Timer;
+        uint32 SaluteTimer;
+        uint32 ResetTimer;
         uint64 PlayerGUID;
 
         void Reset()
         {
             CanTalk = false;
             CanEmote = false;
-            Salute_Timer = 6000;
-            Reset_Timer = 0;
+            SaluteTimer = 6000;
+            ResetTimer = 0;
             PlayerGUID = 0;
         }
 
@@ -84,25 +86,25 @@ public:
         {
             if (CanEmote)
             {
-                if (Reset_Timer <= diff)
+                if (ResetTimer <= diff)
                 {
-                    if (Player* pPlayer = Unit::GetPlayer(*me, PlayerGUID))
+                    if (Player* player = Unit::GetPlayer(*me, PlayerGUID))
                     {
-                        if (pPlayer->GetTypeId() == TYPEID_PLAYER && pPlayer->GetQuestStatus(QUEST_SHATTERED_SALUTE) == QUEST_STATUS_INCOMPLETE)
-                            pPlayer->FailQuest(QUEST_SHATTERED_SALUTE);
+                        if (player->GetTypeId() == TYPEID_PLAYER && player->GetQuestStatus(QUEST_SHATTERED_SALUTE) == QUEST_STATUS_INCOMPLETE)
+                            player->FailQuest(QUEST_SHATTERED_SALUTE);
                     }
                     Reset();
-                } else Reset_Timer -= diff;
+                } else ResetTimer -= diff;
             }
 
             if (CanTalk && !CanEmote)
             {
-                if (Salute_Timer <= diff)
+                if (SaluteTimer <= diff)
                 {
                     me->HandleEmoteCommand(EMOTE_ONESHOT_SALUTE);
                     CanEmote = true;
-                    Reset_Timer = 60000;
-                } else Salute_Timer -= diff;
+                    ResetTimer = 60000;
+                } else SaluteTimer -= diff;
             }
 
             if (!UpdateVictim())
@@ -111,13 +113,13 @@ public:
             DoMeleeAttackIfReady();
         }
 
-        void ReceiveEmote(Player* pPlayer, uint32 emote)
+        void ReceiveEmote(Player* player, uint32 emote)
         {
-            if (emote == TEXTEMOTE_SALUTE && pPlayer->GetQuestStatus(QUEST_SHATTERED_SALUTE) == QUEST_STATUS_INCOMPLETE)
+            if (emote == TEXT_EMOTE_SALUTE && player->GetQuestStatus(QUEST_SHATTERED_SALUTE) == QUEST_STATUS_INCOMPLETE)
             {
                 if (CanEmote)
                 {
-                    pPlayer->AreaExploredOrEventHappens(QUEST_SHATTERED_SALUTE);
+                    player->AreaExploredOrEventHappens(QUEST_SHATTERED_SALUTE);
                     Reset();
                 }
             }
@@ -126,16 +128,17 @@ public:
 
 };
 
-
-
 /*######
 ## npc_thrall_warchief
 ######*/
 
-#define QUEST_6566              6566
+enum ThrallWarchief
+{
+    QUEST_6566              = 6566,
 
-#define SPELL_CHAIN_LIGHTNING   16033
-#define SPELL_SHOCK             16034
+    SPELL_CHAIN_LIGHTNING   = 16033,
+    SPELL_SHOCK             = 16034
+};
 
 #define GOSSIP_HTW "Please share your wisdom with me, Warchief."
 #define GOSSIP_STW1 "What discoveries?"
@@ -151,99 +154,97 @@ class npc_thrall_warchief : public CreatureScript
 public:
     npc_thrall_warchief() : CreatureScript("npc_thrall_warchief") { }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 /*uiSender*/, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        switch (uiAction)
+        player->PlayerTalkClass->ClearMenus();
+        switch (action)
         {
             case GOSSIP_ACTION_INFO_DEF+1:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_STW1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
-                pPlayer->SEND_GOSSIP_MENU(5733, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_STW1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
+                player->SEND_GOSSIP_MENU(5733, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+2:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_STW2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+3);
-                pPlayer->SEND_GOSSIP_MENU(5734, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_STW2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+3);
+                player->SEND_GOSSIP_MENU(5734, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+3:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_STW3, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+4);
-                pPlayer->SEND_GOSSIP_MENU(5735, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_STW3, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+4);
+                player->SEND_GOSSIP_MENU(5735, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+4:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_STW4, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+5);
-                pPlayer->SEND_GOSSIP_MENU(5736, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_STW4, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+5);
+                player->SEND_GOSSIP_MENU(5736, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+5:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_STW5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+6);
-                pPlayer->SEND_GOSSIP_MENU(5737, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_STW5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+6);
+                player->SEND_GOSSIP_MENU(5737, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+6:
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_STW6, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+7);
-                pPlayer->SEND_GOSSIP_MENU(5738, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_STW6, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+7);
+                player->SEND_GOSSIP_MENU(5738, creature->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF+7:
-                pPlayer->CLOSE_GOSSIP_MENU();
-                pPlayer->AreaExploredOrEventHappens(QUEST_6566);
+                player->CLOSE_GOSSIP_MENU();
+                player->AreaExploredOrEventHappens(QUEST_6566);
                 break;
         }
         return true;
     }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        if (pCreature->isQuestGiver())
-            pPlayer->PrepareQuestMenu(pCreature->GetGUID());
+        if (creature->isQuestGiver())
+            player->PrepareQuestMenu(creature->GetGUID());
 
-        if (pPlayer->GetQuestStatus(QUEST_6566) == QUEST_STATUS_INCOMPLETE)
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HTW, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
+        if (player->GetQuestStatus(QUEST_6566) == QUEST_STATUS_INCOMPLETE)
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_HTW, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
 
-        pPlayer->SEND_GOSSIP_MENU(pPlayer->GetGossipTextId(pCreature), pCreature->GetGUID());
+        player->SEND_GOSSIP_MENU(player->GetGossipTextId(creature), creature->GetGUID());
         return true;
     }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_thrall_warchiefAI (pCreature);
+        return new npc_thrall_warchiefAI (creature);
     }
 
     struct npc_thrall_warchiefAI : public ScriptedAI
     {
-        npc_thrall_warchiefAI(Creature* c) : ScriptedAI(c) {}
+        npc_thrall_warchiefAI(Creature* creature) : ScriptedAI(creature) {}
 
-        uint32 ChainLightning_Timer;
-        uint32 Shock_Timer;
+        uint32 ChainLightningTimer;
+        uint32 ShockTimer;
 
         void Reset()
         {
-            ChainLightning_Timer = 2000;
-            Shock_Timer = 8000;
+            ChainLightningTimer = 2000;
+            ShockTimer = 8000;
         }
 
-        void EnterCombat(Unit * /*who*/) {}
+        void EnterCombat(Unit* /*who*/) {}
 
         void UpdateAI(const uint32 diff)
         {
             if (!UpdateVictim())
                 return;
 
-            if (ChainLightning_Timer <= diff)
+            if (ChainLightningTimer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_CHAIN_LIGHTNING);
-                ChainLightning_Timer = 9000;
-            } else ChainLightning_Timer -= diff;
+                ChainLightningTimer = 9000;
+            } else ChainLightningTimer -= diff;
 
-            if (Shock_Timer <= diff)
+            if (ShockTimer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_SHOCK);
-                Shock_Timer = 15000;
-            } else Shock_Timer -= diff;
+                ShockTimer = 15000;
+            } else ShockTimer -= diff;
 
             DoMeleeAttackIfReady();
         }
     };
 
 };
-
-
 
 void AddSC_orgrimmar()
 {

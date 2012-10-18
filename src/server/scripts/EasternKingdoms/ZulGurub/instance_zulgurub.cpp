@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Missing reset function after killing a boss for Ohgan, Thekal.
 SDCategory: Zul'Gurub
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "zulgurub.h"
 
 class instance_zulgurub : public InstanceMapScript
@@ -36,7 +37,7 @@ class instance_zulgurub : public InstanceMapScript
 
         struct instance_zulgurub_InstanceMapScript : public InstanceScript
         {
-            instance_zulgurub_InstanceMapScript(Map* pMap) : InstanceScript(pMap) {Initialize();};
+            instance_zulgurub_InstanceMapScript(Map* map) : InstanceScript(map) {}
 
             //If all High Priest bosses were killed. Lorkhan, Zath and Ohgan are added too.
             uint32 m_auiEncounter[MAX_ENCOUNTERS];
@@ -65,7 +66,7 @@ class instance_zulgurub : public InstanceMapScript
 
             void OnCreatureCreate(Creature* creature)
             {
-                switch(creature->GetEntry())
+                switch (creature->GetEntry())
                 {
                     case 11347: m_uiLorKhanGUID = creature->GetGUID(); break;
                     case 11348: m_uiZathGUID = creature->GetGUID(); break;
@@ -76,37 +77,37 @@ class instance_zulgurub : public InstanceMapScript
 
             void SetData(uint32 uiType, uint32 uiData)
             {
-                switch(uiType)
+                switch (uiType)
                 {
-                    case TYPE_ARLOKK:
+                    case DATA_ARLOKK:
                         m_auiEncounter[0] = uiData;
                         break;
 
-                    case TYPE_JEKLIK:
+                    case DATA_JEKLIK:
                         m_auiEncounter[1] = uiData;
                         break;
 
-                    case TYPE_VENOXIS:
+                    case DATA_VENOXIS:
                         m_auiEncounter[2] = uiData;
                         break;
 
-                    case TYPE_MARLI:
+                    case DATA_MARLI:
                         m_auiEncounter[3] = uiData;
                         break;
 
-                    case TYPE_THEKAL:
+                    case DATA_THEKAL:
                         m_auiEncounter[4] = uiData;
                         break;
 
-                    case TYPE_LORKHAN:
+                    case DATA_LORKHAN:
                         m_auiEncounter[5] = uiData;
                         break;
 
-                    case TYPE_ZATH:
+                    case DATA_ZATH:
                         m_auiEncounter[6] = uiData;
                         break;
 
-                    case TYPE_OHGAN:
+                    case DATA_OHGAN:
                         m_auiEncounter[7] = uiData;
                         break;
                 }
@@ -114,23 +115,23 @@ class instance_zulgurub : public InstanceMapScript
 
             uint32 GetData(uint32 uiType)
             {
-                switch(uiType)
+                switch (uiType)
                 {
-                    case TYPE_ARLOKK:
+                    case DATA_ARLOKK:
                         return m_auiEncounter[0];
-                    case TYPE_JEKLIK:
+                    case DATA_JEKLIK:
                         return m_auiEncounter[1];
-                    case TYPE_VENOXIS:
+                    case DATA_VENOXIS:
                         return m_auiEncounter[2];
-                    case TYPE_MARLI:
+                    case DATA_MARLI:
                         return m_auiEncounter[3];
-                    case TYPE_THEKAL:
+                    case DATA_THEKAL:
                         return m_auiEncounter[4];
-                    case TYPE_LORKHAN:
+                    case DATA_LORKHAN:
                         return m_auiEncounter[5];
-                    case TYPE_ZATH:
+                    case DATA_ZATH:
                         return m_auiEncounter[6];
-                    case TYPE_OHGAN:
+                    case DATA_OHGAN:
                         return m_auiEncounter[7];
                 }
                 return 0;
@@ -138,7 +139,7 @@ class instance_zulgurub : public InstanceMapScript
 
             uint64 GetData64(uint32 uiData)
             {
-                switch(uiData)
+                switch (uiData)
                 {
                     case DATA_LORKHAN:
                         return m_uiLorKhanGUID;
@@ -153,9 +154,9 @@ class instance_zulgurub : public InstanceMapScript
             }
         };
 
-        InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+        InstanceScript* GetInstanceScript(InstanceMap* map) const
         {
-            return new instance_zulgurub_InstanceMapScript(pMap);
+            return new instance_zulgurub_InstanceMapScript(map);
         }
 };
 

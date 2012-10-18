@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,11 +15,12 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "ScriptedEscortAI.h"
 
 //How to win friends and influence enemies
-// texts signed for creature 28939 but used for 28939,28940,28610
+// texts signed for creature 28939 but used for 28939, 28940, 28610
 enum win_friends
 {
     SAY_PERSUADE1                     = -1609501,
@@ -49,14 +50,14 @@ class npc_crusade_persuaded : public CreatureScript
 public:
     npc_crusade_persuaded() : CreatureScript("npc_crusade_persuaded") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_crusade_persuadedAI (pCreature);
+        return new npc_crusade_persuadedAI (creature);
     }
 
     struct npc_crusade_persuadedAI : public ScriptedAI
     {
-        npc_crusade_persuadedAI(Creature *pCreature) : ScriptedAI(pCreature) {}
+        npc_crusade_persuadedAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 uiSpeech_timer;
         uint32 uiSpeech_counter;
@@ -71,7 +72,7 @@ public:
             me->RestoreFaction();
         }
 
-        void SpellHit(Unit *caster, const SpellEntry *spell)
+        void SpellHit(Unit* caster, const SpellInfo* spell)
         {
             if (spell->Id == SPELL_PERSUASIVE_STRIKE && caster->GetTypeId() == TYPEID_PLAYER && me->isAlive() && !uiSpeech_counter)
             {
@@ -86,12 +87,12 @@ public:
                     me->SetReactState(REACT_PASSIVE);
                     DoCastAOE(58111, true);
 
-                    DoScriptText(RAND(SAY_PERSUADE1,SAY_PERSUADE2,SAY_PERSUADE3,
-                                      SAY_PERSUADE4,SAY_PERSUADE5,SAY_PERSUADE6,
+                    DoScriptText(RAND(SAY_PERSUADE1, SAY_PERSUADE2, SAY_PERSUADE3,
+                                      SAY_PERSUADE4, SAY_PERSUADE5, SAY_PERSUADE6,
                                       SAY_PERSUADE7), caster);
 
-                    DoScriptText(RAND(SAY_CRUSADER1,SAY_CRUSADER2,SAY_CRUSADER3,
-                                      SAY_CRUSADER4,SAY_CRUSADER5,SAY_CRUSADER6), me);
+                    DoScriptText(RAND(SAY_CRUSADER1, SAY_CRUSADER2, SAY_CRUSADER3,
+                                      SAY_CRUSADER4, SAY_CRUSADER5, SAY_CRUSADER6), me);
                 }
             }
         }
@@ -102,26 +103,47 @@ public:
             {
                 if (uiSpeech_timer <= diff)
                 {
-                    Player* pPlayer = Unit::GetPlayer(*me, uiPlayerGUID);
-                    if (!pPlayer)
+                    Player* player = Unit::GetPlayer(*me, uiPlayerGUID);
+                    if (!player)
                     {
                         EnterEvadeMode();
                         return;
                     }
 
-                    switch(uiSpeech_counter)
+                    switch (uiSpeech_counter)
                     {
-                        case 1: DoScriptText(SAY_PERSUADED1, me); uiSpeech_timer = 8000; break;
-                        case 2: DoScriptText(SAY_PERSUADED2, me); uiSpeech_timer = 8000; break;
-                        case 3: DoScriptText(SAY_PERSUADED3, me); uiSpeech_timer = 8000; break;
-                        case 4: DoScriptText(SAY_PERSUADED4, me); uiSpeech_timer = 8000; break;
-                        case 5: DoScriptText(SAY_PERSUADED5, pPlayer); uiSpeech_timer = 8000; break;
-                        case 6: DoScriptText(SAY_PERSUADED6, me);
-                            pPlayer->Kill(me);
+                        case 1:
+                            DoScriptText(SAY_PERSUADED1, me);
+                            uiSpeech_timer = 8000;
+                            break;
+
+                        case 2:
+                            DoScriptText(SAY_PERSUADED2, me);
+                            uiSpeech_timer = 8000;
+                            break;
+
+                        case 3:
+                            DoScriptText(SAY_PERSUADED3, me);
+                            uiSpeech_timer = 8000;
+                            break;
+
+                        case 4:
+                            DoScriptText(SAY_PERSUADED4, me);
+                            uiSpeech_timer = 8000;
+                            break;
+
+                        case 5:
+                            DoScriptText(SAY_PERSUADED5, player);
+                            uiSpeech_timer = 8000;
+                            break;
+
+                        case 6:
+                            DoScriptText(SAY_PERSUADED6, me);
+                            player->Kill(me);
                             //me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
                             //me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                             uiSpeech_counter = 0;
-                            pPlayer->GroupEventHappens(12720, me);
+                            player->GroupEventHappens(12720, me);
                             return;
                     }
 
@@ -140,7 +162,6 @@ public:
     };
 
 };
-
 
 /*######
 ## npc_koltira_deathweaver
@@ -178,26 +199,26 @@ class npc_koltira_deathweaver : public CreatureScript
 public:
     npc_koltira_deathweaver() : CreatureScript("npc_koltira_deathweaver") { }
 
-    bool OnQuestAccept(Player* pPlayer, Creature* pCreature, const Quest* pQuest)
+    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest)
     {
-        if (pQuest->GetQuestId() == QUEST_BREAKOUT)
+        if (quest->GetQuestId() == QUEST_BREAKOUT)
         {
-            pCreature->SetStandState(UNIT_STAND_STATE_STAND);
+            creature->SetStandState(UNIT_STAND_STATE_STAND);
 
-            if (npc_escortAI* pEscortAI = CAST_AI(npc_koltira_deathweaver::npc_koltira_deathweaverAI,pCreature->AI()))
-                pEscortAI->Start(false, false, pPlayer->GetGUID());
+            if (npc_escortAI* pEscortAI = CAST_AI(npc_koltira_deathweaver::npc_koltira_deathweaverAI, creature->AI()))
+                pEscortAI->Start(false, false, player->GetGUID());
         }
         return true;
     }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_koltira_deathweaverAI(pCreature);
+        return new npc_koltira_deathweaverAI(creature);
     }
 
     struct npc_koltira_deathweaverAI : public npc_escortAI
     {
-        npc_koltira_deathweaverAI(Creature *pCreature) : npc_escortAI(pCreature)
+        npc_koltira_deathweaverAI(Creature* creature) : npc_escortAI(creature)
         {
             me->SetReactState(REACT_DEFENSIVE);
         }
@@ -219,9 +240,9 @@ public:
             }
         }
 
-        void WaypointReached(uint32 uiPointId)
+        void WaypointReached(uint32 waypointId)
         {
-            switch(uiPointId)
+            switch (waypointId)
             {
                 case 0:
                     DoScriptText(SAY_BREAKOUT1, me);
@@ -249,23 +270,21 @@ public:
                     me->Mount(MODEL_DEATH_KNIGHT_MOUNT);
                     break;
                 case 10:
-                    me->Unmount();
+                    me->Dismount();
                     break;
             }
         }
 
-        void JustSummoned(Creature* pSummoned)
+        void JustSummoned(Creature* summoned)
         {
-            if (Player* pPlayer = GetPlayerForEscort())
-            {
-                pSummoned->AI()->AttackStart(pPlayer);
-            }
+            if (Player* player = GetPlayerForEscort())
+                summoned->AI()->AttackStart(player);
 
-            if (pSummoned->GetEntry() == NPC_HIGH_INQUISITOR_VALROTH)
-                m_uiValrothGUID = pSummoned->GetGUID();
+            if (summoned->GetEntry() == NPC_HIGH_INQUISITOR_VALROTH)
+                m_uiValrothGUID = summoned->GetGUID();
 
-            pSummoned->AddThreat(me, 0.0f);
-            pSummoned->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+            summoned->AddThreat(me, 0.0f);
+            summoned->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
         }
 
         void SummonAcolyte(uint32 uiAmount)
@@ -282,7 +301,7 @@ public:
             {
                 if (m_uiWave_Timer <= uiDiff)
                 {
-                    switch(m_uiWave)
+                    switch (m_uiWave)
                     {
                         case 0:
                             DoScriptText(SAY_BREAKOUT3, me);
@@ -306,9 +325,9 @@ public:
                             break;
                         case 4:
                         {
-                            Creature* pTemp = Unit::GetCreature(*me, m_uiValrothGUID);
+                            Creature* temp = Unit::GetCreature(*me, m_uiValrothGUID);
 
-                            if (!pTemp || !pTemp->isAlive())
+                            if (!temp || !temp->isAlive())
                             {
                                 DoScriptText(SAY_BREAKOUT8, me);
                                 m_uiWave_Timer = 5000;
@@ -342,8 +361,6 @@ public:
 
 };
 
-
-
 //Scarlet courier
 enum ScarletCourierEnum
 {
@@ -359,14 +376,14 @@ class mob_scarlet_courier : public CreatureScript
 public:
     mob_scarlet_courier() : CreatureScript("mob_scarlet_courier") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_scarlet_courierAI (pCreature);
+        return new mob_scarlet_courierAI (creature);
     }
 
     struct mob_scarlet_courierAI : public ScriptedAI
     {
-        mob_scarlet_courierAI(Creature *pCreature) : ScriptedAI(pCreature) {}
+        mob_scarlet_courierAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 uiStage;
         uint32 uiStage_timer;
@@ -378,10 +395,10 @@ public:
             uiStage_timer = 3000;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_TREE2, me);
-            me->Unmount();
+            me->Dismount();
             uiStage = 0;
         }
 
@@ -400,10 +417,10 @@ public:
             {
                 if (uiStage_timer <= diff)
                 {
-                    switch(uiStage)
+                    switch (uiStage)
                     {
                     case 1:
-                        me->AddUnitMovementFlag(MOVEMENTFLAG_WALKING);
+                        me->SetWalk(true);
                         if (GameObject* tree = me->FindNearestGameObject(GO_INCONSPICUOUS_TREE, 40.0f))
                         {
                             DoScriptText(SAY_TREE1, me);
@@ -414,7 +431,7 @@ public:
                         break;
                     case 2:
                         if (GameObject* tree = me->FindNearestGameObject(GO_INCONSPICUOUS_TREE, 40.0f))
-                            if (Unit *unit = tree->GetOwner())
+                            if (Unit* unit = tree->GetOwner())
                                 AttackStart(unit);
                         break;
                     }
@@ -431,7 +448,6 @@ public:
     };
 
 };
-
 
 //Koltira & Valroth- Breakout
 
@@ -454,14 +470,14 @@ class mob_high_inquisitor_valroth : public CreatureScript
 public:
     mob_high_inquisitor_valroth() : CreatureScript("mob_high_inquisitor_valroth") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_high_inquisitor_valrothAI (pCreature);
+        return new mob_high_inquisitor_valrothAI (creature);
     }
 
     struct mob_high_inquisitor_valrothAI : public ScriptedAI
     {
-        mob_high_inquisitor_valrothAI(Creature *pCreature) : ScriptedAI(pCreature) {}
+        mob_high_inquisitor_valrothAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 uiRenew_timer;
         uint32 uiInquisitor_Penance_timer;
@@ -486,21 +502,21 @@ public:
             {
                 Shout();
                 DoCast(me, SPELL_RENEW);
-                uiRenew_timer = 1000 + rand()%5000;
+                uiRenew_timer = urand(1000, 6000);
             } else uiRenew_timer -= diff;
 
             if (uiInquisitor_Penance_timer <= diff)
             {
                 Shout();
                 DoCast(me->getVictim(), SPELL_INQUISITOR_PENANCE);
-                uiInquisitor_Penance_timer = 2000 + rand()%5000;
+                uiInquisitor_Penance_timer = urand(2000, 7000);
             } else uiInquisitor_Penance_timer -= diff;
 
             if (uiValroth_Smite_timer <= diff)
             {
                 Shout();
                 DoCast(me->getVictim(), SPELL_VALROTH_SMITE);
-                uiValroth_Smite_timer = 1000 + rand()%5000;
+                uiValroth_Smite_timer = urand(1000, 6000);
             } else uiValroth_Smite_timer -= diff;
 
             DoMeleeAttackIfReady();
@@ -509,7 +525,7 @@ public:
         void Shout()
         {
             if (rand()%100 < 15)
-                DoScriptText(RAND(SAY_VALROTH3,SAY_VALROTH4,SAY_VALROTH5), me);
+                DoScriptText(RAND(SAY_VALROTH3, SAY_VALROTH4, SAY_VALROTH5), me);
         }
 
         void JustDied(Unit* killer)
@@ -521,11 +537,10 @@ public:
 
 };
 
-
 /*######
 ## npc_a_special_surprise
 ######*/
-//used by 29032,29061,29065,29067,29068,29070,29074,29072,29073,29071 but signed for 29032
+//used by 29032, 29061, 29065, 29067, 29068, 29070, 29074, 29072, 29073, 29071 but signed for 29032
 enum SpecialSurprise
 {
     SAY_EXEC_START_1            = -1609025,                 // speech for all
@@ -591,14 +606,14 @@ class npc_a_special_surprise : public CreatureScript
 public:
     npc_a_special_surprise() : CreatureScript("npc_a_special_surprise") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_a_special_surpriseAI(pCreature);
+        return new npc_a_special_surpriseAI(creature);
     }
 
     struct npc_a_special_surpriseAI : public ScriptedAI
     {
-        npc_a_special_surpriseAI(Creature *pCreature) : ScriptedAI(pCreature) {}
+        npc_a_special_surpriseAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 ExecuteSpeech_Timer;
         uint32 ExecuteSpeech_Counter;
@@ -610,51 +625,51 @@ public:
             ExecuteSpeech_Counter = 0;
             PlayerGUID = 0;
 
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
         }
 
-        bool MeetQuestCondition(Unit* pPlayer)
+        bool MeetQuestCondition(Player* player)
         {
-            switch(me->GetEntry())
+            switch (me->GetEntry())
             {
                 case 29061:                                     // Ellen Stanbridge
-                    if (CAST_PLR(pPlayer)->GetQuestStatus(12742) == QUEST_STATUS_INCOMPLETE)
+                    if (player->GetQuestStatus(12742) == QUEST_STATUS_INCOMPLETE)
                         return true;
                     break;
                 case 29072:                                     // Kug Ironjaw
-                    if (CAST_PLR(pPlayer)->GetQuestStatus(12748) == QUEST_STATUS_INCOMPLETE)
+                    if (player->GetQuestStatus(12748) == QUEST_STATUS_INCOMPLETE)
                         return true;
                     break;
                 case 29067:                                     // Donovan Pulfrost
-                    if (CAST_PLR(pPlayer)->GetQuestStatus(12744) == QUEST_STATUS_INCOMPLETE)
+                    if (player->GetQuestStatus(12744) == QUEST_STATUS_INCOMPLETE)
                         return true;
                     break;
                 case 29065:                                     // Yazmina Oakenthorn
-                    if (CAST_PLR(pPlayer)->GetQuestStatus(12743) == QUEST_STATUS_INCOMPLETE)
+                    if (player->GetQuestStatus(12743) == QUEST_STATUS_INCOMPLETE)
                         return true;
                     break;
                 case 29071:                                     // Antoine Brack
-                    if (CAST_PLR(pPlayer)->GetQuestStatus(12750) == QUEST_STATUS_INCOMPLETE)
+                    if (player->GetQuestStatus(12750) == QUEST_STATUS_INCOMPLETE)
                         return true;
                     break;
                 case 29032:                                     // Malar Bravehorn
-                    if (CAST_PLR(pPlayer)->GetQuestStatus(12739) == QUEST_STATUS_INCOMPLETE)
+                    if (player->GetQuestStatus(12739) == QUEST_STATUS_INCOMPLETE)
                         return true;
                     break;
                 case 29068:                                     // Goby Blastenheimer
-                    if (CAST_PLR(pPlayer)->GetQuestStatus(12745) == QUEST_STATUS_INCOMPLETE)
+                    if (player->GetQuestStatus(12745) == QUEST_STATUS_INCOMPLETE)
                         return true;
                     break;
                 case 29073:                                     // Iggy Darktusk
-                    if (CAST_PLR(pPlayer)->GetQuestStatus(12749) == QUEST_STATUS_INCOMPLETE)
+                    if (player->GetQuestStatus(12749) == QUEST_STATUS_INCOMPLETE)
                         return true;
                     break;
                 case 29074:                                     // Lady Eonys
-                    if (CAST_PLR(pPlayer)->GetQuestStatus(12747) == QUEST_STATUS_INCOMPLETE)
+                    if (player->GetQuestStatus(12747) == QUEST_STATUS_INCOMPLETE)
                         return true;
                     break;
                 case 29070:                                     // Valok the Righteous
-                    if (CAST_PLR(pPlayer)->GetQuestStatus(12746) == QUEST_STATUS_INCOMPLETE)
+                    if (player->GetQuestStatus(12746) == QUEST_STATUS_INCOMPLETE)
                         return true;
                     break;
             }
@@ -662,13 +677,13 @@ public:
             return false;
         }
 
-        void MoveInLineOfSight(Unit* pWho)
+        void MoveInLineOfSight(Unit* who)
         {
-            if (PlayerGUID || pWho->GetTypeId() != TYPEID_PLAYER || !pWho->IsWithinDist(me, INTERACTION_DISTANCE))
+            if (PlayerGUID || who->GetTypeId() != TYPEID_PLAYER || !who->IsWithinDist(me, INTERACTION_DISTANCE))
                 return;
 
-            if (MeetQuestCondition(pWho))
-                PlayerGUID = pWho->GetGUID();
+            if (MeetQuestCondition(who->ToPlayer()))
+                PlayerGUID = who->GetGUID();
         }
 
         void UpdateAI(const uint32 diff)
@@ -677,9 +692,9 @@ public:
             {
                 if (ExecuteSpeech_Timer <= diff)
                 {
-                    Player* pPlayer = Unit::GetPlayer(*me, PlayerGUID);
+                    Player* player = Unit::GetPlayer(*me, PlayerGUID);
 
-                    if (!pPlayer)
+                    if (!player)
                     {
                         Reset();
                         return;
@@ -687,29 +702,31 @@ public:
 
                     //TODO: simplify text's selection
 
-                    switch(pPlayer->getRace())
+                    switch (player->getRace())
                     {
                         case RACE_HUMAN:
-                            switch(ExecuteSpeech_Counter)
+                            switch (ExecuteSpeech_Counter)
                             {
-                                case 0: DoScriptText(SAY_EXEC_START_1, me, pPlayer); break;
+                                case 0: DoScriptText(SAY_EXEC_START_1, me, player); break;
                                 case 1: me->SetStandState(UNIT_STAND_STATE_STAND); break;
-                                case 2: DoScriptText(SAY_EXEC_PROG_5, me, pPlayer); break;
-                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, pPlayer); break;
-                                case 4: DoScriptText(SAY_EXEC_RECOG_1, me, pPlayer); break;
-                                case 5: DoScriptText(SAY_EXEC_NOREM_5, me, pPlayer); break;
-                                case 6: DoScriptText(SAY_EXEC_THINK_7, me, pPlayer); break;
-                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, pPlayer); break;
+                                case 2: DoScriptText(SAY_EXEC_PROG_5, me, player); break;
+                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, player); break;
+                                case 4: DoScriptText(SAY_EXEC_RECOG_1, me, player); break;
+                                case 5: DoScriptText(SAY_EXEC_NOREM_5, me, player); break;
+                                case 6: DoScriptText(SAY_EXEC_THINK_7, me, player); break;
+                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, player); break;
                                 case 8:
                                     if (Creature* Plaguefist = GetClosestCreatureWithEntry(me, NPC_PLAGUEFIST, 85.0f))
-                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, pPlayer);
+                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, player);
                                     break;
                                 case 9:
-                                    DoScriptText(SAY_EXEC_TIME_6, me, pPlayer);
+                                    DoScriptText(SAY_EXEC_TIME_6, me, player);
                                     me->SetStandState(UNIT_STAND_STATE_KNEEL);
-                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
                                     break;
-                                case 10: DoScriptText(SAY_EXEC_WAITING, me, pPlayer); break;
+                                case 10:
+                                    DoScriptText(SAY_EXEC_WAITING, me, player);
+                                    break;
                                 case 11:
                                     DoScriptText(EMOTE_DIES, me);
                                     me->setDeathState(JUST_DIED);
@@ -718,26 +735,28 @@ public:
                             }
                             break;
                         case RACE_ORC:
-                            switch(ExecuteSpeech_Counter)
+                            switch (ExecuteSpeech_Counter)
                             {
-                                case 0: DoScriptText(SAY_EXEC_START_1, me, pPlayer); break;
+                                case 0: DoScriptText(SAY_EXEC_START_1, me, player); break;
                                 case 1: me->SetStandState(UNIT_STAND_STATE_STAND); break;
-                                case 2: DoScriptText(SAY_EXEC_PROG_6, me, pPlayer); break;
-                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, pPlayer); break;
-                                case 4: DoScriptText(SAY_EXEC_RECOG_1, me, pPlayer); break;
-                                case 5: DoScriptText(SAY_EXEC_NOREM_7, me, pPlayer); break;
-                                case 6: DoScriptText(SAY_EXEC_THINK_8, me, pPlayer); break;
-                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, pPlayer); break;
+                                case 2: DoScriptText(SAY_EXEC_PROG_6, me, player); break;
+                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, player); break;
+                                case 4: DoScriptText(SAY_EXEC_RECOG_1, me, player); break;
+                                case 5: DoScriptText(SAY_EXEC_NOREM_7, me, player); break;
+                                case 6: DoScriptText(SAY_EXEC_THINK_8, me, player); break;
+                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, player); break;
                                 case 8:
                                     if (Creature* Plaguefist = GetClosestCreatureWithEntry(me, NPC_PLAGUEFIST, 85.0f))
-                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, pPlayer);
+                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, player);
                                     break;
                                 case 9:
-                                    DoScriptText(SAY_EXEC_TIME_8, me, pPlayer);
+                                    DoScriptText(SAY_EXEC_TIME_8, me, player);
                                     me->SetStandState(UNIT_STAND_STATE_KNEEL);
-                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
                                     break;
-                                case 10: DoScriptText(SAY_EXEC_WAITING, me, pPlayer); break;
+                                case 10:
+                                    DoScriptText(SAY_EXEC_WAITING, me, player);
+                                    break;
                                 case 11:
                                     DoScriptText(EMOTE_DIES, me);
                                     me->setDeathState(JUST_DIED);
@@ -746,26 +765,28 @@ public:
                             }
                             break;
                         case RACE_DWARF:
-                            switch(ExecuteSpeech_Counter)
+                            switch (ExecuteSpeech_Counter)
                             {
-                                case 0: DoScriptText(SAY_EXEC_START_2, me, pPlayer); break;
+                                case 0: DoScriptText(SAY_EXEC_START_2, me, player); break;
                                 case 1: me->SetStandState(UNIT_STAND_STATE_STAND); break;
-                                case 2: DoScriptText(SAY_EXEC_PROG_2, me, pPlayer); break;
-                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, pPlayer); break;
-                                case 4: DoScriptText(SAY_EXEC_RECOG_3, me, pPlayer); break;
-                                case 5: DoScriptText(SAY_EXEC_NOREM_2, me, pPlayer); break;
-                                case 6: DoScriptText(SAY_EXEC_THINK_5, me, pPlayer); break;
-                                case 7: DoScriptText(SAY_EXEC_LISTEN_2, me, pPlayer); break;
+                                case 2: DoScriptText(SAY_EXEC_PROG_2, me, player); break;
+                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, player); break;
+                                case 4: DoScriptText(SAY_EXEC_RECOG_3, me, player); break;
+                                case 5: DoScriptText(SAY_EXEC_NOREM_2, me, player); break;
+                                case 6: DoScriptText(SAY_EXEC_THINK_5, me, player); break;
+                                case 7: DoScriptText(SAY_EXEC_LISTEN_2, me, player); break;
                                 case 8:
                                     if (Creature* Plaguefist = GetClosestCreatureWithEntry(me, NPC_PLAGUEFIST, 85.0f))
-                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, pPlayer);
+                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, player);
                                     break;
                                 case 9:
-                                    DoScriptText(SAY_EXEC_TIME_3, me, pPlayer);
+                                    DoScriptText(SAY_EXEC_TIME_3, me, player);
                                     me->SetStandState(UNIT_STAND_STATE_KNEEL);
-                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
                                     break;
-                                case 10: DoScriptText(SAY_EXEC_WAITING, me, pPlayer); break;
+                                case 10:
+                                    DoScriptText(SAY_EXEC_WAITING, me, player);
+                                    break;
                                 case 11:
                                     DoScriptText(EMOTE_DIES, me);
                                     me->setDeathState(JUST_DIED);
@@ -774,26 +795,28 @@ public:
                             }
                             break;
                         case RACE_NIGHTELF:
-                            switch(ExecuteSpeech_Counter)
+                            switch (ExecuteSpeech_Counter)
                             {
-                                case 0: DoScriptText(SAY_EXEC_START_1, me, pPlayer); break;
+                                case 0: DoScriptText(SAY_EXEC_START_1, me, player); break;
                                 case 1: me->SetStandState(UNIT_STAND_STATE_STAND); break;
-                                case 2: DoScriptText(SAY_EXEC_PROG_5, me, pPlayer); break;
-                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, pPlayer); break;
-                                case 4: DoScriptText(SAY_EXEC_RECOG_1, me, pPlayer); break;
-                                case 5: DoScriptText(SAY_EXEC_NOREM_6, me, pPlayer); break;
-                                case 6: DoScriptText(SAY_EXEC_THINK_2, me, pPlayer); break;
-                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, pPlayer); break;
+                                case 2: DoScriptText(SAY_EXEC_PROG_5, me, player); break;
+                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, player); break;
+                                case 4: DoScriptText(SAY_EXEC_RECOG_1, me, player); break;
+                                case 5: DoScriptText(SAY_EXEC_NOREM_6, me, player); break;
+                                case 6: DoScriptText(SAY_EXEC_THINK_2, me, player); break;
+                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, player); break;
                                 case 8:
                                     if (Creature* Plaguefist = GetClosestCreatureWithEntry(me, NPC_PLAGUEFIST, 85.0f))
-                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, pPlayer);
+                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, player);
                                     break;
                                 case 9:
-                                    DoScriptText(SAY_EXEC_TIME_7, me, pPlayer);
+                                    DoScriptText(SAY_EXEC_TIME_7, me, player);
                                     me->SetStandState(UNIT_STAND_STATE_KNEEL);
-                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
                                     break;
-                                case 10: DoScriptText(SAY_EXEC_WAITING, me, pPlayer); break;
+                                case 10:
+                                    DoScriptText(SAY_EXEC_WAITING, me, player);
+                                    break;
                                 case 11:
                                     DoScriptText(EMOTE_DIES, me);
                                     me->setDeathState(JUST_DIED);
@@ -802,26 +825,28 @@ public:
                             }
                             break;
                         case RACE_UNDEAD_PLAYER:
-                            switch(ExecuteSpeech_Counter)
+                            switch (ExecuteSpeech_Counter)
                             {
-                                case 0: DoScriptText(SAY_EXEC_START_1, me, pPlayer); break;
+                                case 0: DoScriptText(SAY_EXEC_START_1, me, player); break;
                                 case 1: me->SetStandState(UNIT_STAND_STATE_STAND); break;
-                                case 2: DoScriptText(SAY_EXEC_PROG_3, me, pPlayer); break;
-                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, pPlayer); break;
-                                case 4: DoScriptText(SAY_EXEC_RECOG_4, me, pPlayer); break;
-                                case 5: DoScriptText(SAY_EXEC_NOREM_3, me, pPlayer); break;
-                                case 6: DoScriptText(SAY_EXEC_THINK_1, me, pPlayer); break;
-                                case 7: DoScriptText(SAY_EXEC_LISTEN_3, me, pPlayer); break;
+                                case 2: DoScriptText(SAY_EXEC_PROG_3, me, player); break;
+                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, player); break;
+                                case 4: DoScriptText(SAY_EXEC_RECOG_4, me, player); break;
+                                case 5: DoScriptText(SAY_EXEC_NOREM_3, me, player); break;
+                                case 6: DoScriptText(SAY_EXEC_THINK_1, me, player); break;
+                                case 7: DoScriptText(SAY_EXEC_LISTEN_3, me, player); break;
                                 case 8:
                                     if (Creature* Plaguefist = GetClosestCreatureWithEntry(me, NPC_PLAGUEFIST, 85.0f))
-                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, pPlayer);
+                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, player);
                                     break;
                                 case 9:
-                                    DoScriptText(SAY_EXEC_TIME_4, me, pPlayer);
+                                    DoScriptText(SAY_EXEC_TIME_4, me, player);
                                     me->SetStandState(UNIT_STAND_STATE_KNEEL);
-                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
                                     break;
-                                case 10: DoScriptText(SAY_EXEC_WAITING, me, pPlayer); break;
+                                case 10:
+                                    DoScriptText(SAY_EXEC_WAITING, me, player);
+                                    break;
                                 case 11:
                                     DoScriptText(EMOTE_DIES, me);
                                     me->setDeathState(JUST_DIED);
@@ -830,26 +855,28 @@ public:
                             }
                             break;
                         case RACE_TAUREN:
-                            switch(ExecuteSpeech_Counter)
+                            switch (ExecuteSpeech_Counter)
                             {
-                                case 0: DoScriptText(SAY_EXEC_START_1, me, pPlayer); break;
+                                case 0: DoScriptText(SAY_EXEC_START_1, me, player); break;
                                 case 1: me->SetStandState(UNIT_STAND_STATE_STAND); break;
-                                case 2: DoScriptText(SAY_EXEC_PROG_1, me, pPlayer); break;
-                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, pPlayer); break;
-                                case 4: DoScriptText(SAY_EXEC_RECOG_5, me, pPlayer); break;
-                                case 5: DoScriptText(SAY_EXEC_NOREM_8, me, pPlayer); break;
-                                case 6: DoScriptText(SAY_EXEC_THINK_9, me, pPlayer); break;
-                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, pPlayer); break;
+                                case 2: DoScriptText(SAY_EXEC_PROG_1, me, player); break;
+                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, player); break;
+                                case 4: DoScriptText(SAY_EXEC_RECOG_5, me, player); break;
+                                case 5: DoScriptText(SAY_EXEC_NOREM_8, me, player); break;
+                                case 6: DoScriptText(SAY_EXEC_THINK_9, me, player); break;
+                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, player); break;
                                 case 8:
                                     if (Creature* Plaguefist = GetClosestCreatureWithEntry(me, NPC_PLAGUEFIST, 85.0f))
-                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, pPlayer);
+                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, player);
                                     break;
                                 case 9:
-                                    DoScriptText(SAY_EXEC_TIME_9, me, pPlayer);
+                                    DoScriptText(SAY_EXEC_TIME_9, me, player);
                                     me->SetStandState(UNIT_STAND_STATE_KNEEL);
-                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
                                     break;
-                                case 10: DoScriptText(SAY_EXEC_WAITING, me, pPlayer); break;
+                                case 10:
+                                    DoScriptText(SAY_EXEC_WAITING, me, player);
+                                    break;
                                 case 11:
                                     DoScriptText(EMOTE_DIES, me);
                                     me->setDeathState(JUST_DIED);
@@ -858,26 +885,28 @@ public:
                             }
                             break;
                         case RACE_GNOME:
-                            switch(ExecuteSpeech_Counter)
+                            switch (ExecuteSpeech_Counter)
                             {
-                                case 0: DoScriptText(SAY_EXEC_START_1, me, pPlayer); break;
+                                case 0: DoScriptText(SAY_EXEC_START_1, me, player); break;
                                 case 1: me->SetStandState(UNIT_STAND_STATE_STAND); break;
-                                case 2: DoScriptText(SAY_EXEC_PROG_4, me, pPlayer); break;
-                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, pPlayer); break;
-                                case 4: DoScriptText(SAY_EXEC_RECOG_1, me, pPlayer); break;
-                                case 5: DoScriptText(SAY_EXEC_NOREM_4, me, pPlayer); break;
-                                case 6: DoScriptText(SAY_EXEC_THINK_6, me, pPlayer); break;
-                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, pPlayer); break;
+                                case 2: DoScriptText(SAY_EXEC_PROG_4, me, player); break;
+                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, player); break;
+                                case 4: DoScriptText(SAY_EXEC_RECOG_1, me, player); break;
+                                case 5: DoScriptText(SAY_EXEC_NOREM_4, me, player); break;
+                                case 6: DoScriptText(SAY_EXEC_THINK_6, me, player); break;
+                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, player); break;
                                 case 8:
                                     if (Creature* Plaguefist = GetClosestCreatureWithEntry(me, NPC_PLAGUEFIST, 85.0f))
-                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, pPlayer);
+                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, player);
                                     break;
                                 case 9:
-                                    DoScriptText(SAY_EXEC_TIME_5, me, pPlayer);
+                                    DoScriptText(SAY_EXEC_TIME_5, me, player);
                                     me->SetStandState(UNIT_STAND_STATE_KNEEL);
-                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
                                     break;
-                                case 10: DoScriptText(SAY_EXEC_WAITING, me, pPlayer); break;
+                                case 10:
+                                    DoScriptText(SAY_EXEC_WAITING, me, player);
+                                    break;
                                 case 11:
                                     DoScriptText(EMOTE_DIES, me);
                                     me->setDeathState(JUST_DIED);
@@ -886,26 +915,28 @@ public:
                             }
                             break;
                         case RACE_TROLL:
-                            switch(ExecuteSpeech_Counter)
+                            switch (ExecuteSpeech_Counter)
                             {
-                                case 0: DoScriptText(SAY_EXEC_START_3, me, pPlayer); break;
+                                case 0: DoScriptText(SAY_EXEC_START_3, me, player); break;
                                 case 1: me->SetStandState(UNIT_STAND_STATE_STAND); break;
-                                case 2: DoScriptText(SAY_EXEC_PROG_7, me, pPlayer); break;
-                                case 3: DoScriptText(SAY_EXEC_NAME_2, me, pPlayer); break;
-                                case 4: DoScriptText(SAY_EXEC_RECOG_6, me, pPlayer); break;
-                                case 5: DoScriptText(SAY_EXEC_NOREM_9, me, pPlayer); break;
-                                case 6: DoScriptText(SAY_EXEC_THINK_10, me, pPlayer); break;
-                                case 7: DoScriptText(SAY_EXEC_LISTEN_4, me, pPlayer); break;
+                                case 2: DoScriptText(SAY_EXEC_PROG_7, me, player); break;
+                                case 3: DoScriptText(SAY_EXEC_NAME_2, me, player); break;
+                                case 4: DoScriptText(SAY_EXEC_RECOG_6, me, player); break;
+                                case 5: DoScriptText(SAY_EXEC_NOREM_9, me, player); break;
+                                case 6: DoScriptText(SAY_EXEC_THINK_10, me, player); break;
+                                case 7: DoScriptText(SAY_EXEC_LISTEN_4, me, player); break;
                                 case 8:
                                     if (Creature* Plaguefist = GetClosestCreatureWithEntry(me, NPC_PLAGUEFIST, 85.0f))
-                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, pPlayer);
+                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, player);
                                     break;
                                 case 9:
-                                    DoScriptText(SAY_EXEC_TIME_10, me, pPlayer);
+                                    DoScriptText(SAY_EXEC_TIME_10, me, player);
                                     me->SetStandState(UNIT_STAND_STATE_KNEEL);
-                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
                                     break;
-                                case 10: DoScriptText(SAY_EXEC_WAITING, me, pPlayer); break;
+                                case 10:
+                                    DoScriptText(SAY_EXEC_WAITING, me, player);
+                                    break;
                                 case 11:
                                     DoScriptText(EMOTE_DIES, me);
                                     me->setDeathState(JUST_DIED);
@@ -914,26 +945,28 @@ public:
                             }
                             break;
                         case RACE_BLOODELF:
-                            switch(ExecuteSpeech_Counter)
+                            switch (ExecuteSpeech_Counter)
                             {
-                                case 0: DoScriptText(SAY_EXEC_START_1, me, pPlayer); break;
+                                case 0: DoScriptText(SAY_EXEC_START_1, me, player); break;
                                 case 1: me->SetStandState(UNIT_STAND_STATE_STAND); break;
-                                case 2: DoScriptText(SAY_EXEC_PROG_1, me, pPlayer); break;
-                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, pPlayer); break;
-                                case 4: DoScriptText(SAY_EXEC_RECOG_1, me, pPlayer); break;
+                                case 2: DoScriptText(SAY_EXEC_PROG_1, me, player); break;
+                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, player); break;
+                                case 4: DoScriptText(SAY_EXEC_RECOG_1, me, player); break;
                                 //case 5: //unknown
-                                case 6: DoScriptText(SAY_EXEC_THINK_3, me, pPlayer); break;
-                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, pPlayer); break;
+                                case 6: DoScriptText(SAY_EXEC_THINK_3, me, player); break;
+                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, player); break;
                                 case 8:
                                     if (Creature* Plaguefist = GetClosestCreatureWithEntry(me, NPC_PLAGUEFIST, 85.0f))
-                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, pPlayer);
+                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, player);
                                     break;
                                 case 9:
-                                    DoScriptText(SAY_EXEC_TIME_1, me, pPlayer);
+                                    DoScriptText(SAY_EXEC_TIME_1, me, player);
                                     me->SetStandState(UNIT_STAND_STATE_KNEEL);
-                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
                                     break;
-                                case 10: DoScriptText(SAY_EXEC_WAITING, me, pPlayer); break;
+                                case 10:
+                                    DoScriptText(SAY_EXEC_WAITING, me, player);
+                                    break;
                                 case 11:
                                     DoScriptText(EMOTE_DIES, me);
                                     me->setDeathState(JUST_DIED);
@@ -942,26 +975,28 @@ public:
                             }
                             break;
                         case RACE_DRAENEI:
-                            switch(ExecuteSpeech_Counter)
+                            switch (ExecuteSpeech_Counter)
                             {
-                                case 0: DoScriptText(SAY_EXEC_START_1, me, pPlayer); break;
+                                case 0: DoScriptText(SAY_EXEC_START_1, me, player); break;
                                 case 1: me->SetStandState(UNIT_STAND_STATE_STAND); break;
-                                case 2: DoScriptText(SAY_EXEC_PROG_1, me, pPlayer); break;
-                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, pPlayer); break;
-                                case 4: DoScriptText(SAY_EXEC_RECOG_2, me, pPlayer); break;
-                                case 5: DoScriptText(SAY_EXEC_NOREM_1, me, pPlayer); break;
-                                case 6: DoScriptText(SAY_EXEC_THINK_4, me, pPlayer); break;
-                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, pPlayer); break;
+                                case 2: DoScriptText(SAY_EXEC_PROG_1, me, player); break;
+                                case 3: DoScriptText(SAY_EXEC_NAME_1, me, player); break;
+                                case 4: DoScriptText(SAY_EXEC_RECOG_2, me, player); break;
+                                case 5: DoScriptText(SAY_EXEC_NOREM_1, me, player); break;
+                                case 6: DoScriptText(SAY_EXEC_THINK_4, me, player); break;
+                                case 7: DoScriptText(SAY_EXEC_LISTEN_1, me, player); break;
                                 case 8:
                                     if (Creature* Plaguefist = GetClosestCreatureWithEntry(me, NPC_PLAGUEFIST, 85.0f))
-                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, pPlayer);
+                                        DoScriptText(SAY_PLAGUEFIST, Plaguefist, player);
                                     break;
                                 case 9:
-                                    DoScriptText(SAY_EXEC_TIME_2, me, pPlayer);
+                                    DoScriptText(SAY_EXEC_TIME_2, me, player);
                                     me->SetStandState(UNIT_STAND_STATE_KNEEL);
-                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
+                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
                                     break;
-                                case 10: DoScriptText(SAY_EXEC_WAITING, me, pPlayer); break;
+                                case 10:
+                                    DoScriptText(SAY_EXEC_WAITING, me, player);
+                                    break;
                                 case 11:
                                     DoScriptText(EMOTE_DIES, me);
                                     me->setDeathState(JUST_DIED);
@@ -983,9 +1018,7 @@ public:
             }
         }
     };
-
 };
-
 
 void AddSC_the_scarlet_enclave_c2()
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: CrystalsongForest
 Script Data End */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 /*******************************************************
  * npc_warmage_violetstand
@@ -49,7 +50,7 @@ public:
 
     struct npc_warmage_violetstandAI : public Scripted_NoMovementAI
     {
-        npc_warmage_violetstandAI(Creature* pCreature) : Scripted_NoMovementAI(pCreature){}
+        npc_warmage_violetstandAI(Creature* creature) : Scripted_NoMovementAI(creature){}
 
         uint64 uiTargetGUID;
 
@@ -87,18 +88,18 @@ public:
             }else
             {
                 if (!uiTargetGUID)
-                    if (Creature* pOrb = GetClosestCreatureWithEntry(me,NPC_TRANSITUS_SHIELD_DUMMY,32.0f))
+                    if (Creature* pOrb = GetClosestCreatureWithEntry(me, NPC_TRANSITUS_SHIELD_DUMMY, 32.0f))
                         uiTargetGUID = pOrb->GetGUID();
 
             }
 
-            if (Creature* pOrb = me->GetCreature(*me,uiTargetGUID))
-                DoCast(pOrb,SPELL_TRANSITUS_SHIELD_BEAM);
+            if (Creature* pOrb = me->GetCreature(*me, uiTargetGUID))
+                DoCast(pOrb, SPELL_TRANSITUS_SHIELD_BEAM);
 
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_warmage_violetstandAI(creature);
     }

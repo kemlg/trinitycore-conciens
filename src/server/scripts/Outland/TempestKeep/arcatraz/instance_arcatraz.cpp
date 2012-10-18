@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,26 +23,26 @@ SDComment: Mainly Harbringer Skyriss event
 SDCategory: Tempest Keep, The Arcatraz
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "arcatraz.h"
 
 #define MAX_ENCOUNTER 9
 
 enum eUnits
 {
-    CONTAINMENT_CORE_SECURITY_FIELD_ALPHA = 184318,//door opened when Wrath-Scryer Soccothrates dies
-    CONTAINMENT_CORE_SECURITY_FIELD_BETA  = 184319,//door opened when Dalliah the Doomsayer dies
-    POD_ALPHA                             = 183961,//pod first boss wave
-    POD_BETA                              = 183963,//pod second boss wave
-    POD_DELTA                             = 183964,//pod third boss wave
-    POD_GAMMA                             = 183962,//pod fourth boss wave
-    POD_OMEGA                             = 183965,//pod fifth boss wave
-    WARDENS_SHIELD                        = 184802,// warden shield
-    SEAL_SPHERE                           = 184802,//shield 'protecting' mellichar
+    CONTAINMENT_CORE_SECURITY_FIELD_ALPHA = 184318, //door opened when Wrath-Scryer Soccothrates dies
+    CONTAINMENT_CORE_SECURITY_FIELD_BETA  = 184319, //door opened when Dalliah the Doomsayer dies
+    POD_ALPHA                             = 183961, //pod first boss wave
+    POD_BETA                              = 183963, //pod second boss wave
+    POD_DELTA                             = 183964, //pod third boss wave
+    POD_GAMMA                             = 183962, //pod fourth boss wave
+    POD_OMEGA                             = 183965, //pod fifth boss wave
+    WARDENS_SHIELD                        = 184802, // warden shield
+    SEAL_SPHERE                           = 184802, //shield 'protecting' mellichar
 
-    MELLICHAR                             = 20904,//skyriss will kill this unit
+    MELLICHAR                             = 20904, //skyriss will kill this unit
 };
-
 
 /* Arcatraz encounters:
 1 - Zereketh the Unbound event
@@ -60,7 +60,7 @@ class instance_arcatraz : public InstanceMapScript
         }
         struct instance_arcatraz_InstanceMapScript : public InstanceScript
         {
-            instance_arcatraz_InstanceMapScript(Map* pMap) : InstanceScript(pMap) { Initialize(); };
+            instance_arcatraz_InstanceMapScript(Map* map) : InstanceScript(map) {}
 
             uint32 m_auiEncounter[MAX_ENCOUNTER];
 
@@ -94,25 +94,51 @@ class instance_arcatraz : public InstanceMapScript
             bool IsEncounterInProgress() const
             {
                 for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
-                    if (m_auiEncounter[i] == IN_PROGRESS) return true;
+                    if (m_auiEncounter[i] == IN_PROGRESS)
+                        return true;
 
                 return false;
             }
 
-
             void OnGameObjectCreate(GameObject* go)
             {
-                switch(go->GetEntry())
+                switch (go->GetEntry())
                 {
-                case CONTAINMENT_CORE_SECURITY_FIELD_ALPHA: Containment_Core_Security_Field_AlphaGUID = go->GetGUID(); break;
-                case CONTAINMENT_CORE_SECURITY_FIELD_BETA:  Containment_Core_Security_Field_BetaGUID =  go->GetGUID(); break;
-                case POD_ALPHA:                             Pod_AlphaGUID = go->GetGUID();                             break;
-                case POD_GAMMA:                             Pod_GammaGUID = go->GetGUID();                             break;
-                case POD_BETA:                              Pod_BetaGUID =  go->GetGUID();                             break;
-                case POD_DELTA:                             Pod_DeltaGUID = go->GetGUID();                             break;
-                case POD_OMEGA:                             Pod_OmegaGUID = go->GetGUID();                             break;
-                case SEAL_SPHERE:                           GoSphereGUID = go->GetGUID();                              break;
-                //case WARDENS_SHIELD:                        Wardens_ShieldGUID = go->GetGUID();                        break;
+                case CONTAINMENT_CORE_SECURITY_FIELD_ALPHA:
+                    Containment_Core_Security_Field_AlphaGUID = go->GetGUID();
+                    break;
+
+                case CONTAINMENT_CORE_SECURITY_FIELD_BETA:
+                    Containment_Core_Security_Field_BetaGUID = go->GetGUID();
+                    break;
+
+                case POD_ALPHA:
+                    Pod_AlphaGUID = go->GetGUID();
+                    break;
+
+                case POD_GAMMA:
+                    Pod_GammaGUID = go->GetGUID();
+                    break;
+
+                case POD_BETA:
+                    Pod_BetaGUID = go->GetGUID();
+                    break;
+
+                case POD_DELTA:
+                    Pod_DeltaGUID = go->GetGUID();
+                    break;
+
+                case POD_OMEGA:
+                    Pod_OmegaGUID = go->GetGUID();
+                    break;
+
+                case SEAL_SPHERE:
+                    GoSphereGUID = go->GetGUID();
+                    break;
+
+                /*case WARDENS_SHIELD:
+                    Wardens_ShieldGUID = go->GetGUID();
+                    break;*/
                 }
             }
 
@@ -124,7 +150,7 @@ class instance_arcatraz : public InstanceMapScript
 
             void SetData(uint32 type, uint32 data)
             {
-                switch(type)
+                switch (type)
                 {
                 case TYPE_ZEREKETH:
                     m_auiEncounter[0] = data;
@@ -206,7 +232,7 @@ class instance_arcatraz : public InstanceMapScript
 
             uint32 GetData(uint32 type)
             {
-                switch(type)
+                switch (type)
                 {
                 case TYPE_HARBINGERSKYRISS: return m_auiEncounter[3];
                 case TYPE_WARDEN_1:         return m_auiEncounter[4];
@@ -220,7 +246,7 @@ class instance_arcatraz : public InstanceMapScript
 
             uint64 GetData64(uint32 data)
             {
-                switch(data)
+                switch (data)
                 {
                 case DATA_MELLICHAR:        return MellicharGUID;
                 case DATA_SPHERE_SHIELD:    return GoSphereGUID;
@@ -229,9 +255,9 @@ class instance_arcatraz : public InstanceMapScript
             }
         };
 
-        InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+        InstanceScript* GetInstanceScript(InstanceMap* map) const
         {
-            return new instance_arcatraz_InstanceMapScript(pMap);
+            return new instance_arcatraz_InstanceMapScript(map);
         }
 };
 

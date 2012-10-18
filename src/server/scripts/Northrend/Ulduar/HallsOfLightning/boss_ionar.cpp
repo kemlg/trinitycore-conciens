@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -20,7 +20,8 @@
  * Comment: Timer check pending
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "halls_of_lightning.h"
 
 enum Spells
@@ -41,13 +42,10 @@ enum Spells
 
 enum Yells
 {
-    SAY_AGGRO                                     = -1602011,
-    SAY_SLAY_1                                    = -1602012,
-    SAY_SLAY_2                                    = -1602013,
-    SAY_SLAY_3                                    = -1602014,
-    SAY_DEATH                                     = -1602015,
-    SAY_SPLIT_1                                   = -1602016,
-    SAY_SPLIT_2                                   = -1602017
+    SAY_AGGRO                                     = 0,
+    SAY_SPLIT                                     = 1,
+    SAY_SLAY                                      = 2,
+    SAY_DEATH                                     = 3
 };
 
 enum Creatures
@@ -71,19 +69,19 @@ class boss_ionar : public CreatureScript
 public:
     boss_ionar() : CreatureScript("boss_ionar") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_ionarAI(pCreature);
+        return new boss_ionarAI(creature);
     }
 
     struct boss_ionarAI : public ScriptedAI
     {
-        boss_ionarAI(Creature *pCreature) : ScriptedAI(pCreature), lSparkList(pCreature)
+        boss_ionarAI(Creature* creature) : ScriptedAI(creature), lSparkList(creature)
         {
-            pInstance = pCreature->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         SummonList lSparkList;
 
@@ -109,41 +107,41 @@ public:
             uiStaticOverloadTimer = urand(5*IN_MILLISECONDS, 6*IN_MILLISECONDS);
             uiBallLightningTimer = urand(10*IN_MILLISECONDS, 11*IN_MILLISECONDS);
 
-            uiDisperseHealth = 45 + urand(0,10);
+            uiDisperseHealth = 45 + urand(0, 10);
 
             me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE|UNIT_FLAG_NOT_SELECTABLE|UNIT_FLAG_DISABLE_MOVE);
 
             if (!me->IsVisible())
                 me->SetVisible(true);
 
-            if (pInstance)
-                pInstance->SetData(TYPE_IONAR, NOT_STARTED);
+            if (instance)
+                instance->SetData(TYPE_IONAR, NOT_STARTED);
         }
 
         void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(SAY_AGGRO, me);
+            Talk(SAY_AGGRO);
 
-            if (pInstance)
-                pInstance->SetData(TYPE_IONAR, IN_PROGRESS);
+            if (instance)
+                instance->SetData(TYPE_IONAR, IN_PROGRESS);
         }
 
         void JustDied(Unit* /*killer*/)
         {
-            DoScriptText(SAY_DEATH, me);
+            Talk(SAY_DEATH);
 
             lSparkList.DespawnAll();
 
-            if (pInstance)
-                pInstance->SetData(TYPE_IONAR, DONE);
+            if (instance)
+                instance->SetData(TYPE_IONAR, DONE);
         }
 
-        void KilledUnit(Unit * /*victim*/)
+        void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_SLAY_1,SAY_SLAY_2,SAY_SLAY_3), me);
+            Talk(SAY_SLAY);
         }
 
-        void SpellHit(Unit* /*caster*/, const SpellEntry* spell)
+        void SpellHit(Unit* /*caster*/, const SpellInfo* spell)
         {
             if (spell->Id == SPELL_DISPERSE)
             {
@@ -180,39 +178,39 @@ public:
                         pSpark->GetMotionMaster()->MovePoint(DATA_POINT_CALLBACK, pos);
                     }
                     else
-                        pSpark->ForcedDespawn();
+                        pSpark->DespawnOrUnsummon();
                 }
             }
         }
 
-        void DamageTaken(Unit * /*pDoneBy*/, uint32 &uiDamage)
+        void DamageTaken(Unit* /*pDoneBy*/, uint32 &uiDamage)
         {
             if (!me->IsVisible())
                 uiDamage = 0;
         }
 
-        void JustSummoned(Creature* pSummoned)
+        void JustSummoned(Creature* summoned)
         {
-            if (pSummoned->GetEntry() == NPC_SPARK_OF_IONAR)
+            if (summoned->GetEntry() == NPC_SPARK_OF_IONAR)
             {
-                lSparkList.Summon(pSummoned);
+                lSparkList.Summon(summoned);
 
-                pSummoned->CastSpell(pSummoned, DUNGEON_MODE(SPELL_SPARK_VISUAL_TRIGGER,H_SPELL_SPARK_VISUAL_TRIGGER), true);
+                summoned->CastSpell(summoned, DUNGEON_MODE(SPELL_SPARK_VISUAL_TRIGGER, H_SPELL_SPARK_VISUAL_TRIGGER), true);
 
-                Unit* pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0);
-                if (pTarget)
+                Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0);
+                if (target)
                 {
-                    pSummoned->SetInCombatWith(pTarget);
-                    pSummoned->GetMotionMaster()->Clear();
-                    pSummoned->GetMotionMaster()->MoveFollow(pTarget, 0.0f, 0.0f);
+                    summoned->SetInCombatWith(target);
+                    summoned->GetMotionMaster()->Clear();
+                    summoned->GetMotionMaster()->MoveFollow(target, 0.0f, 0.0f);
                 }
             }
         }
 
-        void SummonedCreatureDespawn(Creature *pSummoned)
+        void SummonedCreatureDespawn(Creature* summoned)
         {
-            if (pSummoned->GetEntry() == NPC_SPARK_OF_IONAR)
-                lSparkList.Despawn(pSummoned);
+            if (summoned->GetEntry() == NPC_SPARK_OF_IONAR)
+                lSparkList.Despawn(summoned);
         }
 
         void UpdateAI(const uint32 uiDiff)
@@ -257,8 +255,8 @@ public:
 
             if (uiStaticOverloadTimer <= uiDiff)
             {
-                if (Unit* pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0))
-                    DoCast(pTarget, SPELL_STATIC_OVERLOAD);
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                    DoCast(target, SPELL_STATIC_OVERLOAD);
 
                 uiStaticOverloadTimer = urand(5*IN_MILLISECONDS, 6*IN_MILLISECONDS);
             }
@@ -278,7 +276,7 @@ public:
             {
                 bHasDispersed = true;
 
-                DoScriptText(RAND(SAY_SPLIT_1,SAY_SPLIT_2), me);
+                Talk(SAY_SPLIT);
 
                 if (me->IsNonMeleeSpellCasted(false))
                     me->InterruptNonMeleeSpells(false);
@@ -292,8 +290,6 @@ public:
 
 };
 
-
-
 /*######
 ## mob_spark_of_ionar
 ######*/
@@ -303,19 +299,19 @@ class mob_spark_of_ionar : public CreatureScript
 public:
     mob_spark_of_ionar() : CreatureScript("mob_spark_of_ionar") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_spark_of_ionarAI(pCreature);
+        return new mob_spark_of_ionarAI(creature);
     }
 
     struct mob_spark_of_ionarAI : public ScriptedAI
     {
-        mob_spark_of_ionarAI(Creature *pCreature) : ScriptedAI(pCreature)
+        mob_spark_of_ionarAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = pCreature->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 uiCheckTimer;
 
@@ -327,14 +323,14 @@ public:
 
         void MovementInform(uint32 uiType, uint32 uiPointId)
         {
-            if (uiType != POINT_MOTION_TYPE || !pInstance)
+            if (uiType != POINT_MOTION_TYPE || !instance)
                 return;
 
             if (uiPointId == DATA_POINT_CALLBACK)
-                me->ForcedDespawn();
+                me->DespawnOrUnsummon();
         }
 
-        void DamageTaken(Unit * /*pDoneBy*/, uint32 &uiDamage)
+        void DamageTaken(Unit* /*pDoneBy*/, uint32 &uiDamage)
         {
             uiDamage = 0;
         }
@@ -342,18 +338,18 @@ public:
         void UpdateAI(const uint32 uiDiff)
         {
             // Despawn if the encounter is not running
-            if (pInstance && pInstance->GetData(TYPE_IONAR) != IN_PROGRESS)
+            if (instance && instance->GetData(TYPE_IONAR) != IN_PROGRESS)
             {
-                me->ForcedDespawn();
+                me->DespawnOrUnsummon();
                 return;
             }
 
             // Prevent them to follow players through the whole instance
             if (uiCheckTimer <= uiDiff)
             {
-                if (pInstance)
+                if (instance)
                 {
-                    Creature* pIonar = pInstance->instance->GetCreature(pInstance->GetData64(DATA_IONAR));
+                    Creature* pIonar = instance->instance->GetCreature(instance->GetData64(DATA_IONAR));
                     if (pIonar && pIonar->isAlive())
                     {
                         if (me->GetDistance(pIonar) > DATA_MAX_SPARK_DISTANCE)
@@ -367,7 +363,7 @@ public:
                         }
                     }
                     else
-                        me->ForcedDespawn();
+                        me->DespawnOrUnsummon();
                 }
                 uiCheckTimer = 2*IN_MILLISECONDS;
             }
@@ -379,7 +375,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_ionar()
 {

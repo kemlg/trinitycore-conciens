@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -26,26 +26,26 @@ class UpdateMask
 {
     public:
         UpdateMask() : mCount(0), mBlocks(0), mUpdateMask(0) { }
-        UpdateMask(const UpdateMask& mask) : mUpdateMask(0) { *this = mask; }
+        UpdateMask(UpdateMask const& mask) : mUpdateMask(0) { *this = mask; }
 
         ~UpdateMask()
         {
-            delete [] mUpdateMask;
+            delete[] mUpdateMask;
         }
 
-        void SetBit (uint32 index)
+        void SetBit(uint32 index)
         {
-            ((uint8 *)mUpdateMask)[ index >> 3 ] |= 1 << (index & 0x7);
+            ((uint8*)mUpdateMask)[index >> 3] |= 1 << (index & 0x7);
         }
 
-        void UnsetBit (uint32 index)
+        void UnsetBit(uint32 index)
         {
-            ((uint8 *)mUpdateMask)[ index >> 3 ] &= (0xff ^ (1 <<  (index & 0x7)));
+            ((uint8*)mUpdateMask)[index >> 3] &= (0xff ^ (1 <<  (index & 0x7)));
         }
 
-        bool GetBit (uint32 index) const
+        bool GetBit(uint32 index) const
         {
-            return (((uint8 *)mUpdateMask)[ index >> 3 ] & (1 << (index & 0x7))) != 0;
+            return (((uint8*)mUpdateMask)[index >> 3] & (1 << (index & 0x7))) != 0;
         }
 
         uint32 GetBlockCount() const { return mBlocks; }
@@ -70,29 +70,32 @@ class UpdateMask
                 memset(mUpdateMask, 0, mBlocks << 2);
         }
 
-        UpdateMask& operator = (const UpdateMask& mask)
+        UpdateMask& operator=(UpdateMask const& mask)
         {
+            if (this == &mask)
+                return *this;
+
             SetCount(mask.mCount);
             memcpy(mUpdateMask, mask.mUpdateMask, mBlocks << 2);
 
             return *this;
         }
 
-        void operator &= (const UpdateMask& mask)
+        void operator&=(UpdateMask const& mask)
         {
             ASSERT(mask.mCount <= mCount);
             for (uint32 i = 0; i < mBlocks; ++i)
                 mUpdateMask[i] &= mask.mUpdateMask[i];
         }
 
-        void operator |= (const UpdateMask& mask)
+        void operator|=(UpdateMask const& mask)
         {
             ASSERT(mask.mCount <= mCount);
             for (uint32 i = 0; i < mBlocks; ++i)
                 mUpdateMask[i] |= mask.mUpdateMask[i];
         }
 
-        UpdateMask operator & (const UpdateMask& mask) const
+        UpdateMask operator&(UpdateMask const& mask) const
         {
             ASSERT(mask.mCount <= mCount);
 
@@ -103,7 +106,7 @@ class UpdateMask
             return newmask;
         }
 
-        UpdateMask operator | (const UpdateMask& mask) const
+        UpdateMask operator|(UpdateMask const& mask) const
         {
             ASSERT(mask.mCount <= mCount);
 

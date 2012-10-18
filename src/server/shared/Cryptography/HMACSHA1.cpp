@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -18,6 +18,7 @@
 
 #include "HMACSHA1.h"
 #include "BigNumber.h"
+#include "Common.h"
 
 HmacHash::HmacHash(uint32 len, uint8 *seed)
 {
@@ -30,19 +31,9 @@ HmacHash::~HmacHash()
     HMAC_CTX_cleanup(&m_ctx);
 }
 
-void HmacHash::UpdateBigNumber(BigNumber *bn)
-{
-    UpdateData(bn->AsByteArray(), bn->GetNumBytes());
-}
-
-void HmacHash::UpdateData(const uint8 *data, int length)
-{
-    HMAC_Update(&m_ctx, data, length);
-}
-
 void HmacHash::UpdateData(const std::string &str)
 {
-    UpdateData((uint8 const*)str.c_str(), str.length());
+    HMAC_Update(&m_ctx, (uint8 const*)str.c_str(), str.length());
 }
 
 void HmacHash::Finalize()
@@ -52,7 +43,7 @@ void HmacHash::Finalize()
     ASSERT(length == SHA_DIGEST_LENGTH)
 }
 
-uint8 *HmacHash::ComputeHash(BigNumber *bn)
+uint8 *HmacHash::ComputeHash(BigNumber* bn)
 {
     HMAC_Update(&m_ctx, bn->AsByteArray(), bn->GetNumBytes());
     Finalize();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,7 +15,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "gundrak.h"
 
 #define MAX_ENCOUNTER     5
@@ -33,18 +34,17 @@ class instance_gundrak : public InstanceMapScript
 public:
     instance_gundrak() : InstanceMapScript("instance_gundrak", 604) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+    InstanceScript* GetInstanceScript(InstanceMap* map) const
     {
-        return new instance_gundrak_InstanceMapScript(pMap);
+        return new instance_gundrak_InstanceMapScript(map);
     }
 
     struct instance_gundrak_InstanceMapScript : public InstanceScript
     {
-        instance_gundrak_InstanceMapScript(Map* pMap) : InstanceScript(pMap)
+        instance_gundrak_InstanceMapScript(Map* map) : InstanceScript(map)
         {
-            bHeroicMode = pMap->IsHeroic();
-            Initialize();
-        };
+            bHeroicMode = map->IsHeroic();
+        }
 
         bool bHeroicMode;
         bool spawnSupport;
@@ -132,14 +132,15 @@ public:
        bool IsEncounterInProgress() const
         {
             for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
-                if (m_auiEncounter[i] == IN_PROGRESS) return true;
+                if (m_auiEncounter[i] == IN_PROGRESS)
+                    return true;
 
             return false;
         }
 
         void OnCreatureCreate(Creature* creature)
         {
-            switch(creature->GetEntry())
+            switch (creature->GetEntry())
             {
                 case CREATURE_SLAD_RAN: uiSladRan = creature->GetGUID(); break;
                 case CREATURE_MOORABI: uiMoorabi = creature->GetGUID(); break;
@@ -155,16 +156,16 @@ public:
 
         void OnGameObjectCreate(GameObject* go)
         {
-            switch(go->GetEntry())
+            switch (go->GetEntry())
             {
                 case 192518:
                     uiSladRanAltar = go->GetGUID();
                     // Make sure that they start out as unusuable
-                    go->SetFlag(GAMEOBJECT_FLAGS,GO_FLAG_UNK1);
+                    go->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
                     if (m_auiEncounter[0] == DONE)
                     {
                         if (uiSladRanStatueState == GO_STATE_ACTIVE)
-                            go->RemoveFlag(GAMEOBJECT_FLAGS,GO_FLAG_UNK1);
+                            go->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
                         else
                         {
                             ++phase;
@@ -175,11 +176,11 @@ public:
                 case 192519:
                     uiMoorabiAltar = go->GetGUID();
                     // Make sure that they start out as unusuable
-                    go->SetFlag(GAMEOBJECT_FLAGS,GO_FLAG_UNK1);
+                    go->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
                     if (m_auiEncounter[0] == DONE)
                     {
                         if (uiMoorabiStatueState == GO_STATE_ACTIVE)
-                            go->RemoveFlag(GAMEOBJECT_FLAGS,GO_FLAG_UNK1);
+                            go->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
                         else
                         {
                             ++phase;
@@ -190,11 +191,11 @@ public:
                 case 192520:
                     uiDrakkariColossusAltar = go->GetGUID();
                     // Make sure that they start out as unusuable
-                    go->SetFlag(GAMEOBJECT_FLAGS,GO_FLAG_UNK1);
+                    go->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
                     if (m_auiEncounter[0] == DONE)
                     {
                         if (uiDrakkariColossusStatueState == GO_STATE_ACTIVE)
-                            go->RemoveFlag(GAMEOBJECT_FLAGS,GO_FLAG_UNK1);
+                            go->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
                         else
                         {
                             ++phase;
@@ -221,21 +222,21 @@ public:
                 case 192632:
                     uiEckTheFerociousDoor = go->GetGUID();
                     if (bHeroicMode && m_auiEncounter[1] == DONE)
-                        HandleGameObject(NULL,true,go);
+                        HandleGameObject(0, true, go);
                     break;
                 case 192569:
                     uiEckTheFerociousDoorBehind = go->GetGUID();
                     if (bHeroicMode && m_auiEncounter[4] == DONE)
-                        HandleGameObject(NULL,true,go);
+                        HandleGameObject(0, true, go);
                 case 193208:
                     uiGalDarahDoor1 = go->GetGUID();
                     if (m_auiEncounter[3] == DONE)
-                        HandleGameObject(NULL,true,go);
+                        HandleGameObject(0, true, go);
                     break;
                 case 193209:
                     uiGalDarahDoor2 = go->GetGUID();
                     if (m_auiEncounter[3] == DONE)
-                        HandleGameObject(NULL,true,go);
+                        HandleGameObject(0, true, go);
                     break;
                 case 193188:
                     uiBridge = go->GetGUID();
@@ -254,7 +255,7 @@ public:
 
         void SetData(uint32 type, uint32 data)
         {
-            switch(type)
+            switch (type)
             {
             case DATA_SLAD_RAN_EVENT:
                 m_auiEncounter[0] = data;
@@ -262,7 +263,7 @@ public:
                 {
                   GameObject* go = instance->GetGameObject(uiSladRanAltar);
                   if (go)
-                      go->RemoveFlag(GAMEOBJECT_FLAGS,GO_FLAG_UNK1);
+                      go->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
                 }
                 break;
             case DATA_MOORABI_EVENT:
@@ -271,9 +272,9 @@ public:
                 {
                   GameObject* go = instance->GetGameObject(uiMoorabiAltar);
                   if (go)
-                      go->RemoveFlag(GAMEOBJECT_FLAGS,GO_FLAG_UNK1);
+                      go->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
                   if (bHeroicMode)
-                      HandleGameObject(uiEckTheFerociousDoor,true);
+                      HandleGameObject(uiEckTheFerociousDoor, true);
                 }
                 break;
             case DATA_DRAKKARI_COLOSSUS_EVENT:
@@ -282,21 +283,21 @@ public:
                 {
                   GameObject* go = instance->GetGameObject(uiDrakkariColossusAltar);
                   if (go)
-                      go->RemoveFlag(GAMEOBJECT_FLAGS,GO_FLAG_UNK1);
+                      go->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
                 }
                 break;
             case DATA_GAL_DARAH_EVENT:
                 m_auiEncounter[3] = data;
                 if (data == DONE)
                 {
-                    HandleGameObject(uiGalDarahDoor1,true);
-                    HandleGameObject(uiGalDarahDoor2,true);
+                    HandleGameObject(uiGalDarahDoor1, true);
+                    HandleGameObject(uiGalDarahDoor2, true);
                 }
                 break;
             case DATA_ECK_THE_FEROCIOUS_EVENT:
                 m_auiEncounter[4] = data;
                 if (bHeroicMode && data == DONE)
-                    HandleGameObject(uiEckTheFerociousDoorBehind,true);
+                    HandleGameObject(uiEckTheFerociousDoorBehind, true);
                 break;
             }
 
@@ -307,19 +308,31 @@ public:
         void SetData64(uint32 type, uint64 data)
         {
             if (type == DATA_RUIN_DWELLER_DIED)
-            DwellerGUIDs.erase(data);
+                DwellerGUIDs.erase(data);
+            else if (type == DATA_STATUE_ACTIVATE)
+            {
+                toActivate = data;
+                timer = 3500;
+                ++phase;
+            }
         }
 
         uint32 GetData(uint32 type)
         {
-            switch(type)
+            switch (type)
             {
-                case DATA_SLAD_RAN_EVENT:             return m_auiEncounter[0];
-                case DATA_MOORABI_EVENT:              return m_auiEncounter[1];
-                case DATA_GAL_DARAH_EVENT:            return m_auiEncounter[2];
-                case DATA_DRAKKARI_COLOSSUS_EVENT:    return m_auiEncounter[3];
-                case DATA_ECK_THE_FEROCIOUS_EVENT:    return m_auiEncounter[4];
-                case DATA_ALIVE_RUIN_DWELLERS:        return DwellerGUIDs.size();
+                case DATA_SLAD_RAN_EVENT:
+                    return m_auiEncounter[0];
+                case DATA_MOORABI_EVENT:
+                    return m_auiEncounter[1];
+                case DATA_GAL_DARAH_EVENT:
+                    return m_auiEncounter[2];
+                case DATA_DRAKKARI_COLOSSUS_EVENT:
+                    return m_auiEncounter[3];
+                case DATA_ECK_THE_FEROCIOUS_EVENT:
+                    return m_auiEncounter[4];
+                case DATA_ALIVE_RUIN_DWELLERS:
+                    return DwellerGUIDs.size();
             }
 
             return 0;
@@ -327,15 +340,24 @@ public:
 
         uint64 GetData64(uint32 type)
         {
-            switch(type)
+            switch (type)
             {
-                case DATA_SLAD_RAN_ALTAR:             return uiSladRanAltar;
-                case DATA_MOORABI_ALTAR:              return uiMoorabiAltar;
-                case DATA_DRAKKARI_COLOSSUS_ALTAR:    return uiDrakkariColossusAltar;
-                case DATA_SLAD_RAN_STATUE:            return uiSladRanStatue;
-                case DATA_MOORABI_STATUE:             return uiMoorabiStatue;
-                case DATA_DRAKKARI_COLOSSUS_STATUE:   return uiDrakkariColossusStatue;
-                case DATA_DRAKKARI_COLOSSUS:          return uiDrakkariColossus;
+                case DATA_SLAD_RAN_ALTAR:
+                    return uiSladRanAltar;
+                case DATA_MOORABI_ALTAR:
+                    return uiMoorabiAltar;
+                case DATA_DRAKKARI_COLOSSUS_ALTAR:
+                    return uiDrakkariColossusAltar;
+                case DATA_SLAD_RAN_STATUE:
+                    return uiSladRanStatue;
+                case DATA_MOORABI_STATUE:
+                    return uiMoorabiStatue;
+                case DATA_DRAKKARI_COLOSSUS_STATUE:
+                    return uiDrakkariColossusStatue;
+                case DATA_DRAKKARI_COLOSSUS:
+                    return uiDrakkariColossus;
+                case DATA_STATUE_ACTIVATE:
+                    return toActivate;
             }
 
             return 0;
@@ -346,12 +368,11 @@ public:
             OUT_SAVE_INST_DATA;
 
             std::ostringstream saveStream;
-            saveStream << "G D " << m_auiEncounter[0] << " " << m_auiEncounter[1] << " "
-                 << m_auiEncounter[2] << " " << m_auiEncounter[3] << " " << m_auiEncounter[4] << " "
-                 << (uiSladRanStatue ? GetObjState(uiSladRanStatue) : GO_STATE_ACTIVE) << " " << (uiMoorabiStatue ? GetObjState(uiMoorabiStatue) : GO_STATE_ACTIVE) << " "
-                 << (uiDrakkariColossusStatue ? GetObjState(uiDrakkariColossusStatue) : GO_STATE_ACTIVE) << " " << (uiGalDarahStatue ? GetObjState(uiGalDarahStatue) : GO_STATE_READY) << " "
-                 << (uiBridge ? GetObjState(uiBridge) : GO_STATE_ACTIVE) << " " << (uiCollision ? GetObjState(uiCollision) : GO_STATE_READY);
-
+            saveStream << "G D " << m_auiEncounter[0] << ' ' << m_auiEncounter[1] << ' '
+                 << m_auiEncounter[2] << ' ' << m_auiEncounter[3] << ' ' << m_auiEncounter[4] << ' '
+                 << (uiSladRanStatue ? GetObjState(uiSladRanStatue) : GO_STATE_ACTIVE) << ' ' << (uiMoorabiStatue ? GetObjState(uiMoorabiStatue) : GO_STATE_ACTIVE) << ' '
+                 << (uiDrakkariColossusStatue ? GetObjState(uiDrakkariColossusStatue) : GO_STATE_ACTIVE) << ' ' << (uiGalDarahStatue ? GetObjState(uiGalDarahStatue) : GO_STATE_READY) << ' '
+                 << (uiBridge ? GetObjState(uiBridge) : GO_STATE_ACTIVE) << ' ' << (uiCollision ? GetObjState(uiCollision) : GO_STATE_READY);
 
             str_data = saveStream.str();
 
@@ -398,17 +419,6 @@ public:
             OUT_LOAD_INST_DATA_COMPLETE;
         }
 
-         bool QueueActivation(uint64 guid, uint32 time)
-         {
-             if (timer)
-                 return false;
-
-             toActivate = guid;
-             timer = time;
-             phase++;
-             return true;
-         }
-
          void Update(uint32 diff)
          {
              // Spawn the support for the bridge if necessary
@@ -428,13 +438,14 @@ public:
                  timer = 0;
                  if (toActivate == uiBridge)
                  {
-                     toActivate = 0;
                      GameObject* pBridge = instance->GetGameObject(uiBridge);
                      GameObject* pCollision = instance->GetGameObject(uiCollision);
                      GameObject* pSladRanStatue = instance->GetGameObject(uiSladRanStatue);
                      GameObject* pMoorabiStatue = instance->GetGameObject(uiMoorabiStatue);
                      GameObject* pDrakkariColossusStatue = instance->GetGameObject(uiDrakkariColossusStatue);
                      GameObject* pGalDarahStatue = instance->GetGameObject(uiGalDarahStatue);
+
+                     toActivate = 0;
 
                      if (pBridge && pCollision && pSladRanStatue && pMoorabiStatue && pDrakkariColossusStatue && pGalDarahStatue)
                      {
@@ -458,11 +469,13 @@ public:
                      {
                          spell = 57071;
                          pAltar = instance->GetGameObject(uiSladRanAltar);
-                     } else if (toActivate == uiMoorabiStatue)
+                     }
+                     else if (toActivate == uiMoorabiStatue)
                      {
                          spell = 57068;
                          pAltar = instance->GetGameObject(uiMoorabiAltar);
-                     } else if (toActivate == uiDrakkariColossusStatue)
+                     }
+                     else if (toActivate == uiDrakkariColossusStatue)
                      {
                          spell = 57072;
                          pAltar = instance->GetGameObject(uiDrakkariColossusAltar);
@@ -484,11 +497,13 @@ public:
                      toActivate = 0;
 
                      if (phase == 3)
-                         QueueActivation(uiBridge, 3000);
+                         SetData64(DATA_STATUE_ACTIVATE, uiBridge);
                      else
                          SaveToDB(); // Don't save in between last statue and bridge turning in case of crash leading to stuck instance
-                 }
-             } else timer -= diff;
+                }
+            }
+            else
+                timer -= diff;
         }
 
          GOState GetObjState(uint64 guid)
@@ -506,26 +521,34 @@ class go_gundrak_altar : public GameObjectScript
 public:
     go_gundrak_altar() : GameObjectScript("go_gundrak_altar") { }
 
-    bool OnGossipHello(Player * /*pPlayer*/, GameObject* pGO)
+    bool OnGossipHello(Player* /*player*/, GameObject* go)
     {
-        InstanceScript *pInstance = pGO->GetInstanceScript();
+        InstanceScript* instance = go->GetInstanceScript();
         uint64 uiStatue = 0;
 
-        pGO->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_UNK1);
-        pGO->SetGoState(GO_STATE_ACTIVE);
+        go->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+        go->SetGoState(GO_STATE_ACTIVE);
 
-        if (pInstance)
+        if (instance)
         {
-            switch(pGO->GetEntry())
+            switch (go->GetEntry())
             {
-                case 192518: uiStatue = pInstance->GetData64(DATA_SLAD_RAN_STATUE); break;
-                case 192519: uiStatue = pInstance->GetData64(DATA_MOORABI_STATUE); break;
-                case 192520: uiStatue = pInstance->GetData64(DATA_DRAKKARI_COLOSSUS_STATUE); break;
+                case 192518:
+                    uiStatue = instance->GetData64(DATA_SLAD_RAN_STATUE);
+                    break;
+                case 192519:
+                    uiStatue = instance->GetData64(DATA_MOORABI_STATUE);
+                    break;
+                case 192520:
+                    uiStatue = instance->GetData64(DATA_DRAKKARI_COLOSSUS_STATUE);
+                    break;
             }
-            if (CAST_INST(instance_gundrak::instance_gundrak_InstanceMapScript, pInstance)->QueueActivation(uiStatue, 3500))
+
+            if (!instance->GetData64(DATA_STATUE_ACTIVATE))
             {
-                pGO->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_UNK1);
-                pGO->SetGoState(GO_STATE_ACTIVE);
+                instance->SetData64(DATA_STATUE_ACTIVATE, uiStatue);
+                go->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+                go->SetGoState(GO_STATE_ACTIVE);
             }
             return true;
         }
@@ -533,7 +556,6 @@ public:
     }
 
 };
-
 
 void AddSC_instance_gundrak()
 {

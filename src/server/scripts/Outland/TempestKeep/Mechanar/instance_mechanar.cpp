@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Mechanar
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "mechanar.h"
 
 #define MAX_ENCOUNTER      1
@@ -38,7 +39,7 @@ class instance_mechanar : public InstanceMapScript
 
         struct instance_mechanar_InstanceMapScript : public InstanceScript
         {
-            instance_mechanar_InstanceMapScript(Map* pMap) : InstanceScript(pMap) { Initialize(); };
+            instance_mechanar_InstanceMapScript(Map* map) : InstanceScript(map) {}
 
             uint32 m_auiEncounter[MAX_ENCOUNTER];
 
@@ -58,7 +59,7 @@ class instance_mechanar : public InstanceMapScript
 
             uint32 GetData(uint32 type)
             {
-                switch(type)
+                switch (type)
                 {
                 case DATA_NETHERMANCER_EVENT:   return m_auiEncounter[0];
                 }
@@ -66,26 +67,25 @@ class instance_mechanar : public InstanceMapScript
                 return false;
             }
 
-            uint64 GetData64 (uint32 /*identifier*/)
+            uint64 GetData64(uint32 /*identifier*/)
             {
                 return 0;
             }
 
             void SetData(uint32 type, uint32 data)
             {
-                switch(type)
+                switch (type)
                 {
                 case DATA_NETHERMANCER_EVENT:   m_auiEncounter[0] = data;   break;
                 }
             }
         };
 
-        InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+        InstanceScript* GetInstanceScript(InstanceMap* map) const
         {
-            return new instance_mechanar_InstanceMapScript(pMap);
+            return new instance_mechanar_InstanceMapScript(map);
         }
 };
-
 
 void AddSC_instance_mechanar()
 {

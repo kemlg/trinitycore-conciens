@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -19,8 +19,11 @@
 #ifndef _FORMATIONS_H
 #define _FORMATIONS_H
 
-#include "Common.h"
+#include "Define.h"
+#include "UnorderedMap.h"
+#include <map>
 
+class Creature;
 class CreatureGroup;
 
 struct FormationInfo
@@ -31,25 +34,24 @@ struct FormationInfo
     uint8 groupAI;
 };
 
-class CreatureGroupManager
-{
-    friend class ACE_Singleton<CreatureGroupManager, ACE_Null_Mutex>;
-    public:
-        void AddCreatureToGroup(uint32 group_id, Creature *creature);
-        void RemoveCreatureFromGroup(CreatureGroup *group, Creature *creature);
-        void LoadCreatureFormations();
-};
-
-#define sFormationMgr ACE_Singleton<CreatureGroupManager, ACE_Null_Mutex>::instance()
-
 typedef UNORDERED_MAP<uint32/*memberDBGUID*/, FormationInfo*>   CreatureGroupInfoType;
 
-extern CreatureGroupInfoType    CreatureGroupMap;
+class FormationMgr
+{
+    friend class ACE_Singleton<FormationMgr, ACE_Null_Mutex>;
+    public:
+        FormationMgr() { }
+        ~FormationMgr();
+        void AddCreatureToGroup(uint32 group_id, Creature* creature);
+        void RemoveCreatureFromGroup(CreatureGroup* group, Creature* creature);
+        void LoadCreatureFormations();
+        CreatureGroupInfoType CreatureGroupMap;
+};
 
 class CreatureGroup
 {
     private:
-        Creature *m_leader; //Important do not forget sometimes to work with pointers instead synonims :D:D
+        Creature* m_leader; //Important do not forget sometimes to work with pointers instead synonims :D:D
         typedef std::map<Creature*, FormationInfo*>  CreatureGroupMemberType;
         CreatureGroupMemberType m_members;
 
@@ -59,19 +61,21 @@ class CreatureGroup
     public:
         //Group cannot be created empty
         explicit CreatureGroup(uint32 id) : m_leader(NULL), m_groupID(id), m_Formed(false) {}
-        ~CreatureGroup() { sLog->outDebug("Destroying group"); }
+        ~CreatureGroup() {}
 
         Creature* getLeader() const { return m_leader; }
         uint32 GetId() const { return m_groupID; }
         bool isEmpty() const { return m_members.empty(); }
         bool isFormed() const { return m_Formed; }
 
-        void AddMember(Creature *member);
-        void RemoveMember(Creature *member);
+        void AddMember(Creature* member);
+        void RemoveMember(Creature* member);
         void FormationReset(bool dismiss);
 
         void LeaderMoveTo(float x, float y, float z);
-        void MemberAttackStart(Creature* member, Unit *target);
+        void MemberAttackStart(Creature* member, Unit* target);
 };
+
+#define sFormationMgr ACE_Singleton<FormationMgr, ACE_Null_Mutex>::instance()
 
 #endif

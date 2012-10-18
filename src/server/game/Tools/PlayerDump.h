@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -30,8 +30,7 @@ enum DumpTableType
     DTT_CHAR_TABLE,     //                                  // character_achievement, character_achievement_progress,
                                                             // character_action, character_aura, character_homebind,
                                                             // character_queststatus, character_queststatus_rewarded, character_reputation,
-                                                            // character_spell, character_spell_cooldown, character_ticket, character_talent,
-                                                            // character_tutorial
+                                                            // character_spell, character_spell_cooldown, character_ticket, character_talent
 
     DTT_EQSET_TABLE,    // <- guid                          // character_equipmentsets
 

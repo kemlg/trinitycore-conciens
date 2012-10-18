@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Uldaman
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 #define SAY_AGGRO                   -1070000
 
@@ -42,7 +43,7 @@ class boss_ironaya : public CreatureScript
 
         struct boss_ironayaAI : public ScriptedAI
         {
-            boss_ironayaAI(Creature* pCreature) : ScriptedAI(pCreature) {}
+            boss_ironayaAI(Creature* creature) : ScriptedAI(creature) {}
 
             uint32 uiArcingTimer;
             bool bHasCastedWstomp;
@@ -55,7 +56,7 @@ class boss_ironaya : public CreatureScript
                 bHasCastedWstomp = false;
             }
 
-            void EnterCombat(Unit * /*who*/)
+            void EnterCombat(Unit* /*who*/)
             {
                 DoScriptText(SAY_AGGRO, me);
             }
@@ -72,13 +73,13 @@ class boss_ironaya : public CreatureScript
                     DoCast(me->getVictim(), SPELL_KNOCKAWAY, true);
 
                     // current aggro target is knocked away pick new target
-                    Unit* pTarget = SelectUnit(SELECT_TARGET_TOPAGGRO, 0);
+                    Unit* target = SelectTarget(SELECT_TARGET_TOPAGGRO, 0);
 
-                    if (!pTarget || pTarget == me->getVictim())
-                        pTarget = SelectUnit(SELECT_TARGET_TOPAGGRO, 1);
+                    if (!target || target == me->getVictim())
+                        target = SelectTarget(SELECT_TARGET_TOPAGGRO, 1);
 
-                    if (pTarget)
-                        me->TauntApply(pTarget);
+                    if (target)
+                        me->TauntApply(target);
 
                     //Shouldn't cast this agian
                     bHasCastedKnockaway = true;

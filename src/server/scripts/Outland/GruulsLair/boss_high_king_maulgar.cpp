@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Correct timers, after whirlwind melee attack bug, prayer of healing
 SDCategory: Gruul's Lair
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "gruuls_lair.h"
 
 #define SAY_AGGRO               -1565000
@@ -67,9 +68,9 @@ EndScriptData */
 #define SPELL_SPELLSHIELD       33054
 #define SPELL_BLAST_WAVE        33061
 
-bool CheckAllBossDied(InstanceScript* pInstance, Creature* me)
+bool CheckAllBossDied(InstanceScript* instance, Creature* me)
 {
-    if (!pInstance || !me)
+    if (!instance || !me)
         return false;
 
     uint64 MaulgarGUID = 0;
@@ -84,11 +85,11 @@ bool CheckAllBossDied(InstanceScript* pInstance, Creature* me)
     Creature* Olm = NULL;
     Creature* Krosh = NULL;
 
-    MaulgarGUID = pInstance->GetData64(DATA_MAULGAR);
-    KigglerGUID = pInstance->GetData64(DATA_KIGGLERTHECRAZED);
-    BlindeyeGUID = pInstance->GetData64(DATA_BLINDEYETHESEER);
-    OlmGUID = pInstance->GetData64(DATA_OLMTHESUMMONER);
-    KroshGUID = pInstance->GetData64(DATA_KROSHFIREHAND);
+    MaulgarGUID = instance->GetData64(DATA_MAULGAR);
+    KigglerGUID = instance->GetData64(DATA_KIGGLERTHECRAZED);
+    BlindeyeGUID = instance->GetData64(DATA_BLINDEYETHESEER);
+    OlmGUID = instance->GetData64(DATA_OLMTHESUMMONER);
+    KroshGUID = instance->GetData64(DATA_KROSHFIREHAND);
 
     Maulgar = (Unit::GetCreature((*me), MaulgarGUID));
     Kiggler = (Unit::GetCreature((*me), KigglerGUID));
@@ -111,21 +112,21 @@ class boss_high_king_maulgar : public CreatureScript
 public:
     boss_high_king_maulgar() : CreatureScript("boss_high_king_maulgar") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_high_king_maulgarAI (pCreature);
+        return new boss_high_king_maulgarAI (creature);
     }
 
     struct boss_high_king_maulgarAI : public ScriptedAI
     {
-        boss_high_king_maulgarAI(Creature *c) : ScriptedAI(c)
+        boss_high_king_maulgarAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
             for (uint8 i = 0; i < 4; ++i)
                 Council[i] = 0;
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 ArcingSmash_Timer;
         uint32 MightyBlow_Timer;
@@ -149,71 +150,71 @@ public:
 
             Phase2 = false;
 
-            Creature *pCreature = NULL;
+            Creature* creature = NULL;
             for (uint8 i = 0; i < 4; ++i)
             {
                 if (Council[i])
                 {
-                    pCreature = (Unit::GetCreature((*me), Council[i]));
-                    if (pCreature && !pCreature->isAlive())
+                    creature = (Unit::GetCreature((*me), Council[i]));
+                    if (creature && !creature->isAlive())
                     {
-                        pCreature->Respawn();
-                        pCreature->AI()->EnterEvadeMode();
+                        creature->Respawn();
+                        creature->AI()->EnterEvadeMode();
                     }
                 }
             }
 
             //reset encounter
-            if (pInstance)
-                pInstance->SetData(DATA_MAULGAREVENT, NOT_STARTED);
+            if (instance)
+                instance->SetData(DATA_MAULGAREVENT, NOT_STARTED);
         }
 
         void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_SLAY1,SAY_SLAY2,SAY_SLAY3), me);
+            DoScriptText(RAND(SAY_SLAY1, SAY_SLAY2, SAY_SLAY3), me);
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
             DoScriptText(SAY_DEATH, me);
 
-            if (CheckAllBossDied(pInstance, me))
-                pInstance->SetData(DATA_MAULGAREVENT, DONE);
+            if (CheckAllBossDied(instance, me))
+                instance->SetData(DATA_MAULGAREVENT, DONE);
         }
 
            void AddDeath()
            {
-                DoScriptText(RAND(SAY_OGRE_DEATH1,SAY_OGRE_DEATH2,SAY_OGRE_DEATH3,SAY_OGRE_DEATH4), me);
+                DoScriptText(RAND(SAY_OGRE_DEATH1, SAY_OGRE_DEATH2, SAY_OGRE_DEATH3, SAY_OGRE_DEATH4), me);
            }
 
-        void EnterCombat(Unit *who)
+        void EnterCombat(Unit* who)
         {
             StartEvent(who);
         }
 
         void GetCouncil()
         {
-            if (pInstance)
+            if (instance)
             {
                 //get council member's guid to respawn them if needed
-                Council[0] = pInstance->GetData64(DATA_KIGGLERTHECRAZED);
-                Council[1] = pInstance->GetData64(DATA_BLINDEYETHESEER);
-                Council[2] = pInstance->GetData64(DATA_OLMTHESUMMONER);
-                Council[3] = pInstance->GetData64(DATA_KROSHFIREHAND);
+                Council[0] = instance->GetData64(DATA_KIGGLERTHECRAZED);
+                Council[1] = instance->GetData64(DATA_BLINDEYETHESEER);
+                Council[2] = instance->GetData64(DATA_OLMTHESUMMONER);
+                Council[3] = instance->GetData64(DATA_KROSHFIREHAND);
             }
         }
 
-        void StartEvent(Unit *who)
+        void StartEvent(Unit* who)
         {
-            if (!pInstance)
+            if (!instance)
                 return;
 
             GetCouncil();
 
             DoScriptText(SAY_AGGRO, me);
 
-            pInstance->SetData64(DATA_MAULGAREVENT_TANK, who->GetGUID());
-            pInstance->SetData(DATA_MAULGAREVENT, IN_PROGRESS);
+            instance->SetData64(DATA_MAULGAREVENT_TANK, who->GetGUID());
+            instance->SetData(DATA_MAULGAREVENT, IN_PROGRESS);
 
             DoZoneInCombat();
         }
@@ -221,13 +222,13 @@ public:
         void UpdateAI(const uint32 diff)
         {
             //Only if not incombat check if the event is started
-            if (!me->isInCombat() && pInstance && pInstance->GetData(DATA_MAULGAREVENT))
+            if (!me->isInCombat() && instance && instance->GetData(DATA_MAULGAREVENT))
             {
-                Unit *pTarget = Unit::GetUnit((*me), pInstance->GetData64(DATA_MAULGAREVENT_TANK));
+                Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_MAULGAREVENT_TANK));
 
-                if (pTarget)
+                if (target)
                 {
-                    AttackStart(pTarget);
+                    AttackStart(target);
                     GetCouncil();
                 }
             }
@@ -237,7 +238,7 @@ public:
                 return;
 
             //someone evaded!
-            if (pInstance && !pInstance->GetData(DATA_MAULGAREVENT))
+            if (instance && !instance->GetData(DATA_MAULGAREVENT))
             {
                 EnterEvadeMode();
                 return;
@@ -280,12 +281,12 @@ public:
                 //Charging_Timer
                 if (Charging_Timer <= diff)
                 {
-                    Unit *pTarget = NULL;
-                    pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0);
-                    if (pTarget)
+                    Unit* target = NULL;
+                    target = SelectTarget(SELECT_TARGET_RANDOM, 0);
+                    if (target)
                     {
-                        AttackStart(pTarget);
-                        DoCast(pTarget, SPELL_BERSERKER_C);
+                        AttackStart(target);
+                        DoCast(target, SPELL_BERSERKER_C);
                     }
                     Charging_Timer = 20000;
                 } else Charging_Timer -= diff;
@@ -310,23 +311,23 @@ class boss_olm_the_summoner : public CreatureScript
 public:
     boss_olm_the_summoner() : CreatureScript("boss_olm_the_summoner") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_olm_the_summonerAI (pCreature);
+        return new boss_olm_the_summonerAI (creature);
     }
 
     struct boss_olm_the_summonerAI : public ScriptedAI
     {
-        boss_olm_the_summonerAI(Creature *c) : ScriptedAI(c)
+        boss_olm_the_summonerAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
         uint32 DarkDecay_Timer;
         uint32 Summon_Timer;
            uint32 DeathCoil_Timer;
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         void Reset()
         {
@@ -335,59 +336,59 @@ public:
             DeathCoil_Timer = 20000;
 
             //reset encounter
-            if (pInstance)
-                pInstance->SetData(DATA_MAULGAREVENT, NOT_STARTED);
+            if (instance)
+                instance->SetData(DATA_MAULGAREVENT, NOT_STARTED);
         }
 
-        void AttackStart(Unit* pWho)
+        void AttackStart(Unit* who)
         {
-            if (!pWho)
+            if (!who)
                 return;
 
-            if (me->Attack(pWho, true))
+            if (me->Attack(who, true))
             {
-                me->AddThreat(pWho, 0.0f);
-                me->SetInCombatWith(pWho);
-                pWho->SetInCombatWith(me);
+                me->AddThreat(who, 0.0f);
+                me->SetInCombatWith(who);
+                who->SetInCombatWith(me);
 
-                me->GetMotionMaster()->MoveChase(pWho, 30.0f);
+                me->GetMotionMaster()->MoveChase(who, 30.0f);
             }
         }
 
-        void EnterCombat(Unit *who)
+        void EnterCombat(Unit* who)
         {
-            if (pInstance)
+            if (instance)
             {
-                pInstance->SetData64(DATA_MAULGAREVENT_TANK, who->GetGUID());
-                pInstance->SetData(DATA_MAULGAREVENT, IN_PROGRESS);
+                instance->SetData64(DATA_MAULGAREVENT_TANK, who->GetGUID());
+                instance->SetData(DATA_MAULGAREVENT, IN_PROGRESS);
             }
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
-            if (pInstance)
+            if (instance)
             {
-                Creature *Maulgar = NULL;
-                Maulgar = (Unit::GetCreature((*me), pInstance->GetData64(DATA_MAULGAR)));
+                Creature* Maulgar = NULL;
+                Maulgar = (Unit::GetCreature((*me), instance->GetData64(DATA_MAULGAR)));
 
                 if (Maulgar)
                     CAST_AI(boss_high_king_maulgar::boss_high_king_maulgarAI, Maulgar->AI())->AddDeath();
 
-                if (CheckAllBossDied(pInstance, me))
-                    pInstance->SetData(DATA_MAULGAREVENT, DONE);
+                if (CheckAllBossDied(instance, me))
+                    instance->SetData(DATA_MAULGAREVENT, DONE);
             }
         }
 
         void UpdateAI(const uint32 diff)
         {
             //Only if not incombat check if the event is started
-            if (!me->isInCombat() && pInstance && pInstance->GetData(DATA_MAULGAREVENT))
+            if (!me->isInCombat() && instance && instance->GetData(DATA_MAULGAREVENT))
             {
-                Unit *pTarget = Unit::GetUnit((*me), pInstance->GetData64(DATA_MAULGAREVENT_TANK));
+                Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_MAULGAREVENT_TANK));
 
-                if (pTarget)
+                if (target)
                 {
-                    AttackStart(pTarget);
+                    AttackStart(target);
                 }
             }
 
@@ -396,7 +397,7 @@ public:
                 return;
 
             //someone evaded!
-            if (pInstance && !pInstance->GetData(DATA_MAULGAREVENT))
+            if (instance && !instance->GetData(DATA_MAULGAREVENT))
             {
                 EnterEvadeMode();
                 return;
@@ -419,10 +420,10 @@ public:
             //DeathCoil Timer /need correct timer
             if (DeathCoil_Timer <= diff)
             {
-                Unit *pTarget = NULL;
-                pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0);
-                if (pTarget)
-                    DoCast(pTarget, SPELL_DEATH_COIL);
+                Unit* target = NULL;
+                target = SelectTarget(SELECT_TARGET_RANDOM, 0);
+                if (target)
+                    DoCast(target, SPELL_DEATH_COIL);
                 DeathCoil_Timer = 20000;
             } else DeathCoil_Timer -= diff;
 
@@ -438,16 +439,16 @@ class boss_kiggler_the_crazed : public CreatureScript
 public:
     boss_kiggler_the_crazed() : CreatureScript("boss_kiggler_the_crazed") { }
 
-    CreatureAI *GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_kiggler_the_crazedAI (pCreature);
+        return new boss_kiggler_the_crazedAI (creature);
     }
 
     struct boss_kiggler_the_crazedAI : public ScriptedAI
     {
-        boss_kiggler_the_crazedAI(Creature *c) : ScriptedAI(c)
+        boss_kiggler_the_crazedAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
         uint32 GreaterPolymorph_Timer;
@@ -455,7 +456,7 @@ public:
         uint32 ArcaneShock_Timer;
         uint32 ArcaneExplosion_Timer;
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         void Reset()
         {
@@ -465,44 +466,44 @@ public:
             ArcaneExplosion_Timer = 30000;
 
             //reset encounter
-            if (pInstance)
-                pInstance->SetData(DATA_MAULGAREVENT, NOT_STARTED);
+            if (instance)
+                instance->SetData(DATA_MAULGAREVENT, NOT_STARTED);
         }
 
         void EnterCombat(Unit* who)
         {
-            if (pInstance)
+            if (instance)
             {
-                pInstance->SetData64(DATA_MAULGAREVENT_TANK, who->GetGUID());
-                pInstance->SetData(DATA_MAULGAREVENT, IN_PROGRESS);
+                instance->SetData64(DATA_MAULGAREVENT_TANK, who->GetGUID());
+                instance->SetData(DATA_MAULGAREVENT, IN_PROGRESS);
             }
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
-            if (pInstance)
+            if (instance)
             {
-                Creature *Maulgar = NULL;
-                Maulgar = (Unit::GetCreature((*me), pInstance->GetData64(DATA_MAULGAR)));
+                Creature* Maulgar = NULL;
+                Maulgar = (Unit::GetCreature((*me), instance->GetData64(DATA_MAULGAR)));
 
                 if (Maulgar)
                     CAST_AI(boss_high_king_maulgar::boss_high_king_maulgarAI, Maulgar->AI())->AddDeath();
 
-                if (CheckAllBossDied(pInstance, me))
-                    pInstance->SetData(DATA_MAULGAREVENT, DONE);
+                if (CheckAllBossDied(instance, me))
+                    instance->SetData(DATA_MAULGAREVENT, DONE);
             }
         }
 
         void UpdateAI(const uint32 diff)
         {
             //Only if not incombat check if the event is started
-            if (!me->isInCombat() && pInstance && pInstance->GetData(DATA_MAULGAREVENT))
+            if (!me->isInCombat() && instance && instance->GetData(DATA_MAULGAREVENT))
             {
-                Unit *pTarget = Unit::GetUnit((*me), pInstance->GetData64(DATA_MAULGAREVENT_TANK));
+                Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_MAULGAREVENT_TANK));
 
-                if (pTarget)
+                if (target)
                 {
-                    AttackStart(pTarget);
+                    AttackStart(target);
                 }
             }
 
@@ -511,7 +512,7 @@ public:
                 return;
 
             //someone evaded!
-            if (pInstance && !pInstance->GetData(DATA_MAULGAREVENT))
+            if (instance && !instance->GetData(DATA_MAULGAREVENT))
             {
                 EnterEvadeMode();
                 return;
@@ -520,11 +521,11 @@ public:
             //GreaterPolymorph_Timer
             if (GreaterPolymorph_Timer <= diff)
             {
-                Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0);
-                if (pTarget)
-                    DoCast(pTarget, SPELL_GREATER_POLYMORPH);
+                Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0);
+                if (target)
+                    DoCast(target, SPELL_GREATER_POLYMORPH);
 
-                GreaterPolymorph_Timer = 15000 + rand()%5000;
+                GreaterPolymorph_Timer = urand(15000, 20000);
             } else GreaterPolymorph_Timer -= diff;
 
             //LightningBolt_Timer
@@ -560,69 +561,69 @@ class boss_blindeye_the_seer : public CreatureScript
 public:
     boss_blindeye_the_seer() : CreatureScript("boss_blindeye_the_seer") { }
 
-    CreatureAI *GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_blindeye_the_seerAI (pCreature);
+        return new boss_blindeye_the_seerAI (creature);
     }
 
     struct boss_blindeye_the_seerAI : public ScriptedAI
     {
-        boss_blindeye_the_seerAI(Creature *c) : ScriptedAI(c)
+        boss_blindeye_the_seerAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
         uint32 GreaterPowerWordShield_Timer;
         uint32 Heal_Timer;
         uint32 PrayerofHealing_Timer;
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         void Reset()
         {
             GreaterPowerWordShield_Timer = 5000;
-            Heal_Timer = 25000 + rand()%15000;
-            PrayerofHealing_Timer = 45000 + rand()%10000;
+            Heal_Timer = urand(25000, 40000);
+            PrayerofHealing_Timer = urand(45000, 55000);
 
             //reset encounter
-            if (pInstance)
-                pInstance->SetData(DATA_MAULGAREVENT, NOT_STARTED);
+            if (instance)
+                instance->SetData(DATA_MAULGAREVENT, NOT_STARTED);
         }
 
-        void EnterCombat(Unit * who)
+        void EnterCombat(Unit* who)
         {
-            if (pInstance)
+            if (instance)
             {
-                pInstance->SetData64(DATA_MAULGAREVENT_TANK, who->GetGUID());
-                pInstance->SetData(DATA_MAULGAREVENT, IN_PROGRESS);
+                instance->SetData64(DATA_MAULGAREVENT_TANK, who->GetGUID());
+                instance->SetData(DATA_MAULGAREVENT, IN_PROGRESS);
             }
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
-            if (pInstance)
+            if (instance)
             {
-                Creature *Maulgar = NULL;
-                Maulgar = (Unit::GetCreature((*me), pInstance->GetData64(DATA_MAULGAR)));
+                Creature* Maulgar = NULL;
+                Maulgar = (Unit::GetCreature((*me), instance->GetData64(DATA_MAULGAR)));
 
                 if (Maulgar)
                     CAST_AI(boss_high_king_maulgar::boss_high_king_maulgarAI, Maulgar->AI())->AddDeath();
 
-                if (CheckAllBossDied(pInstance, me))
-                    pInstance->SetData(DATA_MAULGAREVENT, DONE);
+                if (CheckAllBossDied(instance, me))
+                    instance->SetData(DATA_MAULGAREVENT, DONE);
             }
         }
 
          void UpdateAI(const uint32 diff)
         {
             //Only if not incombat check if the event is started
-            if (!me->isInCombat() && pInstance && pInstance->GetData(DATA_MAULGAREVENT))
+            if (!me->isInCombat() && instance && instance->GetData(DATA_MAULGAREVENT))
             {
-                Unit *pTarget = Unit::GetUnit((*me), pInstance->GetData64(DATA_MAULGAREVENT_TANK));
+                Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_MAULGAREVENT_TANK));
 
-                if (pTarget)
+                if (target)
                 {
-                    AttackStart(pTarget);
+                    AttackStart(target);
                 }
             }
 
@@ -631,7 +632,7 @@ public:
                 return;
 
             //someone evaded!
-            if (pInstance && !pInstance->GetData(DATA_MAULGAREVENT))
+            if (instance && !instance->GetData(DATA_MAULGAREVENT))
             {
                 EnterEvadeMode();
                 return;
@@ -648,14 +649,14 @@ public:
             if (Heal_Timer <= diff)
             {
                 DoCast(me, SPELL_HEAL);
-                Heal_Timer = 15000 + rand()%25000;
+                Heal_Timer = urand(15000, 40000);
             } else Heal_Timer -= diff;
 
             //PrayerofHealing_Timer
             if (PrayerofHealing_Timer <= diff)
             {
                 DoCast(me, SPELL_PRAYER_OH);
-                PrayerofHealing_Timer = 35000 + rand()%15000;
+                PrayerofHealing_Timer = urand(35000, 50000);
             } else PrayerofHealing_Timer -= diff;
 
             DoMeleeAttackIfReady();
@@ -670,23 +671,23 @@ class boss_krosh_firehand : public CreatureScript
 public:
     boss_krosh_firehand() : CreatureScript("boss_krosh_firehand") { }
 
-    CreatureAI *GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_krosh_firehandAI (pCreature);
+        return new boss_krosh_firehandAI (creature);
     }
 
     struct boss_krosh_firehandAI : public ScriptedAI
     {
-        boss_krosh_firehandAI(Creature *c) : ScriptedAI(c)
+        boss_krosh_firehandAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
+            instance = creature->GetInstanceScript();
         }
 
         uint32 GreaterFireball_Timer;
         uint32 SpellShield_Timer;
         uint32 BlastWave_Timer;
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         void Reset()
         {
@@ -695,44 +696,44 @@ public:
             BlastWave_Timer = 20000;
 
             //reset encounter
-            if (pInstance)
-                pInstance->SetData(DATA_MAULGAREVENT, NOT_STARTED);
+            if (instance)
+                instance->SetData(DATA_MAULGAREVENT, NOT_STARTED);
         }
 
-        void EnterCombat(Unit * who)
+        void EnterCombat(Unit* who)
         {
-            if (pInstance)
+            if (instance)
             {
-                pInstance->SetData64(DATA_MAULGAREVENT_TANK, who->GetGUID());
-                pInstance->SetData(DATA_MAULGAREVENT, IN_PROGRESS);
+                instance->SetData64(DATA_MAULGAREVENT_TANK, who->GetGUID());
+                instance->SetData(DATA_MAULGAREVENT, IN_PROGRESS);
             }
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
-            if (pInstance)
+            if (instance)
             {
-                Creature *Maulgar = NULL;
-                Maulgar = (Unit::GetCreature((*me), pInstance->GetData64(DATA_MAULGAR)));
+                Creature* Maulgar = NULL;
+                Maulgar = (Unit::GetCreature((*me), instance->GetData64(DATA_MAULGAR)));
 
                 if (Maulgar)
                     CAST_AI(boss_high_king_maulgar::boss_high_king_maulgarAI, Maulgar->AI())->AddDeath();
 
-                if (CheckAllBossDied(pInstance, me))
-                    pInstance->SetData(DATA_MAULGAREVENT, DONE);
+                if (CheckAllBossDied(instance, me))
+                    instance->SetData(DATA_MAULGAREVENT, DONE);
             }
         }
 
         void UpdateAI(const uint32 diff)
         {
             //Only if not incombat check if the event is started
-            if (!me->isInCombat() && pInstance && pInstance->GetData(DATA_MAULGAREVENT))
+            if (!me->isInCombat() && instance && instance->GetData(DATA_MAULGAREVENT))
             {
-                Unit *pTarget = Unit::GetUnit((*me), pInstance->GetData64(DATA_MAULGAREVENT_TANK));
+                Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_MAULGAREVENT_TANK));
 
-                if (pTarget)
+                if (target)
                 {
-                    AttackStart(pTarget);
+                    AttackStart(target);
                 }
             }
 
@@ -741,7 +742,7 @@ public:
                 return;
 
             //someone evaded!
-            if (pInstance && !pInstance->GetData(DATA_MAULGAREVENT))
+            if (instance && !instance->GetData(DATA_MAULGAREVENT))
             {
                 EnterEvadeMode();
                 return;
@@ -765,22 +766,22 @@ public:
             //BlastWave_Timer
             if (BlastWave_Timer <= diff)
             {
-                Unit *pTarget = NULL;
-                std::list<HostileReference *> t_list = me->getThreatManager().getThreatList();
-                std::vector<Unit *> target_list;
-                for (std::list<HostileReference *>::const_iterator itr = t_list.begin(); itr!= t_list.end(); ++itr)
+                Unit* target = NULL;
+                std::list<HostileReference*> t_list = me->getThreatManager().getThreatList();
+                std::vector<Unit*> target_list;
+                for (std::list<HostileReference*>::const_iterator itr = t_list.begin(); itr!= t_list.end(); ++itr)
                 {
-                    pTarget = Unit::GetUnit(*me, (*itr)->getUnitGuid());
+                    target = Unit::GetUnit(*me, (*itr)->getUnitGuid());
                                                                 //15 yard radius minimum
-                    if (pTarget && pTarget->IsWithinDist(me, 15,false))
-                        target_list.push_back(pTarget);
-                    pTarget = NULL;
+                    if (target && target->IsWithinDist(me, 15, false))
+                        target_list.push_back(target);
+                    target = NULL;
                 }
-                if (target_list.size())
-                    pTarget = *(target_list.begin()+rand()%target_list.size());
+                if (!target_list.empty())
+                    target = *(target_list.begin()+rand()%target_list.size());
 
                 me->InterruptNonMeleeSpells(false);
-                DoCast(pTarget, SPELL_BLAST_WAVE);
+                DoCast(target, SPELL_BLAST_WAVE);
                 BlastWave_Timer = 60000;
             } else BlastWave_Timer -= diff;
         }

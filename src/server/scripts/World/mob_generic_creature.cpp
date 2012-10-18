@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,9 @@ SDComment: Should be replaced with core based AI
 SDCategory: Creatures
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
+#include "PassiveAI.h"
 
 #define GENERIC_CREATURE_COOLDOWN   5000
 
@@ -34,7 +36,7 @@ public:
 
     struct generic_creatureAI : public ScriptedAI
     {
-        generic_creatureAI(Creature *c) : ScriptedAI(c) {}
+        generic_creatureAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 GlobalCooldown;      //This variable acts like the global cooldown that players have (1.5 seconds)
         uint32 BuffTimer;           //This variable keeps track of buffs
@@ -47,7 +49,7 @@ public:
             IsSelfRooted = false;
         }
 
-        void EnterCombat(Unit *who)
+        void EnterCombat(Unit* who)
         {
             if (!me->IsWithinMeleeRange(who))
                 IsSelfRooted = true;
@@ -66,7 +68,7 @@ public:
                 if (BuffTimer <= diff)
                 {
                     //Find a spell that targets friendly and applies an aura (these are generally buffs)
-                    SpellEntry const *info = SelectSpell(me, 0, 0, SELECT_TARGET_ANY_FRIEND, 0, 0, 0, 0, SELECT_EFFECT_AURA);
+                    SpellInfo const* info = SelectSpell(me, 0, 0, SELECT_TARGET_ANY_FRIEND, 0, 0, 0, 0, SELECT_EFFECT_AURA);
 
                     if (info && !GlobalCooldown)
                     {
@@ -94,7 +96,7 @@ public:
                 if (me->isAttackReady() && !me->IsNonMeleeSpellCasted(false))
                 {
                     bool Healing = false;
-                    SpellEntry const *info = NULL;
+                    SpellInfo const* info = NULL;
 
                     //Select a healing spell if less than 30% hp
                     if (HealthBelowPct(30))
@@ -105,7 +107,7 @@ public:
                     else info = SelectSpell(me->getVictim(), 0, 0, SELECT_TARGET_ANY_ENEMY, 0, 0, 0, 0, SELECT_EFFECT_DONTCARE);
 
                     //50% chance if elite or higher, 20% chance if not, to replace our white hit with a spell
-                    if (info && (rand() % (me->GetCreatureInfo()->rank > 1 ? 2 : 5) == 0) && !GlobalCooldown)
+                    if (info && (rand() % (me->GetCreatureTemplate()->rank > 1 ? 2 : 5) == 0) && !GlobalCooldown)
                     {
                         //Cast the spell
                         if (Healing)DoCastSpell(me, info);
@@ -125,7 +127,7 @@ public:
                 if (!me->IsNonMeleeSpellCasted(false))
                 {
                     bool Healing = false;
-                    SpellEntry const *info = NULL;
+                    SpellInfo const* info = NULL;
 
                     //Select a healing spell if less than 30% hp ONLY 33% of the time
                     if (HealthBelowPct(30) && rand() % 3 == 0)
@@ -143,8 +145,8 @@ public:
                             IsSelfRooted = true;
 
                         //Cast spell
-                        if (Healing) DoCastSpell(me,info);
-                        else DoCastSpell(me->getVictim(),info);
+                        if (Healing) DoCastSpell(me, info);
+                        else DoCastSpell(me->getVictim(), info);
 
                         //Set our global cooldown
                         GlobalCooldown = GENERIC_CREATURE_COOLDOWN;
@@ -161,7 +163,7 @@ public:
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new generic_creatureAI(creature);
     }
@@ -174,15 +176,15 @@ public:
 
     struct trigger_periodicAI : public NullCreatureAI
     {
-        trigger_periodicAI(Creature* c) : NullCreatureAI(c)
+        trigger_periodicAI(Creature* creature) : NullCreatureAI(creature)
         {
-            spell = me->m_spells[0] ? GetSpellStore()->LookupEntry(me->m_spells[0]) : NULL;
+            spell = me->m_spells[0] ? sSpellMgr->GetSpellInfo(me->m_spells[0]) : NULL;
             interval = me->GetAttackTime(BASE_ATTACK);
             timer = interval;
         }
 
         uint32 timer, interval;
-        const SpellEntry * spell;
+        const SpellInfo* spell;
 
         void UpdateAI(const uint32 diff)
         {
@@ -197,7 +199,7 @@ public:
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new trigger_periodicAI(creature);
     }
@@ -210,15 +212,15 @@ public:
 
     struct trigger_deathAI : public NullCreatureAI
     {
-        trigger_deathAI(Creature* c) : NullCreatureAI(c) {}
-        void JustDied(Unit *killer)
+        trigger_deathAI(Creature* creature) : NullCreatureAI(creature) {}
+        void JustDied(Unit* killer)
         {
             if (me->m_spells[0])
                 me->CastSpell(killer, me->m_spells[0], true);
         }
     };
 
-    CreatureAI *GetAI(Creature *creature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
         return new trigger_deathAI(creature);
     }

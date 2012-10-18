@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,9 @@ SDComment:
 SDCategory: Hellfire Citadel, Magtheridon's lair
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
+#include "InstanceScript.h"
 #include "magtheridons_lair.h"
 
 enum eSpells
@@ -50,9 +52,8 @@ class instance_magtheridons_lair : public InstanceMapScript
 
         struct instance_magtheridons_lair_InstanceMapScript : public InstanceScript
         {
-            instance_magtheridons_lair_InstanceMapScript(Map* pMap) : InstanceScript(pMap)
+            instance_magtheridons_lair_InstanceMapScript(Map* map) : InstanceScript(map)
             {
-                Initialize();
             }
 
             uint32 m_auiEncounter[MAX_ENCOUNTER];
@@ -81,13 +82,15 @@ class instance_magtheridons_lair : public InstanceMapScript
             bool IsEncounterInProgress() const
             {
                 for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
-                    if (m_auiEncounter[i] == IN_PROGRESS) return true;
+                    if (m_auiEncounter[i] == IN_PROGRESS)
+                        return true;
+
                 return false;
             }
 
             void OnCreatureCreate(Creature* creature)
             {
-                switch(creature->GetEntry())
+                switch (creature->GetEntry())
                 {
                 case 17257:
                     MagtheridonGUID = creature->GetGUID();
@@ -100,7 +103,7 @@ class instance_magtheridons_lair : public InstanceMapScript
 
             void OnGameObjectCreate(GameObject* go)
             {
-                switch(go->GetEntry())
+                switch (go->GetEntry())
                 {
                 case 181713:
                     go->SetUInt32Value(GAMEOBJECT_FLAGS, 0);
@@ -122,7 +125,7 @@ class instance_magtheridons_lair : public InstanceMapScript
 
             uint64 GetData64(uint32 type)
             {
-                switch(type)
+                switch (type)
                 {
                 case DATA_MAGTHERIDON:
                     return MagtheridonGUID;
@@ -132,7 +135,7 @@ class instance_magtheridons_lair : public InstanceMapScript
 
             void SetData(uint32 type, uint32 data)
             {
-                switch(type)
+                switch (type)
                 {
                 case DATA_MAGTHERIDON_EVENT:
                     m_auiEncounter[0] = data;
@@ -142,7 +145,7 @@ class instance_magtheridons_lair : public InstanceMapScript
                        HandleGameObject(DoorGUID, true);
                     break;
                 case DATA_CHANNELER_EVENT:
-                    switch(data)
+                    switch (data)
                     {
                     case NOT_STARTED: // Reset all channelers once one is reset.
                         if (m_auiEncounter[1] != NOT_STARTED)
@@ -224,7 +227,7 @@ class instance_magtheridons_lair : public InstanceMapScript
                         Creature* Magtheridon = instance->GetCreature(MagtheridonGUID);
                         if (Magtheridon && Magtheridon->isAlive())
                         {
-                            Magtheridon->ClearUnitState(UNIT_STAT_STUNNED);
+                            Magtheridon->ClearUnitState(UNIT_STATE_STUNNED);
                             Magtheridon->AI()->AttackStart(Magtheridon->SelectNearestTarget(999));
                         }
                         CageTimer = 0;
@@ -251,12 +254,11 @@ class instance_magtheridons_lair : public InstanceMapScript
             }
         };
 
-        InstanceScript* GetInstanceScript(InstanceMap* pMap) const
+        InstanceScript* GetInstanceScript(InstanceMap* map) const
         {
-            return new instance_magtheridons_lair_InstanceMapScript(pMap);
+            return new instance_magtheridons_lair_InstanceMapScript(map);
         }
 };
-
 
 void AddSC_instance_magtheridons_lair()
 {

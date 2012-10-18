@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -27,7 +27,9 @@ EndScriptData */
 npcs_riverbreeze_and_silversky
 EndContentData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
+#include "ScriptedGossip.h"
 
 /*######
 ## npcs_riverbreeze_and_silversky
@@ -35,58 +37,67 @@ EndContentData */
 
 #define GOSSIP_ITEM_BEACON  "Please make me a Cenarion Beacon"
 
+enum RiverbreezeAndSilversky
+{
+    SPELL_CENARION_BEACON       = 15120,
+
+    NPC_ARATHANDRIS_SILVERSKY   = 9528,
+    NPC_MAYBESS_RIVERBREEZE     = 9529,
+
+    QUEST_CLEASING_FELWOOD_A    = 4101,
+    QUEST_CLEASING_FELWOOD_H    = 4102
+};
+
 class npcs_riverbreeze_and_silversky : public CreatureScript
 {
 public:
     npcs_riverbreeze_and_silversky() : CreatureScript("npcs_riverbreeze_and_silversky") { }
 
-    bool OnGossipSelect(Player* pPlayer, Creature* pCreature, uint32 /*uiSender*/, uint32 uiAction)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
-        pPlayer->PlayerTalkClass->ClearMenus();
-        if (uiAction == GOSSIP_ACTION_INFO_DEF+1)
+        player->PlayerTalkClass->ClearMenus();
+        if (action == GOSSIP_ACTION_INFO_DEF+1)
         {
-            pPlayer->CLOSE_GOSSIP_MENU();
-            pCreature->CastSpell(pPlayer, 15120, false);
+            player->CLOSE_GOSSIP_MENU();
+            creature->CastSpell(player, SPELL_CENARION_BEACON, false);
         }
         return true;
     }
 
-    bool OnGossipHello(Player* pPlayer, Creature* pCreature)
+    bool OnGossipHello(Player* player, Creature* creature)
     {
-        uint32 eCreature = pCreature->GetEntry();
+        if (creature->isQuestGiver())
+            player->PrepareQuestMenu(creature->GetGUID());
 
-        if (pCreature->isQuestGiver())
-            pPlayer->PrepareQuestMenu(pCreature->GetGUID());
+        uint32 creatureId = creature->GetEntry();
 
-        if (eCreature == 9528)
+        if (creatureId == NPC_ARATHANDRIS_SILVERSKY)
         {
-            if (pPlayer->GetQuestRewardStatus(4101))
+            if (player->GetQuestRewardStatus(QUEST_CLEASING_FELWOOD_A))
             {
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_BEACON, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-                pPlayer->SEND_GOSSIP_MENU(2848, pCreature->GetGUID());
-            } else if (pPlayer->GetTeam() == HORDE)
-            pPlayer->SEND_GOSSIP_MENU(2845, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_BEACON, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
+                player->SEND_GOSSIP_MENU(2848, creature->GetGUID());
+            } else if (player->GetTeam() == HORDE)
+            player->SEND_GOSSIP_MENU(2845, creature->GetGUID());
             else
-                pPlayer->SEND_GOSSIP_MENU(2844, pCreature->GetGUID());
+                player->SEND_GOSSIP_MENU(2844, creature->GetGUID());
         }
 
-        if (eCreature == 9529)
+        if (creatureId == NPC_MAYBESS_RIVERBREEZE)
         {
-            if (pPlayer->GetQuestRewardStatus(4102))
+            if (player->GetQuestRewardStatus(QUEST_CLEASING_FELWOOD_H))
             {
-                pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_BEACON, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-                pPlayer->SEND_GOSSIP_MENU(2849, pCreature->GetGUID());
-            } else if (pPlayer->GetTeam() == ALLIANCE)
-            pPlayer->SEND_GOSSIP_MENU(2843, pCreature->GetGUID());
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_BEACON, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
+                player->SEND_GOSSIP_MENU(2849, creature->GetGUID());
+            } else if (player->GetTeam() == ALLIANCE)
+            player->SEND_GOSSIP_MENU(2843, creature->GetGUID());
             else
-                pPlayer->SEND_GOSSIP_MENU(2842, pCreature->GetGUID());
+                player->SEND_GOSSIP_MENU(2842, creature->GetGUID());
         }
 
         return true;
     }
-
 };
-
 
 void AddSC_felwood()
 {

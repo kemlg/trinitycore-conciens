@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Need adjustments to initial summons
 SDCategory: Tempest Keep, The Mechanar
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "mechanar.h"
 
 enum eSays
@@ -61,12 +62,12 @@ class boss_nethermancer_sepethrea : public CreatureScript
         }
         struct boss_nethermancer_sepethreaAI : public ScriptedAI
         {
-            boss_nethermancer_sepethreaAI(Creature* pCreature) : ScriptedAI(pCreature)
+            boss_nethermancer_sepethreaAI(Creature* creature) : ScriptedAI(creature)
             {
-                pInstance = pCreature->GetInstanceScript();
+                instance = creature->GetInstanceScript();
             }
 
-            InstanceScript *pInstance;
+            InstanceScript* instance;
 
             uint32 frost_attack_Timer;
             uint32 arcane_blast_Timer;
@@ -76,20 +77,20 @@ class boss_nethermancer_sepethrea : public CreatureScript
 
             void Reset()
             {
-                frost_attack_Timer = 7000 + rand()%3000;
-                arcane_blast_Timer = 12000 + rand()%6000;
-                dragons_breath_Timer = 18000 + rand()%4000;
-                knockback_Timer = 22000 + rand()%6000;
+                frost_attack_Timer = urand(7000, 10000);
+                arcane_blast_Timer = urand(12000, 18000);
+                dragons_breath_Timer = urand(18000, 22000);
+                knockback_Timer = urand(22000, 28000);
                 solarburn_Timer = 30000;
 
-                if (pInstance)
-                    pInstance->SetData(DATA_NETHERMANCER_EVENT, NOT_STARTED);
+                if (instance)
+                    instance->SetData(DATA_NETHERMANCER_EVENT, NOT_STARTED);
             }
 
             void EnterCombat(Unit* who)
             {
-                if (pInstance)
-                    pInstance->SetData(DATA_NETHERMANCER_EVENT, IN_PROGRESS);
+                if (instance)
+                    instance->SetData(DATA_NETHERMANCER_EVENT, IN_PROGRESS);
 
                 DoScriptText(SAY_AGGRO, me);
                 DoCast(who, SPELL_SUMMON_RAGIN_FLAMES);
@@ -98,14 +99,14 @@ class boss_nethermancer_sepethrea : public CreatureScript
 
             void KilledUnit(Unit* /*victim*/)
             {
-                DoScriptText(RAND(SAY_SLAY1,SAY_SLAY2), me);
+                DoScriptText(RAND(SAY_SLAY1, SAY_SLAY2), me);
             }
 
-            void JustDied(Unit* /*Killer*/)
+            void JustDied(Unit* /*killer*/)
             {
                 DoScriptText(SAY_DEATH, me);
-                if (pInstance)
-                    pInstance->SetData(DATA_NETHERMANCER_EVENT, DONE);
+                if (instance)
+                    instance->SetData(DATA_NETHERMANCER_EVENT, DONE);
             }
 
             void UpdateAI(const uint32 diff)
@@ -114,13 +115,12 @@ class boss_nethermancer_sepethrea : public CreatureScript
                 if (!UpdateVictim())
                     return;
 
-
                 //Frost Attack
                 if (frost_attack_Timer <= diff)
                 {
                     DoCast(me->getVictim(), SPELL_FROST_ATTACK);
 
-                    frost_attack_Timer = 7000 + rand()%3000;
+                    frost_attack_Timer = urand(7000, 10000);
                 }
                 else
                     frost_attack_Timer -= diff;
@@ -140,9 +140,9 @@ class boss_nethermancer_sepethrea : public CreatureScript
                     {
                         if (rand()%2)
                             return;
-                        DoScriptText(RAND(SAY_DRAGONS_BREATH_1,SAY_DRAGONS_BREATH_2), me);
+                        DoScriptText(RAND(SAY_DRAGONS_BREATH_1, SAY_DRAGONS_BREATH_2), me);
                     }
-                    dragons_breath_Timer = 12000 + rand()%10000;
+                    dragons_breath_Timer = urand(12000, 22000);
                 }
                 else
                     dragons_breath_Timer -= diff;
@@ -151,7 +151,7 @@ class boss_nethermancer_sepethrea : public CreatureScript
                 if (knockback_Timer <= diff)
                 {
                     DoCast(me->getVictim(), SPELL_KNOCKBACK);
-                    knockback_Timer = 15000 + rand()%10000;
+                    knockback_Timer = urand(15000, 25000);
                 }
                 else
                     knockback_Timer -= diff;
@@ -184,12 +184,12 @@ class mob_ragin_flames : public CreatureScript
 
             struct mob_ragin_flamesAI : public ScriptedAI
             {
-                mob_ragin_flamesAI(Creature* pCreature) : ScriptedAI(pCreature)
+                mob_ragin_flamesAI(Creature* creature) : ScriptedAI(creature)
                 {
-                    pInstance = pCreature->GetInstanceScript();
+                    instance = creature->GetInstanceScript();
                 }
 
-                InstanceScript *pInstance;
+                InstanceScript* instance;
 
                 uint32 inferno_Timer;
                 uint32 flame_timer;
@@ -217,9 +217,9 @@ class mob_ragin_flames : public CreatureScript
                     //Check_Timer
                     if (Check_Timer <= diff)
                     {
-                        if (pInstance)
+                        if (instance)
                         {
-                            if (pInstance->GetData(DATA_NETHERMANCER_EVENT) != IN_PROGRESS)
+                            if (instance->GetData(DATA_NETHERMANCER_EVENT) != IN_PROGRESS)
                             {
                                 //remove
                                 me->setDeathState(JUST_DIED);
@@ -234,8 +234,8 @@ class mob_ragin_flames : public CreatureScript
 
                     if (!onlyonce)
                     {
-                        if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM,0))
-                            me->GetMotionMaster()->MoveChase(pTarget);
+                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                            me->GetMotionMaster()->MoveChase(target);
                         onlyonce = true;
                     }
 

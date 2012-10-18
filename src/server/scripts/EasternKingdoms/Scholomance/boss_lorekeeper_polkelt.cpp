@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment:
 SDCategory: Scholomance
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "scholomance.h"
 
 #define SPELL_VOLATILEINFECTION      24928
@@ -36,14 +37,14 @@ class boss_lorekeeper_polkelt : public CreatureScript
 public:
     boss_lorekeeper_polkelt() : CreatureScript("boss_lorekeeper_polkelt") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_lorekeeperpolkeltAI (pCreature);
+        return new boss_lorekeeperpolkeltAI (creature);
     }
 
     struct boss_lorekeeperpolkeltAI : public ScriptedAI
     {
-        boss_lorekeeperpolkeltAI(Creature *c) : ScriptedAI(c) {}
+        boss_lorekeeperpolkeltAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 VolatileInfection_Timer;
         uint32 Darkplague_Timer;
@@ -58,19 +59,19 @@ public:
             NoxiousCatalyst_Timer = 35000;
         }
 
-        void JustDied(Unit * /*killer*/)
+        void JustDied(Unit* /*killer*/)
         {
-            InstanceScript *pInstance = me->GetInstanceScript();
-            if (pInstance)
+            InstanceScript* instance = me->GetInstanceScript();
+            if (instance)
             {
-                pInstance->SetData(DATA_LOREKEEPERPOLKELT_DEATH, 0);
+                instance->SetData(DATA_LOREKEEPERPOLKELT_DEATH, 0);
 
-                if (pInstance->GetData(TYPE_GANDLING) == IN_PROGRESS)
+                if (instance->GetData(TYPE_GANDLING) == IN_PROGRESS)
                     me->SummonCreature(1853, 180.73f, -9.43856f, 75.507f, 1.61399f, TEMPSUMMON_DEAD_DESPAWN, 0);
             }
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
         }
 

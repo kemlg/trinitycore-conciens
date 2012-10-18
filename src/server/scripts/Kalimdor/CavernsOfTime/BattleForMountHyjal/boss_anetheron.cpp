@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,74 +15,54 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "hyjal.h"
 #include "hyjal_trash.h"
 
-#define SPELL_CARRION_SWARM 31306
-#define SPELL_SLEEP 31298
-#define SPELL_VAMPIRIC_AURA 38196
-#define SPELL_INFERNO 31299
+enum Spells
+{
+    SPELL_CARRION_SWARM     = 31306,
+    SPELL_SLEEP             = 31298,
+    SPELL_VAMPIRIC_AURA     = 38196,
+    SPELL_INFERNO           = 31299,
+    SPELL_IMMOLATION        = 31303,
+    SPELL_INFERNO_EFFECT    = 31302,
+};
 
-#define SAY_ONDEATH "The clock... is still... ticking."
-#define SOUND_ONDEATH 10982
-
-#define SAY_ONSLAY1 "Your hopes are lost!"
-#define SAY_ONSLAY2 "Scream for me!"
-#define SAY_ONSLAY3 "Pity, no time for a slow death!"
-#define SOUND_ONSLAY1 10981
-#define SOUND_ONSLAY2 11038
-#define SOUND_ONSLAY3 11039
-
-#define SAY_SWARM1 "The swarm is eager to feed!"
-#define SAY_SWARM2 "Pestilence upon you!"
-#define SOUND_SWARM1 10979
-#define SOUND_SWARM2 11037
-
-#define SAY_SLEEP1 "You look tired..."
-#define SAY_SLEEP2 "Sweet dreams..."
-#define SOUND_SLEEP1 10978
-#define SOUND_SLEEP2 11545
-
-#define SAY_INFERNO1 "Let fire rain from above!"
-#define SAY_INFERNO2 "Earth and sky shall burn!"
-#define SOUND_INFERNO1 10980
-#define SOUND_INFERNO2 11036
-
-#define SAY_ONAGGRO "You are defenders of a doomed world! Flee here, and perhaps you will prolong your pathetic lives!"
-#define SOUND_ONAGGRO 10977
+enum Texts
+{
+    SAY_ONDEATH         = 0,
+    SAY_ONSLAY          = 1,
+    SAY_SWARM           = 2,
+    SAY_SLEEP           = 3,
+    SAY_INFERNO         = 4,
+    SAY_ONAGGRO         = 5,
+};
 
 class boss_anetheron : public CreatureScript
 {
 public:
     boss_anetheron() : CreatureScript("boss_anetheron") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_anetheronAI (pCreature);
+        return new boss_anetheronAI (creature);
     }
 
     struct boss_anetheronAI : public hyjal_trashAI
     {
-        boss_anetheronAI(Creature *c) : hyjal_trashAI(c)
+        boss_anetheronAI(Creature* creature) : hyjal_trashAI(creature)
         {
-            pInstance = c->GetInstanceScript();
-            pGo = false;
-            pos = 0;
-            SpellEntry *TempSpell = GET_SPELL(SPELL_SLEEP);
-            if (TempSpell && TempSpell->EffectImplicitTargetA[0] != 1)
-            {
-                TempSpell->EffectImplicitTargetA[0] = 1;
-                TempSpell->EffectImplicitTargetB[0] = 0;
-            }
+            instance = creature->GetInstanceScript();
+            go = false;
         }
 
         uint32 SwarmTimer;
         uint32 SleepTimer;
         uint32 AuraTimer;
         uint32 InfernoTimer;
-        bool pGo;
-        uint32 pos;
+        bool go;
 
         void Reset()
         {
@@ -92,55 +72,38 @@ public:
             AuraTimer = 5000;
             InfernoTimer = 45000;
 
-            if (pInstance && IsEvent)
-                pInstance->SetData(DATA_ANETHERONEVENT, NOT_STARTED);
+            if (instance && IsEvent)
+                instance->SetData(DATA_ANETHERONEVENT, NOT_STARTED);
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
-            if (pInstance && IsEvent)
-                pInstance->SetData(DATA_ANETHERONEVENT, IN_PROGRESS);
-            DoPlaySoundToSet(me, SOUND_ONAGGRO);
-            me->MonsterYell(SAY_ONAGGRO, LANG_UNIVERSAL, 0);
+            if (instance && IsEvent)
+                instance->SetData(DATA_ANETHERONEVENT, IN_PROGRESS);
+            Talk(SAY_ONAGGRO);
         }
 
-        void KilledUnit(Unit * /*victim*/)
+        void KilledUnit(Unit* /*victim*/)
         {
-            switch (urand(0,2))
+            Talk(SAY_ONSLAY);
+        }
+
+        void WaypointReached(uint32 waypointId)
+        {
+            if (waypointId == 7 && instance)
             {
-                case 0:
-                    DoPlaySoundToSet(me, SOUND_ONSLAY1);
-                    me->MonsterYell(SAY_ONSLAY1, LANG_UNIVERSAL, 0);
-                    break;
-                case 1:
-                    DoPlaySoundToSet(me, SOUND_ONSLAY2);
-                    me->MonsterYell(SAY_ONSLAY2, LANG_UNIVERSAL, 0);
-                    break;
-                case 2:
-                    DoPlaySoundToSet(me, SOUND_ONSLAY3);
-                    me->MonsterYell(SAY_ONSLAY3, LANG_UNIVERSAL, 0);
-                    break;
+                Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_JAINAPROUDMOORE));
+                if (target && target->isAlive())
+                    me->AddThreat(target, 0.0f);
             }
         }
 
-        void WaypointReached(uint32 i)
+        void JustDied(Unit* killer)
         {
-            pos = i;
-            if (i == 7 && pInstance)
-            {
-                Unit *pTarget = Unit::GetUnit((*me), pInstance->GetData64(DATA_JAINAPROUDMOORE));
-                if (pTarget && pTarget->isAlive())
-                    me->AddThreat(pTarget,0.0f);
-            }
-        }
-
-        void JustDied(Unit *victim)
-        {
-            hyjal_trashAI::JustDied(victim);
-            if (pInstance && IsEvent)
-                pInstance->SetData(DATA_ANETHERONEVENT, DONE);
-            DoPlaySoundToSet(me, SOUND_ONDEATH);
-            me->MonsterYell(SAY_ONDEATH, LANG_UNIVERSAL, 0);
+            hyjal_trashAI::JustDied(killer);
+            if (instance && IsEvent)
+                instance->SetData(DATA_ANETHERONEVENT, DONE);
+            Talk(SAY_ONDEATH);
         }
 
         void UpdateAI(const uint32 diff)
@@ -149,10 +112,10 @@ public:
             {
                 //Must update npc_escortAI
                 npc_escortAI::UpdateAI(diff);
-                if (!pGo)
+                if (!go)
                 {
-                    pGo = true;
-                    if (pInstance)
+                    go = true;
+                    if (instance)
                     {
                         AddWaypoint(0, 4896.08f,    -1576.35f,    1333.65f);
                         AddWaypoint(1, 4898.68f,    -1615.02f,    1329.48f);
@@ -174,63 +137,33 @@ public:
 
             if (SwarmTimer <= diff)
             {
-                if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                    DoCast(pTarget, SPELL_CARRION_SWARM);
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                    DoCast(target, SPELL_CARRION_SWARM);
 
-                SwarmTimer = urand(45000,60000);
-                switch (urand(0,1))
-                {
-                    case 0:
-                        DoPlaySoundToSet(me, SOUND_SWARM1);
-                        me->MonsterYell(SAY_SWARM1, LANG_UNIVERSAL, 0);
-                        break;
-                    case 1:
-                        DoPlaySoundToSet(me, SOUND_SWARM2);
-                        me->MonsterYell(SAY_SWARM2, LANG_UNIVERSAL, 0);
-                        break;
-                }
+                SwarmTimer = urand(45000, 60000);
+                Talk(SAY_SWARM);
             } else SwarmTimer -= diff;
 
             if (SleepTimer <= diff)
             {
                 for (uint8 i = 0; i < 3; ++i)
                 {
-                    if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
-                        pTarget->CastSpell(pTarget,SPELL_SLEEP,true);
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                        target->CastSpell(target, SPELL_SLEEP, true);
                 }
                 SleepTimer = 60000;
-                switch (urand(0,1))
-                {
-                    case 0:
-                        DoPlaySoundToSet(me, SOUND_SLEEP1);
-                        me->MonsterYell(SAY_SLEEP1, LANG_UNIVERSAL, 0);
-                        break;
-                    case 1:
-                        DoPlaySoundToSet(me, SOUND_SLEEP2);
-                        me->MonsterYell(SAY_SLEEP2, LANG_UNIVERSAL, 0);
-                        break;
-                }
+                Talk(SAY_SLEEP);
             } else SleepTimer -= diff;
             if (AuraTimer <= diff)
             {
                 DoCast(me, SPELL_VAMPIRIC_AURA, true);
-                AuraTimer = urand(10000,20000);
+                AuraTimer = urand(10000, 20000);
             } else AuraTimer -= diff;
             if (InfernoTimer <= diff)
             {
                 DoCast(SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true), SPELL_INFERNO);
                 InfernoTimer = 45000;
-                switch (urand(0,1))
-                {
-                    case 0:
-                        DoPlaySoundToSet(me, SOUND_INFERNO1);
-                        me->MonsterYell(SAY_INFERNO1, LANG_UNIVERSAL, 0);
-                        break;
-                    case 1:
-                        DoPlaySoundToSet(me, SOUND_INFERNO2);
-                        me->MonsterYell(SAY_INFERNO2, LANG_UNIVERSAL, 0);
-                        break;
-                }
+                Talk(SAY_INFERNO);
             } else InfernoTimer -= diff;
 
             DoMeleeAttackIfReady();
@@ -239,33 +172,29 @@ public:
 
 };
 
-
-#define SPELL_IMMOLATION     31303
-#define SPELL_INFERNO_EFFECT 31302
-
 class mob_towering_infernal : public CreatureScript
 {
 public:
     mob_towering_infernal() : CreatureScript("mob_towering_infernal") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_towering_infernalAI (pCreature);
+        return new mob_towering_infernalAI (creature);
     }
 
     struct mob_towering_infernalAI : public ScriptedAI
     {
-        mob_towering_infernalAI(Creature *c) : ScriptedAI(c)
+        mob_towering_infernalAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = c->GetInstanceScript();
-            if (pInstance)
-                AnetheronGUID = pInstance->GetData64(DATA_ANETHERON);
+            instance = creature->GetInstanceScript();
+            if (instance)
+                AnetheronGUID = instance->GetData64(DATA_ANETHERON);
         }
 
         uint32 ImmolationTimer;
         uint32 CheckTimer;
         uint64 AnetheronGUID;
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         void Reset()
         {
@@ -274,21 +203,21 @@ public:
             CheckTimer = 5000;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
         }
 
-        void KilledUnit(Unit * /*victim*/)
+        void KilledUnit(Unit* /*victim*/)
         {
         }
 
-        void JustDied(Unit * /*victim*/)
+        void JustDied(Unit* /*killer*/)
         {
         }
 
-        void MoveInLineOfSight(Unit *who)
+        void MoveInLineOfSight(Unit* who)
         {
-            if (me->IsWithinDist(who, 50) && !me->isInCombat() && me->IsHostileTo(who))
+            if (me->IsWithinDist(who, 50) && !me->isInCombat() && me->IsValidAttackTarget(who))
                 AttackStart(who);
         }
 
@@ -298,7 +227,7 @@ public:
             {
                 if (AnetheronGUID)
                 {
-                    Creature* boss = Unit::GetCreature((*me),AnetheronGUID);
+                    Creature* boss = Unit::GetCreature((*me), AnetheronGUID);
                     if (!boss || (boss && boss->isDead()))
                     {
                         me->setDeathState(JUST_DIED);
@@ -324,7 +253,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_anetheron()
 {

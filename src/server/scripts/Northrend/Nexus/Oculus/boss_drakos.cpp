@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,41 +15,46 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "oculus.h"
 
 enum Spells
 {
     SPELL_MAGIC_PULL                              = 51336,
-    SPELL_MAGIC_PULL_EFFECT                       = 50770,
     SPELL_THUNDERING_STOMP                        = 50774,
-    SPELL_THUNDERING_STOMP_H                      = 59370,
     SPELL_UNSTABLE_SPHERE_PASSIVE                 = 50756,
     SPELL_UNSTABLE_SPHERE_PULSE                   = 50757,
     SPELL_UNSTABLE_SPHERE_TIMER                   = 50758,
     NPC_UNSTABLE_SPHERE                           = 28166,
 };
 
-//not in db
 enum Yells
 {
-    SAY_AGGRO                                     = -1578000,
-    SAY_KILL_1                                    = -1578001,
-    SAY_KILL_2                                    = -1578002,
-    SAY_KILL_3                                    = -1578003,
-    SAY_DEATH                                     = -1578004,
-    SAY_PULL_1                                    = -1578005,
-    SAY_PULL_2                                    = -1578006,
-    SAY_PULL_3                                    = -1578007,
-    SAY_PULL_4                                    = -1578008,
-    SAY_STOMP_1                                   = -1578009,
-    SAY_STOMP_2                                   = -1578010,
-    SAY_STOMP_3                                   = -1578011
+    SAY_AGGRO                                     = -1578005,
+    SAY_KILL_1                                    = -1578006,
+    SAY_KILL_2                                    = -1578007,
+    SAY_KILL_3                                    = -1578008,
+    SAY_DEATH                                     = -1578009,
+    SAY_PULL_1                                    = -1578010,
+    SAY_PULL_2                                    = -1578011,
+    SAY_PULL_3                                    = -1578012,
+    SAY_PULL_4                                    = -1578013,
+    SAY_STOMP_1                                   = -1578014,
+    SAY_STOMP_2                                   = -1578015,
+    SAY_STOMP_3                                   = -1578016
 };
 
-enum
+enum DrakosAchievement
 {
     ACHIEV_TIMED_START_EVENT                      = 18153,
+};
+
+enum DrakosEvents
+{
+    EVENT_MAGIC_PULL = 1,
+    EVENT_STOMP,
+    EVENT_BOMB_SUMMON
 };
 
 class boss_drakos : public CreatureScript
@@ -57,138 +62,108 @@ class boss_drakos : public CreatureScript
 public:
     boss_drakos() : CreatureScript("boss_drakos") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_drakosAI (pCreature);
+        return new boss_drakosAI (creature);
     }
 
-    struct boss_drakosAI : public ScriptedAI
+    struct boss_drakosAI : public BossAI
     {
-        boss_drakosAI(Creature* pCreature) : ScriptedAI(pCreature), lSummons(me)
-        {
-            pInstance = pCreature->GetInstanceScript();
-        }
-
-        uint32 uiMagicPullTimer;
-        uint32 uiStompTimer;
-        uint32 uiBombSummonTimer;
-
-        bool bPostPull;
-
-        InstanceScript* pInstance;
-        SummonList lSummons;
+        boss_drakosAI(Creature* creature) : BossAI(creature, DATA_DRAKOS_EVENT) {}
 
         void Reset()
         {
-            lSummons.DespawnAll();
-            uiMagicPullTimer = 15000;
-            uiStompTimer = 17000;
-            uiBombSummonTimer = 2000;
+            _Reset();
 
-            bPostPull = false;
+            events.ScheduleEvent(EVENT_MAGIC_PULL, 15000);
+            events.ScheduleEvent(EVENT_STOMP, 17000);
+            events.ScheduleEvent(EVENT_BOMB_SUMMON, 2000);
 
-            if (pInstance)
-                pInstance->SetData(DATA_DRAKOS_EVENT, NOT_STARTED);
+            postPull = false;
         }
 
         void EnterCombat(Unit* /*who*/)
         {
+            _EnterCombat();
             DoScriptText(SAY_AGGRO, me);
-
-            if (pInstance)
-                pInstance->SetData(DATA_DRAKOS_EVENT, IN_PROGRESS);
         }
 
-        void JustSummoned(Creature* pSummon)
-        {
-            lSummons.Summon(pSummon);
-        }
-
-        void UpdateAI(const uint32 uiDiff)
+        void UpdateAI(const uint32 diff)
         {
             //Return since we have no target
             if (!UpdateVictim())
                 return;
 
-            if (uiBombSummonTimer <= uiDiff)
-            {
-                Position pPosition;
-                me->GetPosition(&pPosition);
+            events.Update(diff);
 
-                if (bPostPull)
+            if (me->HasUnitState(UNIT_STATE_CASTING))
+                return;
+
+            while (uint32 eventId = events.ExecuteEvent())
+            {
+                switch (eventId)
                 {
-                    for (uint8 uiI = 0; uiI >= 3; uiI++)
-                    {
-                        me->GetRandomNearPosition(pPosition, float(urand(0,10)));
-                        me->SummonCreature(NPC_UNSTABLE_SPHERE, pPosition);
-                    }
+                    case EVENT_BOMB_SUMMON:
+                        {
+                            Position pPosition;
+                            me->GetPosition(&pPosition);
+
+                            for (uint8 i = 0; i <= (postPull ? 3 : 0); i++)
+                            {
+                                me->GetRandomNearPosition(pPosition, float(urand(0, 10)));
+                                me->SummonCreature(NPC_UNSTABLE_SPHERE, pPosition);
+                            }
+                        }
+                        events.ScheduleEvent(EVENT_BOMB_SUMMON, 2000);
+                        break;
+                    case EVENT_MAGIC_PULL:
+                        DoCast(SPELL_MAGIC_PULL);
+                        postPull = true;
+                        events.ScheduleEvent(EVENT_MAGIC_PULL, 15000);
+                        break;
+                    case EVENT_STOMP:
+                        DoScriptText(RAND(SAY_STOMP_1, SAY_STOMP_2, SAY_STOMP_3), me);
+                        DoCast(SPELL_THUNDERING_STOMP);
+                        events.ScheduleEvent(EVENT_STOMP, 17000);
+                        break;
                 }
-                else
-                {
-                    me->GetRandomNearPosition(pPosition, float(urand(0,10)));
-                    me->SummonCreature(NPC_UNSTABLE_SPHERE, pPosition);
-                }
-
-                uiBombSummonTimer = 2000;
-            } else uiBombSummonTimer -= uiDiff;
-
-            if (uiMagicPullTimer <= uiDiff)
-            {
-                DoCast(SPELL_MAGIC_PULL);
-
-                bPostPull = true;
-
-                uiMagicPullTimer = 15000;
-            } else uiMagicPullTimer -= uiDiff;
-
-            if (uiStompTimer <= uiDiff)
-            {
-                DoScriptText(RAND(SAY_STOMP_1,SAY_STOMP_2,SAY_STOMP_3), me);
-                DoCast(SPELL_THUNDERING_STOMP);
-                uiStompTimer = 17000;
-            } else uiStompTimer -= uiDiff;
+            }
 
             DoMeleeAttackIfReady();
         }
 
         void JustDied(Unit* /*killer*/)
         {
+            _JustDied();
+
             DoScriptText(SAY_DEATH, me);
 
-            if (pInstance)
-            {
-                pInstance->SetData(DATA_DRAKOS_EVENT, DONE);
-                // start achievement timer (kill Eregos within 20 min)
-                pInstance->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_TIMED_START_EVENT);
-            }
-
-            lSummons.DespawnAll();
+            // start achievement timer (kill Eregos within 20 min)
+            instance->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_TIMED_START_EVENT);
         }
+
         void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_KILL_1,SAY_KILL_2,SAY_KILL_3), me);
+            DoScriptText(RAND(SAY_KILL_1, SAY_KILL_2, SAY_KILL_3), me);
         }
+    private:
+        bool postPull;
     };
-
 };
-
 
 class npc_unstable_sphere : public CreatureScript
 {
 public:
     npc_unstable_sphere() : CreatureScript("npc_unstable_sphere") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new npc_unstable_sphereAI (pCreature);
+        return new npc_unstable_sphereAI (creature);
     }
 
     struct npc_unstable_sphereAI : public ScriptedAI
     {
-        npc_unstable_sphereAI(Creature* pCreature) : ScriptedAI(pCreature) {}
-
-        uint32 uiPulseTimer;
-        uint32 uiDeathTimer;
+        npc_unstable_sphereAI(Creature* creature) : ScriptedAI(creature) {}
 
         void Reset()
         {
@@ -198,26 +173,28 @@ public:
             me->AddAura(SPELL_UNSTABLE_SPHERE_PASSIVE, me);
             me->AddAura(SPELL_UNSTABLE_SPHERE_TIMER, me);
 
-            uiPulseTimer = 3000;
-            uiDeathTimer = 19000;
+            pulseTimer = 3000;
+            deathTimer = 19000;
         }
 
-        void UpdateAI(const uint32 uiDiff)
+        void UpdateAI(const uint32 diff)
         {
-            if (uiPulseTimer <= uiDiff)
+            if (pulseTimer <= diff)
             {
                 DoCast(SPELL_UNSTABLE_SPHERE_PULSE);
-                uiPulseTimer = 3*IN_MILLISECONDS;
-            } else uiPulseTimer -= uiDiff;
+                pulseTimer = 3*IN_MILLISECONDS;
+            } else pulseTimer -= diff;
 
-            if (uiDeathTimer <= uiDiff)
+            if (deathTimer <= diff)
                 me->DisappearAndDie();
-            else uiDeathTimer -= uiDiff;
+            else deathTimer -= diff;
         }
+    private:
+        uint32 pulseTimer;
+        uint32 deathTimer;
     };
 
 };
-
 
 void AddSC_boss_drakos()
 {

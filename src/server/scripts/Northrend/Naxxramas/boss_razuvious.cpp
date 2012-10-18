@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,7 +15,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "naxxramas.h"
 
 //Razuvious - NO TEXT sound only
@@ -32,14 +33,14 @@
 //8860 death - An honorable... death...
 //8947 - Aggro Mixed? - ?
 
-#define SOUND_AGGRO     RAND(8852,8853,8854)
-#define SOUND_SLAY      RAND(8861,8863)
-#define SOUND_COMMND    RAND(8855,8856,8858,8859,8861)
+#define SOUND_AGGRO     RAND(8852, 8853, 8854)
+#define SOUND_SLAY      RAND(8861, 8863)
+#define SOUND_COMMND    RAND(8855, 8856, 8858, 8859, 8861)
 #define SOUND_DEATH     8860
 #define SOUND_AGGROMIX  8847
 
 #define SPELL_UNBALANCING_STRIKE    26613
-#define SPELL_DISRUPTING_SHOUT      RAID_MODE(29107,55543)
+#define SPELL_DISRUPTING_SHOUT      RAID_MODE(29107, 55543)
 #define SPELL_JAGGED_KNIFE          55550
 #define SPELL_HOPELESS              29125
 
@@ -57,14 +58,14 @@ class boss_razuvious : public CreatureScript
 public:
     boss_razuvious() : CreatureScript("boss_razuvious") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_razuviousAI (pCreature);
+        return new boss_razuviousAI (creature);
     }
 
     struct boss_razuviousAI : public BossAI
     {
-        boss_razuviousAI(Creature *c) : BossAI(c, BOSS_RAZUVIOUS) {}
+        boss_razuviousAI(Creature* creature) : BossAI(creature, BOSS_RAZUVIOUS) {}
 
         void KilledUnit(Unit* /*victim*/)
         {
@@ -88,7 +89,7 @@ public:
             me->CastSpell(me, SPELL_HOPELESS, true); // TODO: this may affect other creatures
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             _EnterCombat();
             DoPlaySoundToSet(me, SOUND_AGGRO);
@@ -107,7 +108,7 @@ public:
 
             while (uint32 eventId = events.ExecuteEvent())
             {
-                switch(eventId)
+                switch (eventId)
                 {
                     case EVENT_STRIKE:
                         DoCast(me->getVictim(), SPELL_UNBALANCING_STRIKE);
@@ -118,8 +119,8 @@ public:
                         events.ScheduleEvent(EVENT_SHOUT, 25000);
                         return;
                     case EVENT_KNIFE:
-                        if (Unit *pTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 45.0f))
-                            DoCast(pTarget, SPELL_JAGGED_KNIFE);
+                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 45.0f))
+                            DoCast(target, SPELL_JAGGED_KNIFE);
                         events.ScheduleEvent(EVENT_KNIFE, 10000);
                         return;
                     case EVENT_COMMAND:
@@ -134,7 +135,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_razuvious()
 {

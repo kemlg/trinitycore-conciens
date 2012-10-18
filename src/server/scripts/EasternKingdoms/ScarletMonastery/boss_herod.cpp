@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,36 +23,50 @@ SDComment: Should in addition spawn Myrmidons in the hallway outside
 SDCategory: Scarlet Monastery
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "ScriptedEscortAI.h"
 
-#define SAY_AGGRO                   -1189000
-#define SAY_WHIRLWIND               -1189001
-#define SAY_ENRAGE                  -1189002
-#define SAY_KILL                    -1189003
-#define EMOTE_ENRAGE                -1189004
+enum Says
+{
+    SAY_AGGRO                   = -1189000,
+    SAY_WHIRLWIND               = -1189001,
+    SAY_ENRAGE                  = -1189002,
+    SAY_KILL                    = -1189003
+};
 
-#define SPELL_RUSHINGCHARGE         8260
-#define SPELL_CLEAVE                15496
-#define SPELL_WHIRLWIND             8989
-#define SPELL_FRENZY                8269
+enum Emotes
+{
+    EMOTE_ENRAGE                = -1189004
+};
 
-#define ENTRY_SCARLET_TRAINEE       6575
-#define ENTRY_SCARLET_MYRMIDON      4295
+enum Spells
+{
+    SPELL_RUSHINGCHARGE         = 8260,
+    SPELL_CLEAVE                = 15496,
+    SPELL_WHIRLWIND             = 8989,
+    SPELL_FRENZY                = 8269
+};
+
+enum Entry
+{
+    ENTRY_SCARLET_TRAINEE       = 6575,
+    ENTRY_SCARLET_MYRMIDON      = 4295
+};
 
 class boss_herod : public CreatureScript
 {
 public:
     boss_herod() : CreatureScript("boss_herod") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_herodAI(pCreature);
+        return new boss_herodAI(creature);
     }
 
     struct boss_herodAI : public ScriptedAI
     {
-        boss_herodAI(Creature *c) : ScriptedAI(c) {}
+        boss_herodAI(Creature* creature) : ScriptedAI(creature) {}
 
         bool Enrage;
 
@@ -66,13 +80,13 @@ public:
             Whirlwind_Timer = 60000;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
             DoScriptText(SAY_AGGRO, me);
             DoCast(me, SPELL_RUSHINGCHARGE);
         }
 
-         void KilledUnit(Unit * /*victim*/)
+         void KilledUnit(Unit* /*victim*/)
          {
              DoScriptText(SAY_KILL, me);
          }
@@ -102,7 +116,8 @@ public:
             {
                 DoCast(me->getVictim(), SPELL_CLEAVE);
                 Cleave_Timer = 12000;
-            } else Cleave_Timer -= diff;
+            }
+            else Cleave_Timer -= diff;
 
             // Whirlwind_Timer
             if (Whirlwind_Timer <= diff)
@@ -110,36 +125,40 @@ public:
                 DoScriptText(SAY_WHIRLWIND, me);
                 DoCast(me->getVictim(), SPELL_WHIRLWIND);
                 Whirlwind_Timer = 30000;
-            } else Whirlwind_Timer -= diff;
+            }
+            else Whirlwind_Timer -= diff;
 
             DoMeleeAttackIfReady();
         }
     };
-
 };
-
 
 class mob_scarlet_trainee : public CreatureScript
 {
 public:
     mob_scarlet_trainee() : CreatureScript("mob_scarlet_trainee") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_scarlet_traineeAI(pCreature);
+        return new mob_scarlet_traineeAI(creature);
     }
 
     struct mob_scarlet_traineeAI : public npc_escortAI
     {
-        mob_scarlet_traineeAI(Creature *c) : npc_escortAI(c)
+        mob_scarlet_traineeAI(Creature* creature) : npc_escortAI(creature)
         {
-            Start_Timer = urand(1000,6000);
+            Start_Timer = urand(1000, 6000);
         }
 
         uint32 Start_Timer;
 
         void Reset() {}
-        void WaypointReached(uint32 /*uiPoint*/) {}
+
+        void WaypointReached(uint32 /*waypointId*/)
+        {
+
+        }
+
         void EnterCombat(Unit* /*who*/) {}
 
         void UpdateAI(const uint32 diff)
@@ -148,7 +167,7 @@ public:
             {
                 if (Start_Timer <= diff)
                 {
-                    Start(true,true);
+                    Start(true, true);
                     Start_Timer = 0;
                 } else Start_Timer -= diff;
             }
@@ -156,9 +175,7 @@ public:
             npc_escortAI::UpdateAI(diff);
         }
     };
-
 };
-
 
 void AddSC_boss_herod()
 {

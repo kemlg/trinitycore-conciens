@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ SDComment: Doors missing in instance script.
 SDCategory: Scholomance
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 #include "scholomance.h"
 
 #define SPELL_ARCANEMISSILES           22272
@@ -55,19 +56,19 @@ class boss_darkmaster_gandling : public CreatureScript
 public:
     boss_darkmaster_gandling() : CreatureScript("boss_darkmaster_gandling") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_darkmaster_gandlingAI (pCreature);
+        return new boss_darkmaster_gandlingAI (creature);
     }
 
     struct boss_darkmaster_gandlingAI : public ScriptedAI
     {
-        boss_darkmaster_gandlingAI(Creature *c) : ScriptedAI(c)
+        boss_darkmaster_gandlingAI(Creature* creature) : ScriptedAI(creature)
         {
-            pInstance = me->GetInstanceScript();
+            instance = me->GetInstanceScript();
         }
 
-        InstanceScript* pInstance;
+        InstanceScript* instance;
 
         uint32 ArcaneMissiles_Timer;
         uint32 ShadowShield_Timer;
@@ -82,14 +83,14 @@ public:
             Teleport_Timer = 16000;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         {
         }
 
-        void JustDied(Unit * /*killer*/)
+        void JustDied(Unit* /*killer*/)
         {
-            if (pInstance)
-                pInstance->SetData(TYPE_GANDLING, DONE);
+            if (instance)
+                instance->SetData(TYPE_GANDLING, DONE);
         }
 
         void UpdateAI(const uint32 diff)
@@ -108,14 +109,14 @@ public:
             if (ShadowShield_Timer <= diff)
             {
                 DoCast(me, SPELL_SHADOWSHIELD);
-                ShadowShield_Timer = 14000 + rand()%14000;
+                ShadowShield_Timer = urand(14000, 28000);
             } else ShadowShield_Timer -= diff;
 
             //Curse_Timer
             if (Curse_Timer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_CURSE);
-                Curse_Timer = 15000 + rand()%12000;
+                Curse_Timer = urand(15000, 27000);
             } else Curse_Timer -= diff;
 
             //Teleporting Random Target to one of the six pre boss rooms and spawn 3-4 skeletons near the gamer.
@@ -124,97 +125,97 @@ public:
             {
                 if (Teleport_Timer <= diff)
                 {
-                    Unit *pTarget = NULL;
-                    pTarget = SelectUnit(SELECT_TARGET_RANDOM,0);
-                    if (pTarget && pTarget->GetTypeId() == TYPEID_PLAYER)
+                    Unit* target = NULL;
+                    target = SelectTarget(SELECT_TARGET_RANDOM, 0);
+                    if (target && target->GetTypeId() == TYPEID_PLAYER)
                     {
-                        if (DoGetThreat(pTarget))
-                            DoModifyThreatPercent(pTarget, -100);
+                        if (DoGetThreat(target))
+                            DoModifyThreatPercent(target, -100);
 
-                        Creature *Summoned = NULL;
-                        switch(rand()%6)
+                        Creature* Summoned = NULL;
+                        switch (rand()%6)
                         {
                             case 0:
-                                DoTeleportPlayer(pTarget, 250.0696f,0.3921f,84.8408f,3.149f);
-                                Summoned = me->SummonCreature(16119,254.2325f,0.3417f,84.8407f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                DoTeleportPlayer(target, 250.0696f, 0.3921f, 84.8408f, 3.149f);
+                                Summoned = me->SummonCreature(16119, 254.2325f, 0.3417f, 84.8407f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,257.7133f,4.0226f,84.8407f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 257.7133f, 4.0226f, 84.8407f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,258.6702f,-2.60656f,84.8407f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 258.6702f, -2.60656f, 84.8407f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
+                                    Summoned->AI()->AttackStart(target);
                                 break;
                             case 1:
-                                DoTeleportPlayer(pTarget, 181.4220f,-91.9481f,84.8410f,1.608f);
-                                Summoned = me->SummonCreature(16119,184.0519f,-73.5649f,84.8407f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                DoTeleportPlayer(target, 181.4220f, -91.9481f, 84.8410f, 1.608f);
+                                Summoned = me->SummonCreature(16119, 184.0519f, -73.5649f, 84.8407f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,179.5951f,-73.7045f,84.8407f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 179.5951f, -73.7045f, 84.8407f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,180.6452f,-78.2143f,84.8407f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 180.6452f, -78.2143f, 84.8407f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,283.2274f,-78.1518f,84.8407f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 283.2274f, -78.1518f, 84.8407f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
+                                    Summoned->AI()->AttackStart(target);
                                 break;
                             case 2:
-                                DoTeleportPlayer(pTarget, 95.1547f,-1.8173f,85.2289f,0.043f);
-                                Summoned = me->SummonCreature(16119,100.9404f,-1.8016f,85.2289f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                DoTeleportPlayer(target, 95.1547f, -1.8173f, 85.2289f, 0.043f);
+                                Summoned = me->SummonCreature(16119, 100.9404f, -1.8016f, 85.2289f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,101.3729f,0.4882f,85.2289f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 101.3729f, 0.4882f, 85.2289f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,101.4596f,-4.4740f,85.2289f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 101.4596f, -4.4740f, 85.2289f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
+                                    Summoned->AI()->AttackStart(target);
                                 break;
                             case 3:
-                                DoTeleportPlayer(pTarget, 250.0696f,0.3921f,72.6722f,3.149f);
-                                Summoned = me->SummonCreature(16119,240.34481f,0.7368f,72.6722f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                DoTeleportPlayer(target, 250.0696f, 0.3921f, 72.6722f, 3.149f);
+                                Summoned = me->SummonCreature(16119, 240.34481f, 0.7368f, 72.6722f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,240.3633f,-2.9520f,72.6722f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 240.3633f, -2.9520f, 72.6722f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,240.6702f,3.34949f,72.6722f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 240.6702f, 3.34949f, 72.6722f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
+                                    Summoned->AI()->AttackStart(target);
                                 break;
                             case 4:
-                                DoTeleportPlayer(pTarget, 181.4220f,-91.9481f,70.7734f,1.608f);
-                                Summoned = me->SummonCreature(16119,184.0519f,-73.5649f,70.7734f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                DoTeleportPlayer(target, 181.4220f, -91.9481f, 70.7734f, 1.608f);
+                                Summoned = me->SummonCreature(16119, 184.0519f, -73.5649f, 70.7734f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,179.5951f,-73.7045f,70.7734f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 179.5951f, -73.7045f, 70.7734f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,180.6452f,-78.2143f,70.7734f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 180.6452f, -78.2143f, 70.7734f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,283.2274f,-78.1518f,70.7734f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 283.2274f, -78.1518f, 70.7734f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
+                                    Summoned->AI()->AttackStart(target);
                                 break;
                             case 5:
-                                DoTeleportPlayer(pTarget, 106.1541f,-1.8994f,75.3663f,0.043f);
-                                Summoned = me->SummonCreature(16119,115.3945f,-1.5555f,75.3663f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                DoTeleportPlayer(target, 106.1541f, -1.8994f, 75.3663f, 0.043f);
+                                Summoned = me->SummonCreature(16119, 115.3945f, -1.5555f, 75.3663f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,257.7133f,1.8066f,75.3663f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 257.7133f, 1.8066f, 75.3663f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
-                                Summoned = me->SummonCreature(16119,258.6702f,-5.1001f,75.3663f,0,TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT,10000);
+                                    Summoned->AI()->AttackStart(target);
+                                Summoned = me->SummonCreature(16119, 258.6702f, -5.1001f, 75.3663f, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
                                 if (Summoned)
-                                    Summoned->AI()->AttackStart(pTarget);
+                                    Summoned->AI()->AttackStart(target);
                                 break;
                         }
                     }
-                    Teleport_Timer = 20000 + rand()%15000;
+                    Teleport_Timer = urand(20000, 35000);
                 } else Teleport_Timer -= diff;
             }
 

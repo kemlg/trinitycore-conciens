@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,7 +15,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "InstanceScript.h"
 #include "drak_tharon_keep.h"
 
 #define MAX_ENCOUNTER     4
@@ -49,7 +50,7 @@ public:
 
     struct instance_drak_tharon_InstanceScript : public InstanceScript
     {
-        instance_drak_tharon_InstanceScript(Map* pMap) : InstanceScript(pMap) {Initialize();};
+        instance_drak_tharon_InstanceScript(Map* map) : InstanceScript(map) {}
 
         uint8 uiDredAchievCounter;
 
@@ -69,6 +70,7 @@ public:
 
         void Initialize()
         {
+            memset(&m_auiEncounter, 0, sizeof(m_auiEncounter));
             uiTrollgore = 0;
             uiNovos = 0;
             uiDred = 0;
@@ -83,14 +85,15 @@ public:
         bool IsEncounterInProgress() const
         {
             for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
-                if (m_auiEncounter[i] == IN_PROGRESS) return true;
+                if (m_auiEncounter[i] == IN_PROGRESS)
+                    return true;
 
             return false;
         }
 
         void OnGameObjectCreate(GameObject* go)
         {
-            switch(go->GetEntry())
+            switch (go->GetEntry())
             {
                 case GO_NOVOS_CRYSTAL_1:
                     uiNovosCrystal1 = go->GetGUID();
@@ -109,7 +112,7 @@ public:
 
         void OnCreatureCreate(Creature* creature)
         {
-            switch(creature->GetEntry())
+            switch (creature->GetEntry())
             {
                 case NPC_TROLLGORE:
                     uiTrollgore = creature->GetGUID();
@@ -128,7 +131,7 @@ public:
 
         uint64 GetData64(uint32 identifier)
         {
-            switch(identifier)
+            switch (identifier)
             {
                 case DATA_TROLLGORE:          return uiTrollgore;
                 case DATA_NOVOS:              return uiNovos;
@@ -145,7 +148,7 @@ public:
 
         void SetData(uint32 type, uint32 data)
         {
-            switch(type)
+            switch (type)
             {
                 case DATA_TROLLGORE_EVENT:
                     m_auiEncounter[0] = data;
@@ -188,16 +191,12 @@ public:
         {
             OUT_SAVE_INST_DATA;
 
-            std::string str_data;
-
             std::ostringstream saveStream;
-            saveStream << "D K " << m_auiEncounter[0] << " " << m_auiEncounter[1] << " "
-                << m_auiEncounter[2] << " " << m_auiEncounter[3];
-
-            str_data = saveStream.str();
+            saveStream << "D K " << m_auiEncounter[0] << ' ' << m_auiEncounter[1] << ' '
+                << m_auiEncounter[2] << ' ' << m_auiEncounter[3];
 
             OUT_SAVE_INST_DATA_COMPLETE;
-            return str_data;
+            return saveStream.str();
         }
 
         void Load(const char* in)
@@ -211,7 +210,7 @@ public:
             OUT_LOAD_INST_DATA(in);
 
             char dataHead1, dataHead2;
-            uint16 data0,data1,data2,data3;
+            uint16 data0, data1, data2, data3;
 
             std::istringstream loadStream(in);
             loadStream >> dataHead1 >> dataHead2 >> data0 >> data1 >> data2 >> data3;
@@ -232,7 +231,7 @@ public:
         }
     };
 
-    InstanceScript* GetInstanceScript(InstanceMap *map) const
+    InstanceScript* GetInstanceScript(InstanceMap* map) const
     {
         return new instance_drak_tharon_InstanceScript(map);
     }

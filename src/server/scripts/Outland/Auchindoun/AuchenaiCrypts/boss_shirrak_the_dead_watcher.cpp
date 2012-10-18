@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@ Comment: InhibitMagic should stack slower far from the boss, proper Visual for F
 Category: Auchindoun, Auchenai Crypts
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
 #define SPELL_INHIBITMAGIC          32264
 #define SPELL_ATTRACTMAGIC          32265
@@ -45,14 +46,14 @@ class boss_shirrak_the_dead_watcher : public CreatureScript
 public:
     boss_shirrak_the_dead_watcher() : CreatureScript("boss_shirrak_the_dead_watcher") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_shirrak_the_dead_watcherAI (pCreature);
+        return new boss_shirrak_the_dead_watcherAI (creature);
     }
 
     struct boss_shirrak_the_dead_watcherAI : public ScriptedAI
     {
-        boss_shirrak_the_dead_watcherAI(Creature *c) : ScriptedAI(c)
+        boss_shirrak_the_dead_watcherAI(Creature* creature) : ScriptedAI(creature)
         {
         }
 
@@ -72,19 +73,19 @@ public:
             FocusedTargetGUID = 0;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         { }
 
-        void JustSummoned(Creature *summoned)
+        void JustSummoned(Creature* summoned)
         {
             if (summoned && summoned->GetEntry() == ENTRY_FOCUS_FIRE)
             {
-                summoned->CastSpell(summoned,SPELL_FOCUS_FIRE_VISUAL,false);
+                summoned->CastSpell(summoned, SPELL_FOCUS_FIRE_VISUAL, false);
                 summoned->setFaction(me->getFaction());
                 summoned->SetLevel(me->getLevel());
-                summoned->AddUnitState(UNIT_STAT_ROOT);
+                summoned->AddUnitState(UNIT_STATE_ROOT);
 
-                if (Unit *pFocusedTarget = Unit::GetUnit(*me, FocusedTargetGUID))
+                if (Unit* pFocusedTarget = Unit::GetUnit(*me, FocusedTargetGUID))
                     summoned->AI()->AttackStart(pFocusedTarget);
             }
         }
@@ -95,8 +96,8 @@ public:
             if (Inhibitmagic_Timer <= diff)
             {
                 float dist;
-                Map* pMap = me->GetMap();
-                Map::PlayerList const &PlayerList = pMap->GetPlayers();
+                Map* map = me->GetMap();
+                Map::PlayerList const &PlayerList = map->GetPlayers();
                 for (Map::PlayerList::const_iterator i = PlayerList.begin(); i != PlayerList.end(); ++i)
                     if (Player* i_pl = i->getSource())
                         if (i_pl->isAlive() && (dist = i_pl->IsWithinDist(me, 45)))
@@ -136,20 +137,18 @@ public:
             if (FocusFire_Timer <= diff)
             {
                 // Summon Focus Fire & Emote
-                Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM,1);
-                if (pTarget && pTarget->GetTypeId() == TYPEID_PLAYER && pTarget->isAlive())
+                Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1);
+                if (target && target->GetTypeId() == TYPEID_PLAYER && target->isAlive())
                 {
-                    FocusedTargetGUID = pTarget->GetGUID();
-                    me->SummonCreature(ENTRY_FOCUS_FIRE,pTarget->GetPositionX(),pTarget->GetPositionY(),pTarget->GetPositionZ(),0,TEMPSUMMON_TIMED_DESPAWN,5500);
+                    FocusedTargetGUID = target->GetGUID();
+                    me->SummonCreature(ENTRY_FOCUS_FIRE, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN, 5500);
 
                     // TODO: Find better way to handle emote
                     // Emote
-                    std::string *emote = new std::string(EMOTE_FOCUSES_ON);
-                    emote->append(pTarget->GetName());
-                    emote->append("!");
-                    const char* text = emote->c_str();
-                    me->MonsterTextEmote(text, 0, true);
-                    delete emote;
+                    std::string emote(EMOTE_FOCUSES_ON);
+                    emote.append(target->GetName());
+                    emote.push_back('!');
+                    me->MonsterTextEmote(emote.c_str(), 0, true);
                 }
                 FocusFire_Timer = 15000+(rand()%5000);
             } else FocusFire_Timer -= diff;
@@ -160,20 +159,19 @@ public:
 
 };
 
-
 class mob_focus_fire : public CreatureScript
 {
 public:
     mob_focus_fire() : CreatureScript("mob_focus_fire") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new mob_focus_fireAI (pCreature);
+        return new mob_focus_fireAI (creature);
     }
 
     struct mob_focus_fireAI : public ScriptedAI
     {
-        mob_focus_fireAI(Creature *c) : ScriptedAI(c)
+        mob_focus_fireAI(Creature* creature) : ScriptedAI(creature)
         {
         }
 
@@ -186,7 +184,7 @@ public:
             fiery1 = fiery2 = true;
         }
 
-        void EnterCombat(Unit * /*who*/)
+        void EnterCombat(Unit* /*who*/)
         { }
 
         void UpdateAI(const uint32 diff)
@@ -211,7 +209,6 @@ public:
     };
 
 };
-
 
 void AddSC_boss_shirrak_the_dead_watcher()
 {

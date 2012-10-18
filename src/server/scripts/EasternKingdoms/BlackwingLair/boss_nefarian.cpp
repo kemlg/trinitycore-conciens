@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,56 +23,63 @@ SDComment: Some issues with class calls effecting more than one class
 SDCategory: Blackwing Lair
 EndScriptData */
 
-#include "ScriptPCH.h"
+#include "ScriptMgr.h"
+#include "ScriptedCreature.h"
 
-#define SAY_AGGRO               -1469007
-#define SAY_XHEALTH             -1469008
-#define SAY_SHADOWFLAME         -1469009
-#define SAY_RAISE_SKELETONS     -1469010
-#define SAY_SLAY                -1469011
-#define SAY_DEATH               -1469012
+enum Say
+{
+    SAY_AGGRO               = -1469007,
+    SAY_XHEALTH             = -1469008,
+    SAY_SHADOWFLAME         = -1469009,
+    SAY_RAISE_SKELETONS     = -1469010,
+    SAY_SLAY                = -1469011,
+    SAY_DEATH               = -1469012,
 
-#define SAY_MAGE                -1469013
-#define SAY_WARRIOR             -1469014
-#define SAY_DRUID               -1469015
-#define SAY_PRIEST              -1469016
-#define SAY_PALADIN             -1469017
-#define SAY_SHAMAN              -1469018
-#define SAY_WARLOCK             -1469019
-#define SAY_HUNTER              -1469020
-#define SAY_ROGUE               -1469021
+    SAY_MAGE                = -1469013,
+    SAY_WARRIOR             = -1469014,
+    SAY_DRUID               = -1469015,
+    SAY_PRIEST              = -1469016,
+    SAY_PALADIN             = -1469017,
+    SAY_SHAMAN              = -1469018,
+    SAY_WARLOCK             = -1469019,
+    SAY_HUNTER              = -1469020,
+    SAY_ROGUE               = -1469021
+};
 
-#define SPELL_SHADOWFLAME_INITIAL   22972
-#define SPELL_SHADOWFLAME           22539
-#define SPELL_BELLOWINGROAR         22686
-#define SPELL_VEILOFSHADOW          7068
-#define SPELL_CLEAVE                20691
-#define SPELL_TAILLASH              23364
-#define SPELL_BONECONTRUST          23363                   //23362, 23361
+enum Spells
+{
+    SPELL_SHADOWFLAME_INITIAL   = 22972,
+    SPELL_SHADOWFLAME           = 22539,
+    SPELL_BELLOWINGROAR         = 22686,
+    SPELL_VEILOFSHADOW          = 7068,
+    SPELL_CLEAVE                = 20691,
+    SPELL_TAILLASH              = 23364,
+    SPELL_BONECONTRUST          = 23363,     //23362, 23361
 
-#define SPELL_MAGE                  23410                   //wild magic
-#define SPELL_WARRIOR               23397                   //beserk
-#define SPELL_DRUID                 23398                   // cat form
-#define SPELL_PRIEST                23401                   // corrupted healing
-#define SPELL_PALADIN               23418                   //syphon blessing
-#define SPELL_SHAMAN                23425                   //totems
-#define SPELL_WARLOCK               23427                   //infernals
-#define SPELL_HUNTER                23436                   //bow broke
-#define SPELL_ROGUE                 23414                   //Paralise
+    SPELL_MAGE                  = 23410,     //wild magic
+    SPELL_WARRIOR               = 23397,     //beserk
+    SPELL_DRUID                 = 23398,     // cat form
+    SPELL_PRIEST                = 23401,     // corrupted healing
+    SPELL_PALADIN               = 23418,     //syphon blessing
+    SPELL_SHAMAN                = 23425,     //totems
+    SPELL_WARLOCK               = 23427,     //infernals
+    SPELL_HUNTER                = 23436,     //bow broke
+    SPELL_ROGUE                 = 23414     //Paralise
+};
 
 class boss_nefarian : public CreatureScript
 {
 public:
     boss_nefarian() : CreatureScript("boss_nefarian") { }
 
-    CreatureAI* GetAI(Creature* pCreature) const
+    CreatureAI* GetAI(Creature* creature) const
     {
-        return new boss_nefarianAI (pCreature);
+        return new boss_nefarianAI (creature);
     }
 
     struct boss_nefarianAI : public ScriptedAI
     {
-        boss_nefarianAI(Creature *c) : ScriptedAI(c) {}
+        boss_nefarianAI(Creature* creature) : ScriptedAI(creature) {}
 
         uint32 ShadowFlame_Timer;
         uint32 BellowingRoar_Timer;
@@ -86,12 +93,12 @@ public:
 
         void Reset()
         {
-            ShadowFlame_Timer = 12000;                          //These times are probably wrong
+            ShadowFlame_Timer = 12000;                          // These times are probably wrong
             BellowingRoar_Timer = 30000;
             VeilOfShadow_Timer = 15000;
             Cleave_Timer = 7000;
             TailLash_Timer = 10000;
-            ClassCall_Timer = 35000;                            //35-40 seconds
+            ClassCall_Timer = 35000;                            // 35-40 seconds
             Phase3 = false;
 
             DespawnTimer = 5000;
@@ -105,14 +112,14 @@ public:
             DoScriptText(SAY_SLAY, me, Victim);
         }
 
-        void JustDied(Unit* /*Killer*/)
+        void JustDied(Unit* /*killer*/)
         {
             DoScriptText(SAY_DEATH, me);
         }
 
-        void EnterCombat(Unit * who)
+        void EnterCombat(Unit* who)
         {
-            DoScriptText(RAND(SAY_XHEALTH,SAY_AGGRO,SAY_SHADOWFLAME), me);
+            DoScriptText(RAND(SAY_XHEALTH, SAY_AGGRO, SAY_SHADOWFLAME), me);
 
             DoCast(who, SPELL_SHADOWFLAME_INITIAL);
             DoZoneInCombat();
@@ -123,7 +130,7 @@ public:
             if (DespawnTimer <= diff)
             {
                 if (!UpdateVictim())
-                    me->ForcedDespawn();
+                    me->DespawnOrUnsummon();
                 DespawnTimer = 5000;
             } else DespawnTimer -= diff;
 
@@ -174,7 +181,7 @@ public:
                 //On official it is based on what classes are currently on the hostil list
                 //but we can't do that yet so just randomly call one
 
-                switch (urand(0,8))
+                switch (urand(0, 8))
                 {
                     case 0:
                         DoScriptText(SAY_MAGE, me);
@@ -227,7 +234,6 @@ public:
             DoMeleeAttackIfReady();
         }
     };
-
 };
 
 void AddSC_boss_nefarian()
