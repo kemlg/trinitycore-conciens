@@ -24,16 +24,9 @@
 #include "ArenaTeamMgr.h"
 
 ArenaTeam::ArenaTeam()
+    : TeamId(0), Type(0), TeamName(), CaptainGuid(0), BackgroundColor(0), EmblemStyle(0), EmblemColor(0),
+    BorderStyle(0), BorderColor(0)
 {
-    TeamId            = 0;
-    Type              = 0;
-    TeamName          = "";
-    CaptainGuid       = 0;
-    BackgroundColor   = 0;
-    EmblemStyle       = 0;
-    EmblemColor       = 0;
-    BorderStyle       = 0;
-    BorderColor       = 0;
     Stats.WeekGames   = 0;
     Stats.SeasonGames = 0;
     Stats.Rank        = 0;

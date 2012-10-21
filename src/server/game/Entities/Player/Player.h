@@ -114,7 +114,7 @@ struct PlayerTalent
 // Spell modifier (used for modify other spells)
 struct SpellModifier
 {
-    SpellModifier(Aura* _ownerAura = NULL) : charges(0), ownerAura(_ownerAura) {}
+    SpellModifier(Aura* _ownerAura = NULL) : op(SPELLMOD_DAMAGE), type(SPELLMOD_FLAT), charges(0), value(0), mask(), spellId(0), ownerAura(_ownerAura) {}
     SpellModOp   op   : 8;
     SpellModType type : 8;
     int16 charges     : 16;
@@ -299,7 +299,7 @@ struct Areas
 enum RuneCooldowns
 {
     RUNE_BASE_COOLDOWN  = 10000,
-    RUNE_MISS_COOLDOWN  = 1500,     // cooldown applied on runes when the spell misses
+    RUNE_MISS_COOLDOWN  = 1500     // cooldown applied on runes when the spell misses
 };
 
 enum RuneType
@@ -399,7 +399,7 @@ enum PlayerFlags
     PLAYER_FLAGS_UNK28             = 0x10000000,
     PLAYER_FLAGS_UNK29             = 0x20000000,
     PLAYER_FLAGS_UNK30             = 0x40000000,
-    PLAYER_FLAGS_UNK31             = 0x80000000,
+    PLAYER_FLAGS_UNK31             = 0x80000000
 };
 
 // used for PLAYER__FIELD_KNOWN_TITLES field (uint64), (1<<bit_index) without (-1)
@@ -672,7 +672,7 @@ enum TradeSlots
     TRADE_SLOT_COUNT            = 7,
     TRADE_SLOT_TRADED_COUNT     = 6,
     TRADE_SLOT_NONTRADED        = 6,
-    TRADE_SLOT_INVALID          = -1,
+    TRADE_SLOT_INVALID          = -1
 };
 
 enum TransferAbortReason
@@ -692,7 +692,7 @@ enum TransferAbortReason
     TRANSFER_ABORT_NOT_FOUND2               = 0x0D,         // 3.1
     TRANSFER_ABORT_NOT_FOUND3               = 0x0E,         // 3.2
     TRANSFER_ABORT_REALM_ONLY               = 0x0F,         // All players on party must be from the same realm.
-    TRANSFER_ABORT_MAP_NOT_ALLOWED          = 0x10,         // Map can't be entered at this time.
+    TRANSFER_ABORT_MAP_NOT_ALLOWED          = 0x10          // Map can't be entered at this time.
 };
 
 enum InstanceResetWarningType
@@ -739,7 +739,7 @@ enum TeleportToOptions
     TELE_TO_NOT_LEAVE_TRANSPORT = 0x02,
     TELE_TO_NOT_LEAVE_COMBAT    = 0x04,
     TELE_TO_NOT_UNSUMMON_PET    = 0x08,
-    TELE_TO_SPELL               = 0x10,
+    TELE_TO_SPELL               = 0x10
 };
 
 /// Type of environmental damages
@@ -761,7 +761,7 @@ enum PlayerChatTag
     CHAT_TAG_DND        = 0x02,
     CHAT_TAG_GM         = 0x04,
     CHAT_TAG_COM        = 0x08, // Commentator
-    CHAT_TAG_DEV        = 0x10,
+    CHAT_TAG_DEV        = 0x10
 };
 
 enum PlayedTimeIndex
@@ -807,7 +807,7 @@ enum PlayerLoginQueryIndex
     PLAYER_LOGIN_QUERY_LOADQUESTSTATUSREW       = 29,
     PLAYER_LOGIN_QUERY_LOADINSTANCELOCKTIMES    = 30,
     PLAYER_LOGIN_QUERY_LOADSEASONALQUESTSTATUS  = 31,
-    MAX_PLAYER_LOGIN_QUERY,
+    MAX_PLAYER_LOGIN_QUERY
 };
 
 enum PlayerDelayedOperations
@@ -896,6 +896,16 @@ enum PlayerRestState
     REST_STATE_RAF_LINKED                            = 0x06
 };
 
+enum PlayerCommandStates
+{
+    CHEAT_NONE      = 0x00,
+    CHEAT_GOD       = 0x01,
+    CHEAT_CASTTIME  = 0x02,
+    CHEAT_COOLDOWN  = 0x04,
+    CHEAT_POWER     = 0x08,
+    CHEAT_WATERWALK = 0x10
+};
+
 class PlayerTaxi
 {
     public:
@@ -981,7 +991,7 @@ class TradeData
     public:                                                 // constructors
         TradeData(Player* player, Player* trader) :
             m_player(player),  m_trader(trader), m_accepted(false), m_acceptProccess(false),
-            m_money(0), m_spell(0) {}
+            m_money(0), m_spell(0), m_spellCastItem(0) { memset(m_items, 0, TRADE_SLOT_COUNT * sizeof(uint64)); }
 
         Player* GetTrader() const { return m_trader; }
         TradeData* GetTraderData() const;
@@ -1147,6 +1157,11 @@ class Player : public Unit, public GridObject<Player>
         void GiveLevel(uint8 level);
 
         void InitStatsForLevel(bool reapplyMods = false);
+
+        // .cheat command related
+        bool GetCommandStatus(uint32 command) const { return _activeCheats & command; }
+        void SetCommandStatusOn(uint32 command) { _activeCheats |= command; }
+        void SetCommandStatusOff(uint32 command) { _activeCheats &= ~command; }
 
         // Played Time Stuff
         time_t m_logintime;
@@ -2417,9 +2432,9 @@ class Player : public Unit, public GridObject<Player>
         Player* GetNextRandomRaidMember(float radius);
         PartyResult CanUninviteFromGroup() const;
 
-        // Battleground Group System
-        void SetBattlegroundRaid(Group* group, int8 subgroup = -1);
-        void RemoveFromBattlegroundRaid();
+        // Battleground / Battlefield Group System
+        void SetBattlegroundOrBattlefieldRaid(Group* group, int8 subgroup = -1);
+        void RemoveFromBattlegroundOrBattlefieldRaid();
         Group* GetOriginalGroup() { return m_originalGroup.getTarget(); }
         GroupReference& GetOriginalGroupRef() { return m_originalGroup; }
         uint8 GetOriginalSubGroup() const { return m_originalGroup.getSubGroup(); }
@@ -2854,6 +2869,8 @@ class Player : public Unit, public GridObject<Player>
         InstanceTimeMap _instanceResetTimes;
         uint32 _pendingBindId;
         uint32 _pendingBindTimer;
+
+        uint32 _activeCheats;
 };
 
 void AddItemsSetItem(Player*player, Item* item);

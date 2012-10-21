@@ -244,10 +244,18 @@ class instance_trial_of_the_crusader : public InstanceMapScript
                 switch (type)
                 {
                     case TYPE_JARAXXUS:
+                        // Cleanup Icehowl
+                        if (Creature* icehowl = instance->GetCreature(IcehowlGUID))
+                            icehowl->DespawnOrUnsummon();
                         if (data == DONE)
                             EventStage = 2000;
                         break;
                     case TYPE_CRUSADERS:
+                        // Cleanup Jaraxxus
+                        if (Creature* jaraxxus = instance->GetCreature(JaraxxusGUID))
+                            jaraxxus->DespawnOrUnsummon();
+                        if (Creature* fizzlebang = instance->GetCreature(FizzlebangGUID))
+                            fizzlebang->DespawnOrUnsummon();
                         switch (data)
                         {
                             case IN_PROGRESS:
@@ -267,6 +275,9 @@ class instance_trial_of_the_crusader : public InstanceMapScript
                         }
                         break;
                     case TYPE_VALKIRIES:
+                        // Cleanup chest
+                        if (GameObject* cache = instance->GetGameObject(CrusadersCacheGUID))
+                            cache->Delete();
                         switch (data)
                         {
                             case FAIL:
@@ -321,7 +332,8 @@ class instance_trial_of_the_crusader : public InstanceMapScript
                                 }
                                 if (tributeChest)
                                     if (Creature* tirion =  instance->GetCreature(TirionGUID))
-                                        if (GameObject* chest = tirion->SummonGameObject(tributeChest, 805.62f, 134.87f, 142.16f, 3.27f, 0, 0, 0, 0, 90000000))
+                                        // need proper location.this one is guessed based on videos
+                                        if (GameObject* chest = tirion->SummonGameObject(tributeChest, 643.814f, 136.027f, 141.295f, 0, 0, 0, 0, 0, 90000000))
                                             chest->SetRespawnTime(chest->GetRespawnDelay());
                                 break;
                         }

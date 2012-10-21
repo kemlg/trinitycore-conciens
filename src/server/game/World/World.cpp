@@ -77,6 +77,7 @@
 #include "WardenCheckMgr.h"
 #include "Warden.h"
 #include "CalendarMgr.h"
+#include "BattlefieldMgr.h"
 
 ACE_Atomic_Op<ACE_Thread_Mutex, bool> World::m_stopEvent = false;
 uint8 World::m_ExitCode = SHUTDOWN_EXIT_CODE;
@@ -1192,6 +1193,11 @@ void World::LoadConfigSettings(bool reload)
     m_bool_configs[CONFIG_AUTOBROADCAST] = ConfigMgr::GetBoolDefault("AutoBroadcast.On", false);
     m_int_configs[CONFIG_AUTOBROADCAST_CENTER] = ConfigMgr::GetIntDefault("AutoBroadcast.Center", 0);
     m_int_configs[CONFIG_AUTOBROADCAST_INTERVAL] = ConfigMgr::GetIntDefault("AutoBroadcast.Timer", 60000);
+    if (reload)
+    {
+        m_timers[WUPDATE_AUTOBROADCAST].SetInterval(m_int_configs[CONFIG_AUTOBROADCAST_INTERVAL]);
+        m_timers[WUPDATE_AUTOBROADCAST].Reset();
+    }
 
     // MySQL ping time interval
     m_int_configs[CONFIG_DB_PING_INTERVAL] = ConfigMgr::GetIntDefault("MaxPingTime", 30);
@@ -1201,6 +1207,14 @@ void World::LoadConfigSettings(bool reload)
     m_bool_configs[CONFIG_PDUMP_NO_OVERWRITE] = ConfigMgr::GetBoolDefault("PlayerDump.DisallowOverwrite", true);
 
     // call ScriptMgr if we're reloading the configuration
+    m_bool_configs[CONFIG_WINTERGRASP_ENABLE] = ConfigMgr::GetBoolDefault("Wintergrasp.Enable", false);
+    m_int_configs[CONFIG_WINTERGRASP_PLR_MAX] = ConfigMgr::GetIntDefault("Wintergrasp.PlayerMax", 100);
+    m_int_configs[CONFIG_WINTERGRASP_PLR_MIN] = ConfigMgr::GetIntDefault("Wintergrasp.PlayerMin", 0);
+    m_int_configs[CONFIG_WINTERGRASP_PLR_MIN_LVL] = ConfigMgr::GetIntDefault("Wintergrasp.PlayerMinLvl", 77);
+    m_int_configs[CONFIG_WINTERGRASP_BATTLETIME] = ConfigMgr::GetIntDefault("Wintergrasp.BattleTimer", 30);
+    m_int_configs[CONFIG_WINTERGRASP_NOBATTLETIME] = ConfigMgr::GetIntDefault("Wintergrasp.NoBattleTimer", 150);
+    m_int_configs[CONFIG_WINTERGRASP_RESTART_AFTER_CRASH] = ConfigMgr::GetIntDefault("Wintergrasp.CrashRestartTimer", 10);
+
     if (reload)
         sScriptMgr->OnConfigLoad(reload);
 }
@@ -1721,6 +1735,10 @@ void World::SetInitialWorldSettings()
     sLog->outInfo(LOG_FILTER_SERVER_LOADING, "Starting Outdoor PvP System");
     sOutdoorPvPMgr->InitOutdoorPvP();
 
+    ///- Initialize Battlefield
+    sLog->outInfo(LOG_FILTER_SERVER_LOADING, "Starting Battlefield System");
+    sBattlefieldMgr->InitBattlefield();
+
     sLog->outInfo(LOG_FILTER_SERVER_LOADING, "Loading Transports...");
     sMapMgr->LoadTransports();
 
@@ -1984,6 +2002,9 @@ void World::Update(uint32 diff)
 
     sOutdoorPvPMgr->Update(diff);
     RecordTimeDiff("UpdateOutdoorPvPMgr");
+
+    sBattlefieldMgr->Update(diff);
+    RecordTimeDiff("BattlefieldMgr");
 
     ///- Delete all characters which have been deleted X days before
     if (m_timers[WUPDATE_DELETECHARS].Passed())
@@ -2912,7 +2933,7 @@ void World::LoadCharacterNameData()
     QueryResult result = CharacterDatabase.Query("SELECT guid, name, race, gender, class FROM characters WHERE deleteDate IS NULL");
     if (!result)
     {
-        sLog->outError(LOG_FILTER_SQL, "No character name data loaded, empty query");
+        sLog->outInfo(LOG_FILTER_SERVER_LOADING, "No character name data loaded, empty query");
         return;
     }
 

@@ -30,6 +30,8 @@
 #include "CreatureAI.h"
 #include "MapManager.h"
 #include "BattlegroundIC.h"
+#include "BattlefieldWG.h"
+#include "BattlefieldMgr.h"
 
 bool IsPrimaryProfessionSkill(uint32 skill)
 {
@@ -1120,10 +1122,20 @@ bool SpellArea::IsFitToRequirements(Player const* player, uint32 newZone, uint32
                 return false;
             break;
         }
+        case 58730: // No fly Zone - Wintergrasp
+        {
+            if (!player)
+                return false;
+
+            Battlefield* Bf = sBattlefieldMgr->GetBattlefieldToZoneId(player->GetZoneId());
+            if (!Bf || Bf->CanFlyIn() || (!player->HasAuraType(SPELL_AURA_MOD_INCREASE_MOUNTED_FLIGHT_SPEED) && !player->HasAuraType(SPELL_AURA_FLY)))
+                return false;
+            break;
+        }
         case 68719: // Oil Refinery - Isle of Conquest.
         case 68720: // Quarry - Isle of Conquest.
         {
-            if (player->GetBattlegroundTypeId() != BATTLEGROUND_IC || !player->GetBattleground())
+            if (!player || player->GetBattlegroundTypeId() != BATTLEGROUND_IC || !player->GetBattleground())
                 return false;
 
             uint8 nodeType = spellId == 68719 ? NODE_TYPE_REFINERY : NODE_TYPE_QUARRY;
@@ -1135,6 +1147,46 @@ bool SpellArea::IsFitToRequirements(Player const* player, uint32 newZone, uint32
 
             return false;
         }
+        case 56618: // Horde Controls Factory Phase Shift
+        case 56617: // Alliance Controls Factory Phase Shift
+            {
+                if (!player)
+                    return false;
+
+                Battlefield* bf = sBattlefieldMgr->GetBattlefieldToZoneId(player->GetZoneId());
+
+                if (!bf || bf->GetTypeId() != BATTLEFIELD_WG)
+                    return false;
+
+                // team that controls the workshop in the specified area
+                uint32 team = bf->GetData(newArea);
+
+                if (team == TEAM_HORDE)
+                    return spellId == 56618;
+                else if (team == TEAM_ALLIANCE)
+                    return spellId == 56617;
+            }
+            break;
+        case 57940: // Essence of Wintergrasp - Northrend
+        case 58045: // Essence of Wintergrasp - Wintergrasp
+        {
+            if (!player)
+                return false;
+
+            if (Battlefield* battlefieldWG = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG))
+                return battlefieldWG->IsEnabled() && (player->GetTeamId() == battlefieldWG->GetDefenderTeam()) && !battlefieldWG->IsWarTime();
+            break;
+        }
+        case 74411: // Battleground - Dampening
+        {
+            if (!player)
+                return false;
+
+            if (Battlefield* bf = sBattlefieldMgr->GetBattlefieldToZoneId(player->GetZoneId()))
+                return bf->IsWarTime();
+            break;
+        }
+
     }
 
     return true;
@@ -3211,6 +3263,22 @@ void SpellMgr::LoadDbcDataCorrections()
                         // this needs research on modifier applying rules, does not seem to be in Attributes fields
                 spellInfo->EffectSpellClassMask[0] = flag96(0x00000040, 0x00000000, 0x00000000);
                 break;
+            case 64949: // Idol of the Flourishing Life
+                spellInfo->EffectSpellClassMask[EFFECT_0] = flag96(0x00000000, 0x02000000, 0x00000000);
+                spellInfo->EffectApplyAuraName[EFFECT_0] = SPELL_AURA_ADD_FLAT_MODIFIER;
+                break;
+            case 34231: // Libram of the Lightbringer
+            case 60792: // Libram of Tolerance
+            case 64956: // Libram of the Resolute
+                spellInfo->EffectSpellClassMask[EFFECT_0] = flag96(0x80000000, 0x00000000, 0x00000000);
+                spellInfo->EffectApplyAuraName[EFFECT_0] = SPELL_AURA_ADD_FLAT_MODIFIER;
+                break;
+            case 28851: // Libram of Light
+            case 28853: // Libram of Divinity
+            case 32403: // Blessed Book of Nagrand
+                spellInfo->EffectSpellClassMask[EFFECT_0] = flag96(0x40000000, 0x00000000, 0x00000000);
+                spellInfo->EffectApplyAuraName[EFFECT_0] = SPELL_AURA_ADD_FLAT_MODIFIER;
+                break;
             case 45602: // Ride Carpet
                 spellInfo->EffectBasePoints[EFFECT_0] = 0; // force seat 0, vehicle doesn't have the required seat flags for "no seat specified (-1)"
                 break;
@@ -3353,6 +3421,9 @@ void SpellMgr::LoadDbcDataCorrections()
                 break;
             case 71159: // Awaken Plagued Zombies
                 spellInfo->DurationIndex = 21;
+                break;
+            case 70530: // Volatile Ooze Beam Protection (Professor Putricide)
+                spellInfo->Effect[0] = SPELL_EFFECT_APPLY_AURA; // for an unknown reason this was SPELL_EFFECT_APPLY_AREA_AURA_RAID
                 break;
             // THIS IS HERE BECAUSE COOLDOWN ON CREATURE PROCS IS NOT IMPLEMENTED
             case 71604: // Mutated Strength (Professor Putricide)
