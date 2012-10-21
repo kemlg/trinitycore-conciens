@@ -972,7 +972,7 @@ void ScriptMgr::OnGameObjectStateChanged(GameObject* go, uint32 state)
 {
     ASSERT(go);
 
-    eb->sendEvent(EVENT_TYPE_OBJECT_DESTROYED,player,NULL,eventId,NULL,NULL,NULL,NULL,NULL,NULL,go);
+    eb->sendEvent(EVENT_TYPE_OBJECT_CHANGED,NULL,NULL,state,NULL,NULL,NULL,NULL,NULL,NULL,go);
     GET_SCRIPT(GameObjectScript, go->GetScriptId(), tmpscript);
     tmpscript->OnGameObjectStateChanged(go, state);
 }
@@ -1243,7 +1243,7 @@ void ScriptMgr::OnPlayerKilledByCreature(Creature* killer, Player* killed)
 
 void ScriptMgr::OnPlayerLevelChanged(Player* player, uint8 oldLevel)
 {
-    eb->sendEvent(EVENT_TYPE_LEVEL_CHANGED,player,NULL,(uint32)newLevel);
+    eb->sendEvent(EVENT_TYPE_LEVEL_CHANGED,player,NULL,(uint32)oldLevel);
     FOREACH_SCRIPT(PlayerScript)->OnLevelChanged(player, oldLevel);
 }
 

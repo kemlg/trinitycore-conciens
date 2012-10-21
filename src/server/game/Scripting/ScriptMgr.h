@@ -1039,16 +1039,15 @@ class ScriptMgr
 
     public: /* Scheduled scripts */
 
-    // cOncienS
-    private:
-        EventBridge*	eb;
-
         uint32 IncreaseScheduledScriptsCount() { return ++_scheduledScripts; }
         uint32 DecreaseScheduledScriptCount() { return --_scheduledScripts; }
         uint32 DecreaseScheduledScriptCount(size_t count) { return _scheduledScripts -= count; }
         bool IsScriptScheduled() const { return _scheduledScripts > 0; }
 
     private:
+
+    	// cOncienS
+        EventBridge*	eb;
 
         uint32 _scriptCount;
 
