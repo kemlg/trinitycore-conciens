@@ -25,7 +25,7 @@
 #include "Item.h"
 
 // Event Types
-enum EventTypes
+enum ConciensEventTypes
 {
 	EVENT_TYPE_EMOTE,							//  0
 	EVENT_TYPE_ITEM_USE,						//  1
@@ -46,7 +46,7 @@ enum EventTypes
 	EVENT_TYPE_QUEST_COMPLETE_OBJECT,			// 16
 	EVENT_TYPE_QUEST_REWARD_OBJECT,				// 17
 	EVENT_TYPE_GET_DIALOG_STATUS_OBJECT,		// 18
-	EVENT_TYPE_OBJECT_DESTROYED,				// 19
+	EVENT_TYPE_OBJECT_CHANGED,				// 19
 	EVENT_TYPE_OBJECT_UPDATE,					// 20
 	EVENT_TYPE_AREA_TRIGGER,					// 21
 	EVENT_TYPE_WEATHER_CHANGE,					// 22
@@ -69,7 +69,7 @@ public:
 	virtual ~EventBridge();
 	void sendMessage(char*);
 	void sendEvent(const int event_type, const Player* player, const Creature* creature = NULL, const uint32 num = NULL,
-		const Item* item = NULL, const Quest* quest = NULL, const SpellCastTargets* targets = NULL, const ItemPrototype *proto = NULL,
+		const Item* item = NULL, const Quest* quest = NULL, const SpellCastTargets* targets = NULL, const ItemTemplate *proto = NULL,
 		const uint32 num2 = NULL, const char* st = NULL, const GameObject* go = NULL, const AreaTriggerEntry* area = NULL,
 		const Weather* weather = NULL, const int state = NULL, const float grade = NULL, const Player* other = NULL);
 

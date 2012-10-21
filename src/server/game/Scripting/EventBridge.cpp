@@ -44,18 +44,18 @@ void* processMessages(void* ptr)
 			connect(sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
 			if(sock < 1)
 			{
-				sLog->outBasic("EventBridge: sockin < 1");
+				sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockin < 1");
 			}
 			else
 			{
-				sLog->outBasic("EventBridge: sockin >= 1");
+				sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockin >= 1");
 			}
 		}
 		else
 		{
 			recv_data[bytes_recieved] = '\n';
 			recv_data[bytes_recieved+1] = '\0';
-			sLog->outBasic("EventBridgeThread [%s]", recv_data);
+			sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridgeThread [%s]", recv_data);
 		}
 
 		//if (strcmp(recv_data, "q") == 0 || strcmp(recv_data, "Q") == 0)
@@ -89,11 +89,11 @@ void EventBridge::createSocketIn()
 	connect(sockin, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
 	if(sockin < 1)
 	{
-		sLog->outBasic("EventBridge: sockin < 1");
+		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockin < 1");
 	}
 	else
 	{
-		sLog->outBasic("EventBridge: sockin >= 1");
+		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockin >= 1");
 	}
 }
 
@@ -114,11 +114,11 @@ void EventBridge::createSocketOut()
 	connect(sockout, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
 	if(sockout < 1)
 	{
-		sLog->outBasic("EventBridge: sockout < 1");
+		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockout < 1");
 	}
 	else
 	{
-		sLog->outBasic("EventBridge: sockout >= 1");
+		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockout >= 1");
 	}
 }
 
@@ -133,7 +133,7 @@ EventBridge::EventBridge()
 	pthread_t			thread1;
 	int					iret;
 
-	sLog->outBasic("EventBridge: Starting EventBridge...");
+	sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: Starting EventBridge...");
 
 	this->createSocket();
 
@@ -173,7 +173,7 @@ void EventBridge::sendMessage(char* send_data)
 }
 
 void EventBridge::sendEvent(const int event_type, const Player* player, const Creature* creature, const uint32 num,
-	const Item* item, const Quest* quest, const SpellCastTargets* targets, const ItemPrototype *proto,
+	const Item* item, const Quest* quest, const SpellCastTargets* targets, const ItemTemplate *proto,
 	const uint32 num2, const char* st, const GameObject* go, const AreaTriggerEntry* area,
 	const Weather* weather, const int state, const float grade, const Player* other)
 {
@@ -236,7 +236,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 		sprintf(msg, "QUEST_ACCEPT_OBJECT|%llu|%llu|%lu", player->GetGUID(), go->GetGUID(), quest->GetQuestId());
 		break;
 	case EVENT_TYPE_ITEM_USE: // TODO: Verify use of targets info
-		sprintf(msg, "ITEM_USE|%llu|%llu|%llu", player->GetGUID(), item->GetGUID(), targets->getUnitTarget()->GetGUID());
+		sprintf(msg, "ITEM_USE|%llu|%llu|%llu", player->GetGUID(), item->GetGUID(), targets->GetUnitTarget()->GetGUID());
 		break;
 	case EVENT_TYPE_ITEM_EXPIRE:
 		sprintf(msg, "ITEM_EXPIRE|%llu|%lu", player->GetGUID(), proto->ItemId);
@@ -271,8 +271,8 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	case EVENT_TYPE_GET_DIALOG_STATUS_OBJECT:
 		sprintf(msg, "GET_DIALOG_STATUS_OBJECT|%llu|%llu", player->GetGUID(), go->GetGUID());
 		break;
-	case EVENT_TYPE_OBJECT_DESTROYED:
-		sprintf(msg, "OBJECT_DESTROYED|%llu|%llu|%lu", player->GetGUID(), go->GetGUID(), num);
+	case EVENT_TYPE_OBJECT_CHANGED:
+		sprintf(msg, "OBJECT_CHANGED|%llu|%lu", go->GetGUID(), num);
 		break;
 	default:
 		sprintf(msg, "UNDEF|%d", event_type);
@@ -281,7 +281,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 
 	if(done)
 	{
-		sLog->outBasic("Sending: [%s]", msg);
+		sLog->outInfo(LOG_FILTER_NETWORKIO, "Sending: [%s]", msg);
 		this->sendMessage(msg);
 	}
 }
