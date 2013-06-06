@@ -52,11 +52,11 @@ enum Spells
 
 enum Events
 {
-    EVENT_FROST_ATTACK             = 0,
-    EVENT_ARCANE_BLAST             = 1,
-    EVENT_DRAGONS_BREATH           = 2,
-    EVENT_KNOCKBACK                = 3,
-    EVENT_SOLARBURN                = 4
+    EVENT_FROST_ATTACK             = 1,
+    EVENT_ARCANE_BLAST             = 2,
+    EVENT_DRAGONS_BREATH           = 3,
+    EVENT_KNOCKBACK                = 4,
+    EVENT_SOLARBURN                = 5
 };
 
 class boss_nethermancer_sepethrea : public CreatureScript
@@ -91,7 +91,7 @@ class boss_nethermancer_sepethrea : public CreatureScript
                 Talk(SAY_DEATH);
             }
 
-            void UpdateAI(uint32 const diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -177,7 +177,7 @@ class mob_ragin_flames : public CreatureScript
                 {
                 }
 
-                void UpdateAI(const uint32 diff)
+                void UpdateAI(uint32 diff)
                 {
                     //Check_Timer
                     if (Check_Timer <= diff)

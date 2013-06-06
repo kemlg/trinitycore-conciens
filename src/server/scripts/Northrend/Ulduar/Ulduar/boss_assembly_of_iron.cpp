@@ -122,9 +122,11 @@ enum AssemblyYells
     EMOTE_BRUNDIR_OVERLOAD                      = 7
 };
 
-enum AssemblyNPCs
+enum Misc
 {
-    NPC_WORLD_TRIGGER                            = 22515
+    NPC_WORLD_TRIGGER                            = 22515,
+
+    DATA_PHASE_3                                 = 1
 };
 
 #define FLOOR_Z                                  427.28f
@@ -158,7 +160,15 @@ class boss_steelbreaker : public CreatureScript
                 events.ScheduleEvent(EVENT_FUSION_PUNCH, 15000);
             }
 
-            void DoAction(int32 const action)
+            uint32 GetData(uint32 type) const
+            {
+                if (type == DATA_PHASE_3)
+                    return (phase >= 3) ? 1 : 0;
+
+                return 0;
+            }
+
+            void DoAction(int32 action)
             {
                 switch (action)
                 {
@@ -184,7 +194,7 @@ class boss_steelbreaker : public CreatureScript
 
                 if (instance->GetBossState(BOSS_ASSEMBLY_OF_IRON) == DONE)
                 {
-                    DoCastAOE(SPELL_KILL_CREDIT);
+                    DoCastAOE(SPELL_KILL_CREDIT, true);
                     Talk(SAY_STEELBREAKER_ENCOUNTER_DEFEATED);
                 }
                 else
@@ -212,7 +222,7 @@ class boss_steelbreaker : public CreatureScript
                     DoCast(me, SPELL_ELECTRICAL_CHARGE);
             }
 
-            void UpdateAI(uint32 const diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -287,7 +297,15 @@ class boss_runemaster_molgeim : public CreatureScript
                 events.ScheduleEvent(EVENT_RUNE_OF_POWER, 20000);
             }
 
-            void DoAction(int32 const action)
+            uint32 GetData(uint32 type) const
+            {
+                if (type == DATA_PHASE_3)
+                    return (phase >= 3) ? 1 : 0;
+
+                return 0;
+            }
+
+            void DoAction(int32 action)
             {
                 switch (action)
                 {
@@ -313,7 +331,7 @@ class boss_runemaster_molgeim : public CreatureScript
 
                 if (instance->GetBossState(BOSS_ASSEMBLY_OF_IRON) == DONE)
                 {
-                    DoCastAOE(SPELL_KILL_CREDIT);
+                    DoCastAOE(SPELL_KILL_CREDIT, true);
                     Talk(SAY_MOLGEIM_ENCOUNTER_DEFEATED);
                 }
                 else
@@ -338,7 +356,7 @@ class boss_runemaster_molgeim : public CreatureScript
                     Talk(SAY_MOLGEIM_SLAY);
             }
 
-            void UpdateAI(uint32 const diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -429,6 +447,14 @@ class boss_stormcaller_brundir : public CreatureScript
                 me->ApplySpellImmune(0, IMMUNITY_MECHANIC, MECHANIC_STUN, false);       // Reset immumity, Brundir should be stunnable by default
             }
 
+            uint32 GetData(uint32 type) const
+            {
+                if (type == DATA_PHASE_3)
+                    return (phase >= 3) ? 1 : 0;
+
+                return 0;
+            }
+
             void EnterCombat(Unit* /*who*/)
             {
                 _EnterCombat();
@@ -440,7 +466,7 @@ class boss_stormcaller_brundir : public CreatureScript
                 events.ScheduleEvent(EVENT_OVERLOAD, urand(60000, 120000));
             }
 
-            void DoAction(int32 const action)
+            void DoAction(int32 action)
             {
                 switch (action)
                 {
@@ -470,7 +496,7 @@ class boss_stormcaller_brundir : public CreatureScript
 
                 if (instance->GetBossState(BOSS_ASSEMBLY_OF_IRON) == DONE)
                 {
-                    DoCastAOE(SPELL_KILL_CREDIT);
+                    DoCastAOE(SPELL_KILL_CREDIT, true);
                     Talk(SAY_BRUNDIR_ENCOUNTER_DEFEATED);
                 }
                 else
@@ -499,7 +525,7 @@ class boss_stormcaller_brundir : public CreatureScript
                     Talk(SAY_BRUNDIR_SLAY);
             }
 
-            void UpdateAI(uint32 const diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -697,6 +723,17 @@ class spell_assembly_rune_of_summoning : public SpellScriptLoader
         }
 };
 
+class achievement_assembly_i_choose_you : public AchievementCriteriaScript
+{
+    public:
+        achievement_assembly_i_choose_you() : AchievementCriteriaScript("achievement_assembly_i_choose_you") { }
+
+        bool OnCheck(Player* /*player*/, Unit* target)
+        {
+            return target && target->GetAI()->GetData(DATA_PHASE_3);
+        }
+};
+
 void AddSC_boss_assembly_of_iron()
 {
     new boss_steelbreaker();
@@ -705,4 +742,5 @@ void AddSC_boss_assembly_of_iron()
     new spell_shield_of_runes();
     new spell_assembly_meltdown();
     new spell_assembly_rune_of_summoning();
+    new achievement_assembly_i_choose_you();
 }

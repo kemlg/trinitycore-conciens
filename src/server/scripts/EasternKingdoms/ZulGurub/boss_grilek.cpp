@@ -35,8 +35,8 @@ enum Spells
 
 enum Events
 {
-    EVENT_AVATAR                    = 0,
-    EVENT_GROUND_TREMOR             = 1
+    EVENT_AVATAR                    = 1,
+    EVENT_GROUND_TREMOR             = 2
 };
 
 class boss_grilek : public CreatureScript // grilek
@@ -64,7 +64,7 @@ class boss_grilek : public CreatureScript // grilek
                 events.ScheduleEvent(EVENT_GROUND_TREMOR, urand(15000, 25000));
             }
 
-            void UpdateAI(uint32 const diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;

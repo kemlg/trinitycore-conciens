@@ -19,7 +19,7 @@
 SDName: Boss salramm
 SDAuthor: Tartalo
 SD%Complete: 80
-SDComment: TODO: Intro
+SDComment: @todo Intro
 SDCategory:
 Script Data End */
 
@@ -96,7 +96,7 @@ public:
                  instance->SetData(DATA_SALRAMM_EVENT, IN_PROGRESS);
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff)
         {
             //Return since we have no target
             if (!UpdateVictim())

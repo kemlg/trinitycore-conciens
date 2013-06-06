@@ -162,7 +162,7 @@ public:
         {
             instance = creature->GetInstanceScript();
             if (!instance)
-                sLog->outError(LOG_FILTER_TSCR, "No Instance eye_of_cthunAI");
+                TC_LOG_ERROR(LOG_FILTER_TSCR, "No Instance eye_of_cthunAI");
 
             SetCombatMovement(false);
         }
@@ -230,7 +230,7 @@ public:
                         Spawned->AI()->AttackStart(target);
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff)
         {
             //Check if we have a target
             if (!UpdateVictim())
@@ -470,7 +470,7 @@ public:
 
             instance = creature->GetInstanceScript();
             if (!instance)
-                sLog->outError(LOG_FILTER_TSCR, "No Instance eye_of_cthunAI");
+                TC_LOG_ERROR(LOG_FILTER_TSCR, "No Instance eye_of_cthunAI");
         }
 
         InstanceScript* instance;
@@ -581,7 +581,7 @@ public:
             return (*j);
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff)
         {
             //Check if we have a target
             if (!UpdateVictim())
@@ -895,7 +895,7 @@ public:
             }
         }
 
-        void DoAction(const int32 param)
+        void DoAction(int32 param)
         {
             switch (param)
             {
@@ -955,7 +955,7 @@ public:
             DoZoneInCombat();
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff)
         {
             //Check if we have a target
             if (!UpdateVictim())
@@ -1030,7 +1030,7 @@ public:
             DoZoneInCombat();
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff)
         {
             //Check if we have a target
             if (!UpdateVictim())
@@ -1142,7 +1142,7 @@ public:
             DoZoneInCombat();
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff)
         {
             //Check if we have a target
             if (!UpdateVictim())
@@ -1255,7 +1255,7 @@ public:
             DoZoneInCombat();
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff)
         {
             //Check if we have a target
             if (!UpdateVictim())

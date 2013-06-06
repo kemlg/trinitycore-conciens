@@ -45,6 +45,7 @@ class AccountMgr
 
     private:
         AccountMgr();
+        ~AccountMgr();
 
     public:
         AccountOpResult CreateAccount(std::string username, std::string password);
@@ -62,10 +63,9 @@ class AccountMgr
         static std::string CalculateShaPassHash(std::string const& name, std::string const& password);
         static bool normalizeString(std::string& utf8String);
         static bool IsPlayerAccount(uint32 gmlevel);
-        static bool IsModeratorAccount(uint32 gmlevel);
-        static bool IsGMAccount(uint32 gmlevel);
         static bool IsAdminAccount(uint32 gmlevel);
         static bool IsConsoleAccount(uint32 gmlevel);
+        static bool HasPermission(uint32 accountId, uint32 permission, uint32 realmId);
 
         void UpdateAccountAccess(RBACData* rbac, uint32 accountId, uint8 securityLevel, int32 realmId);
 
@@ -77,12 +77,15 @@ class AccountMgr
         RBACGroupsContainer const& GetRBACGroupList() const { return _groups; }
         RBACRolesContainer const& GetRBACRoleList() const { return _roles; }
         RBACPermissionsContainer const& GetRBACPermissionList() const { return _permissions; }
+        RBACGroupContainer const& GetRBACDefaultGroups() const { return _defaultGroups; }
 
     private:
+        void ClearRBAC();
         RBACPermissionsContainer _permissions;
         RBACRolesContainer _roles;
         RBACGroupsContainer _groups;
-        RBACDefaultSecurityGroupContainer _defaultGroups;
+        RBACDefaultSecurityGroupContainer _defaultSecGroups;
+        RBACGroupContainer _defaultGroups;
 };
 
 #define sAccountMgr ACE_Singleton<AccountMgr, ACE_Null_Mutex>::instance()

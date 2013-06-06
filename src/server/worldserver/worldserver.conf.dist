@@ -18,6 +18,7 @@
 #    GAME MASTER SETTINGS
 #    VISIBILITY AND DISTANCES
 #    SERVER RATES
+#    STATS LIMITS
 #    AUTO BROADCAST
 #    BATTLEGROUND CONFIG
 #    BATTLEFIELD CONFIG
@@ -1054,7 +1055,7 @@ Event.Announce = 0
 
 #
 #    BeepAtStart
-#        Description: Beep when the world server finished starting (Unix/Linux systems).
+#        Description: Beep when the world server finished starting.
 #        Default:     1 - (Enabled)
 #                     0 - (Disabled)
 
@@ -1118,6 +1119,14 @@ DBC.EnforceItemAttributes = 1
 #        Default:     5
 
 AccountInstancesPerHour = 5
+
+#
+#   RBAC.DefaultGroups
+#        Description: Comma separated list of groups to be added to any account
+#                     Check auth.rbac_groups for correct ids
+#        Default:     "" (No group)
+
+RBAC.DefaultGroups = ""
 
 #
 ###################################################################################################
@@ -1192,13 +1201,6 @@ Warden.BanDuration = 86400
 ###################################################################################################
 # PLAYER INTERACTION
 #
-#    AllowTwoSide.Accounts
-#        Description: Allow creating characters of both factions on the same account.
-#        Default:     1 - (Enabled)
-#                     0 - (Disabled)
-
-AllowTwoSide.Accounts = 1
-
 #
 #    AllowTwoSide.Interaction.Calendar
 #        Description: Allow calendar invites between factions.
@@ -1206,14 +1208,6 @@ AllowTwoSide.Accounts = 1
 #                     1 - (Enabled)
 
 AllowTwoSide.Interaction.Calendar = 0
-
-#
-#    AllowTwoSide.Interaction.Chat
-#        Description: Allow say chat between factions.
-#        Default:     0 - (Disabled)
-#                     1 - (Enabled)
-
-AllowTwoSide.Interaction.Chat = 0
 
 #
 #    AllowTwoSide.Interaction.Channel
@@ -1246,30 +1240,6 @@ AllowTwoSide.Interaction.Guild = 0
 #                     1 - (Enabled)
 
 AllowTwoSide.Interaction.Auction = 0
-
-#
-#    AllowTwoSide.Interaction.Mail
-#        Description: Allow sending mails between factions.
-#        Default:     0 - (Disabled)
-#                     1 - (Enabled)
-
-AllowTwoSide.Interaction.Mail = 0
-
-#
-#    AllowTwoSide.WhoList
-#        Description: Show characters from both factions in the /who list.
-#        Default:     0 - (Disabled)
-#                     1 - (Enabled)
-
-AllowTwoSide.WhoList = 0
-
-#
-#    AllowTwoSide.AddFriend
-#        Description: Allow adding friends from other faction the friends list.
-#        Default:     0 - (Disabled)
-#                     1 - (Enabled)
-
-AllowTwoSide.AddFriend = 0
 
 #
 #    AllowTwoSide.Trade
@@ -1526,15 +1496,6 @@ ChatFlood.MuteTime = 10
 Channel.RestrictedLfg = 1
 
 #
-#    Channel.SilentlyGMJoin
-#        Description: Silently join GM characters to channels. If set to 1, channel kick and ban
-#                     commands issued by a GM will not be broadcasted.
-#        Default:     0 - (Disabled, Join with announcement)
-#                     1 - (Enabled, Join without announcement)
-
-Channel.SilentlyGMJoin = 0
-
-#
 #    ChatLevelReq.Channel
 #        Description: Level requirement for characters to be able to write in chat channels.
 #        Default:     1
@@ -1638,14 +1599,6 @@ GM.InGMList.Level = 3
 GM.InWhoList.Level = 3
 
 #
-#    GM.LogTrade
-#        Description: Include GM trade and trade slot enchanting operations in GM log.
-#        Default:     1 - (Enabled)
-#                     0 - (Disabled)
-
-GM.LogTrade = 1
-
-#
 #    GM.StartLevel
 #        Description: GM character starting level.
 #        Default:     1
@@ -1659,14 +1612,6 @@ GM.StartLevel = 1
 #                     1 - (Enabled)
 
 GM.AllowInvite = 0
-
-#
-#    GM.AllowFriend
-#        Description: Allow players to add GM characters to their friends list.
-#        Default:     0 - (Disabled)
-#                     1 - (Enabled)
-
-GM.AllowFriend = 0
 
 #
 #    GM.LowerSecurity
@@ -1875,20 +1820,6 @@ Rate.Auction.Cut     = 1
 Rate.Honor = 1
 
 #
-#    Rate.Mining.Amount
-#        Description: Rate for minimum/maximum times a deposit can be used.
-#        Default:     1
-
-Rate.Mining.Amount = 1
-
-#
-#    Rate.Mining.Next
-#        Description: Mining rates.
-#        Default:     Chance to to mine a deposit again.
-
-Rate.Mining.Next = 1
-
-#
 #    Rate.Talent
 #        Description: Talent point rate.
 #        Default:     1
@@ -2069,6 +2000,28 @@ Death.Bones.BattlegroundOrArena = 1
 #                     0 - (Disabled)
 
 Die.Command.Mode = 1
+
+#
+###################################################################################################
+
+###################################################################################################
+# STATS LIMITS
+#
+#    Stats.Limits.Enable
+#        Description: Enable or disable stats system
+#        Default:     0 - Disabled
+
+Stats.Limits.Enable = 0
+
+#
+#    Stats.Limit.[STAT]
+#        Description: Set percentage limit for dodge, parry, block and crit rating
+#        Default:     95.0 (95%)
+
+Stats.Limits.Dodge = 95.0
+Stats.Limits.Parry = 95.0
+Stats.Limits.Block = 95.0
+Stats.Limits.Crit  = 95.0
 
 #
 ###################################################################################################
@@ -2442,11 +2395,19 @@ CharDelete.Method = 0
 
 #
 #    CharDelete.MinLevel
-#        Description: Required level to use the unlinking method if enabled.
+#        Description: Required level to use the unlinking method if enabled for non-heroic classes.
 #        Default:     0  - (Same method for every level)
 #                     1+ - (Only characters with the specified level will use the unlinking method)
 
 CharDelete.MinLevel = 0
+
+#
+#    CharDelete.Heroic.MinLevel
+#        Description: Required level to use the unlinking method if enabled for heroic classes.
+#        Default:     0  - (Same method for every level)
+#                     1+ - (Only characters with the specified level will use the unlinking method)
+
+CharDelete.Heroic.MinLevel = 0
 
 #
 #    CharDelete.KeepDays
@@ -2781,6 +2742,8 @@ Appenders=Console Server GM DBErrors Char RA Warden Chat
 #                        40 - Server Loading
 #                        41 - Opcodes (just id and name sent / received)
 #                        42 - SOAP
+#                        43 - RBAC (Role Based Access Control)
+#                        44 - Cheat (used to log cheat attempts)
 #
 #                     LogLevel
 #                         0 - (Disabled)

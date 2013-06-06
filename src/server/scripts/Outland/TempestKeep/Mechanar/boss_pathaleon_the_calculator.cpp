@@ -54,11 +54,11 @@ enum Spells
 
 enum Events
 {
-    EVENT_SUMMON                   = 0,
-    EVENT_MANA_TAP                 = 1,
-    EVENT_ARCANE_TORRENT           = 2,
-    EVENT_DOMINATION               = 3,
-    EVENT_ARCANE_EXPLOSION         = 4
+    EVENT_SUMMON                   = 1,
+    EVENT_MANA_TAP                 = 2,
+    EVENT_ARCANE_TORRENT           = 3,
+    EVENT_DOMINATION               = 4,
+    EVENT_ARCANE_EXPLOSION         = 5
 };
 
 enum Creatures
@@ -106,7 +106,7 @@ class boss_pathaleon_the_calculator : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 const diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -189,7 +189,7 @@ class mob_nether_wraith : public CreatureScript
 
             void EnterCombat(Unit* /*who*/) {}
 
-            void UpdateAI(const uint32 diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!UpdateVictim())
                     return;

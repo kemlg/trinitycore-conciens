@@ -18,22 +18,16 @@
 #ifndef _TCSOAP_H
 #define _TCSOAP_H
 
-#include "Common.h"
-#include "World.h"
-#include "AccountMgr.h"
-#include "Log.h"
-
-#include "soapH.h"
-#include "soapStub.h"
-#include "stdsoap2.h"
+#include "Define.h"
 
 #include <ace/Semaphore.h>
 #include <ace/Task.h>
+#include <Threading.h>
 
 class TCSoapRunnable: public ACE_Based::Runnable
 {
     public:
-        TCSoapRunnable() { }
+        TCSoapRunnable() : m_host(""), m_port(0) { }
         void run();
         void setListenArguments(std::string host, uint16 port)
         {

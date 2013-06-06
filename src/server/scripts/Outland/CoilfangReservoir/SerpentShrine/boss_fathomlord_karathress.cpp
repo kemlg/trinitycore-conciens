@@ -222,7 +222,7 @@ public:
             StartEvent(who);
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff)
         {
             //Only if not incombat check if the event is started
             if (!me->isInCombat() && instance && instance->GetData(DATA_KARATHRESSEVENT))
@@ -372,7 +372,7 @@ public:
             }
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff)
         {
             //Only if not incombat check if the event is started
             if (!me->isInCombat() && instance && instance->GetData(DATA_KARATHRESSEVENT))
@@ -506,7 +506,7 @@ public:
             DoCast(me, SPELL_WINDFURY_WEAPON);
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff)
         {
             //Only if not incombat check if the event is started
             if (!me->isInCombat() && instance && instance->GetData(DATA_KARATHRESSEVENT))
@@ -542,27 +542,31 @@ public:
             if (Spitfire_Timer <= diff)
             {
                 DoCast(me, SPELL_SPITFIRE_TOTEM);
-                Unit* SpitfireTotem = Unit::GetUnit(*me, CREATURE_SPITFIRE_TOTEM);
-                if (SpitfireTotem)
-                {
-                    CAST_CRE(SpitfireTotem)->AI()->AttackStart(me->getVictim());
-                }
+                if (Unit* SpitfireTotem = Unit::GetUnit(*me, CREATURE_SPITFIRE_TOTEM))
+                    SpitfireTotem->ToCreature()->AI()->AttackStart(me->getVictim());
+
                 Spitfire_Timer = 60000;
-            } else Spitfire_Timer -= diff;
+            }
+            else
+                Spitfire_Timer -= diff;
 
             //PoisonCleansing_Timer
             if (PoisonCleansing_Timer <= diff)
             {
                 DoCast(me, SPELL_POISON_CLEANSING_TOTEM);
                 PoisonCleansing_Timer = 30000;
-            } else PoisonCleansing_Timer -= diff;
+            }
+            else
+                PoisonCleansing_Timer -= diff;
 
             //Earthbind_Timer
             if (Earthbind_Timer <= diff)
             {
                 DoCast(me, SPELL_EARTHBIND_TOTEM);
                 Earthbind_Timer = 45000;
-            } else Earthbind_Timer -= diff;
+            }
+            else
+                Earthbind_Timer -= diff;
 
             DoMeleeAttackIfReady();
         }
@@ -624,7 +628,7 @@ public:
             }
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff)
         {
             //Only if not incombat check if the event is started
             if (!me->isInCombat() && instance && instance->GetData(DATA_KARATHRESSEVENT))
@@ -665,17 +669,19 @@ public:
             {
                 //DoCast(me, SPELL_SUMMON_CYCLONE); // Doesn't work
                 Cyclone_Timer = 30000+rand()%10000;
-                Creature* Cyclone = me->SummonCreature(CREATURE_CYCLONE, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), float(rand()%5), TEMPSUMMON_TIMED_DESPAWN, 15000);
-                if (Cyclone)
+
+                if (Creature* Cyclone = me->SummonCreature(CREATURE_CYCLONE, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), float(rand()%5), TEMPSUMMON_TIMED_DESPAWN, 15000))
                 {
-                    CAST_CRE(Cyclone)->SetObjectScale(3.0f);
+                    Cyclone->SetObjectScale(3.0f);
                     Cyclone->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                     Cyclone->setFaction(me->getFaction());
                     Cyclone->CastSpell(Cyclone, SPELL_CYCLONE_CYCLONE, true);
                     if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                         Cyclone->AI()->AttackStart(target);
                 }
-            } else Cyclone_Timer -= diff;
+            }
+            else
+                Cyclone_Timer -= diff;
 
             //Heal_Timer
             if (Heal_Timer <= diff)
@@ -684,14 +690,14 @@ public:
                 Unit* unit = NULL;
 
                 while (unit == NULL || !unit->isAlive())
-                {
                     unit = selectAdvisorUnit();
-                }
 
                 if (unit && unit->isAlive())
                     DoCast(unit, SPELL_HEAL);
                 Heal_Timer = 60000;
-            } else Heal_Timer -= diff;
+            }
+            else
+                Heal_Timer -= diff;
 
             DoMeleeAttackIfReady();
         }

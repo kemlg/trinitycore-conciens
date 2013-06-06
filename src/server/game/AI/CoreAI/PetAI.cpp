@@ -40,7 +40,6 @@ int PetAI::Permissible(const Creature* creature)
 
 PetAI::PetAI(Creature* c) : CreatureAI(c), i_tracker(TIME_INTERVAL_LOOK)
 {
-    m_AllySet.clear();
     UpdateAllies();
 }
 
@@ -57,7 +56,7 @@ void PetAI::_stopAttack()
 {
     if (!me->isAlive())
     {
-        sLog->outDebug(LOG_FILTER_GENERAL, "Creature stoped attacking cuz his dead [guid=%u]", me->GetGUIDLow());
+        TC_LOG_DEBUG(LOG_FILTER_GENERAL, "Creature stoped attacking cuz his dead [guid=%u]", me->GetGUIDLow());
         me->GetMotionMaster()->Clear();
         me->GetMotionMaster()->MoveIdle();
         me->CombatStop();
@@ -74,7 +73,7 @@ void PetAI::_stopAttack()
     HandleReturnMovement();
 }
 
-void PetAI::UpdateAI(const uint32 diff)
+void PetAI::UpdateAI(uint32 diff)
 {
     if (!me->isAlive() || !me->GetCharmInfo())
         return;
@@ -98,7 +97,7 @@ void PetAI::UpdateAI(const uint32 diff)
 
         if (_needToStop())
         {
-            sLog->outDebug(LOG_FILTER_GENERAL, "Pet AI stopped attacking [guid=%u]", me->GetGUIDLow());
+            TC_LOG_DEBUG(LOG_FILTER_GENERAL, "Pet AI stopped attacking [guid=%u]", me->GetGUIDLow());
             _stopAttack();
             return;
         }
