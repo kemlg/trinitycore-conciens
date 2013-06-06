@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -38,12 +38,10 @@ enum Spells
 
 enum Yells
 {
-    SAY_AGGRO                                   = -1595026,
-    SAY_SLAY_1                                  = -1595027,
-    SAY_SLAY_2                                  = -1595028,
-    SAY_SLAY_3                                  = -1595029,
-    SAY_SPAWN                                   = -1595030,
-    SAY_DEATH                                   = -1595031
+    SAY_AGGRO                                   = 0,
+    SAY_SLAY                                    = 1,
+    SAY_SPAWN                                   = 2,
+    SAY_DEATH                                   = 3
 };
 
 class boss_meathook : public CreatureScript
@@ -62,7 +60,7 @@ public:
         {
             instance = creature->GetInstanceScript();
             if (instance)
-                DoScriptText(SAY_SPAWN, me);
+                Talk(SAY_SPAWN);
         }
 
         uint32 uiChainTimer;
@@ -83,7 +81,7 @@ public:
 
         void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(SAY_AGGRO, me);
+            Talk(SAY_AGGRO);
 
             if (instance)
                 instance->SetData(DATA_MEATHOOK_EVENT, IN_PROGRESS);
@@ -119,7 +117,7 @@ public:
 
         void JustDied(Unit* /*killer*/)
         {
-            DoScriptText(SAY_DEATH, me);
+            Talk(SAY_DEATH);
 
             if (instance)
                 instance->SetData(DATA_MEATHOOK_EVENT, DONE);
@@ -130,7 +128,7 @@ public:
             if (victim == me)
                 return;
 
-            DoScriptText(RAND(SAY_SLAY_1, SAY_SLAY_2, SAY_SLAY_3), me);
+            Talk(SAY_SLAY);
         }
     };
 

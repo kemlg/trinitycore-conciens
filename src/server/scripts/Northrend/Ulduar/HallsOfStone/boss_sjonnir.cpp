@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -44,11 +44,9 @@ enum Spells
 
 enum Yells
 {
-    SAY_AGGRO                                              = -1599011,
-    SAY_SLAY_1                                             = -1599012,
-    SAY_SLAY_2                                             = -1599013,
-    SAY_SLAY_3                                             = -1599014,
-    SAY_DEATH                                              = -1599015
+    SAY_AGGRO                                              = 0,
+    SAY_SLAY                                               = 1,
+    SAY_DEATH                                              = 2
 };
 
 #define EMOTE_GENERIC_FRENZY                               -1000002
@@ -132,7 +130,7 @@ public:
 
         void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(SAY_AGGRO, me);
+            Talk(SAY_AGGRO);
 
             uiEncounterTimer = 0;
 
@@ -217,7 +215,7 @@ public:
 
         void JustDied(Unit* /*killer*/)
         {
-            DoScriptText(SAY_DEATH, me);
+            Talk(SAY_DEATH);
             lSummons.DespawnAll();
 
             if (instance)
@@ -227,7 +225,7 @@ public:
         {
             if (victim == me)
                 return;
-            DoScriptText(RAND(SAY_SLAY_1, SAY_SLAY_2, SAY_SLAY_3), me);
+            Talk(SAY_SLAY);
         }
 
         void DoAction(int32 const action)
@@ -236,7 +234,7 @@ public:
                 ++abuseTheOoze;
         }
 
-        uint32 GetData(uint32 type)
+        uint32 GetData(uint32 type) const
         {
             if (type == DATA_ABUSE_THE_OOZE)
                 return abuseTheOoze;

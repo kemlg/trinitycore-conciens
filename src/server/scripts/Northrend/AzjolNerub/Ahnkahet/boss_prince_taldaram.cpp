@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -57,7 +57,7 @@ enum Yells
     SAY_SLAY                                      = 3,
     SAY_DEATH                                     = 4,
     SAY_FEED                                      = 5,
-    SAY_VANISH                                    = 6,
+    SAY_VANISH                                    = 6
 };
 enum CombatPhase
 {
@@ -140,8 +140,8 @@ public:
                         {
                             float angle, x, y;
                             angle = pSpheres[0]->GetAngle(pSphereTarget);
-                            x = pSpheres[0]->GetPositionX() + DATA_SPHERE_DISTANCE * cos(angle);
-                            y = pSpheres[0]->GetPositionY() + DATA_SPHERE_DISTANCE * sin(angle);
+                            x = pSpheres[0]->GetPositionX() + DATA_SPHERE_DISTANCE * std::cos(angle);
+                            y = pSpheres[0]->GetPositionY() + DATA_SPHERE_DISTANCE * std::sin(angle);
                             pSpheres[0]->GetMotionMaster()->MovePoint(0, x, y, pSpheres[0]->GetPositionZ());
                         }
                         if (IsHeroic())
@@ -154,12 +154,12 @@ public:
                             {
                                 float angle, x, y;
                                 angle = pSpheres[1]->GetAngle(pSphereTarget) + DATA_SPHERE_ANGLE_OFFSET;
-                                x = pSpheres[1]->GetPositionX() + DATA_SPHERE_DISTANCE/2 * cos(angle);
-                                y = pSpheres[1]->GetPositionY() + DATA_SPHERE_DISTANCE/2 * sin(angle);
+                                x = pSpheres[1]->GetPositionX() + DATA_SPHERE_DISTANCE/2 * std::cos(angle);
+                                y = pSpheres[1]->GetPositionY() + DATA_SPHERE_DISTANCE/2 * std::sin(angle);
                                 pSpheres[1]->GetMotionMaster()->MovePoint(0, x, y, pSpheres[1]->GetPositionZ());
                                 angle = pSpheres[2]->GetAngle(pSphereTarget) - DATA_SPHERE_ANGLE_OFFSET;
-                                x = pSpheres[2]->GetPositionX() + DATA_SPHERE_DISTANCE/2 * cos(angle);
-                                y = pSpheres[2]->GetPositionY() + DATA_SPHERE_DISTANCE/2 * sin(angle);
+                                x = pSpheres[2]->GetPositionX() + DATA_SPHERE_DISTANCE/2 * std::cos(angle);
+                                y = pSpheres[2]->GetPositionY() + DATA_SPHERE_DISTANCE/2 * std::sin(angle);
                                 pSpheres[2]->GetMotionMaster()->MovePoint(0, x, y, pSpheres[2]->GetPositionZ());
                             }
                         }
@@ -424,7 +424,7 @@ public:
 
 void AddSC_boss_taldaram()
 {
-    new boss_taldaram;
-    new mob_taldaram_flamesphere;
-    new prince_taldaram_sphere;
+    new boss_taldaram();
+    new mob_taldaram_flamesphere();
+    new prince_taldaram_sphere();
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -32,17 +32,13 @@ BattlegroundRV::BattlegroundRV()
     StartDelayTimes[BG_STARTING_EVENT_SECOND] = BG_START_DELAY_30S;
     StartDelayTimes[BG_STARTING_EVENT_THIRD]  = BG_START_DELAY_15S;
     StartDelayTimes[BG_STARTING_EVENT_FOURTH] = BG_START_DELAY_NONE;
-    // we must set messageIds
     StartMessageIds[BG_STARTING_EVENT_FIRST]  = LANG_ARENA_ONE_MINUTE;
     StartMessageIds[BG_STARTING_EVENT_SECOND] = LANG_ARENA_THIRTY_SECONDS;
     StartMessageIds[BG_STARTING_EVENT_THIRD]  = LANG_ARENA_FIFTEEN_SECONDS;
     StartMessageIds[BG_STARTING_EVENT_FOURTH] = LANG_ARENA_HAS_BEGUN;
 }
 
-BattlegroundRV::~BattlegroundRV()
-{
-
-}
+BattlegroundRV::~BattlegroundRV() { }
 
 void BattlegroundRV::PostUpdateImpl(uint32 diff)
 {
@@ -103,10 +99,7 @@ void BattlegroundRV::StartingEventOpenDoors()
 void BattlegroundRV::AddPlayer(Player* player)
 {
     Battleground::AddPlayer(player);
-    //create score and add it to map, default values are set in constructor
-    BattlegroundRVScore* sc = new BattlegroundRVScore;
-
-    PlayerScores[player->GetGUID()] = sc;
+    PlayerScores[player->GetGUID()] = new BattlegroundScore;
 
     UpdateWorldState(BG_RV_WORLD_STATE_A, GetAlivePlayersCountByTeam(ALLIANCE));
     UpdateWorldState(BG_RV_WORLD_STATE_H, GetAlivePlayersCountByTeam(HORDE));
@@ -144,16 +137,16 @@ void BattlegroundRV::HandleKillPlayer(Player* player, Player* killer)
 
 bool BattlegroundRV::HandlePlayerUnderMap(Player* player)
 {
-    player->TeleportTo(GetMapId(), 763.5f, -284, 28.276f, 2.422f, false);
+    player->TeleportTo(GetMapId(), 763.5f, -284, 28.276f, 2.422f);
     return true;
 }
 
-void BattlegroundRV::HandleAreaTrigger(Player* Source, uint32 Trigger)
+void BattlegroundRV::HandleAreaTrigger(Player* player, uint32 trigger)
 {
     if (GetStatus() != STATUS_IN_PROGRESS)
         return;
 
-    switch (Trigger)
+    switch (trigger)
     {
         case 5224:
         case 5226:
@@ -162,8 +155,7 @@ void BattlegroundRV::HandleAreaTrigger(Player* Source, uint32 Trigger)
         case 5474:
             break;
         default:
-            sLog->outError(LOG_FILTER_BATTLEGROUND, "WARNING: Unhandled AreaTrigger in Battleground: %u", Trigger);
-            Source->GetSession()->SendAreaTriggerMessage("Warning: Unhandled AreaTrigger in Battleground: %u", Trigger);
+            Battleground::HandleAreaTrigger(player, trigger);
             break;
     }
 }

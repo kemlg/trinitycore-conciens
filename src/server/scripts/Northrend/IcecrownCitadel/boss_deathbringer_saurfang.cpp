@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,6 +21,7 @@
 #include "ScriptedGossip.h"
 #include "SpellAuras.h"
 #include "icecrown_citadel.h"
+#include "Player.h"
 
 enum ScriptTexts
 {
@@ -184,9 +185,7 @@ enum Phases
 {
     PHASE_INTRO_A       = 1,
     PHASE_INTRO_H       = 2,
-    PHASE_COMBAT        = 3,
-
-    PHASE_INTRO_MASK    = (1 << PHASE_INTRO_A) | (1 << PHASE_INTRO_H),
+    PHASE_COMBAT        = 3
 };
 
 enum Actions
@@ -414,9 +413,16 @@ class boss_deathbringer_saurfang : public CreatureScript
                 }
             }
 
+            void SpellHit(Unit* /*caster*/, SpellInfo const* spell)
+            {
+                if (spell->Id == SPELL_BLOOD_LINK_POWER)
+                    if (Aura* bloodPower = me->GetAura(SPELL_BLOOD_POWER))
+                        bloodPower->RecalculateAmountOfEffects();
+            }
+
             void UpdateAI(uint32 const diff)
             {
-                if (!UpdateVictim() && !(events.GetPhaseMask() & PHASE_INTRO_MASK))
+                if (!UpdateVictim() && !(events.IsInPhase(PHASE_INTRO_A) || events.IsInPhase(PHASE_INTRO_H)))
                     return;
 
                 events.Update(diff);
@@ -496,7 +502,7 @@ class boss_deathbringer_saurfang : public CreatureScript
                 DoMeleeAttackIfReady();
             }
 
-            uint32 GetData(uint32 type)
+            uint32 GetData(uint32 type) const
             {
                 if (type == DATA_MADE_A_MESS)
                     if (_fallenChampionCastCount < RAID_MODE<uint32>(3, 5, 3, 5))
@@ -604,7 +610,7 @@ class npc_high_overlord_saurfang_icc : public CreatureScript
                     case ACTION_START_EVENT:
                     {
                         // Prevent crashes
-                        if (_events.GetPhaseMask() & PHASE_INTRO_MASK)
+                        if (_events.IsInPhase(PHASE_INTRO_A) || _events.IsInPhase(PHASE_INTRO_H))
                             return;
 
                         GetCreatureListWithEntryInGrid(_guardList, me, NPC_SE_KOR_KRON_REAVER, 20.0f);
@@ -813,7 +819,7 @@ class npc_muradin_bronzebeard_icc : public CreatureScript
                     case ACTION_START_EVENT:
                     {
                         // Prevent crashes
-                        if (_events.GetPhaseMask() & PHASE_INTRO_MASK)
+                        if (_events.IsInPhase(PHASE_INTRO_A) || _events.IsInPhase(PHASE_INTRO_H))
                             return;
 
                         _events.SetPhase(PHASE_INTRO_A);
@@ -1003,8 +1009,6 @@ class spell_deathbringer_blood_link : public SpellScriptLoader
             void HandleDummy(SpellEffIndex /*effIndex*/)
             {
                 GetHitUnit()->CastCustomSpell(SPELL_BLOOD_LINK_POWER, SPELLVALUE_BASE_POINT0, GetEffectValue(), GetHitUnit(), true);
-                if (Aura* bloodPower = GetHitUnit()->GetAura(SPELL_BLOOD_POWER))
-                    bloodPower->RecalculateAmountOfEffects();
                 PreventHitDefaultEffect(EFFECT_0);
             }
 
@@ -1091,13 +1095,6 @@ class spell_deathbringer_blood_power : public SpellScriptLoader
             {
                 DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_deathbringer_blood_power_AuraScript::RecalculateHook, EFFECT_0, SPELL_AURA_MOD_SCALE);
                 DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_deathbringer_blood_power_AuraScript::RecalculateHook, EFFECT_1, SPELL_AURA_MOD_DAMAGE_PERCENT_DONE);
-            }
-
-            bool Load()
-            {
-                if (GetUnitOwner()->getPowerType() != POWER_ENERGY)
-                    return false;
-                return true;
             }
         };
 
@@ -1217,6 +1214,12 @@ class spell_deathbringer_blood_nova_targeting : public SpellScriptLoader
                 if (targetsAtRange < minTargets)
                     targetsAtRange = std::min<uint32>(targets.size() - 1, minTargets);
 
+                if (!targetsAtRange)
+                {
+                    targets.clear();
+                    return;
+                }
+
                 std::list<WorldObject*>::const_iterator itr = targets.begin();
                 std::advance(itr, urand(0, targetsAtRange));
                 target = *itr;
@@ -1227,10 +1230,10 @@ class spell_deathbringer_blood_nova_targeting : public SpellScriptLoader
             // use the same target for first and second effect
             void FilterTargetsSubsequent(std::list<WorldObject*>& unitList)
             {
+                unitList.clear();
                 if (!target)
                     return;
 
-                unitList.clear();
                 unitList.push_back(target);
             }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,6 +18,8 @@
 #include "ScriptMgr.h"
 #include "InstanceScript.h"
 #include "razorfen_downs.h"
+#include "Player.h"
+#include "TemporarySummon.h"
 
 #define    MAX_ENCOUNTER  1
 
@@ -185,7 +187,7 @@ public:
             }
         }
 
-        uint32 GetData(uint32 uiType)
+        uint32 GetData(uint32 uiType) const
         {
             switch (uiType)
             {
@@ -196,7 +198,7 @@ public:
             return 0;
         }
 
-        uint64 GetData64(uint32 uiType)
+        uint64 GetData64(uint32 uiType) const
         {
             switch (uiType)
             {

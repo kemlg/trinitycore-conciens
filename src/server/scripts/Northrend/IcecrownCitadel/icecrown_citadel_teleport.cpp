@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,6 +20,7 @@
 #include "InstanceScript.h"
 #include "icecrown_citadel.h"
 #include "Spell.h"
+#include "Player.h"
 
 #define GOSSIP_SENDER_ICC_PORT 631
 

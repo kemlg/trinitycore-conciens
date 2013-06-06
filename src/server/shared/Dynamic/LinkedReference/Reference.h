@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -20,6 +20,7 @@
 #define _REFERENCE_H
 
 #include "Dynamic/LinkedList.h"
+#include "Errors.h" // for ASSERT
 
 //=====================================================
 
@@ -44,7 +45,7 @@ template <class TO, class FROM> class Reference : public LinkedListElement
         // Create new link
         void link(TO* toObj, FROM* fromObj)
         {
-            assert(fromObj);                                // fromObj MUST not be NULL
+            ASSERT(fromObj);                                // fromObj MUST not be NULL
             if (isValid())
                 unlink();
             if (toObj != NULL)
@@ -57,13 +58,21 @@ template <class TO, class FROM> class Reference : public LinkedListElement
 
         // We don't need the reference anymore. Call comes from the refFrom object
         // Tell our refTo object, that the link is cut
-        void unlink() { targetObjectDestroyLink(); delink(); iRefTo = NULL; iRefFrom = NULL; }
+        void unlink()
+        {
+            targetObjectDestroyLink();
+            delink();
+            iRefTo = NULL;
+            iRefFrom = NULL;
+        }
 
         // Link is invalid due to destruction of referenced target object. Call comes from the refTo object
         // Tell our refFrom object, that the link is cut
         void invalidate()                                   // the iRefFrom MUST remain!!
         {
-            sourceObjectDestroyLink(); delink(); iRefTo = NULL;
+            sourceObjectDestroyLink();
+            delink();
+            iRefTo = NULL;
         }
 
         bool isValid() const                                // Only check the iRefTo
@@ -89,4 +98,3 @@ template <class TO, class FROM> class Reference : public LinkedListElement
 
 //=====================================================
 #endif
-

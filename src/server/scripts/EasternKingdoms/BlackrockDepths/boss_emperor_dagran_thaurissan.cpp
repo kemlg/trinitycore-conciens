@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
 
 enum Yells
 {
-    SAY_AGGRO                                              = -1230001,
-    SAY_SLAY                                               = -1230002
+    SAY_AGGRO                                              = 0,
+    SAY_SLAY                                               = 1
 };
 
 enum Spells
@@ -63,13 +63,13 @@ public:
 
         void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(SAY_AGGRO, me);
+            Talk(SAY_AGGRO);
             me->CallForHelp(VISIBLE_RANGE);
         }
 
         void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(SAY_SLAY, me);
+            Talk(SAY_SLAY);
         }
 
         void JustDied(Unit* /*killer*/)

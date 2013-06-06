@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -29,12 +29,11 @@ EndScriptData */
 
 enum eEnums
 {
-    SAY_ENTER                   = -1269006,
-    SAY_AGGRO                   = -1269007,
-    SAY_BANISH                  = -1269008,
-    SAY_SLAY1                   = -1269009,
-    SAY_SLAY2                   = -1269010,
-    SAY_DEATH                   = -1269011,
+    SAY_ENTER                   = 0,
+    SAY_AGGRO                   = 1,
+    SAY_BANISH                  = 2,
+    SAY_SLAY                    = 3,
+    SAY_DEATH                   = 4,
 
     SPELL_ARCANE_BLAST          = 31457,
     H_SPELL_ARCANE_BLAST        = 38538,
@@ -78,7 +77,7 @@ public:
 
         void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(SAY_AGGRO, me);
+            Talk(SAY_AGGRO);
         }
 
         void MoveInLineOfSight(Unit* who)
@@ -88,7 +87,7 @@ public:
             {
                 if (me->IsWithinDistInMap(who, 20.0f))
                 {
-                    DoScriptText(SAY_BANISH, me);
+                    Talk(SAY_BANISH);
                     me->DealDamage(who, who->GetHealth(), NULL, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, NULL, false);
                 }
             }
@@ -98,12 +97,12 @@ public:
 
         void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_SLAY1, SAY_SLAY2), me);
+            Talk(SAY_SLAY);
         }
 
         void JustDied(Unit* /*killer*/)
         {
-            DoScriptText(SAY_DEATH, me);
+            Talk(SAY_DEATH);
 
             if (instance)
                 instance->SetData(TYPE_RIFT, SPECIAL);
@@ -125,15 +124,15 @@ public:
             //Arcane Discharge
             if (ArcaneDischarge_Timer <= diff)
             {
-                Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0);
-                DoCast(target, SPELL_ARCANE_DISCHARGE);
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                    DoCast(target, SPELL_ARCANE_DISCHARGE);
                 ArcaneDischarge_Timer = 20000+rand()%10000;
             } else ArcaneDischarge_Timer -= diff;
 
             //Time Lapse
             if (TimeLapse_Timer <= diff)
             {
-                DoScriptText(SAY_BANISH, me);
+                Talk(SAY_BANISH);
                 DoCast(me, SPELL_TIME_LAPSE);
                 TimeLapse_Timer = 15000+rand()%10000;
             } else TimeLapse_Timer -= diff;

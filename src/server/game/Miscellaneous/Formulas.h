@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -22,6 +22,7 @@
 #include "World.h"
 #include "SharedDefines.h"
 #include "ScriptMgr.h"
+#include "Player.h"
 
 namespace Trinity
 {
@@ -38,7 +39,8 @@ namespace Trinity
         {
             return uint32(ceil(hk_honor_at_level_f(level, multiplier)));
         }
-    }
+    } // namespace Trinity::Honor
+
     namespace XP
     {
         inline uint8 GetGrayLevel(uint8 pl_level)
@@ -218,7 +220,7 @@ namespace Trinity
             sScriptMgr->OnGroupRateCalculation(rate, count, isRaid);
             return rate;
         }
-    }
-}
+    } // namespace Trinity::XP
+} // namespace Trinity
 
 #endif

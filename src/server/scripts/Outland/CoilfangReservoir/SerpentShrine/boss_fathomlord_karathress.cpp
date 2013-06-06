@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -28,64 +28,62 @@ EndScriptData */
 #include "serpent_shrine.h"
 #include "ScriptedEscortAI.h"
 
-#define SAY_AGGRO                   -1548021
-#define SAY_GAIN_BLESSING           -1548022
-#define SAY_GAIN_ABILITY1           -1548023
-#define SAY_GAIN_ABILITY2           -1548024
-#define SAY_GAIN_ABILITY3           -1548025
-#define SAY_SLAY1                   -1548026
-#define SAY_SLAY2                   -1548027
-#define SAY_SLAY3                   -1548028
-#define SAY_DEATH                   -1548029
+enum FathomlordKarathress
+{
+    SAY_AGGRO                       = 0,
+    SAY_GAIN_BLESSING               = 1,
+    SAY_GAIN_ABILITY1               = 2,
+    SAY_GAIN_ABILITY2               = 3,
+    SAY_GAIN_ABILITY3               = 4,
+    SAY_SLAY                        = 5,
+    SAY_DEATH                       = 6,
 
-//Karathress spells
-#define SPELL_CATACLYSMIC_BOLT          38441
-#define SPELL_POWER_OF_SHARKKIS         38455
-#define SPELL_POWER_OF_TIDALVESS        38452
-#define SPELL_POWER_OF_CARIBDIS         38451
-#define SPELL_ENRAGE                    24318
-#define SPELL_SEAR_NOVA                 38445
-#define SPELL_BLESSING_OF_THE_TIDES     38449
+    //Karathress spells
+    SPELL_CATACLYSMIC_BOLT          = 38441,
+    SPELL_POWER_OF_SHARKKIS         = 38455,
+    SPELL_POWER_OF_TIDALVESS        = 38452,
+    SPELL_POWER_OF_CARIBDIS         = 38451,
+    SPELL_ENRAGE                    = 24318,
+    SPELL_SEAR_NOVA                 = 38445,
+    SPELL_BLESSING_OF_THE_TIDES     = 38449,
 
-//Sharkkis spells
-#define SPELL_LEECHING_THROW            29436
-#define SPELL_THE_BEAST_WITHIN          38373
-#define SPELL_MULTISHOT                 38366
-#define SPELL_SUMMON_FATHOM_LURKER      38433
-#define SPELL_SUMMON_FATHOM_SPOREBAT    38431
-#define SPELL_PET_ENRAGE                19574
+    //Sharkkis spells
+    SPELL_LEECHING_THROW            = 29436,
+    SPELL_THE_BEAST_WITHIN          = 38373,
+    SPELL_MULTISHOT                 = 38366,
+    SPELL_SUMMON_FATHOM_LURKER      = 38433,
+    SPELL_SUMMON_FATHOM_SPOREBAT    = 38431,
+    SPELL_PET_ENRAGE                = 19574,
 
-//Tidalvess spells
-#define SPELL_FROST_SHOCK               38234
-#define SPELL_SPITFIRE_TOTEM            38236
-#define SPELL_POISON_CLEANSING_TOTEM    38306
-// Spell obsolete
-// #define SPELL_POISON_CLEANSING_EFFECT   8167
-#define SPELL_EARTHBIND_TOTEM           38304
-#define SPELL_EARTHBIND_TOTEM_EFFECT    6474
-#define SPELL_WINDFURY_WEAPON           38184
+    //Tidalvess spells
+    SPELL_FROST_SHOCK               = 38234,
+    SPELL_SPITFIRE_TOTEM            = 38236,
+    SPELL_POISON_CLEANSING_TOTEM    = 38306,
+    // Spell obsolete
+    SPELL_EARTHBIND_TOTEM           = 38304,
+    SPELL_EARTHBIND_TOTEM_EFFECT    = 6474,
+    SPELL_WINDFURY_WEAPON           = 38184,
 
-//Caribdis Spells
-#define SPELL_WATER_BOLT_VOLLEY         38335
-#define SPELL_TIDAL_SURGE               38358
-#define SPELL_TIDAL_SURGE_FREEZE        38357
-#define SPELL_HEAL                      38330
-#define SPELL_SUMMON_CYCLONE            38337
-#define SPELL_CYCLONE_CYCLONE           29538
+    //Caribdis Spells
+    SPELL_WATER_BOLT_VOLLEY         = 38335,
+    SPELL_TIDAL_SURGE               = 38358,
+    SPELL_TIDAL_SURGE_FREEZE        = 38357,
+    SPELL_HEAL                      = 38330,
+    SPELL_SUMMON_CYCLONE            = 38337,
+    SPELL_CYCLONE_CYCLONE           = 29538,
 
-//Yells and Quotes
-#define SAY_GAIN_BLESSING_OF_TIDES      "Your overconfidence will be your undoing! Guards, lend me your strength!"
-#define SOUND_GAIN_BLESSING_OF_TIDES    11278
-#define SAY_MISC                        "Alana be'lendor!" //don't know what use this
-#define SOUND_MISC                      11283
+    //Yells and Quotes
+    SOUND_GAIN_BLESSING_OF_TIDES    = 11278,
+    SOUND_MISC                      = 11283,
 
-//Summoned Unit GUIDs
-#define CREATURE_CYCLONE                22104
-#define CREATURE_FATHOM_SPOREBAT        22120
-#define CREATURE_FATHOM_LURKER          22119
-#define CREATURE_SPITFIRE_TOTEM         22091
-#define CREATURE_EARTHBIND_TOTEM        22486
-#define CREATURE_POISON_CLEANSING_TOTEM 22487
+    //Summoned Unit GUIDs
+    CREATURE_CYCLONE                = 22104,
+    CREATURE_FATHOM_SPOREBAT        = 22120,
+    CREATURE_FATHOM_LURKER          = 22119,
+    CREATURE_SPITFIRE_TOTEM         = 22091,
+    CREATURE_EARTHBIND_TOTEM        = 22486,
+    CREATURE_POISON_CLEANSING_TOTEM = 22487,
+};
 
 //entry and position for Seer Olum
 #define SEER_OLUM                  22820
@@ -93,6 +91,9 @@ EndScriptData */
 #define OLUM_Y                     -542.76f
 #define OLUM_Z                     -7.54773f
 #define OLUM_O                     0.401581f
+
+#define SAY_GAIN_BLESSING_OF_TIDES      "Your overconfidence will be your undoing! Guards, lend me your strength!"
+#define SAY_MISC                        "Alana be'lendor!" //don't know what use this
 
 #define MAX_ADVISORS 3
 //Fathom-Lord Karathress AI
@@ -160,19 +161,19 @@ public:
 
         void EventSharkkisDeath()
         {
-            DoScriptText(SAY_GAIN_ABILITY1, me);
+            Talk(SAY_GAIN_ABILITY1);
             DoCast(me, SPELL_POWER_OF_SHARKKIS);
         }
 
         void EventTidalvessDeath()
         {
-            DoScriptText(SAY_GAIN_ABILITY2, me);
+            Talk(SAY_GAIN_ABILITY2);
             DoCast(me, SPELL_POWER_OF_TIDALVESS);
         }
 
         void EventCaribdisDeath()
         {
-            DoScriptText(SAY_GAIN_ABILITY3, me);
+            Talk(SAY_GAIN_ABILITY3);
             DoCast(me, SPELL_POWER_OF_CARIBDIS);
         }
 
@@ -193,7 +194,7 @@ public:
 
             GetAdvisors();
 
-            DoScriptText(SAY_AGGRO, me);
+            Talk(SAY_AGGRO);
             DoZoneInCombat();
 
             instance->SetData64(DATA_KARATHRESSEVENT_STARTER, who->GetGUID());
@@ -202,12 +203,12 @@ public:
 
         void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_SLAY1, SAY_SLAY2, SAY_SLAY3), me);
+            Talk(SAY_SLAY);
         }
 
         void JustDied(Unit* /*killer*/)
         {
-            DoScriptText(SAY_DEATH, me);
+            Talk(SAY_DEATH);
 
             if (instance)
                 instance->SetData(DATA_FATHOMLORDKARATHRESSEVENT, DONE);
@@ -226,9 +227,7 @@ public:
             //Only if not incombat check if the event is started
             if (!me->isInCombat() && instance && instance->GetData(DATA_KARATHRESSEVENT))
             {
-                Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_KARATHRESSEVENT_STARTER));
-
-                if (target)
+                if (Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_KARATHRESSEVENT_STARTER)))
                 {
                     AttackStart(target);
                     GetAdvisors();
@@ -359,12 +358,8 @@ public:
         {
             if (instance)
             {
-                Creature* Karathress = NULL;
-                Karathress = (Unit::GetCreature((*me), instance->GetData64(DATA_KARATHRESS)));
-
-                if (Karathress)
-                    if (!me->isAlive() && Karathress)
-                        CAST_AI(boss_fathomlord_karathress::boss_fathomlord_karathressAI, Karathress->AI())->EventSharkkisDeath();
+                if (Creature* Karathress = (Unit::GetCreature((*me), instance->GetData64(DATA_KARATHRESS))))
+                    CAST_AI(boss_fathomlord_karathress::boss_fathomlord_karathressAI, Karathress->AI())->EventSharkkisDeath();
             }
         }
 
@@ -382,12 +377,8 @@ public:
             //Only if not incombat check if the event is started
             if (!me->isInCombat() && instance && instance->GetData(DATA_KARATHRESSEVENT))
             {
-                Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_KARATHRESSEVENT_STARTER));
-
-                if (target)
-                {
+                if (Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_KARATHRESSEVENT_STARTER)))
                     AttackStart(target);
-                }
             }
 
             //Return since we have no target
@@ -444,12 +435,13 @@ public:
                     pet_id = CREATURE_FATHOM_SPOREBAT;
                 }
                 //DoCast(me, spell_id, true);
-                Creature* Pet = DoSpawnCreature(pet_id, 0, 0, 0, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 15000);
-                Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0);
-                if (Pet && target)
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                 {
-                    Pet->AI()->AttackStart(target);
-                    SummonedPet = Pet->GetGUID();
+                    if (Creature* Pet = DoSpawnCreature(pet_id, 0, 0, 0, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 15000))
+                    {
+                        Pet->AI()->AttackStart(target);
+                        SummonedPet = Pet->GetGUID();
+                    }
                 }
             } else Pet_Timer -= diff;
 
@@ -499,12 +491,8 @@ public:
         {
             if (instance)
             {
-                Creature* Karathress = NULL;
-                Karathress = (Unit::GetCreature((*me), instance->GetData64(DATA_KARATHRESS)));
-
-                if (Karathress)
-                    if (!me->isAlive() && Karathress)
-                        CAST_AI(boss_fathomlord_karathress::boss_fathomlord_karathressAI, Karathress->AI())->EventTidalvessDeath();
+                if (Creature* Karathress = Unit::GetCreature((*me), instance->GetData64(DATA_KARATHRESS)))
+                    CAST_AI(boss_fathomlord_karathress::boss_fathomlord_karathressAI, Karathress->AI())->EventTidalvessDeath();
             }
         }
 
@@ -523,12 +511,8 @@ public:
             //Only if not incombat check if the event is started
             if (!me->isInCombat() && instance && instance->GetData(DATA_KARATHRESSEVENT))
             {
-                Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_KARATHRESSEVENT_STARTER));
-
-                if (target)
-                {
+                if (Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_KARATHRESSEVENT_STARTER)))
                     AttackStart(target);
-                }
             }
 
             //Return since we have no target
@@ -626,12 +610,8 @@ public:
         {
             if (instance)
             {
-                Creature* Karathress = NULL;
-                Karathress = (Unit::GetCreature((*me), instance->GetData64(DATA_KARATHRESS)));
-
-                if (Karathress)
-                    if (!me->isAlive() && Karathress)
-                        CAST_AI(boss_fathomlord_karathress::boss_fathomlord_karathressAI, Karathress->AI())->EventCaribdisDeath();
+                if (Creature* Karathress = Unit::GetCreature((*me), instance->GetData64(DATA_KARATHRESS)))
+                    CAST_AI(boss_fathomlord_karathress::boss_fathomlord_karathressAI, Karathress->AI())->EventCaribdisDeath();
             }
         }
 
@@ -649,12 +629,8 @@ public:
             //Only if not incombat check if the event is started
             if (!me->isInCombat() && instance && instance->GetData(DATA_KARATHRESSEVENT))
             {
-                Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_KARATHRESSEVENT_STARTER));
-
-                if (target)
-                {
+                if (Unit* target = Unit::GetUnit(*me, instance->GetData64(DATA_KARATHRESSEVENT_STARTER)))
                     AttackStart(target);
-                }
             }
 
             //Return since we have no target
@@ -696,11 +672,8 @@ public:
                     Cyclone->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                     Cyclone->setFaction(me->getFaction());
                     Cyclone->CastSpell(Cyclone, SPELL_CYCLONE_CYCLONE, true);
-                    Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0);
-                    if (target)
-                    {
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                         Cyclone->AI()->AttackStart(target);
-                    }
                 }
             } else Cyclone_Timer -= diff;
 

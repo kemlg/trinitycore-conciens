@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -19,16 +19,14 @@
 #ifndef TRINITYCORE_GROUP_H
 #define TRINITYCORE_GROUP_H
 
-#include "Battleground.h"
 #include "DBCEnums.h"
 #include "GroupRefManager.h"
 #include "LootMgr.h"
 #include "QueryResult.h"
 #include "SharedDefines.h"
-#include "Player.h"
-#include "Battlefield.h"
-#include "BattlefieldMgr.h"
 
+class Battlefield;
+class Battleground;
 class Creature;
 class GroupReference;
 class InstanceSave;
@@ -269,7 +267,7 @@ class Group
         void SendUpdateToPlayer(uint64 playerGUID, MemberSlot* slot = NULL);
         void UpdatePlayerOutOfRange(Player* player);
                                                             // ignore: GUID of player that will be ignored
-        void BroadcastPacket(WorldPacket* packet, bool ignorePlayersInBGRaid, int group=-1, uint64 ignore=0);
+        void BroadcastPacket(WorldPacket* packet, bool ignorePlayersInBGRaid, int group = -1, uint64 ignore = 0);
         void BroadcastReadyCheck(WorldPacket* packet);
         void OfflineReadyCheck();
 
@@ -303,6 +301,7 @@ class Group
         InstanceGroupBind* GetBoundInstance(Player* player);
         InstanceGroupBind* GetBoundInstance(Map* aMap);
         InstanceGroupBind* GetBoundInstance(MapEntry const* mapEntry);
+        InstanceGroupBind* GetBoundInstance(Difficulty difficulty, uint32 mapId);
         BoundInstancesMap& GetBoundInstances(Difficulty difficulty);
 
         // FG: evil hacks

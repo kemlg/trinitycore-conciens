@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,6 +20,7 @@
 #include "ScriptedGossip.h"
 #include "ScriptedEscortAI.h"
 #include "violet_hold.h"
+#include "Player.h"
 
 #define GOSSIP_START_EVENT  "Get your people to safety, we'll keep the Blue Dragonflight's forces at bay."
 #define GOSSIP_ITEM_1       "Activate the crystals when we get in trouble, right"
@@ -124,7 +125,7 @@ enum Spells
 
 enum eSinclari
 {
-    SAY_SINCLARI_1                    = -1608045
+    SAY_SINCLARI_1                    = 0
 };
 
 float FirstPortalWPs [6][3] =
@@ -352,7 +353,7 @@ public:
                     switch (uiPhase)
                     {
                         case 1:
-                            DoScriptText(SAY_SINCLARI_1, me);
+                            Talk(SAY_SINCLARI_1);
                             uiTimer = 4000;
                             uiPhase = 2;
                             break;

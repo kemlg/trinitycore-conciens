@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -25,6 +25,9 @@
 #include "Log.h"
 #include "ObjectMgr.h"
 #include "AutoPtr.h"
+#include "Player.h"
+#include "WorldPacket.h"
+#include "Opcodes.h"
 
 namespace WeatherMgr
 {
@@ -93,8 +96,7 @@ void LoadWeatherData()
 
     if (!result)
     {
-        sLog->outError(LOG_FILTER_SQL, ">> Loaded 0 weather definitions. DB table `game_weather` is empty.");
-
+        sLog->outError(LOG_FILTER_SERVER_LOADING, ">> Loaded 0 weather definitions. DB table `game_weather` is empty.");
         return;
     }
 
@@ -138,7 +140,6 @@ void LoadWeatherData()
     while (result->NextRow());
 
     sLog->outInfo(LOG_FILTER_SERVER_LOADING, ">> Loaded %u weather definitions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
-
 }
 
 void SendFineWeatherUpdateToPlayer(Player* player)

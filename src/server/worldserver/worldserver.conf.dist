@@ -269,6 +269,14 @@ PlayerSave.Stats.MinLevel = 0
 PlayerSave.Stats.SaveOnlyOnLogout = 1
 
 #
+#    mmap.enablePathFinding
+#        Description: Enable/Disable pathfinding using mmaps - experimental
+#        Default:     0 - (Disabled)
+#                     1 - (Enabled)
+
+mmap.enablePathFinding = 0
+
+#
 #    vmap.enableLOS
 #    vmap.enableHeight
 #        Description: VMmap support for line of sight and height calculation.
@@ -278,23 +286,6 @@ PlayerSave.Stats.SaveOnlyOnLogout = 1
 
 vmap.enableLOS    = 1
 vmap.enableHeight = 1
-
-#
-#    vmap.ignoreSpellIds
-#        Description: These spells are ignored for LoS calculation.
-#                     List of ids with delimiter ','.
-#        Example:     "7720,1337"
-#        Default:     "7720"
-
-vmap.ignoreSpellIds = "7720"
-
-#
-#    vmap.petLOS
-#        Description: Check line of sight for pets, to avoid them attacking through walls.
-#        Default:     1 - (Enabled, each pet attack will be checked for line of sight)
-#                     0 - (Disabled, somewhat less CPU usage)
-
-vmap.petLOS = 1
 
 #
 #    vmap.enableIndoorCheck
@@ -823,18 +814,6 @@ RecruitAFriend.MaxLevel = 60
 RecruitAFriend.MaxDifference = 4
 
 #
-#    InstantLogout
-#        Description: Required security level for instantly logging out everywhere.
-#                     Does not work while in combat, dueling or falling.
-#        Default:     1  - (Enabled, Mods/GMs/Admins)
-#                     0  - (Enabled, Everyone)
-#                     2  - (Enabled, GMs/Admins)
-#                     3  - (Enabled, Admins)
-#                     4  - (Disabled)
-
-InstantLogout = 1
-
-#
 #    DisableWaterBreath
 #        Description: Required security level for water breathing.
 #        Default:     4  - (Disabled)
@@ -976,6 +955,14 @@ Quests.IgnoreAutoComplete = 0
 Guild.EventLogRecordsCount = 100
 
 #
+#    Guild.ResetHour
+#        Description: Hour of the day when the daily cap resets occur.
+#        Range:       0-23
+#        Default:     6 - (06:00 AM)
+
+Guild.ResetHour = 6
+
+#
 #    Guild.BankEventLogRecordsCount
 #        Description: Number of log entries for guild bank events that are stored per guild. Old
 #                     entries will be overwritten if the number of log entries exceed the
@@ -1106,12 +1093,15 @@ Command.LookupMaxResults = 0
 AllowTickets = 1
 
 #
-#     DungeonFinder.Enable
+#     DungeonFinder.OptionsMask
 #        Description: Dungeon and raid finder system.
-#        Default:     1 - (Enabled)
-#                     0 - (Disabled)
+#        Value is a bitmask consisting of:
+#           LFG_OPTION_ENABLE_DUNGEON_FINDER = 1,     Enable the dungeon finder browser
+#           LFG_OPTION_ENABLE_RAID_BROWSER   = 2,     Enable the raid browser
+#        Default:     1
 
-DungeonFinder.Enable = 1
+DungeonFinder.OptionsMask = 1
+
 
 #
 #   DBC.EnforceItemAttributes
@@ -1208,6 +1198,14 @@ Warden.BanDuration = 86400
 #                     0 - (Disabled)
 
 AllowTwoSide.Accounts = 1
+
+#
+#    AllowTwoSide.Interaction.Calendar
+#        Description: Allow calendar invites between factions.
+#        Default:     0 - (Disabled)
+#                     1 - (Enabled)
+
+AllowTwoSide.Interaction.Calendar = 0
 
 #
 #    AllowTwoSide.Interaction.Chat
@@ -1556,14 +1554,6 @@ ChatLevelReq.Whisper = 1
 #        Default:     1
 
 ChatLevelReq.Say = 1
-
-#
-#    AllowPlayerCommands
-#        Description: Allow players to use commands.
-#        Default:     1 - (Enabled)
-#                     0 - (Disabled)
-
-AllowPlayerCommands = 1
 
 #
 #    PreserveCustomChannels
@@ -2642,6 +2632,14 @@ PlayerDump.DisallowPaths = 1
 PlayerDump.DisallowOverwrite = 1
 
 #
+#     UI.ShowQuestLevelsInDialogs
+#        Description: Show quest levels next to quest titles in UI dialogs
+#        Example: [13] Westfall Stew
+#        Default: 0 (do not show)
+
+UI.ShowQuestLevelsInDialogs = 0
+
+#
 ###################################################################################################
 
 ###################################################################################################
@@ -2651,7 +2649,7 @@ PlayerDump.DisallowOverwrite = 1
 #  Appender config values: Given a appender "name"
 #    Appender.name
 #        Description: Defines 'where to log'
-#        Format:      Type,LogLevel,Flags,optional1,optional2
+#        Format:      Type,LogLevel,Flags,optional1,optional2,optional3
 #
 #                     Type
 #                         0 - (None)
@@ -2701,6 +2699,13 @@ PlayerDump.DisallowOverwrite = 1
 #                     Mode: Mode to open the file (read as optional2 if Type = File)
 #                          a - (Append)
 #                          w - (Overwrite)
+#
+#                     MaxFileSize: Maximum file size of the log file before creating a new log file
+#                     (read as optional3 if Type = File)
+#                         Size is measured in bytes expressed in a 64-bit unsigned integer.
+#                         Maximum value is 4294967295 (4 gb). Leave blank for no limit.
+#                         NOTE: Does not work with dynamic filenames.
+#                         Example:  536870912 (512 mb)
 #
 
 Appender.Console=1,3,0
@@ -2775,6 +2780,8 @@ Appenders=Console Server GM DBErrors Char RA Warden Chat
 #                        39 - Battlefield
 #                        40 - Server Loading
 #                        41 - Opcodes (just id and name sent / received)
+#                        42 - SOAP
+#
 #                     LogLevel
 #                         0 - (Disabled)
 #                         1 - (Trace)
@@ -2810,6 +2817,14 @@ Logger.Opcodes=41,6,Console Server
 #        Default:     "Root Chat DBErrors GM RA Warden Character Load"
 
 Loggers=Root Chat DBErrors GM RA Warden Character Load WorldServer Opcodes
+
+#
+#    Log.Async.Enable
+#        Description: Enables asyncronous message logging.
+#        Default:     0 - (Disabled)
+#                     1 - (Enabled)
+
+Log.Async.Enable = 0
 
 #
 ###################################################################################################

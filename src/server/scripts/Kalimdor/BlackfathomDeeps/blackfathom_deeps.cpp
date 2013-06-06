@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,6 +20,7 @@
 #include "ScriptedGossip.h"
 #include "blackfathom_deeps.h"
 #include "ScriptedEscortAI.h"
+#include "Player.h"
 
 enum Spells
 {
@@ -191,8 +192,8 @@ public:
 
 enum Morridune
 {
-    SAY_MORRIDUNE_1 = -1048003,
-    SAY_MORRIDUNE_2 = -1048004
+    SAY_MORRIDUNE_1 = 0,
+    SAY_MORRIDUNE_2 = 1
 };
 
 class npc_morridune : public CreatureScript
@@ -230,7 +231,7 @@ public:
     {
         npc_morriduneAI(Creature* creature) : npc_escortAI(creature)
         {
-            DoScriptText(SAY_MORRIDUNE_1, creature);
+            Talk(SAY_MORRIDUNE_1);
             me->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
             Start(false, false, 0);
         }
@@ -244,7 +245,7 @@ public:
                     me->SetOrientation(1.775791f);
                     me->SendMovementFlagUpdate();
                     me->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
-                    DoScriptText(SAY_MORRIDUNE_2, me);
+                    Talk(SAY_MORRIDUNE_2);
                     break;
             }
         }

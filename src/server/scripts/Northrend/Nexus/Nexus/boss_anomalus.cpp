@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -38,10 +38,10 @@ enum Adds
 
 enum Yells
 {
-    SAY_AGGRO                                     = -1576010,
-    SAY_DEATH                                     = -1576011,
-    SAY_RIFT                                      = -1576012,
-    SAY_SHIELD                                    = -1576013
+    SAY_AGGRO                                     = 0,
+    SAY_DEATH                                     = 1,
+    SAY_RIFT                                      = 2,
+    SAY_SHIELD                                    = 3
 };
 
 enum RiftSpells
@@ -96,7 +96,7 @@ class boss_anomalus : public CreatureScript
 
             void EnterCombat(Unit* /*who*/)
             {
-                DoScriptText(SAY_AGGRO, me);
+                Talk(SAY_AGGRO);
 
                 if (instance)
                     instance->SetData(DATA_ANOMALUS_EVENT, IN_PROGRESS);
@@ -104,13 +104,13 @@ class boss_anomalus : public CreatureScript
 
             void JustDied(Unit* /*killer*/)
             {
-                DoScriptText(SAY_DEATH, me);
+                Talk(SAY_DEATH);
 
                 if (instance)
                     instance->SetData(DATA_ANOMALUS_EVENT, DONE);
             }
 
-            uint32 GetData(uint32 type)
+            uint32 GetData(uint32 type) const
             {
                 if (type == DATA_CHAOS_THEORY)
                     return chaosTheory ? 1 : 0;
@@ -155,7 +155,7 @@ class boss_anomalus : public CreatureScript
                 if ((Phase == 0) && HealthBelowPct(50))
                 {
                     Phase = 1;
-                    DoScriptText(SAY_SHIELD, me);
+                    Talk(SAY_SHIELD);
                     DoCast(me, SPELL_RIFT_SHIELD);
                     if (Creature* Rift = me->SummonCreature(MOB_CHAOTIC_RIFT, RiftLocation[urand(0, 5)], TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 1000))
                     {
@@ -163,7 +163,7 @@ class boss_anomalus : public CreatureScript
                         if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                             Rift->AI()->AttackStart(target);
                         uiChaoticRiftGUID = Rift->GetGUID();
-                        DoScriptText(SAY_RIFT, me);
+                        Talk(SAY_RIFT);
                     }
                 }
 
@@ -191,11 +191,12 @@ class mob_chaotic_rift : public CreatureScript
     public:
         mob_chaotic_rift() : CreatureScript("mob_chaotic_rift") { }
 
-        struct mob_chaotic_riftAI : public Scripted_NoMovementAI
+        struct mob_chaotic_riftAI : public ScriptedAI
         {
-            mob_chaotic_riftAI(Creature* creature) : Scripted_NoMovementAI(creature)
+            mob_chaotic_riftAI(Creature* creature) : ScriptedAI(creature)
             {
                 instance = me->GetInstanceScript();
+                SetCombatMovement(false);
             }
 
             InstanceScript* instance;
@@ -207,9 +208,7 @@ class mob_chaotic_rift : public CreatureScript
             {
                 uiChaoticEnergyBurstTimer = 1000;
                 uiSummonCrazedManaWraithTimer = 5000;
-                //me->SetDisplayId(25206); //For some reason in DB models for ally and horde are different.
-                                                 //Model for ally (1126) does not show auras. Horde model works perfect.
-                                                 //Set model to horde number
+                me->SetDisplayId(me->GetCreatureTemplate()->Modelid2);
                 DoCast(me, SPELL_ARCANEFORM, false);
             }
 

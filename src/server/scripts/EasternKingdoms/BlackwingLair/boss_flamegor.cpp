@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -28,7 +28,7 @@ EndScriptData */
 
 enum Emotes
 {
-    EMOTE_FRENZY            = -1469031
+    EMOTE_FRENZY            = 0,
 };
 
 enum Spells
@@ -76,24 +76,26 @@ public:
             //ShadowFlame_Timer
             if (ShadowFlame_Timer <= diff)
             {
-                DoCast(me->getVictim(), SPELL_SHADOWFLAME);
+                DoCastVictim(SPELL_SHADOWFLAME);
                 ShadowFlame_Timer = urand(15000, 22000);
             } else ShadowFlame_Timer -= diff;
 
             //WingBuffet_Timer
             if (WingBuffet_Timer <= diff)
             {
-                DoCast(me->getVictim(), SPELL_WINGBUFFET);
-                if (DoGetThreat(me->getVictim()))
-                    DoModifyThreatPercent(me->getVictim(), -75);
-
+                if (Unit* target = me->getVictim())
+                {
+                    DoCast(target, SPELL_WINGBUFFET);
+                    if (DoGetThreat(target))
+                        DoModifyThreatPercent(target, -75);
+                }
                 WingBuffet_Timer = 25000;
             } else WingBuffet_Timer -= diff;
 
             //Frenzy_Timer
             if (Frenzy_Timer <= diff)
             {
-                DoScriptText(EMOTE_FRENZY, me);
+                Talk(EMOTE_FRENZY);
                 DoCast(me, SPELL_FRENZY);
                 Frenzy_Timer = urand(8000, 10000);
             } else Frenzy_Timer -= diff;

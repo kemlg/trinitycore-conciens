@@ -1,4 +1,4 @@
-/* Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+/* Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * Thanks to the original authors: ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
@@ -8,7 +8,6 @@
 #ifndef SC_GOSSIP_H
 #define SC_GOSSIP_H
 
-#include "Player.h"
 #include "GossipDef.h"
 #include "QuestDef.h"
 

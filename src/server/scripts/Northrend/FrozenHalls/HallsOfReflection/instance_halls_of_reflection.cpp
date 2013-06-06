@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,6 +19,7 @@
 #include "ScriptedCreature.h"
 #include "InstanceScript.h"
 #include "halls_of_reflection.h"
+#include "Player.h"
 
 #define MAX_ENCOUNTER 3
 
@@ -244,7 +245,7 @@ public:
                 SaveToDB();
         }
 
-        uint32 GetData(uint32 type)
+        uint32 GetData(uint32 type) const
         {
             switch (type)
             {
@@ -258,7 +259,7 @@ public:
             return 0;
         }
 
-        uint64 GetData64(uint32 identifier)
+        uint64 GetData64(uint32 identifier) const
         {
             switch (identifier)
             {

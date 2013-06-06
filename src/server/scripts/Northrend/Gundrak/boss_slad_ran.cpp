@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,6 +19,7 @@
 #include "ScriptedCreature.h"
 #include "SpellAuras.h"
 #include "gundrak.h"
+#include "Player.h"
 
 //Spells
 enum Spells
@@ -34,13 +35,12 @@ enum Spells
 //Yell
 enum Yells
 {
-    SAY_AGGRO                                     = -1604017,
-    SAY_SLAY_1                                    = -1604018,
-    SAY_SLAY_2                                    = -1604019,
-    SAY_SLAY_3                                    = -1604020,
-    SAY_DEATH                                     = -1604021,
-    SAY_SUMMON_SNAKES                             = -1604022,
-    SAY_SUMMON_CONSTRICTORS                       = -1604023
+    SAY_AGGRO                                     = 0,
+    SAY_SLAY                                      = 1,
+    SAY_DEATH                                     = 2,
+    SAY_SUMMON_SNAKES                             = 3,
+    SAY_SUMMON_CONSTRICTORS                       = 4,
+    EMOTE_NOVA                                    = 5
 };
 
 //Creatures
@@ -116,7 +116,7 @@ public:
 
         void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(SAY_AGGRO, me);
+            Talk(SAY_AGGRO);
 
             if (instance)
                 instance->SetData(DATA_SLAD_RAN_EVENT, IN_PROGRESS);
@@ -131,6 +131,7 @@ public:
             if (uiPoisonNovaTimer <= diff)
             {
                 DoCast(me->getVictim(), SPELL_POISON_NOVA);
+                Talk(EMOTE_NOVA);
                 uiPoisonNovaTimer = 15*IN_MILLISECONDS;
             } else uiPoisonNovaTimer -= diff;
 
@@ -162,13 +163,13 @@ public:
 
             if (uiPhase == 0 && HealthBelowPct(30))
             {
-                DoScriptText(SAY_SUMMON_SNAKES, me);
+                Talk(SAY_SUMMON_SNAKES);
                 uiPhase = 1;
             }
 
             if (uiPhase == 1 && HealthBelowPct(25))
             {
-                DoScriptText(SAY_SUMMON_CONSTRICTORS, me);
+                Talk(SAY_SUMMON_CONSTRICTORS);
                 uiPhase = 2;
             }
 
@@ -177,7 +178,7 @@ public:
 
         void JustDied(Unit* /*killer*/)
         {
-            DoScriptText(SAY_DEATH, me);
+            Talk(SAY_DEATH);
             lSummons.DespawnAll();
 
             if (instance)
@@ -186,7 +187,7 @@ public:
 
         void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_SLAY_1, SAY_SLAY_2, SAY_SLAY_3), me);
+            Talk(SAY_SLAY);
         }
 
         void JustSummoned(Creature* summoned)
@@ -250,7 +251,7 @@ public:
 
                     if (TempSummon* _me = me->ToTempSummon())
                         if (Creature* sladran = _me->GetSummoner()->ToCreature())
-                            sladran->AI()->SetGUID(target->GetGUID() ,DATA_SNAKES_WHYD_IT_HAVE_TO_BE_SNAKES);
+                            sladran->AI()->SetGUID(target->GetGUID(), DATA_SNAKES_WHYD_IT_HAVE_TO_BE_SNAKES);
 
                     me->DespawnOrUnsummon();
                 }

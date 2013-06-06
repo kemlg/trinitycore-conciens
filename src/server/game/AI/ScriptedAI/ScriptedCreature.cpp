@@ -1,4 +1,4 @@
-/* Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+/* Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * Thanks to the original authors: ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
@@ -77,17 +77,13 @@ void SummonList::RemoveNotExisting()
     }
 }
 
-bool SummonList::HasEntry(uint32 entry)
+bool SummonList::HasEntry(uint32 entry) const
 {
-    for (iterator i = begin(); i != end();)
+    for (const_iterator i = begin(); i != end(); ++i)
     {
         Creature* summon = Unit::GetCreature(*me, *i);
-        if (!summon)
-            erase(i++);
-        else if (summon->GetEntry() == entry)
+        if (summon && summon->GetEntry() == entry)
             return true;
-        else
-            ++i;
     }
 
     return false;
@@ -108,8 +104,16 @@ void ScriptedAI::AttackStartNoMove(Unit* who)
     if (!who)
         return;
 
-    if (me->Attack(who, false))
+    if (me->Attack(who, true))
         DoStartNoMovement(who);
+}
+
+void ScriptedAI::AttackStart(Unit* who)
+{
+    if (IsCombatMovementAllowed())
+        CreatureAI::AttackStart(who);
+    else
+        AttackStartNoMove(who);
 }
 
 void ScriptedAI::UpdateAI(uint32 const /*diff*/)
@@ -254,12 +258,11 @@ void ScriptedAI::DoResetThreat()
         return;
     }
 
-    std::list<HostileReference*>& threatlist = me->getThreatManager().getThreatList();
+    ThreatContainer::StorageType threatlist = me->getThreatManager().getThreatList();
 
-    for (std::list<HostileReference*>::iterator itr = threatlist.begin(); itr != threatlist.end(); ++itr)
+    for (ThreatContainer::StorageType::const_iterator itr = threatlist.begin(); itr != threatlist.end(); ++itr)
     {
         Unit* unit = Unit::GetUnit(*me, (*itr)->getUnitGuid());
-
         if (unit && DoGetThreat(unit))
             DoModifyThreatPercent(unit, -100);
     }
@@ -299,7 +302,8 @@ void ScriptedAI::DoTeleportPlayer(Unit* unit, float x, float y, float z, float o
     if (Player* player = unit->ToPlayer())
         player->TeleportTo(unit->GetMapId(), x, y, z, o, TELE_TO_NOT_LEAVE_COMBAT);
     else
-        sLog->outError(LOG_FILTER_TSCR, "Creature " UI64FMTD " (Entry: %u) Tried to teleport non-player unit (Type: %u GUID: " UI64FMTD ") to x: %f y:%f z: %f o: %f. Aborted.", me->GetGUID(), me->GetEntry(), unit->GetTypeId(), unit->GetGUID(), x, y, z, o);
+        sLog->outError(LOG_FILTER_TSCR, "Creature " UI64FMTD " (Entry: %u) Tried to teleport non-player unit (Type: %u GUID: " UI64FMTD ") to x: %f y:%f z: %f o: %f. Aborted.",
+            me->GetGUID(), me->GetEntry(), unit->GetTypeId(), unit->GetGUID(), x, y, z, o);
 }
 
 void ScriptedAI::DoTeleportAll(float x, float y, float z, float o)
@@ -331,6 +335,7 @@ std::list<Creature*> ScriptedAI::DoFindFriendlyCC(float range)
     Trinity::FriendlyCCedInRange u_check(me, range);
     Trinity::CreatureListSearcher<Trinity::FriendlyCCedInRange> searcher(me, list, u_check);
     me->VisitNearbyObject(range, searcher);
+
     return list;
 }
 
@@ -340,6 +345,7 @@ std::list<Creature*> ScriptedAI::DoFindFriendlyMissingBuff(float range, uint32 u
     Trinity::FriendlyMissingBuffInRange u_check(me, range, uiSpellid);
     Trinity::CreatureListSearcher<Trinity::FriendlyMissingBuffInRange> searcher(me, list, u_check);
     me->VisitNearbyObject(range, searcher);
+
     return list;
 }
 
@@ -441,17 +447,7 @@ bool ScriptedAI::EnterEvadeIfOutOfCombatArea(uint32 const diff)
     return true;
 }
 
-void Scripted_NoMovementAI::AttackStart(Unit* target)
-{
-    if (!target)
-        return;
-
-    if (me->Attack(target, true))
-        DoStartNoMovement(target);
-}
-
 // BossAI - for instanced bosses
-
 BossAI::BossAI(Creature* creature, uint32 bossId) : ScriptedAI(creature),
     instance(creature->GetInstanceScript()),
     summons(creature),
@@ -503,8 +499,9 @@ void BossAI::TeleportCheaters()
 {
     float x, y, z;
     me->GetPosition(x, y, z);
-    std::list<HostileReference*>& threatList = me->getThreatManager().getThreatList();
-    for (std::list<HostileReference*>::iterator itr = threatList.begin(); itr != threatList.end(); ++itr)
+
+    ThreatContainer::StorageType threatList = me->getThreatManager().getThreatList();
+    for (ThreatContainer::StorageType::const_iterator itr = threatList.begin(); itr != threatList.end(); ++itr)
         if (Unit* target = (*itr)->getTarget())
             if (target->GetTypeId() == TYPEID_PLAYER && !CheckBoundary(target))
                 target->NearTeleportTo(x, y, z, 0);

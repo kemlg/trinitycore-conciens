@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -430,13 +430,14 @@ void SmartAI::MovementInform(uint32 MovementType, uint32 Data)
 
 void SmartAI::RemoveAuras()
 {
-    // Only loop throught the applied auras, because here is where all auras on the current unit are stored
-    Unit::AuraApplicationMap appliedAuras = me->GetAppliedAuras();
-    for (Unit::AuraApplicationMap::iterator iter = appliedAuras.begin(); iter != appliedAuras.end(); ++iter)
+    Unit::AuraApplicationMap& appliedAuras = me->GetAppliedAuras();
+    for (Unit::AuraApplicationMap::iterator iter = appliedAuras.begin(); iter != appliedAuras.end();)
     {
         Aura const* aura = iter->second->GetBase();
-        if (!aura->GetSpellInfo()->IsPassive() && !aura->GetSpellInfo()->HasAura(SPELL_AURA_CONTROL_VEHICLE) && aura->GetCaster() != me)
-            me->RemoveAurasDueToSpell(aura->GetId());
+        if (!aura->IsPassive() && !aura->HasEffectType(SPELL_AURA_CONTROL_VEHICLE) && aura->GetCasterGUID() != me->GetGUID())
+            me->RemoveAura(iter);
+        else
+            ++iter;
     }
 }
 
@@ -677,7 +678,7 @@ void SmartAI::CorpseRemoved(uint32& respawnDelay)
 
 void SmartAI::PassengerBoarded(Unit* who, int8 seatId, bool apply)
 {
-    GetScript()->ProcessEventsFor(SMART_EVENT_PASSENGER_BOARDED, who, (uint32)seatId, 0, apply);
+    GetScript()->ProcessEventsFor(apply ? SMART_EVENT_PASSENGER_BOARDED : SMART_EVENT_PASSENGER_REMOVED, who, uint32(seatId), 0, apply);
 }
 
 void SmartAI::InitializeAI()
@@ -698,7 +699,7 @@ void SmartAI::DoAction(const int32 param)
     GetScript()->ProcessEventsFor(SMART_EVENT_ACTION_DONE, NULL, param);
 }
 
-uint32 SmartAI::GetData(uint32 /*id*/)
+uint32 SmartAI::GetData(uint32 /*id*/) const
 {
     return 0;
 }
@@ -712,7 +713,7 @@ void SmartAI::SetGUID(uint64 /*guid*/, int32 /*id*/)
 {
 }
 
-uint64 SmartAI::GetGUID(int32 /*id*/)
+uint64 SmartAI::GetGUID(int32 /*id*/) const
 {
     return 0;
 }

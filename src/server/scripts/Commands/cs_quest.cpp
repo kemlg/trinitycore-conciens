@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,9 +22,11 @@ Comment: All quest related commands
 Category: commandscripts
 EndScriptData */
 
-#include "ScriptMgr.h"
-#include "ObjectMgr.h"
 #include "Chat.h"
+#include "ObjectMgr.h"
+#include "Player.h"
+#include "ReputationMgr.h"
+#include "ScriptMgr.h"
 
 class quest_commandscript : public CommandScript
 {
@@ -39,12 +41,12 @@ public:
             { "complete",       SEC_ADMINISTRATOR,  false, &HandleQuestComplete,               "", NULL },
             { "remove",         SEC_ADMINISTRATOR,  false, &HandleQuestRemove,                 "", NULL },
             { "reward",         SEC_ADMINISTRATOR,  false, &HandleQuestReward,                 "", NULL },
-            { NULL,             0,                  false, NULL,                               "", NULL }
+            { NULL,             SEC_PLAYER,         false, NULL,                               "", NULL }
         };
         static ChatCommand commandTable[] =
         {
             { "quest",          SEC_ADMINISTRATOR,  false, NULL,                  "", questCommandTable },
-            { NULL,             0,                  false, NULL,                               "", NULL }
+            { NULL,             SEC_PLAYER,         false, NULL,                               "", NULL }
         };
         return commandTable;
     }
@@ -78,7 +80,7 @@ public:
 
         // check item starting quest (it can work incorrectly if added without item in inventory)
         ItemTemplateContainer const* itc = sObjectMgr->GetItemTemplateStore();
-        ItemTemplateContainer::const_iterator result = find_if(itc->begin(), itc->end(), Finder<uint32, ItemTemplate>(entry, &ItemTemplate::StartQuest));
+        ItemTemplateContainer::const_iterator result = find_if (itc->begin(), itc->end(), Finder<uint32, ItemTemplate>(entry, &ItemTemplate::StartQuest));
 
         if (result != itc->end())
         {

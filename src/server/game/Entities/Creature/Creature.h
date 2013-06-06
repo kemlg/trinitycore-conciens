@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -63,13 +63,6 @@ enum CreatureFlagsExtra
     CREATURE_FLAG_EXTRA_NO_TAUNT | CREATURE_FLAG_EXTRA_WORLDEVENT | CREATURE_FLAG_EXTRA_NO_CRIT | \
     CREATURE_FLAG_EXTRA_NO_SKILLGAIN | CREATURE_FLAG_EXTRA_TAUNT_DIMINISH | CREATURE_FLAG_EXTRA_ALL_DIMINISH | \
     CREATURE_FLAG_EXTRA_GUARD)
-
-// GCC have alternative #pragma pack(N) syntax and old gcc version not support pack(push, N), also any gcc version not support it at some platform
-#if defined(__GNUC__)
-#pragma pack(1)
-#else
-#pragma pack(push, 1)
-#endif
 
 #define MAX_KILL_CREDIT 2
 #define CREATURE_REGEN_INTERVAL 2 * IN_MILLISECONDS
@@ -180,6 +173,13 @@ typedef UNORDERED_MAP<uint32, CreatureTemplate> CreatureTemplateContainer;
 // TODO: Add MAX_EXPANSION constant.
 #define MAX_CREATURE_BASE_HP 3
 
+// GCC have alternative #pragma pack(N) syntax and old gcc version not support pack(push, N), also any gcc version not support it at some platform
+#if defined(__GNUC__)
+#pragma pack(1)
+#else
+#pragma pack(push, 1)
+#endif
+
 // Defines base stats for creatures (used to calculate HP/mana/armor).
 struct CreatureBaseStats
 {
@@ -241,7 +241,7 @@ typedef UNORDERED_MAP<uint16, EquipmentInfo> EquipmentInfoContainer;
 // from `creature` table
 struct CreatureData
 {
-    explicit CreatureData() : dbData(true) {}
+    CreatureData() : dbData(true) {}
     uint32 id;                                              // entry in creature_template
     uint16 mapid;
     uint16 phaseMask;
@@ -263,19 +263,6 @@ struct CreatureData
     uint32 dynamicflags;
     bool dbData;
 };
-
-// `creature_addon` table
-struct CreatureAddon
-{
-    uint32 path_id;
-    uint32 mount;
-    uint32 bytes1;
-    uint32 bytes2;
-    uint32 emote;
-    std::vector<uint32> auras;
-};
-
-typedef UNORDERED_MAP<uint32, CreatureAddon> CreatureAddonContainer;
 
 struct CreatureModelInfo
 {
@@ -316,6 +303,19 @@ enum ChatType
 #pragma pack(pop)
 #endif
 
+// `creature_addon` table
+struct CreatureAddon
+{
+    uint32 path_id;
+    uint32 mount;
+    uint32 bytes1;
+    uint32 bytes2;
+    uint32 emote;
+    std::vector<uint32> auras;
+};
+
+typedef UNORDERED_MAP<uint32, CreatureAddon> CreatureAddonContainer;
+
 // Vendors
 struct VendorItem
 {
@@ -323,7 +323,7 @@ struct VendorItem
         : item(_item), maxcount(_maxcount), incrtime(_incrtime), ExtendedCost(_ExtendedCost) {}
 
     uint32 item;
-    uint32  maxcount;                                       // 0 for infinity item amount
+    uint32 maxcount;                                        // 0 for infinity item amount
     uint32 incrtime;                                        // time for restore items amount if maxcount != 0
     uint32 ExtendedCost;
 
@@ -520,7 +520,6 @@ class Creature : public Unit, public GridObject<Creature>, public MapCreature
         bool AIM_Initialize(CreatureAI* ai = NULL);
         void Motion_Initialize();
 
-        void AI_SendMoveToPacket(float x, float y, float z, uint32 time, uint32 MovementFlags, uint8 type);
         CreatureAI* AI() const { return (CreatureAI*)i_AI; }
 
         bool SetWalk(bool enable);
@@ -584,7 +583,7 @@ class Creature : public Unit, public GridObject<Creature>, public MapCreature
         void YellToZone(int32 textId, uint32 language, uint64 TargetGuid) { MonsterYellToZone(textId, language, TargetGuid); }
 
         // override WorldObject function for proper name localization
-        const char* GetNameForLocaleIdx(LocaleConstant locale_idx) const;
+        std::string const& GetNameForLocaleIdx(LocaleConstant locale_idx) const;
 
         void setDeathState(DeathState s);                   // override virtual Unit::setDeathState
 
@@ -622,12 +621,14 @@ class Creature : public Unit, public GridObject<Creature>, public MapCreature
 
         bool canStartAttack(Unit const* u, bool force) const;
         float GetAttackDistance(Unit const* player) const;
+        float GetAggroRange(Unit const* target) const;
 
         void SendAIReaction(AiReaction reactionType);
 
         Unit* SelectNearestTarget(float dist = 0) const;
         Unit* SelectNearestTargetInAttackDistance(float dist = 0) const;
         Player* SelectNearestPlayer(float distance = 0) const;
+        Unit* SelectNearestHostileUnitInAggroRange(bool useLOS = false) const;
 
         void DoFleeToGetAssistance();
         void CallForHelp(float fRadius);
@@ -668,6 +669,7 @@ class Creature : public Unit, public GridObject<Creature>, public MapCreature
         bool hasInvolvedQuest(uint32 quest_id)  const;
 
         bool isRegeneratingHealth() { return m_regenHealth; }
+        void setRegeneratingHealth(bool regenHealth) { m_regenHealth = regenHealth; }
         virtual uint8 GetPetAutoSpellSize() const { return MAX_SPELL_CHARM; }
         virtual uint32 GetPetAutoSpellOnPos(uint8 pos) const
         {
@@ -682,8 +684,8 @@ class Creature : public Unit, public GridObject<Creature>, public MapCreature
 
         void SetHomePosition(float x, float y, float z, float o) { m_homePosition.Relocate(x, y, z, o); }
         void SetHomePosition(const Position &pos) { m_homePosition.Relocate(pos); }
-        void GetHomePosition(float &x, float &y, float &z, float &ori) { m_homePosition.GetPosition(x, y, z, ori); }
-        Position GetHomePosition() { return m_homePosition; }
+        void GetHomePosition(float &x, float &y, float &z, float &ori) const { m_homePosition.GetPosition(x, y, z, ori); }
+        Position GetHomePosition() const { return m_homePosition; }
 
         void SetTransportHomePosition(float x, float y, float z, float o) { m_transportHomePosition.Relocate(x, y, z, o); }
         void SetTransportHomePosition(const Position &pos) { m_transportHomePosition.Relocate(pos); }

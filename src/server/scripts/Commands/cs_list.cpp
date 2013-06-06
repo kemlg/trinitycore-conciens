@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -25,8 +25,10 @@ EndScriptData */
 #include "ScriptMgr.h"
 #include "Chat.h"
 #include "SpellAuraEffects.h"
+#include "Language.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
+#include "Player.h"
 
 class list_commandscript : public CommandScript
 {

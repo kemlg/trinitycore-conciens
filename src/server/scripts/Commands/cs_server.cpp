@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,11 +22,13 @@ Comment: All server related commands
 Category: commandscripts
 EndScriptData */
 
-#include "ScriptMgr.h"
 #include "Chat.h"
-#include "SystemConfig.h"
 #include "Config.h"
+#include "Language.h"
 #include "ObjectAccessor.h"
+#include "Player.h"
+#include "ScriptMgr.h"
+#include "SystemConfig.h"
 
 class server_commandscript : public CommandScript
 {

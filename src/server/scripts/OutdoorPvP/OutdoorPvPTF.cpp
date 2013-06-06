@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -296,9 +296,12 @@ void OPvPCapturePointTF::ChangeState()
         uint32 alliance_towers = ((OutdoorPvPTF*)m_PvP)->GetAllianceTowersControlled();
         if (alliance_towers < TF_TOWER_NUM)
             ((OutdoorPvPTF*)m_PvP)->SetAllianceTowersControlled(++alliance_towers);
+
         sWorld->SendZoneText(OutdoorPvPTFBuffZones[0], sObjectMgr->GetTrinityStringForDBCLocale(LANG_OPVP_TF_CAPTURE_A));
+
         for (PlayerSet::iterator itr = m_activePlayers[0].begin(); itr != m_activePlayers[0].end(); ++itr)
-            (*itr)->AreaExploredOrEventHappens(TF_ALLY_QUEST);
+            if (Player* player = ObjectAccessor::FindPlayer(*itr))
+                player->AreaExploredOrEventHappens(TF_ALLY_QUEST);
         break;
     }
     case OBJECTIVESTATE_HORDE:
@@ -308,9 +311,12 @@ void OPvPCapturePointTF::ChangeState()
         uint32 horde_towers = ((OutdoorPvPTF*)m_PvP)->GetHordeTowersControlled();
         if (horde_towers < TF_TOWER_NUM)
             ((OutdoorPvPTF*)m_PvP)->SetHordeTowersControlled(++horde_towers);
+
         sWorld->SendZoneText(OutdoorPvPTFBuffZones[0], sObjectMgr->GetTrinityStringForDBCLocale(LANG_OPVP_TF_CAPTURE_H));
+
         for (PlayerSet::iterator itr = m_activePlayers[1].begin(); itr != m_activePlayers[1].end(); ++itr)
-            (*itr)->AreaExploredOrEventHappens(TF_HORDE_QUEST);
+            if (Player* player = ObjectAccessor::FindPlayer(*itr))
+                player->AreaExploredOrEventHappens(TF_HORDE_QUEST);
         break;
     }
     case OBJECTIVESTATE_NEUTRAL:

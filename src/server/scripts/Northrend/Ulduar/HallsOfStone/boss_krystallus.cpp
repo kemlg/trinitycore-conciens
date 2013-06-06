@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -45,10 +45,10 @@ enum Spells
 
 enum Yells
 {
-    SAY_AGGRO                                   = -1599007,
-    SAY_KILL                                    = -1599008,
-    SAY_DEATH                                   = -1599009,
-    SAY_SHATTER                                 = -1599010
+    SAY_AGGRO                                   = 0,
+    SAY_KILL                                    = 1,
+    SAY_DEATH                                   = 2,
+    SAY_SHATTER                                 = 3
 };
 
 class boss_krystallus : public CreatureScript
@@ -93,7 +93,7 @@ public:
         }
         void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(SAY_AGGRO, me);
+            Talk(SAY_AGGRO);
 
             if (instance)
                 instance->SetData(DATA_KRYSTALLUS_EVENT, IN_PROGRESS);
@@ -146,7 +146,7 @@ public:
 
         void JustDied(Unit* /*killer*/)
         {
-            DoScriptText(SAY_DEATH, me);
+            Talk(SAY_DEATH);
 
             if (instance)
                 instance->SetData(DATA_KRYSTALLUS_EVENT, DONE);
@@ -156,7 +156,7 @@ public:
         {
             if (victim == me)
                 return;
-            DoScriptText(SAY_KILL, me);
+            Talk(SAY_KILL);
         }
 
         void SpellHitTarget(Unit* /*target*/, const SpellInfo* pSpell)

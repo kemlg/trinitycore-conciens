@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -32,14 +32,14 @@ EndContentData */
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "GuardAI.h"
+#include "Player.h"
+#include "SpellInfo.h"
 
 enum GuardGeneric
 {
     GENERIC_CREATURE_COOLDOWN       = 5000,
 
-    SAY_GUARD_SIL_AGGRO1            = -1070001,
-    SAY_GUARD_SIL_AGGRO2            = -1070002,
-    SAY_GUARD_SIL_AGGRO3            = -1070003,
+    SAY_GUARD_SIL_AGGRO             = 0,
 
     NPC_CENARION_HOLD_INFANTRY      = 15184,
     NPC_STORMWIND_CITY_GUARD        = 68,
@@ -65,7 +65,7 @@ public:
         void EnterCombat(Unit* who)
         {
             if (me->GetEntry() == NPC_CENARION_HOLD_INFANTRY)
-                DoScriptText(RAND(SAY_GUARD_SIL_AGGRO1, SAY_GUARD_SIL_AGGRO2, SAY_GUARD_SIL_AGGRO3), me, who);
+                Talk(SAY_GUARD_SIL_AGGRO, who->GetGUID());
             if (SpellInfo const* spell = me->reachWithSpellAttack(who))
                 DoCast(who, spell->Id);
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -60,25 +60,20 @@ void UnitAI::DoMeleeAttackIfReady()
 
 bool UnitAI::DoSpellAttackIfReady(uint32 spell)
 {
-    if (me->HasUnitState(UNIT_STATE_CASTING))
+    if (me->HasUnitState(UNIT_STATE_CASTING) || !me->isAttackReady())
         return true;
 
-    if (me->isAttackReady())
+    if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spell))
     {
-        if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spell))
+        if (me->IsWithinCombatRange(me->getVictim(), spellInfo->GetMaxRange(false)))
         {
-            if (me->IsWithinCombatRange(me->getVictim(), spellInfo->GetMaxRange(false)))
-            {
-                me->CastSpell(me->getVictim(), spell, false);
-                me->resetAttackTimer();
-            }
-            else
-                return false;
+            me->CastSpell(me->getVictim(), spell, false);
+            me->resetAttackTimer();
+            return true;
         }
-        else
-            return false;
     }
-    return true;
+
+    return false;
 }
 
 Unit* UnitAI::SelectTarget(SelectAggroTarget targetType, uint32 position, float dist, bool playerOnly, int32 aura)
@@ -101,30 +96,28 @@ void UnitAI::DoAddAuraToAllHostilePlayers(uint32 spellid)
 {
     if (me->isInCombat())
     {
-        std::list<HostileReference*>& threatlist = me->getThreatManager().getThreatList();
-        for (std::list<HostileReference*>::iterator itr = threatlist.begin(); itr != threatlist.end(); ++itr)
+        ThreatContainer::StorageType threatlist = me->getThreatManager().getThreatList();
+        for (ThreatContainer::StorageType::const_iterator itr = threatlist.begin(); itr != threatlist.end(); ++itr)
         {
             if (Unit* unit = Unit::GetUnit(*me, (*itr)->getUnitGuid()))
                 if (unit->GetTypeId() == TYPEID_PLAYER)
                     me->AddAura(spellid, unit);
         }
-    }else
-        return;
+    }
 }
 
 void UnitAI::DoCastToAllHostilePlayers(uint32 spellid, bool triggered)
 {
     if (me->isInCombat())
     {
-        std::list<HostileReference*>& threatlist = me->getThreatManager().getThreatList();
-        for (std::list<HostileReference*>::iterator itr = threatlist.begin(); itr != threatlist.end(); ++itr)
+        ThreatContainer::StorageType threatlist = me->getThreatManager().getThreatList();
+        for (ThreatContainer::StorageType::const_iterator itr = threatlist.begin(); itr != threatlist.end(); ++itr)
         {
             if (Unit* unit = Unit::GetUnit(*me, (*itr)->getUnitGuid()))
                 if (unit->GetTypeId() == TYPEID_PLAYER)
                     me->CastSpell(unit, spellid, triggered);
         }
-    }else
-        return;
+    }
 }
 
 void UnitAI::DoCast(uint32 spellId)
@@ -165,6 +158,30 @@ void UnitAI::DoCast(uint32 spellId)
 
     if (target)
         me->CastSpell(target, spellId, false);
+}
+
+void UnitAI::DoCast(Unit* victim, uint32 spellId, bool triggered)
+{
+    if (!victim || (me->HasUnitState(UNIT_STATE_CASTING) && !triggered))
+        return;
+
+    me->CastSpell(victim, spellId, triggered);
+}
+
+void UnitAI::DoCastVictim(uint32 spellId, bool triggered)
+{
+    if (!me->getVictim() || (me->HasUnitState(UNIT_STATE_CASTING) && !triggered))
+        return;
+
+    me->CastSpell(me->getVictim(), spellId, triggered);
+}
+
+void UnitAI::DoCastAOE(uint32 spellId, bool triggered)
+{
+    if (!triggered && me->HasUnitState(UNIT_STATE_CASTING))
+        return;
+
+    me->CastSpell((Unit*)NULL, spellId, triggered);
 }
 
 #define UPDATE_TARGET(a) {if (AIInfo->target<a) AIInfo->target=a;}
@@ -221,7 +238,10 @@ void UnitAI::FillAISpellInfo()
 }
 
 //Enable PlayerAI when charmed
-void PlayerAI::OnCharmed(bool apply) { me->IsAIEnabled = apply; }
+void PlayerAI::OnCharmed(bool apply)
+{
+    me->IsAIEnabled = apply;
+}
 
 void SimpleCharmedAI::UpdateAI(const uint32 /*diff*/)
 {

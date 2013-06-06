@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -25,6 +25,8 @@ EndScriptData */
 #include "ScriptMgr.h"
 #include "Chat.h"
 #include "ChannelMgr.h"
+#include "Language.h"
+#include "Player.h"
 
 class message_commandscript : public CommandScript
 {
@@ -71,7 +73,7 @@ public:
         Player* player = handler->GetSession()->GetPlayer();
         Channel* channcel = NULL;
 
-        if (ChannelMgr* cMgr = channelMgr(player->GetTeam()))
+        if (ChannelMgr* cMgr = ChannelMgr::forTeam(player->GetTeam()))
             channcel = cMgr->GetChannel(channelStr, player);
 
         if (strcmp(argStr, "on") == 0)

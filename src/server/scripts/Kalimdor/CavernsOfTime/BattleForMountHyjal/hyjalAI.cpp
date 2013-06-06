@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -617,42 +617,6 @@ uint32 hyjalAI::GetInstanceData(uint32 Event)
     else sLog->outError(LOG_FILTER_TSCR, ERROR_INST_DATA);
 
     return 0;
-}
-
-void hyjalAI::Talk(uint32 id)
-{
-    std::list<uint8> index;
-    for (uint8 i = 0; i < 9; ++i)
-    {
-        if (Faction == 0)                                    // Alliance
-        {
-            if (JainaQuotes[i].id == id)
-                index.push_back(i);
-        }
-        else if (Faction == 1)                               // Horde
-        {
-            if (ThrallQuotes[i].id == id)
-                index.push_back(i);
-        }
-    }
-
-    if (index.empty())
-        return;                                             // No quotes found, no use to continue
-
-    uint8 ind = *(index.begin()) + rand()%index.size();
-
-    int32 YellId = 0;
-    if (Faction == 0)                                        // Alliance
-    {
-        YellId = JainaQuotes[ind].textid;
-    }
-    else if (Faction == 1)                                   // Horde
-    {
-        YellId = ThrallQuotes[ind].textid;
-    }
-
-    if (YellId)
-        DoScriptText(YellId, me);
 }
 
 void hyjalAI::Retreat()

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -32,6 +32,7 @@ EndContentData */
 #include "ScriptedCreature.h"
 #include "ScriptedGossip.h"
 #include "zulfarrak.h"
+#include "Player.h"
 
 /*######
 ## npc_sergeant_bly
@@ -241,16 +242,16 @@ private:
 
 enum weegliSpells
 {
-    SPELL_BOMB                 = 8858,
-    SPELL_GOBLIN_LAND_MINE     = 21688,
-    SPELL_SHOOT                = 6660,
-    SPELL_WEEGLIS_BARREL       = 10772
+    SPELL_BOMB                  = 8858,
+    SPELL_GOBLIN_LAND_MINE      = 21688,
+    SPELL_SHOOT                 = 6660,
+    SPELL_WEEGLIS_BARREL        = 10772
 };
 
 enum weegliSays
 {
-    SAY_WEEGLI_OHNO = -1209000,
-    SAY_WEEGLI_OK_I_GO = -1209001
+    SAY_WEEGLI_OHNO             = 0,
+    SAY_WEEGLI_OK_I_GO          = 1
 };
 
 #define GOSSIP_WEEGLI               "[PH] Please blow up the door."
@@ -362,7 +363,7 @@ public:
                 if (instance->GetData(EVENT_PYRAMID) == PYRAMID_CAGES_OPEN)
                 {
                     instance->SetData(EVENT_PYRAMID, PYRAMID_ARRIVED_AT_STAIR);
-                    DoScriptText(SAY_WEEGLI_OHNO, me);
+                    Talk(SAY_WEEGLI_OHNO);
                     me->SetHomePosition(1882.69f, 1272.28f, 41.87f, 0);
                 }
                 else
@@ -387,7 +388,7 @@ public:
                 me->setFaction(FACTION_FRIENDLY);
                 me->GetMotionMaster()->MovePoint(0, 1858.57f, 1146.35f, 14.745f);
                 me->SetHomePosition(1858.57f, 1146.35f, 14.745f, 3.85f); // in case he gets interrupted
-                DoScriptText(SAY_WEEGLI_OK_I_GO, me);
+                Talk(SAY_WEEGLI_OK_I_GO);
                 destroyingDoor=true;
             }
         }

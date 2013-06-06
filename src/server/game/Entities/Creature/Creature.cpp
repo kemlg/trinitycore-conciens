@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -16,40 +16,42 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "BattlegroundMgr.h"
+#include "CellImpl.h"
 #include "Common.h"
-#include "DatabaseEnv.h"
-#include "WorldPacket.h"
-#include "World.h"
-#include "ObjectMgr.h"
-#include "GroupMgr.h"
-#include "SpellMgr.h"
+#include "CreatureAI.h"
+#include "CreatureAISelector.h"
+#include "CreatureGroups.h"
 #include "Creature.h"
-#include "QuestDef.h"
+#include "DatabaseEnv.h"
+#include "Formulas.h"
+#include "GameEventMgr.h"
 #include "GossipDef.h"
-#include "Player.h"
-#include "PoolMgr.h"
-#include "Opcodes.h"
+#include "GridNotifiers.h"
+#include "GridNotifiersImpl.h"
+#include "Group.h"
+#include "GroupMgr.h"
+#include "InstanceScript.h"
 #include "Log.h"
 #include "LootMgr.h"
 #include "MapManager.h"
-#include "CreatureAI.h"
-#include "CreatureAISelector.h"
-#include "Formulas.h"
-#include "WaypointMovementGenerator.h"
-#include "InstanceScript.h"
-#include "BattlegroundMgr.h"
-#include "Util.h"
-#include "GridNotifiers.h"
-#include "GridNotifiersImpl.h"
-#include "CellImpl.h"
-#include "OutdoorPvPMgr.h"
-#include "GameEventMgr.h"
-#include "CreatureGroups.h"
-#include "Vehicle.h"
-#include "SpellAuraEffects.h"
-#include "Group.h"
-#include "MoveSplineInit.h"
 #include "MoveSpline.h"
+#include "MoveSplineInit.h"
+#include "ObjectMgr.h"
+#include "Opcodes.h"
+#include "OutdoorPvPMgr.h"
+#include "Player.h"
+#include "PoolMgr.h"
+#include "QuestDef.h"
+#include "SpellAuraEffects.h"
+#include "SpellMgr.h"
+#include "TemporarySummon.h"
+#include "Util.h"
+#include "Vehicle.h"
+#include "WaypointMovementGenerator.h"
+#include "World.h"
+#include "WorldPacket.h"
+
 // apply implementation of the singletons
 
 TrainerSpell const* TrainerSpellData::Find(uint32 spell_id) const
@@ -287,6 +289,10 @@ bool Creature::InitEntry(uint32 Entry, uint32 /*team*/, const CreatureData* data
             --diff;
     }
 
+    // Initialize loot duplicate count depending on raid difficulty
+    if (GetMap()->Is25ManRaid())
+        loot.maxDuplicates = 3;
+
     SetEntry(Entry);                                        // normal entry always
     m_creatureInfo = cinfo;                                 // map mode related always
 
@@ -409,6 +415,16 @@ bool Creature::UpdateEntry(uint32 Entry, uint32 team, const CreatureData* data)
             SetPvP(false);
     }
 
+    // updates spell bars for vehicles and set player's faction - should be called here, to overwrite faction that is set from the new template
+    if (IsVehicle())
+    {
+        if (Player* owner = Creature::GetCharmerOrOwnerPlayerOrPlayerItself()) // this check comes in case we don't have a player
+        {
+            setFaction(owner->getFaction()); // vehicles should have same as owner faction
+            owner->VehicleSpellInitialize();
+        }
+    }
+
     // trigger creature is always not selectable and can not be attacked
     if (isTrigger())
         SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
@@ -421,27 +437,26 @@ bool Creature::UpdateEntry(uint32 Entry, uint32 team, const CreatureData* data)
         ApplySpellImmune(0, IMMUNITY_EFFECT, SPELL_EFFECT_ATTACK_ME, true);
     }
 
-    //! Suspect it works this way:
-    //! If creature can walk and fly (usually with pathing)
-    //! Set MOVEMENTFLAG_CAN_FLY. Otherwise if it can only fly
-    //! Set MOVEMENTFLAG_DISABLE_GRAVITY
-    //! The only time I saw Movement Flags: DisableGravity, CanFly, Flying (50332672) on the same unit
-    //! it was a vehicle
-    if (cInfo->InhabitType & INHABIT_AIR && cInfo->InhabitType & INHABIT_GROUND)
+    // Set the movement flags if the creature is in that mode. (Only fly if actually in air, only swim if in water, etc)
+    float ground = GetPositionZ();
+    GetMap()->GetWaterOrGroundLevel(GetPositionX(), GetPositionY(), GetPositionZ(), &ground);
+
+    bool isInAir = G3D::fuzzyGt(GetPositionZ(), ground + 0.05f) || G3D::fuzzyLt(GetPositionZ(), ground - 0.05f); // Can be underground too, prevent the falling
+
+    if (cInfo->InhabitType & INHABIT_AIR && cInfo->InhabitType & INHABIT_GROUND && isInAir)
         SetCanFly(true);
-    else if (cInfo->InhabitType & INHABIT_AIR)
+    else if (cInfo->InhabitType & INHABIT_AIR && isInAir)
         SetDisableGravity(true);
-    /*! Implemented in LoadCreatureAddon. Suspect there's a rule for UNIT_BYTE_1_FLAG_HOVER
-        in relation to DisableGravity also.
+    else
+    {
+        SetCanFly(false);
+        SetDisableGravity(false);
+    }
 
-    else if (GetByteValue(UNIT_FIELD_BYTES_1, 3) & UNIT_BYTE_1_FLAG_HOVER)
-        SetHover(true);
-
-    */
-
-    // TODO: Shouldn't we check whether or not the creature is in water first?
-    if (cInfo->InhabitType & INHABIT_WATER)
-        AddUnitMovementFlag(MOVEMENTFLAG_SWIMMING);
+    if (cInfo->InhabitType & INHABIT_WATER && IsInWater())
+         AddUnitMovementFlag(MOVEMENTFLAG_SWIMMING);
+    else
+        RemoveUnitMovementFlag(MOVEMENTFLAG_SWIMMING);
 
     return true;
 }
@@ -465,6 +480,23 @@ void Creature::Update(uint32 diff)
     {
         if (canWalk())
             RemoveUnitMovementFlag(MOVEMENTFLAG_SWIMMING);
+    }
+
+    // Set the movement flags if the creature is in that mode. (Only fly if actually in air, only swim if in water, etc)
+    float ground = GetPositionZ();
+    GetMap()->GetWaterOrGroundLevel(GetPositionX(), GetPositionY(), GetPositionZ(), &ground);
+
+    bool isInAir = G3D::fuzzyGt(GetPositionZ(), ground + 0.05f) || G3D::fuzzyLt(GetPositionZ(), ground - 0.05f); // Can be underground too, prevent the falling
+    CreatureTemplate const* cinfo = GetCreatureTemplate();
+
+    if (cinfo->InhabitType & INHABIT_AIR && cinfo->InhabitType & INHABIT_GROUND && isInAir)
+        SetCanFly(true);
+    else if (cinfo->InhabitType & INHABIT_AIR && isInAir)
+        SetDisableGravity(true);
+    else
+    {
+        SetCanFly(false);
+        SetDisableGravity(false);
     }
 
     switch (m_deathState)
@@ -630,7 +662,7 @@ void Creature::RegenerateMana()
     AuraEffectList const& ModPowerRegenPCTAuras = GetAuraEffectsByType(SPELL_AURA_MOD_POWER_REGEN_PERCENT);
     for (AuraEffectList::const_iterator i = ModPowerRegenPCTAuras.begin(); i != ModPowerRegenPCTAuras.end(); ++i)
         if ((*i)->GetMiscValue() == POWER_MANA)
-            AddPctN(addvalue, (*i)->GetAmount());
+            AddPct(addvalue, (*i)->GetAmount());
 
     addvalue += GetTotalAuraModifierByMiscValue(SPELL_AURA_MOD_POWER_REGEN, POWER_MANA) * CREATURE_REGEN_INTERVAL / (5 * IN_MILLISECONDS);
 
@@ -667,7 +699,7 @@ void Creature::RegenerateHealth()
     // Apply modifiers (if any).
     AuraEffectList const& ModPowerRegenPCTAuras = GetAuraEffectsByType(SPELL_AURA_MOD_HEALTH_REGEN_PERCENT);
     for (AuraEffectList::const_iterator i = ModPowerRegenPCTAuras.begin(); i != ModPowerRegenPCTAuras.end(); ++i)
-        AddPctN(addvalue, (*i)->GetAmount());
+        AddPct(addvalue, (*i)->GetAmount());
 
     addvalue += GetTotalAuraModifier(SPELL_AURA_MOD_REGEN) * CREATURE_REGEN_INTERVAL  / (5 * IN_MILLISECONDS);
 
@@ -880,7 +912,7 @@ bool Creature::isCanTrainingOf(Player* player, bool msg) const
                 if (msg)
                 {
                     player->PlayerTalkClass->ClearMenus();
-                    switch (GetCreatureTemplate()->trainer_class)
+                    switch (GetCreatureTemplate()->trainer_race)
                     {
                         case RACE_DWARF:        player->PlayerTalkClass->SendGossipMenu(5865, GetGUID()); break;
                         case RACE_GNOME:        player->PlayerTalkClass->SendGossipMenu(4881, GetGUID()); break;
@@ -951,30 +983,6 @@ bool Creature::isCanTrainingAndResetTalentsOf(Player* player) const
     return player->getLevel() >= 10
         && GetCreatureTemplate()->trainer_type == TRAINER_TYPE_CLASS
         && player->getClass() == GetCreatureTemplate()->trainer_class;
-}
-
-void Creature::AI_SendMoveToPacket(float x, float y, float z, uint32 time, uint32 /*MovementFlags*/, uint8 /*type*/)
-{
-    /*    uint32 timeElap = getMSTime();
-        if ((timeElap - m_startMove) < m_moveTime)
-        {
-            oX = (dX - oX) * ((timeElap - m_startMove) / m_moveTime);
-            oY = (dY - oY) * ((timeElap - m_startMove) / m_moveTime);
-        }
-        else
-        {
-            oX = dX;
-            oY = dY;
-        }
-
-        dX = x;
-        dY = y;
-        m_orientation = atan2((oY - dY), (oX - dX));
-
-        m_startMove = getMSTime();
-        m_moveTime = time;*/
-    float speed = GetDistance(x, y, z) / ((float)time * 0.001f);
-    MonsterMoveWithSpeed(x, y, z, speed);
 }
 
 Player* Creature::GetLootRecipient() const
@@ -1565,12 +1573,28 @@ void Creature::setDeathState(DeathState s)
         ResetPlayerDamageReq();
         CreatureTemplate const* cinfo = GetCreatureTemplate();
         SetWalk(true);
-        if (cinfo->InhabitType & INHABIT_AIR && cinfo->InhabitType & INHABIT_GROUND)
+
+        // Set the movement flags if the creature is in that mode. (Only fly if actually in air, only swim if in water, etc)
+        float ground = GetPositionZ();
+        GetMap()->GetWaterOrGroundLevel(GetPositionX(), GetPositionY(), GetPositionZ(), &ground);
+
+        bool isInAir = G3D::fuzzyGt(GetPositionZ(), ground + 0.05f) || G3D::fuzzyLt(GetPositionZ(), ground - 0.05f); // Can be underground too, prevent the falling
+
+        if (cinfo->InhabitType & INHABIT_AIR && cinfo->InhabitType & INHABIT_GROUND && isInAir)
             SetCanFly(true);
-        else if (cinfo->InhabitType & INHABIT_AIR)
+        else if (cinfo->InhabitType & INHABIT_AIR && isInAir)
             SetDisableGravity(true);
-        if (cinfo->InhabitType & INHABIT_WATER)
+        else
+        {
+            SetCanFly(false);
+            SetDisableGravity(false);
+        }
+
+        if (cinfo->InhabitType & INHABIT_WATER && IsInWater())
             AddUnitMovementFlag(MOVEMENTFLAG_SWIMMING);
+        else
+            RemoveUnitMovementFlag(MOVEMENTFLAG_SWIMMING);
+
         SetUInt32Value(UNIT_NPC_FLAGS, cinfo->npcflag);
         ClearUnitState(uint32(UNIT_STATE_ALL_STATE));
         SetMeleeDamageSchool(SpellSchools(cinfo->dmgschool));
@@ -1601,7 +1625,8 @@ void Creature::Respawn(bool force)
         if (m_DBTableGuid)
             GetMap()->RemoveCreatureRespawnTime(m_DBTableGuid);
 
-        sLog->outDebug(LOG_FILTER_UNITS, "Respawning creature %s (GuidLow: %u, Full GUID: " UI64FMTD " Entry: %u)", GetName(), GetGUIDLow(), GetGUID(), GetEntry());
+        sLog->outDebug(LOG_FILTER_UNITS, "Respawning creature %s (GuidLow: %u, Full GUID: " UI64FMTD " Entry: %u)",
+            GetName().c_str(), GetGUIDLow(), GetGUID(), GetEntry());
         m_respawnTime = 0;
         lootForPickPocketed = false;
         lootForBody         = false;
@@ -2127,7 +2152,7 @@ bool Creature::LoadCreaturesAddon(bool reload)
             if (HasAura(*itr))
             {
                 if (!reload)
-                    sLog->outError(LOG_FILTER_SQL, "Creature (GUID: %u Entry: %u) has duplicate aura (spell %u) in `auras` field.", GetGUIDLow(), GetEntry(), *itr);
+                    sLog->outError(LOG_FILTER_SQL, "Creature (GUID: %u Entry: %u) has duplicate aura (spell %u) in `auras` field.", GetDBTableGUIDLow(), GetEntry(), *itr);
 
                 continue;
             }
@@ -2443,7 +2468,7 @@ TrainerSpellData const* Creature::GetTrainerSpells() const
 }
 
 // overwrite WorldObject function for proper name localization
-const char* Creature::GetNameForLocaleIdx(LocaleConstant loc_idx) const
+std::string const & Creature::GetNameForLocaleIdx(LocaleConstant loc_idx) const
 {
     if (loc_idx != DEFAULT_LOCALE)
     {
@@ -2452,7 +2477,7 @@ const char* Creature::GetNameForLocaleIdx(LocaleConstant loc_idx) const
         if (cl)
         {
             if (cl->Name.size() > uloc_idx && !cl->Name[uloc_idx].empty())
-                return cl->Name[uloc_idx].c_str();
+                return cl->Name[uloc_idx];
         }
     }
 
@@ -2535,4 +2560,70 @@ bool Creature::SetHover(bool enable)
     data.append(GetPackGUID());
     SendMessageToSet(&data, false);
     return true;
+}
+
+float Creature::GetAggroRange(Unit const* target) const
+{
+    // Determines the aggro range for creatures (usually pets), used mainly for aggressive pet target selection.
+    // Based on data from wowwiki due to lack of 3.3.5a data
+
+    if (target && this->isPet())
+    {
+        uint32 targetLevel = 0;
+
+        if (target->GetTypeId() == TYPEID_PLAYER)
+            targetLevel = target->getLevelForTarget(this);
+        else if (target->GetTypeId() == TYPEID_UNIT)
+            targetLevel = target->ToCreature()->getLevelForTarget(this);
+
+        uint32 myLevel = getLevelForTarget(target);
+        int32 levelDiff = int32(targetLevel) - int32(myLevel);
+
+        // The maximum Aggro Radius is capped at 45 yards (25 level difference)
+        if (levelDiff < -25)
+            levelDiff = -25;
+
+        // The base aggro radius for mob of same level
+        float aggroRadius = 20;
+
+        // Aggro Radius varies with level difference at a rate of roughly 1 yard/level
+        aggroRadius -= (float)levelDiff;
+
+        // detect range auras
+        aggroRadius += GetTotalAuraModifier(SPELL_AURA_MOD_DETECT_RANGE);
+
+        // detected range auras
+        aggroRadius += target->GetTotalAuraModifier(SPELL_AURA_MOD_DETECTED_RANGE);
+
+        // Just in case, we don't want pets running all over the map
+        if (aggroRadius > MAX_AGGRO_RADIUS)
+            aggroRadius = MAX_AGGRO_RADIUS;
+
+        // Minimum Aggro Radius for a mob seems to be combat range (5 yards)
+        //  hunter pets seem to ignore minimum aggro radius so we'll default it a little higher
+        if (aggroRadius < 10)
+            aggroRadius = 10;
+
+        return (aggroRadius);
+    }
+
+    // Default
+    return 0.0f;
+}
+
+Unit* Creature::SelectNearestHostileUnitInAggroRange(bool useLOS) const
+{
+    // Selects nearest hostile target within creature's aggro range. Used primarily by
+    //  pets set to aggressive. Will not return neutral or friendly targets.
+
+    Unit* target = NULL;
+
+    {
+        Trinity::NearestHostileUnitInAggroRangeCheck u_check(this, useLOS);
+        Trinity::UnitSearcher<Trinity::NearestHostileUnitInAggroRangeCheck> searcher(this, target, u_check);
+
+        VisitNearbyGridObject(MAX_AGGRO_RADIUS, searcher);
+    }
+
+    return target;
 }

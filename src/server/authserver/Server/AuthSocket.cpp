@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -207,7 +207,7 @@ AuthSocket::AuthSocket(RealmSocket& socket) : pPatch(NULL), socket_(socket)
 // Close patch file descriptor before leaving
 AuthSocket::~AuthSocket(void) {}
 
-// Accept the connection and set the s random value for SRP6
+// Accept the connection
 void AuthSocket::OnAccept(void)
 {
     sLog->outDebug(LOG_FILTER_AUTHSERVER, "'%s:%d' Accepting connection", socket().getRemoteAddress().c_str(), socket().getRemotePort());
@@ -280,7 +280,7 @@ void AuthSocket::_SetVSFields(const std::string& rI)
     v = g.ModExp(x, N);
 
     // No SQL injection (username escaped)
-    const char *v_hex, *s_hex;
+    char *v_hex, *s_hex;
     v_hex = v.AsHexStr();
     s_hex = s.AsHexStr();
 
@@ -290,8 +290,8 @@ void AuthSocket::_SetVSFields(const std::string& rI)
     stmt->setString(2, _login);
     LoginDatabase.Execute(stmt);
 
-    OPENSSL_free((void*)v_hex);
-    OPENSSL_free((void*)s_hex);
+    OPENSSL_free(v_hex);
+    OPENSSL_free(s_hex);
 }
 
 // Logon Challenge command handler
@@ -365,7 +365,7 @@ bool AuthSocket::_HandleLogonChallenge()
     if (result)
     {
         pkt << uint8(WOW_FAIL_BANNED);
-        sLog->outDebug(LOG_FILTER_AUTHSERVER, "'%s:%d' [AuthChallenge] Banned ip tries to login!",socket().getRemoteAddress().c_str(), socket().getRemotePort());
+        sLog->outDebug(LOG_FILTER_AUTHSERVER, "'%s:%d' [AuthChallenge] Banned ip tries to login!", socket().getRemoteAddress().c_str(), socket().getRemotePort());
     }
     else
     {
@@ -818,6 +818,28 @@ bool AuthSocket::_HandleReconnectProof()
     }
 }
 
+ACE_INET_Addr const& AuthSocket::GetAddressForClient(Realm const& realm, ACE_INET_Addr const& clientAddr)
+{
+    // Attempt to send best address for client
+    if (clientAddr.is_loopback())
+    {
+        // Try guessing if realm is also connected locally
+        if (realm.LocalAddress.is_loopback() || realm.ExternalAddress.is_loopback())
+            return clientAddr;
+
+        // Assume that user connecting from the machine that authserver is located on
+        // has all realms available in his local network
+        return realm.LocalAddress;
+    }
+
+    // Check if connecting client is in the same network
+    if (IsIPAddrInNetwork(realm.LocalAddress, clientAddr, realm.LocalSubnetMask))
+        return realm.LocalAddress;
+
+    // Return external IP
+    return realm.ExternalAddress;
+}
+
 // Realm List command handler
 bool AuthSocket::_HandleRealmList()
 {
@@ -844,6 +866,9 @@ bool AuthSocket::_HandleRealmList()
 
     // Update realm list if need
     sRealmList->UpdateIfNeed();
+
+    ACE_INET_Addr clientAddr;
+    socket().peer().get_remote_addr(clientAddr);
 
     // Circle through realms in the RealmList and construct the return packet (including # of user characters in each realm)
     ByteBuffer pkt;
@@ -876,6 +901,9 @@ bool AuthSocket::_HandleRealmList()
             name = ss.str();
         }
 
+        // We don't need the port number from which client connects with but the realm's port
+        clientAddr.set_port_number(i->second.ExternalAddress.get_port_number());
+
         uint8 lock = (i->second.allowedSecurityLevel > _accountSecurityLevel) ? 1 : 0;
 
         uint8 AmountOfCharacters = 0;
@@ -891,7 +919,7 @@ bool AuthSocket::_HandleRealmList()
             pkt << lock;                                    // if 1, then realm locked
         pkt << uint8(flag);                                 // RealmFlags
         pkt << name;
-        pkt << i->second.address;
+        pkt << GetAddressString(GetAddressForClient(i->second, clientAddr));
         pkt << i->second.populationLevel;
         pkt << AmountOfCharacters;
         pkt << i->second.timezone;                          // realm category

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,6 +23,7 @@
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "halls_of_lightning.h"
+#include "SpellInfo.h"
 
 enum Spells
 {
@@ -197,8 +198,7 @@ public:
 
                 summoned->CastSpell(summoned, DUNGEON_MODE(SPELL_SPARK_VISUAL_TRIGGER, H_SPELL_SPARK_VISUAL_TRIGGER), true);
 
-                Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0);
-                if (target)
+                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                 {
                     summoned->SetInCombatWith(target);
                     summoned->GetMotionMaster()->Clear();

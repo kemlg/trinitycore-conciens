@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -420,7 +420,7 @@ enum SMART_ACTION
     SMART_ACTION_UPDATE_TEMPLATE                    = 36,     // Entry, Team
     SMART_ACTION_DIE                                = 37,     // No Params
     SMART_ACTION_SET_IN_COMBAT_WITH_ZONE            = 38,     // No Params
-    SMART_ACTION_CALL_FOR_HELP                      = 39,     // Radius
+    SMART_ACTION_CALL_FOR_HELP                      = 39,     // Radius, With Emote
     SMART_ACTION_SET_SHEATH                         = 40,     // Sheath (0-unarmed, 1-melee, 2-ranged)
     SMART_ACTION_FORCE_DESPAWN                      = 41,     // timer
     SMART_ACTION_SET_INVINCIBILITY_HP_LEVEL         = 42,     // MinHpValue(+pct, -flat)
@@ -485,8 +485,10 @@ enum SMART_ACTION
     SMART_ACTION_GO_SET_LOOT_STATE                  = 99,     // state
     SMART_ACTION_SEND_TARGET_TO_TARGET              = 100,    // id
     SMART_ACTION_SET_HOME_POS                       = 101,    // none
+    SMART_ACTION_SET_HEALTH_REGEN                   = 102,    // 0/1
+    SMART_ACTION_SET_ROOT                           = 103,    // off/on
 
-    SMART_ACTION_END                                = 102
+    SMART_ACTION_END                                = 104
 };
 
 struct SmartAction
@@ -676,6 +678,7 @@ struct SmartAction
         struct
         {
             uint32 range;
+            uint32 withEmote;
         } callHelp;
 
         struct
@@ -912,6 +915,16 @@ struct SmartAction
             uint32 angle;
         } setRangedMovement;
 
+        struct
+        {
+            uint32 regenHealth;
+        } setHealthRegen;
+
+        struct
+        {
+            uint32 root;
+        } setRoot;
+
         //! Note for any new future actions
         //! All parameters must have type uint32
 
@@ -990,7 +1003,7 @@ struct SmartTarget
 
         struct
         {
-            uint32 guid;
+            uint32 dbGuid;
             uint32 entry;
         } unitGUID;
 
@@ -1025,7 +1038,7 @@ struct SmartTarget
 
         struct
         {
-            uint32 guid;
+            uint32 dbGuid;
             uint32 entry;
         } goGUID;
 

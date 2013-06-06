@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -31,6 +31,7 @@ EndScriptData */
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
 #include "GossipDef.h"
+#include "Language.h"
 
 #include <fstream>
 
@@ -417,7 +418,7 @@ public:
         sLog->outDebug(LOG_FILTER_NETWORKIO, "Sending opcode %u", data.GetOpcode());
         data.hexlike();
         player->GetSession()->SendPacket(&data);
-        handler->PSendSysMessage(LANG_COMMAND_OPCODESENT, data.GetOpcode(), unit->GetName());
+        handler->PSendSysMessage(LANG_COMMAND_OPCODESENT, data.GetOpcode(), unit->GetName().c_str());
         return true;
     }
 
@@ -496,7 +497,9 @@ public:
         if (!target)
             return false;
 
-        handler->PSendSysMessage("Loot recipient for creature %s (GUID %u, DB GUID %u) is %s", target->GetName(), target->GetGUIDLow(), target->GetDBTableGUIDLow(), target->hasLootRecipient() ? (target->GetLootRecipient() ? target->GetLootRecipient()->GetName() : "offline") : "no loot recipient");
+        handler->PSendSysMessage("Loot recipient for creature %s (GUID %u, DB GUID %u) is %s",
+            target->GetName().c_str(), target->GetGUIDLow(), target->GetDBTableGUIDLow(),
+            target->hasLootRecipient() ? (target->GetLootRecipient() ? target->GetLootRecipient()->GetName().c_str() : "offline") : "no loot recipient");
         return true;
     }
 
@@ -796,17 +799,17 @@ public:
         if (!target || target->isTotem() || target->isPet())
             return false;
 
-        std::list<HostileReference*>& threatList = target->getThreatManager().getThreatList();
-        std::list<HostileReference*>::iterator itr;
+        ThreatContainer::StorageType const &threatList = target->getThreatManager().getThreatList();
+        ThreatContainer::StorageType::const_iterator itr;
         uint32 count = 0;
-        handler->PSendSysMessage("Threat list of %s (guid %u)", target->GetName(), target->GetGUIDLow());
+        handler->PSendSysMessage("Threat list of %s (guid %u)", target->GetName().c_str(), target->GetGUIDLow());
         for (itr = threatList.begin(); itr != threatList.end(); ++itr)
         {
             Unit* unit = (*itr)->getTarget();
             if (!unit)
                 continue;
             ++count;
-            handler->PSendSysMessage("   %u.   %s   (guid %u)  - threat %f", count, unit->GetName(), unit->GetGUIDLow(), (*itr)->getThreat());
+            handler->PSendSysMessage("   %u.   %s   (guid %u)  - threat %f", count, unit->GetName().c_str(), unit->GetGUIDLow(), (*itr)->getThreat());
         }
         handler->SendSysMessage("End of threat list.");
         return true;
@@ -819,13 +822,13 @@ public:
             target = handler->GetSession()->GetPlayer();
         HostileReference* ref = target->getHostileRefManager().getFirst();
         uint32 count = 0;
-        handler->PSendSysMessage("Hostil reference list of %s (guid %u)", target->GetName(), target->GetGUIDLow());
+        handler->PSendSysMessage("Hostil reference list of %s (guid %u)", target->GetName().c_str(), target->GetGUIDLow());
         while (ref)
         {
             if (Unit* unit = ref->getSource()->getOwner())
             {
                 ++count;
-                handler->PSendSysMessage("   %u.   %s   (guid %u)  - threat %f", count, unit->GetName(), unit->GetGUIDLow(), ref->getThreat());
+                handler->PSendSysMessage("   %u.   %s   (guid %u)  - threat %f", count, unit->GetName().c_str(), unit->GetGUIDLow(), ref->getThreat());
             }
             ref = ref->next();
         }
@@ -1047,7 +1050,7 @@ public:
     static bool HandleDebugLoSCommand(ChatHandler* handler, char const* /*args*/)
     {
         if (Unit* unit = handler->getSelectedUnit())
-            handler->PSendSysMessage("Unit %s (GuidLow: %u) is %sin LoS", unit->GetName(), unit->GetGUIDLow(), handler->GetSession()->GetPlayer()->IsWithinLOSInMap(unit) ? "" : "not ");
+            handler->PSendSysMessage("Unit %s (GuidLow: %u) is %sin LoS", unit->GetName().c_str(), unit->GetGUIDLow(), handler->GetSession()->GetPlayer()->IsWithinLOSInMap(unit) ? "" : "not ");
         return true;
     }
 
@@ -1117,13 +1120,13 @@ public:
         if (isInt32)
         {
             uint32 value = (uint32)atoi(y);
-            target->SetUInt32Value(opcode , value);
+            target->SetUInt32Value(opcode, value);
             handler->PSendSysMessage(LANG_SET_UINT_FIELD, GUID_LOPART(guid), opcode, value);
         }
         else
         {
             float value = (float)atof(y);
-            target->SetFloatValue(opcode , value);
+            target->SetFloatValue(opcode, value);
             handler->PSendSysMessage(LANG_SET_FLOAT_FIELD, GUID_LOPART(guid), opcode, value);
         }
 
@@ -1325,7 +1328,7 @@ public:
     {
         Player* player = handler->GetSession()->GetPlayer();
 
-        sLog->outInfo(LOG_FILTER_SQL_DEV, "(@PATH, XX, %.3f, %.3f, %.5f, 0,0, 0,100, 0),", player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
+        sLog->outInfo(LOG_FILTER_SQL_DEV, "(@PATH, XX, %.3f, %.3f, %.5f, 0, 0, 0, 100, 0),", player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
 
         handler->PSendSysMessage("Waypoint SQL written to SQL Developer log");
         return true;

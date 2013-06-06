@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,8 +22,11 @@ Comment: All achievement related commands
 Category: commandscripts
 EndScriptData */
 
-#include "ScriptMgr.h"
+#include "AchievementMgr.h"
 #include "Chat.h"
+#include "Language.h"
+#include "Player.h"
+#include "ScriptMgr.h"
 
 class achievement_commandscript : public CommandScript
 {
@@ -67,7 +70,7 @@ public:
             return false;
         }
 
-        if (AchievementEntry const* achievementEntry = sAchievementStore.LookupEntry(achievementId))
+        if (AchievementEntry const* achievementEntry = sAchievementMgr->GetAchievement(achievementId))
             target->CompletedAchievement(achievementEntry);
 
         return true;

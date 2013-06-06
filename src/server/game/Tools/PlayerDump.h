@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -73,7 +73,7 @@ class PlayerDumpWriter : public PlayerDump
         PlayerDumpWriter() {}
 
         bool GetDump(uint32 guid, std::string& dump);
-        DumpReturn WriteDump(const std::string& file, uint32 guid);
+        DumpReturn WriteDump(std::string const& file, uint32 guid);
     private:
         typedef std::set<uint32> GUIDs;
 
@@ -91,8 +91,7 @@ class PlayerDumpReader : public PlayerDump
     public:
         PlayerDumpReader() {}
 
-        DumpReturn LoadDump(const std::string& file, uint32 account, std::string name, uint32 guid);
+        DumpReturn LoadDump(std::string const& file, uint32 account, std::string name, uint32 guid);
 };
 
 #endif
-

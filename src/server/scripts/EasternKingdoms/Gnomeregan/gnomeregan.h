@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,7 +21,8 @@
 enum eGameObjects
 {
     GO_CAVE_IN_LEFT     = 146085,
-    GO_CAVE_IN_RIGHT    = 146086
+    GO_CAVE_IN_RIGHT    = 146086,
+    GO_RED_ROCKET       = 103820
 };
 
 enum eCreatures

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -16,17 +16,21 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "DatabaseEnv.h"
 #include "AccountMgr.h"
+#include "Config.h"
+#include "DatabaseEnv.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
 #include "Util.h"
 #include "SHA1.h"
+#include "WorldSession.h"
 
-namespace AccountMgr
+AccountMgr::AccountMgr()
 {
 
-AccountOpResult CreateAccount(std::string username, std::string password)
+}
+
+AccountOpResult AccountMgr::CreateAccount(std::string username, std::string password)
 {
     if (utf8length(username) > MAX_ACCOUNT_STR)
         return AOR_NAME_TOO_LONG;                           // username's too long
@@ -42,16 +46,26 @@ AccountOpResult CreateAccount(std::string username, std::string password)
     stmt->setString(0, username);
     stmt->setString(1, CalculateShaPassHash(username, password));
 
-    LoginDatabase.Execute(stmt);
+    LoginDatabase.DirectExecute(stmt); // Enforce saving, otherwise AddGroup can fail
 
     stmt = LoginDatabase.GetPreparedStatement(LOGIN_INS_REALM_CHARACTERS_INIT);
 
     LoginDatabase.Execute(stmt);
 
+    // Add default rbac groups for that security level
+    RBACData* rbac = new RBACData(GetId(username), username, -1);
+    // No need to Load From DB, as it's new data
+
+    RBACGroupContainer const& groupsToAdd = _defaultGroups[0]; // 0: Default sec level
+    for (RBACGroupContainer::const_iterator it = groupsToAdd.begin(); it != groupsToAdd.end(); ++it)
+        rbac->AddGroup(*it, -1);
+
+    delete rbac;
+
     return AOR_OK;                                          // everything's fine
 }
 
-AccountOpResult DeleteAccount(uint32 accountId)
+AccountOpResult AccountMgr::DeleteAccount(uint32 accountId)
 {
     // Check if accounts exists
     PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_SEL_ACCOUNT_BY_ID);
@@ -123,7 +137,7 @@ AccountOpResult DeleteAccount(uint32 accountId)
     return AOR_OK;
 }
 
-AccountOpResult ChangeUsername(uint32 accountId, std::string newUsername, std::string newPassword)
+AccountOpResult AccountMgr::ChangeUsername(uint32 accountId, std::string newUsername, std::string newPassword)
 {
     // Check if accounts exists
     PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_SEL_ACCOUNT_BY_ID);
@@ -153,7 +167,7 @@ AccountOpResult ChangeUsername(uint32 accountId, std::string newUsername, std::s
     return AOR_OK;
 }
 
-AccountOpResult ChangePassword(uint32 accountId, std::string newPassword)
+AccountOpResult AccountMgr::ChangePassword(uint32 accountId, std::string newPassword)
 {
     std::string username;
 
@@ -173,10 +187,18 @@ AccountOpResult ChangePassword(uint32 accountId, std::string newPassword)
 
     LoginDatabase.Execute(stmt);
 
+    stmt = LoginDatabase.GetPreparedStatement(LOGIN_UPD_VS);
+
+    stmt->setString(0, "");
+    stmt->setString(1, "");
+    stmt->setString(2, username);
+
+    LoginDatabase.Execute(stmt);
+
     return AOR_OK;
 }
 
-uint32 GetId(std::string username)
+uint32 AccountMgr::GetId(std::string const& username)
 {
     PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_GET_ACCOUNT_ID_BY_USERNAME);
     stmt->setString(0, username);
@@ -185,7 +207,7 @@ uint32 GetId(std::string username)
     return (result) ? (*result)[0].GetUInt32() : 0;
 }
 
-uint32 GetSecurity(uint32 accountId)
+uint32 AccountMgr::GetSecurity(uint32 accountId)
 {
     PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_GET_ACCOUNT_ACCESS_GMLEVEL);
     stmt->setUInt32(0, accountId);
@@ -194,7 +216,7 @@ uint32 GetSecurity(uint32 accountId)
     return (result) ? (*result)[0].GetUInt8() : uint32(SEC_PLAYER);
 }
 
-uint32 GetSecurity(uint32 accountId, int32 realmId)
+uint32 AccountMgr::GetSecurity(uint32 accountId, int32 realmId)
 {
     PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_GET_GMLEVEL_BY_REALMID);
     stmt->setUInt32(0, accountId);
@@ -204,7 +226,7 @@ uint32 GetSecurity(uint32 accountId, int32 realmId)
     return (result) ? (*result)[0].GetUInt8() : uint32(SEC_PLAYER);
 }
 
-bool GetName(uint32 accountId, std::string& name)
+bool AccountMgr::GetName(uint32 accountId, std::string& name)
 {
     PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_GET_USERNAME_BY_ID);
     stmt->setUInt32(0, accountId);
@@ -219,7 +241,7 @@ bool GetName(uint32 accountId, std::string& name)
     return false;
 }
 
-bool CheckPassword(uint32 accountId, std::string password)
+bool AccountMgr::CheckPassword(uint32 accountId, std::string password)
 {
     std::string username;
 
@@ -237,7 +259,7 @@ bool CheckPassword(uint32 accountId, std::string password)
     return (result) ? true : false;
 }
 
-uint32 GetCharactersCount(uint32 accountId)
+uint32 AccountMgr::GetCharactersCount(uint32 accountId)
 {
     // check character count
     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_SUM_CHARS);
@@ -247,7 +269,7 @@ uint32 GetCharactersCount(uint32 accountId)
     return (result) ? (*result)[0].GetUInt64() : 0;
 }
 
-bool normalizeString(std::string& utf8String)
+bool AccountMgr::normalizeString(std::string& utf8String)
 {
     wchar_t buffer[MAX_ACCOUNT_STR+1];
 
@@ -265,7 +287,7 @@ bool normalizeString(std::string& utf8String)
     return WStrToUtf8(buffer, maxLength, utf8String);
 }
 
-std::string CalculateShaPassHash(std::string& name, std::string& password)
+std::string AccountMgr::CalculateShaPassHash(std::string const& name, std::string const& password)
 {
     SHA1Hash sha;
     sha.Initialize();
@@ -274,35 +296,233 @@ std::string CalculateShaPassHash(std::string& name, std::string& password)
     sha.UpdateData(password);
     sha.Finalize();
 
-    std::string encoded;
-    hexEncodeByteArray(sha.GetDigest(), sha.GetLength(), encoded);
-
-    return encoded;
+    return ByteArrayToHexStr(sha.GetDigest(), sha.GetLength());
 }
 
-bool IsPlayerAccount(uint32 gmlevel)
+bool AccountMgr::IsPlayerAccount(uint32 gmlevel)
 {
     return gmlevel == SEC_PLAYER;
 }
 
-bool IsModeratorAccount(uint32 gmlevel)
+bool AccountMgr::IsModeratorAccount(uint32 gmlevel)
 {
     return gmlevel >= SEC_MODERATOR && gmlevel <= SEC_CONSOLE;
 }
 
-bool IsGMAccount(uint32 gmlevel)
+bool AccountMgr::IsGMAccount(uint32 gmlevel)
 {
     return gmlevel >= SEC_GAMEMASTER && gmlevel <= SEC_CONSOLE;
 }
 
-bool IsAdminAccount(uint32 gmlevel)
+bool AccountMgr::IsAdminAccount(uint32 gmlevel)
 {
     return gmlevel >= SEC_ADMINISTRATOR && gmlevel <= SEC_CONSOLE;
 }
 
-bool IsConsoleAccount(uint32 gmlevel)
+bool AccountMgr::IsConsoleAccount(uint32 gmlevel)
 {
     return gmlevel == SEC_CONSOLE;
 }
 
-} // Namespace AccountMgr
+void AccountMgr::LoadRBAC()
+{
+    uint32 oldMSTime = getMSTime();
+    uint32 count1 = 0;
+    uint32 count2 = 0;
+    uint32 count3 = 0;
+
+    QueryResult result = LoginDatabase.Query("SELECT id, name FROM rbac_permissions");
+    if (!result)
+    {
+        sLog->outInfo(LOG_FILTER_SQL, ">> Loaded 0 account permission definitions. DB table `rbac_permissions` is empty.");
+        return;
+    }
+
+    do
+    {
+        Field* field = result->Fetch();
+        uint32 id = field[0].GetUInt32();
+        _permissions[id] = new RBACPermission(id, field[1].GetString());
+        ++count1;
+    }
+    while (result->NextRow());
+
+    result = LoginDatabase.Query("SELECT id, name FROM rbac_roles");
+    if (!result)
+    {
+        sLog->outInfo(LOG_FILTER_SQL, ">> Loaded 0 account role definitions. DB table `rbac_roles` is empty.");
+        return;
+    }
+
+    do
+    {
+        Field* field = result->Fetch();
+        uint32 id = field[0].GetUInt32();
+        _roles[id] = new RBACRole(id, field[1].GetString());
+        ++count2;
+    }
+    while (result->NextRow());
+
+    result = LoginDatabase.Query("SELECT roleId, permissionId FROM rbac_role_permissions");
+    if (!result)
+    {
+        sLog->outInfo(LOG_FILTER_SQL, ">> Loaded 0 account role-permission definitions. DB table `rbac_role_permissions` is empty.");
+        return;
+    }
+
+    do
+    {
+        Field* field = result->Fetch();
+        uint32 id = field[0].GetUInt32();
+        RBACRole* role = _roles[id];
+        role->GrantPermission(field[1].GetUInt32());
+    }
+    while (result->NextRow());
+
+    result = LoginDatabase.Query("SELECT id, name FROM rbac_groups");
+    if (!result)
+    {
+        sLog->outInfo(LOG_FILTER_SQL, ">> Loaded 0 account group definitions. DB table `rbac_groups` is empty.");
+        return;
+    }
+
+    do
+    {
+        Field* field = result->Fetch();
+        uint32 id = field[0].GetUInt32();
+        _groups[id] = new RBACGroup(id, field[1].GetString());
+        ++count3;
+    }
+    while (result->NextRow());
+
+    result = LoginDatabase.Query("SELECT groupId, roleId FROM rbac_group_roles");
+    if (!result)
+    {
+        sLog->outInfo(LOG_FILTER_SQL, ">> Loaded 0 account group-role definitions. DB table `rbac_group_roles` is empty.");
+        return;
+    }
+
+    do
+    {
+        Field* field = result->Fetch();
+        uint32 id = field[0].GetUInt32();
+        RBACGroup* group = _groups[id];
+        group->GrantRole(field[1].GetUInt32());
+    }
+    while (result->NextRow());
+
+    result = LoginDatabase.Query("SELECT secId, groupId FROM rbac_security_level_groups ORDER by secId ASC");
+    if (!result)
+    {
+        sLog->outInfo(LOG_FILTER_SQL, ">> Loaded 0 account default groups for security levels definitions. DB table `rbac_security_level_groups` is empty.");
+        return;
+    }
+
+    uint8 lastSecId = 255;
+    RBACGroupContainer* groups = NULL;
+    do
+    {
+        Field* field = result->Fetch();
+        uint8 secId = field[0].GetUInt8();
+
+        if (lastSecId != secId)
+            groups = &_defaultGroups[secId];
+
+        groups->insert(field[1].GetUInt32());
+    }
+    while (result->NextRow());
+
+    sLog->outInfo(LOG_FILTER_SERVER_LOADING, ">> Loaded %u permission definitions, %u role definitions and %u group definitions in %u ms", count1, count2, count3, GetMSTimeDiffToNow(oldMSTime));
+}
+
+void AccountMgr::UpdateAccountAccess(RBACData* rbac, uint32 accountId, uint8 securityLevel, int32 realmId)
+{
+    int32 serverRealmId = realmId != -1 ? realmId : ConfigMgr::GetIntDefault("RealmID", 0);
+    bool needDelete = false;
+    if (!rbac)
+    {
+        needDelete = true;
+        rbac = new RBACData(accountId, "", serverRealmId);
+        rbac->LoadFromDB();
+    }
+
+    // Get max security level and realm (checking current realm and -1)
+    PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_SEL_ACCOUNT_ACCESS_BY_ID);
+    stmt->setUInt32(0, accountId);
+    stmt->setInt32(1, serverRealmId);
+    PreparedQueryResult result = LoginDatabase.Query(stmt);
+    if (result)
+    {
+        do
+        {
+            Field* field = result->Fetch();
+            uint8 secLevel = field[0].GetUInt8();
+            int32 realmId = field[1].GetUInt32();
+
+            RBACGroupContainer const& groupsToRemove = _defaultGroups[secLevel];
+            for (RBACGroupContainer::const_iterator it = groupsToRemove.begin(); it != groupsToRemove.end(); ++it)
+                rbac->RemoveGroup(*it, realmId);
+        }
+        while (result->NextRow());
+    }
+
+    // Add new groups depending on the new security Level
+    RBACGroupContainer const& groupsToAdd = _defaultGroups[securityLevel];
+    for (RBACGroupContainer::const_iterator it = groupsToAdd.begin(); it != groupsToAdd.end(); ++it)
+        rbac->AddGroup(*it, realmId);
+
+    if (needDelete)
+        delete rbac;
+
+    // Delete old security level from DB
+    if (realmId == -1)
+    {
+        PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_DEL_ACCOUNT_ACCESS);
+        stmt->setUInt32(0, accountId);
+        LoginDatabase.Execute(stmt);
+    }
+    else
+    {
+        PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_DEL_ACCOUNT_ACCESS_BY_REALM);
+        stmt->setUInt32(0, accountId);
+        stmt->setUInt32(1, realmId);
+        LoginDatabase.Execute(stmt);
+    }
+
+    // Add new security level
+    if (securityLevel)
+    {
+        PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_INS_ACCOUNT_ACCESS);
+        stmt->setUInt32(0, accountId);
+        stmt->setUInt8(1, securityLevel);
+        stmt->setInt32(2, realmId);
+        LoginDatabase.Execute(stmt);
+    }
+}
+
+RBACGroup const* AccountMgr::GetRBACGroup(uint32 group) const
+{
+    RBACGroupsContainer::const_iterator it = _groups.find(group);
+    if (it != _groups.end())
+        return it->second;
+
+    return NULL;
+}
+
+RBACRole const* AccountMgr::GetRBACRole(uint32 role) const
+{
+    RBACRolesContainer::const_iterator it = _roles.find(role);
+    if (it != _roles.end())
+        return it->second;
+
+    return NULL;
+}
+
+RBACPermission const* AccountMgr::GetRBACPermission(uint32 permission) const
+{
+    RBACPermissionsContainer::const_iterator it = _permissions.find(permission);
+    if (it != _permissions.end())
+        return it->second;
+
+    return NULL;
+}

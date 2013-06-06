@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -25,15 +25,14 @@ EndScriptData */
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
+#include "the_botanica.h"
 
 enum eSays
 {
-    SAY_AGGRO          = -1553007,
-    SAY_SLAY_1         = -1553008,
-    SAY_SLAY_2         = -1553009,
-    SAY_SUMMON_1       = -1553010,
-    SAY_SUMMON_2       = -1553011,
-    SAY_DEATH          = -1553012,
+    SAY_AGGRO          = 0,
+    SAY_SLAY           = 1,
+    SAY_SUMMON         = 2,
+    SAY_DEATH          = 3
 };
 
 enum eSpells
@@ -42,13 +41,13 @@ enum eSpells
     SUMMON_TREANTS     = 34727, // DBC: 34727, 34731, 34733, 34734, 34736, 34739, 34741 (with Ancestral Life spell 34742)   // won't work (guardian summon)
     ARCANE_VOLLEY      = 36705,
     ARCANE_VOLLEY_H    = 39133,
-    SPELL_HEAL_FATHER  = 6262,
+    SPELL_HEAL_FATHER  = 6262
 };
 
 enum eOthers
 {
     CREATURE_TREANT    = 19949,
-    TREANT_SPAWN_DIST  = 50, //50 yards from Warp Splinter's spawn point
+    TREANT_SPAWN_DIST  = 50 //50 yards from Warp Splinter's spawn point
 };
 
 float treant_pos[6][3] =
@@ -136,9 +135,9 @@ class boss_warp_splinter : public CreatureScript
             : CreatureScript("boss_warp_splinter")
         {
         }
-        struct boss_warp_splinterAI : public ScriptedAI
+        struct boss_warp_splinterAI : public BossAI
         {
-            boss_warp_splinterAI(Creature* creature) : ScriptedAI(creature)
+            boss_warp_splinterAI(Creature* creature) : BossAI(creature, DATA_WARP_SPLINTER)
             {
                 Treant_Spawn_Pos_X = creature->GetPositionX();
                 Treant_Spawn_Pos_Y = creature->GetPositionY();
@@ -162,17 +161,17 @@ class boss_warp_splinter : public CreatureScript
 
             void EnterCombat(Unit* /*who*/)
             {
-                DoScriptText(SAY_AGGRO, me);
+                Talk(SAY_AGGRO);
             }
 
             void KilledUnit(Unit* /*victim*/)
             {
-                DoScriptText(RAND(SAY_SLAY_1, SAY_SLAY_2), me);
+                Talk(SAY_SLAY);
             }
 
             void JustDied(Unit* /*killer*/)
             {
-                DoScriptText(SAY_DEATH, me);
+                Talk(SAY_DEATH);
             }
 
             void SummonTreants()
@@ -181,14 +180,14 @@ class boss_warp_splinter : public CreatureScript
                 {
                     float angle = (M_PI / 3) * i;
 
-                    float X = Treant_Spawn_Pos_X + TREANT_SPAWN_DIST * cos(angle);
-                    float Y = Treant_Spawn_Pos_Y + TREANT_SPAWN_DIST * sin(angle);
+                    float X = Treant_Spawn_Pos_X + TREANT_SPAWN_DIST * std::cos(angle);
+                    float Y = Treant_Spawn_Pos_Y + TREANT_SPAWN_DIST * std::sin(angle);
                     float O = - me->GetAngle(X, Y);
 
                     if (Creature* pTreant = me->SummonCreature(CREATURE_TREANT, treant_pos[i][0], treant_pos[i][1], treant_pos[i][2], O, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 25000))
                         CAST_AI(mob_warp_splinter_treant::mob_warp_splinter_treantAI, pTreant->AI())->WarpGuid = me->GetGUID();
                 }
-                DoScriptText(RAND(SAY_SUMMON_1, SAY_SUMMON_2), me);
+                Talk(SAY_SUMMON);
             }
 
             void UpdateAI(const uint32 diff)

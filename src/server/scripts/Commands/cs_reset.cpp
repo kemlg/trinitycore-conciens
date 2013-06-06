@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,9 +22,13 @@ Comment: All reset related commands
 Category: commandscripts
 EndScriptData */
 
-#include "ScriptMgr.h"
+#include "AchievementMgr.h"
 #include "Chat.h"
+#include "Language.h"
 #include "ObjectAccessor.h"
+#include "Player.h"
+#include "Pet.h"
+#include "ScriptMgr.h"
 
 class reset_commandscript : public CommandScript
 {
@@ -60,7 +64,7 @@ public:
             return false;
 
         if (target)
-            target->GetAchievementMgr().Reset();
+            target->ResetAchievements();
         else
             AchievementMgr::DeleteFromDB(GUID_LOPART(targetGuid));
 
@@ -168,7 +172,7 @@ public:
         {
             target->resetSpells(/* bool myClassOnly */);
 
-            ChatHandler(target).SendSysMessage(LANG_RESET_SPELLS);
+            ChatHandler(target->GetSession()).SendSysMessage(LANG_RESET_SPELLS);
             if (!handler->GetSession() || handler->GetSession()->GetPlayer() != target)
                 handler->PSendSysMessage(LANG_RESET_SPELLS_ONLINE, handler->GetNameLink(target).c_str());
         }
@@ -220,7 +224,7 @@ public:
                     creature->ToPet()->resetTalents();
                     owner->ToPlayer()->SendTalentsInfoData(true);
 
-                    ChatHandler(owner->ToPlayer()).SendSysMessage(LANG_RESET_PET_TALENTS);
+                    ChatHandler(owner->ToPlayer()->GetSession()).SendSysMessage(LANG_RESET_PET_TALENTS);
                     if (!handler->GetSession() || handler->GetSession()->GetPlayer() != owner->ToPlayer())
                         handler->PSendSysMessage(LANG_RESET_PET_TALENTS_ONLINE, handler->GetNameLink(owner->ToPlayer()).c_str());
                 }
@@ -236,7 +240,7 @@ public:
         {
             target->resetTalents(true);
             target->SendTalentsInfoData(false);
-            ChatHandler(target).SendSysMessage(LANG_RESET_TALENTS);
+            ChatHandler(target->GetSession()).SendSysMessage(LANG_RESET_TALENTS);
             if (!handler->GetSession() || handler->GetSession()->GetPlayer() != target)
                 handler->PSendSysMessage(LANG_RESET_TALENTS_ONLINE, handler->GetNameLink(target).c_str());
 

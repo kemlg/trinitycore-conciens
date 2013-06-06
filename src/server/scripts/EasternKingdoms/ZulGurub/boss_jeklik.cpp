@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -27,40 +27,34 @@ EndScriptData */
 #include "ScriptedCreature.h"
 #include "zulgurub.h"
 
-#define SAY_AGGRO                   -1309002
-#define SAY_RAIN_FIRE               -1309003
-#define SAY_DEATH                   -1309004
-
-#define SPELL_CHARGE              22911
-#define SPELL_SONICBURST          23918
-#define SPELL_SCREECH             6605
-#define SPELL_SHADOW_WORD_PAIN    23952
-#define SPELL_MIND_FLAY           23953
-#define SPELL_CHAIN_MIND_FLAY     26044                     //Right ID unknown. So disabled
-#define SPELL_GREATERHEAL         23954
-#define SPELL_BAT_FORM            23966
-
-// Batriders Spell
-
-#define SPELL_BOMB                40332                     //Wrong ID but Magmadars bomb is not working...
-
-class boss_jeklik : public CreatureScript
+enum Says
 {
-    public:
+    SAY_AGGRO                   = 0,
+    SAY_RAIN_FIRE               = 1,
+    SAY_DEATH                   = 2
+};
 
-        boss_jeklik()
-            : CreatureScript("boss_jeklik")
+enum Spells
+{
+    SPELL_CHARGE                = 22911,
+    SPELL_SONICBURST            = 23918,
+    SPELL_SCREECH               = 6605,
+    SPELL_SHADOW_WORD_PAIN      = 23952,
+    SPELL_MIND_FLAY             = 23953,
+    SPELL_CHAIN_MIND_FLAY       = 26044, // Right ID unknown. So disabled
+    SPELL_GREATERHEAL           = 23954,
+    SPELL_BAT_FORM              = 23966,
+    // Batriders Spell
+    SPELL_BOMB                  = 40332 // Wrong ID but Magmadars bomb is not working...
+};
+
+class boss_jeklik : public CreatureScript //jeklik
+{
+    public: boss_jeklik() : CreatureScript("boss_jeklik") {}
+
+        struct boss_jeklikAI : public BossAI
         {
-        }
-
-        struct boss_jeklikAI : public ScriptedAI
-        {
-            boss_jeklikAI(Creature* creature) : ScriptedAI(creature)
-            {
-                instance = creature->GetInstanceScript();
-            }
-
-            InstanceScript* instance;
+            boss_jeklikAI(Creature* creature) : BossAI(creature, DATA_JEKLIK) {}
 
             uint32 Charge_Timer;
             uint32 SonicBurst_Timer;
@@ -76,6 +70,7 @@ class boss_jeklik : public CreatureScript
 
             void Reset()
             {
+                _Reset();
                 Charge_Timer = 20000;
                 SonicBurst_Timer = 8000;
                 Screech_Timer = 13000;
@@ -89,18 +84,17 @@ class boss_jeklik : public CreatureScript
                 PhaseTwo = false;
             }
 
-            void EnterCombat(Unit* /*who*/)
-            {
-                DoScriptText(SAY_AGGRO, me);
-                DoCast(me, SPELL_BAT_FORM);
-            }
-
             void JustDied(Unit* /*killer*/)
             {
-                DoScriptText(SAY_DEATH, me);
+                _JustDied();
+                Talk(SAY_DEATH);
+            }
 
-                if (instance)
-                    instance->SetData(DATA_JEKLIK, DONE);
+            void EnterCombat(Unit* /*who*/)
+            {
+                _EnterCombat();
+                Talk(SAY_AGGRO);
+                DoCast(me, SPELL_BAT_FORM);
             }
 
             void UpdateAI(const uint32 diff)
@@ -164,7 +158,7 @@ class boss_jeklik : public CreatureScript
                     {
                         if (PhaseTwo)
                         {
-                            if (PhaseTwo && ShadowWordPain_Timer <= diff)
+                            if (ShadowWordPain_Timer <= diff)
                             {
                                 if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                                 {
@@ -195,13 +189,11 @@ class boss_jeklik : public CreatureScript
 
                             if (SpawnFlyingBats_Timer <= diff)
                             {
-                                Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0);
-                                if (!target)
-                                    return;
-
-                                Creature* FlyingBat = me->SummonCreature(14965, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ()+15, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 15000);
-                                if (FlyingBat)
-                                    FlyingBat->AI()->AttackStart(target);
+                                if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                                {
+                                    if (Creature* FlyingBat = me->SummonCreature(14965, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ()+15, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 15000))
+                                        FlyingBat->AI()->AttackStart(target);
+                                }
 
                                 SpawnFlyingBats_Timer = urand(10000, 15000);
                             } else SpawnFlyingBats_Timer -=diff;
@@ -277,7 +269,7 @@ class mob_batrider : public CreatureScript
                 {
                     if (instance)
                     {
-                        if (instance->GetData(DATA_JEKLIK) == DONE)
+                        if (instance->GetBossState(DATA_JEKLIK) == DONE)
                         {
                             me->setDeathState(JUST_DIED);
                             me->RemoveCorpse();

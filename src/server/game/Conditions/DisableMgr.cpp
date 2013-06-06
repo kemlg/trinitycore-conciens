@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -17,10 +17,12 @@
  */
 
 #include "DisableMgr.h"
+#include "AchievementMgr.h"
 #include "ObjectMgr.h"
 #include "OutdoorPvP.h"
 #include "SpellMgr.h"
 #include "VMapManager2.h"
+#include "Player.h"
 
 namespace DisableMgr
 {
@@ -40,7 +42,7 @@ namespace
 
     DisableMap m_DisableMap;
 
-    uint8 MAX_DISABLE_TYPES = 7;
+    uint8 MAX_DISABLE_TYPES = 8;
 }
 
 void LoadDisables()
@@ -60,7 +62,6 @@ void LoadDisables()
     if (!result)
     {
         sLog->outInfo(LOG_FILTER_SERVER_LOADING, ">> Loaded 0 disables. DB table `disables` is empty!");
-
         return;
     }
 
@@ -100,14 +101,14 @@ void LoadDisables()
 
                 if (flags & SPELL_DISABLE_MAP)
                 {
-                    Tokens tokens(params_0, ',');
+                    Tokenizer tokens(params_0, ',');
                     for (uint8 i = 0; i < tokens.size(); )
                         data.params[0].insert(atoi(tokens[i++]));
                 }
 
                 if (flags & SPELL_DISABLE_AREA)
                 {
-                    Tokens tokens(params_1, ',');
+                    Tokenizer tokens(params_1, ',');
                     for (uint8 i = 0; i < tokens.size(); )
                         data.params[1].insert(atoi(tokens[i++]));
                 }
@@ -134,10 +135,12 @@ void LoadDisables()
                     case MAP_INSTANCE:
                     case MAP_RAID:
                         if (flags & DUNGEON_STATUSFLAG_HEROIC && !GetMapDifficultyData(entry, DUNGEON_DIFFICULTY_HEROIC))
-                            isFlagInvalid = true;
-                        else if (flags & RAID_STATUSFLAG_10MAN_HEROIC && !GetMapDifficultyData(entry, RAID_DIFFICULTY_10MAN_HEROIC))
-                            isFlagInvalid = true;
-                        else if (flags & RAID_STATUSFLAG_25MAN_HEROIC && !GetMapDifficultyData(entry, RAID_DIFFICULTY_25MAN_HEROIC))
+                            flags -= DUNGEON_STATUSFLAG_HEROIC;
+                        if (flags & RAID_STATUSFLAG_10MAN_HEROIC && !GetMapDifficultyData(entry, RAID_DIFFICULTY_10MAN_HEROIC))
+                            flags -= RAID_STATUSFLAG_10MAN_HEROIC;
+                        if (flags & RAID_STATUSFLAG_25MAN_HEROIC && !GetMapDifficultyData(entry, RAID_DIFFICULTY_25MAN_HEROIC))
+                            flags -= RAID_STATUSFLAG_25MAN_HEROIC;
+                        if (!flags)
                             isFlagInvalid = true;
                         break;
                     case MAP_BATTLEGROUND:
@@ -171,7 +174,7 @@ void LoadDisables()
                     sLog->outError(LOG_FILTER_SQL, "Disable flags specified for outdoor PvP %u, useless data.", entry);
                 break;
             case DISABLE_TYPE_ACHIEVEMENT_CRITERIA:
-                if (!sAchievementCriteriaStore.LookupEntry(entry))
+                if (!sAchievementMgr->GetAchievementCriteria(entry))
                 {
                     sLog->outError(LOG_FILTER_SQL, "Achievement Criteria entry %u from `disables` doesn't exist in dbc, skipped.", entry);
                     continue;
@@ -219,6 +222,34 @@ void LoadDisables()
                 }
                 break;
             }
+            case DISABLE_TYPE_MMAP:
+            {
+                MapEntry const* mapEntry = sMapStore.LookupEntry(entry);
+                if (!mapEntry)
+                {
+                    sLog->outError(LOG_FILTER_SQL, "Map entry %u from `disables` doesn't exist in dbc, skipped.", entry);
+                    continue;
+                }
+                switch (mapEntry->map_type)
+                {
+                    case MAP_COMMON:
+                        sLog->outInfo(LOG_FILTER_GENERAL, "Pathfinding disabled for world map %u.", entry);
+                        break;
+                    case MAP_INSTANCE:
+                    case MAP_RAID:
+                        sLog->outInfo(LOG_FILTER_GENERAL, "Pathfinding disabled for instance map %u.", entry);
+                        break;
+                    case MAP_BATTLEGROUND:
+                        sLog->outInfo(LOG_FILTER_GENERAL, "Pathfinding disabled for battleground map %u.", entry);
+                        break;
+                    case MAP_ARENA:
+                        sLog->outInfo(LOG_FILTER_GENERAL, "Pathfinding disabled for arena map %u.", entry);
+                        break;
+                    default:
+                        break;
+                }
+                break;
+            }
             default:
                 break;
         }
@@ -229,7 +260,6 @@ void LoadDisables()
     while (result->NextRow());
 
     sLog->outInfo(LOG_FILTER_SERVER_LOADING, ">> Loaded %u disables in %u ms", total_count, GetMSTimeDiffToNow(oldMSTime));
-
 }
 
 void CheckQuestDisables()
@@ -240,7 +270,6 @@ void CheckQuestDisables()
     if (!count)
     {
         sLog->outInfo(LOG_FILTER_SERVER_LOADING, ">> Checked 0 quest disables.");
-
         return;
     }
 
@@ -260,7 +289,6 @@ void CheckQuestDisables()
     }
 
     sLog->outInfo(LOG_FILTER_SERVER_LOADING, ">> Checked %u quest disables in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
-
 }
 
 bool IsDisabledFor(DisableType type, uint32 entry, Unit const* unit, uint8 flags)
@@ -310,6 +338,8 @@ bool IsDisabledFor(DisableType type, uint32 entry, Unit const* unit, uint8 flags
             }
             else if (spellFlags & SPELL_DISABLE_DEPRECATED_SPELL)    // call not from spellcast
                 return true;
+            else if (flags & SPELL_DISABLE_LOS)
+                return spellFlags & SPELL_DISABLE_LOS;
 
             break;
         }
@@ -348,6 +378,7 @@ bool IsDisabledFor(DisableType type, uint32 entry, Unit const* unit, uint8 flags
         case DISABLE_TYPE_BATTLEGROUND:
         case DISABLE_TYPE_OUTDOORPVP:
         case DISABLE_TYPE_ACHIEVEMENT_CRITERIA:
+        case DISABLE_TYPE_MMAP:
             return true;
         case DISABLE_TYPE_VMAP:
            return flags & itr->second.flags;

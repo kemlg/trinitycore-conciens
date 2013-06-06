@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -16,7 +16,6 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Battleground.h"
 #include "BattlegroundBE.h"
 #include "Language.h"
 #include "Object.h"
@@ -65,11 +64,7 @@ void BattlegroundBE::StartingEventOpenDoors()
 void BattlegroundBE::AddPlayer(Player* player)
 {
     Battleground::AddPlayer(player);
-    //create score and add it to map, default values are set in constructor
-    BattlegroundBEScore* sc = new BattlegroundBEScore;
-
-    PlayerScores[player->GetGUID()] = sc;
-
+    PlayerScores[player->GetGUID()] = new BattlegroundScore;
     UpdateArenaWorldState();
 }
 
@@ -101,34 +96,24 @@ void BattlegroundBE::HandleKillPlayer(Player* player, Player* killer)
 
 bool BattlegroundBE::HandlePlayerUnderMap(Player* player)
 {
-    player->TeleportTo(GetMapId(), 6238.930176f, 262.963470f, 0.889519f, player->GetOrientation(), false);
+    player->TeleportTo(GetMapId(), 6238.930176f, 262.963470f, 0.889519f, player->GetOrientation());
     return true;
 }
 
-void BattlegroundBE::HandleAreaTrigger(Player* Source, uint32 Trigger)
+void BattlegroundBE::HandleAreaTrigger(Player* player, uint32 trigger)
 {
-    // this is wrong way to implement these things. On official it done by gameobject spell cast.
     if (GetStatus() != STATUS_IN_PROGRESS)
         return;
 
-    //uint32 SpellId = 0;
-    //uint64 buff_guid = 0;
-    switch (Trigger)
+    switch (trigger)
     {
         case 4538:                                          // buff trigger?
-            //buff_guid = BgObjects[BG_BE_OBJECT_BUFF_1];
-            break;
         case 4539:                                          // buff trigger?
-            //buff_guid = BgObjects[BG_BE_OBJECT_BUFF_2];
             break;
         default:
-            sLog->outError(LOG_FILTER_BATTLEGROUND, "WARNING: Unhandled AreaTrigger in Battleground: %u", Trigger);
-            Source->GetSession()->SendAreaTriggerMessage("Warning: Unhandled AreaTrigger in Battleground: %u", Trigger);
+            Battleground::HandleAreaTrigger(player, trigger);
             break;
     }
-
-    //if (buff_guid)
-    //    HandleTriggerBuff(buff_guid, Source);
 }
 
 void BattlegroundBE::FillInitialWorldStates(WorldPacket &data)

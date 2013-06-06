@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2008 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -26,6 +26,9 @@ EndScriptData */
 #include "ScriptMgr.h"
 #include "InstanceScript.h"
 #include "deadmines.h"
+#include "TemporarySummon.h"
+#include "WorldPacket.h"
+#include "Opcodes.h"
 
 enum Sounds
 {
@@ -213,7 +216,7 @@ class instance_deadmines : public InstanceMapScript
                 }
             }
 
-            uint32 GetData(uint32 type)
+            uint32 GetData(uint32 type) const
             {
                 switch (type)
                 {
@@ -224,7 +227,7 @@ class instance_deadmines : public InstanceMapScript
                 return 0;
             }
 
-            uint64 GetData64(uint32 data)
+            uint64 GetData64(uint32 data) const
             {
                 switch (data)
                 {
@@ -237,16 +240,7 @@ class instance_deadmines : public InstanceMapScript
 
             void DoPlaySound(GameObject* unit, uint32 sound)
             {
-                WorldPacket data(4);
-                data.SetOpcode(SMSG_PLAY_SOUND);
-                data << uint32(sound);
-                unit->SendMessageToSet(&data, false);
-            }
-
-            void DoPlaySoundCreature(Unit* unit, uint32 sound)
-            {
-                WorldPacket data(4);
-                data.SetOpcode(SMSG_PLAY_SOUND);
+                WorldPacket data(SMSG_PLAY_SOUND, 4);
                 data << uint32(sound);
                 unit->SendMessageToSet(&data, false);
             }

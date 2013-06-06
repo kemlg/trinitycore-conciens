@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -24,6 +24,8 @@ SDComment: all sounds, black hole effect triggers to often (46228)
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "sunwell_plateau.h"
+#include "Player.h"
+#include "SpellInfo.h"
 
 // Muru & Entropius's spells
 enum Spells
@@ -199,7 +201,6 @@ public:
             DoMeleeAttackIfReady();
         }
     };
-
 };
 
 class boss_muru : public CreatureScript
@@ -212,10 +213,11 @@ public:
         return new boss_muruAI (creature);
     }
 
-    struct boss_muruAI : public Scripted_NoMovementAI
+    struct boss_muruAI : public ScriptedAI
     {
-        boss_muruAI(Creature* creature) : Scripted_NoMovementAI(creature), Summons(me)
+        boss_muruAI(Creature* creature) : ScriptedAI(creature), Summons(creature)
         {
+            SetCombatMovement(false);
             instance = creature->GetInstanceScript();
         }
 
@@ -364,7 +366,6 @@ public:
             }
         }
     };
-
 };
 
 class npc_muru_portal : public CreatureScript
@@ -377,10 +378,11 @@ public:
         return new npc_muru_portalAI (creature);
     }
 
-    struct npc_muru_portalAI : public Scripted_NoMovementAI
+    struct npc_muru_portalAI : public ScriptedAI
     {
-        npc_muru_portalAI(Creature* creature) : Scripted_NoMovementAI(creature), Summons(me)
+        npc_muru_portalAI(Creature* creature) : ScriptedAI(creature), Summons(creature)
         {
+            SetCombatMovement(false);
             instance = creature->GetInstanceScript();
         }
 
@@ -448,7 +450,6 @@ public:
             } else SummonTimer -= diff;
         }
     };
-
 };
 
 class npc_dark_fiend : public CreatureScript
@@ -500,7 +501,6 @@ public:
                 }
                 else
                 {
-
                     if (me->IsWithinDist(me->getVictim(), 5))
                     {
                         DoCastAOE(SPELL_DARKFIEND_AOE, false);
@@ -511,7 +511,6 @@ public:
             } else WaitTimer -= diff;
         }
     };
-
 };
 
 class npc_void_sentinel : public CreatureScript
@@ -567,7 +566,6 @@ public:
             DoMeleeAttackIfReady();
         }
     };
-
 };
 
 class npc_blackhole : public CreatureScript
@@ -646,7 +644,6 @@ public:
             else DespawnTimer -= diff;
         }
     };
-
 };
 
 void AddSC_boss_muru()

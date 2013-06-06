@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -31,6 +31,7 @@
 #include "Unit.h"
 #include "CreatureAI.h"
 #include "Spell.h"
+#include "WorldSession.h"
 
 class Player;
 //class Map;
@@ -967,7 +968,7 @@ namespace Trinity
                 if (u->GetTypeId() == TYPEID_UNIT && ((Creature*)u)->isTotem())
                     return false;
 
-                if (i_funit->_IsValidAttackTarget(u, _spellInfo,i_obj->GetTypeId() == TYPEID_DYNAMICOBJECT ? i_obj : NULL) && i_obj->IsWithinDistInMap(u, i_range))
+                if (i_funit->_IsValidAttackTarget(u, _spellInfo, i_obj->GetTypeId() == TYPEID_DYNAMICOBJECT ? i_obj : NULL) && i_obj->IsWithinDistInMap(u, i_range))
                     return true;
 
                 return false;
@@ -1084,6 +1085,35 @@ namespace Trinity
             float m_range;
             bool m_force;
             NearestHostileUnitInAttackDistanceCheck(NearestHostileUnitInAttackDistanceCheck const&);
+    };
+
+    class NearestHostileUnitInAggroRangeCheck
+    {
+        public:
+            explicit NearestHostileUnitInAggroRangeCheck(Creature const* creature, bool useLOS = false) : _me(creature), _useLOS(useLOS)
+            {
+            }
+            bool operator()(Unit* u)
+            {
+                if (!u->IsHostileTo(_me))
+                    return false;
+
+                if (!u->IsWithinDistInMap(_me, _me->GetAggroRange(u)))
+                    return false;
+
+                if (!_me->IsValidAttackTarget(u))
+                    return false;
+
+                if (_useLOS && !u->IsWithinLOSInMap(_me))
+                    return false;
+
+                return true;
+            }
+
+    private:
+            Creature const* _me;
+            bool _useLOS;
+            NearestHostileUnitInAggroRangeCheck(NearestHostileUnitInAggroRangeCheck const&);
     };
 
     class AnyAssistCreatureInRangeCheck

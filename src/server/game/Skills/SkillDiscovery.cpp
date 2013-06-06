@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -55,8 +55,7 @@ void LoadSkillDiscoveryTable()
 
     if (!result)
     {
-        sLog->outError(LOG_FILTER_SQL, ">> Loaded 0 skill discovery definitions. DB table `skill_discovery_template` is empty.");
-
+        sLog->outError(LOG_FILTER_SERVER_LOADING, ">> Loaded 0 skill discovery definitions. DB table `skill_discovery_template` is empty.");
         return;
     }
 
@@ -154,7 +153,6 @@ void LoadSkillDiscoveryTable()
     }
 
     sLog->outInfo(LOG_FILTER_SERVER_LOADING, ">> Loaded %u skill discovery definitions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
-
 }
 
 uint32 GetExplicitDiscoverySpell(uint32 spellId, Player* player)

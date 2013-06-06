@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -29,11 +29,11 @@ EndScriptData */
 
 enum eEnums
 {
-    SAY_AGGRO                       = -1585007,
-    SAY_ENERGY                      = -1585008,
-    SAY_OVERLOAD                    = -1585009,
-    SAY_KILL                        = -1585010,
-    EMOTE_DISCHARGE_ENERGY          = -1585011,
+    SAY_AGGRO                       = 0,
+    SAY_ENERGY                      = 1,
+    SAY_OVERLOAD                    = 2,
+    SAY_KILL                        = 3,
+    EMOTE_DISCHARGE_ENERGY          = 4,
 
     //is this text for real?
     //#define SAY_DEATH             "What...happen...ed."
@@ -70,9 +70,9 @@ public:
         return new boss_vexallusAI (creature);
     };
 
-    struct boss_vexallusAI : public ScriptedAI
+    struct boss_vexallusAI : public BossAI
     {
-        boss_vexallusAI(Creature* creature) : ScriptedAI(creature)
+        boss_vexallusAI(Creature* creature) : BossAI(creature, DATA_VEXALLUS_EVENT)
         {
             instance = creature->GetInstanceScript();
         }
@@ -87,6 +87,7 @@ public:
 
         void Reset()
         {
+            summons.DespawnAll();
             ChainLightningTimer = 8000;
             ArcaneShockTimer = 5000;
             OverloadTimer = 1200;
@@ -99,18 +100,19 @@ public:
 
         void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(SAY_KILL, me);
+            Talk(SAY_KILL);
         }
 
         void JustDied(Unit* /*killer*/)
         {
+            summons.DespawnAll();
             if (instance)
                 instance->SetData(DATA_VEXALLUS_EVENT, DONE);
         }
 
         void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(SAY_AGGRO, me);
+            Talk(SAY_AGGRO);
 
             if (instance)
                 instance->SetData(DATA_VEXALLUS_EVENT, IN_PROGRESS);
@@ -144,8 +146,8 @@ public:
                     else
                         ++IntervalHealthAmount;
 
-                    DoScriptText(SAY_ENERGY, me);
-                    DoScriptText(EMOTE_DISCHARGE_ENERGY, me);
+                    Talk(SAY_ENERGY);
+                    Talk(EMOTE_DISCHARGE_ENERGY);
 
                     if (IsHeroic())
                     {
@@ -192,7 +194,6 @@ public:
             DoMeleeAttackIfReady();
         }
     };
-
 };
 
 class mob_pure_energy : public CreatureScript
@@ -207,7 +208,10 @@ public:
 
     struct mob_pure_energyAI : public ScriptedAI
     {
-        mob_pure_energyAI(Creature* creature) : ScriptedAI(creature) {}
+        mob_pure_energyAI(Creature* creature) : ScriptedAI(creature)
+        {
+            me->SetDisplayId(me->GetCreatureTemplate()->Modelid2);
+        }
 
         void Reset() {}
 
@@ -224,7 +228,6 @@ public:
         void MoveInLineOfSight(Unit* /*who*/) {}
         void AttackStart(Unit* /*who*/) {}
     };
-
 };
 
 void AddSC_boss_vexallus()

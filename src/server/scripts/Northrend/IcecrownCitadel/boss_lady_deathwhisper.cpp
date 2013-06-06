@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,6 +22,7 @@
 #include "Group.h"
 #include "icecrown_citadel.h"
 #include "SpellInfo.h"
+#include "Player.h"
 
 enum ScriptTexts
 {
@@ -159,10 +160,7 @@ enum Phases
     PHASE_ALL       = 0,
     PHASE_INTRO     = 1,
     PHASE_ONE       = 2,
-    PHASE_TWO       = 3,
-
-    PHASE_INTRO_MASK    = 1 << PHASE_INTRO,
-    PHASE_ONE_MASK      = 1 << PHASE_ONE,
+    PHASE_TWO       = 3
 };
 
 enum DeprogrammingData
@@ -258,7 +256,7 @@ class boss_lady_deathwhisper : public CreatureScript
                 if (me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE))
                     return;
 
-                if (victim && me->Attack(victim, true) && !(events.GetPhaseMask() & PHASE_ONE_MASK))
+                if (victim && me->Attack(victim, true) && !events.IsInPhase(PHASE_ONE))
                     me->GetMotionMaster()->MoveChase(victim);
             }
 
@@ -357,7 +355,7 @@ class boss_lady_deathwhisper : public CreatureScript
             void DamageTaken(Unit* /*damageDealer*/, uint32& damage)
             {
                 // phase transition
-                if (events.GetPhaseMask() & PHASE_ONE_MASK && damage > me->GetPower(POWER_MANA))
+                if (events.IsInPhase(PHASE_ONE) && damage > me->GetPower(POWER_MANA))
                 {
                     Talk(SAY_PHASE_2);
                     Talk(EMOTE_PHASE_2);
@@ -405,12 +403,12 @@ class boss_lady_deathwhisper : public CreatureScript
 
             void UpdateAI(uint32 const diff)
             {
-                if ((!UpdateVictim() && !(events.GetPhaseMask() & PHASE_INTRO_MASK)) || !CheckInRoom())
+                if ((!UpdateVictim() && !events.IsInPhase(PHASE_INTRO)) || !CheckInRoom())
                     return;
 
                 events.Update(diff);
 
-                if (me->HasUnitState(UNIT_STATE_CASTING) && !(events.GetPhaseMask() & PHASE_INTRO_MASK))
+                if (me->HasUnitState(UNIT_STATE_CASTING) && !events.IsInPhase(PHASE_INTRO))
                     return;
 
                 while (uint32 eventId = events.ExecuteEvent())

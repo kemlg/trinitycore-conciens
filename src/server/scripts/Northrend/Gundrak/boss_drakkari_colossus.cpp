@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,6 +22,7 @@
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "gundrak.h"
+#include "SpellInfo.h"
 
 enum Spells
 {
@@ -147,6 +148,7 @@ class boss_drakkari_colossus : public CreatureScript
                         DoCast(SPELL_EMERGE);
                         break;
                     case ACTION_FREEZE_COLOSSUS:
+                        me->GetMotionMaster()->Clear();
                         me->GetMotionMaster()->MoveIdle();
 
                         me->SetReactState(REACT_PASSIVE);
@@ -190,7 +192,7 @@ class boss_drakkari_colossus : public CreatureScript
                 }
             }
 
-            uint32 GetData(uint32 data)
+            uint32 GetData(uint32 data) const
             {
                if (data == DATA_COLOSSUS_PHASE)
                    return phase;

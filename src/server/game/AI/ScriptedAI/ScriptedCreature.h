@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -54,7 +54,7 @@ class SummonList : public std::list<uint64>
 
         void DoZoneInCombat(uint32 entry = 0);
         void RemoveNotExisting();
-        bool HasEntry(uint32 entry);
+        bool HasEntry(uint32 entry) const;
     private:
         Creature* me;
 };
@@ -136,6 +136,9 @@ struct ScriptedAI : public CreatureAI
     //Called at creature aggro either by MoveInLOS or Attack Start
     void EnterCombat(Unit* /*victim*/) {}
 
+    // Called before EnterCombat even before the creature is in combat.
+    void AttackStart(Unit* /*target*/);
+
     // *************
     //AI Helper Functions
     // *************
@@ -191,7 +194,11 @@ struct ScriptedAI : public CreatureAI
 
     void SetEquipmentSlots(bool loadDefault, int32 mainHand = EQUIP_NO_CHANGE, int32 offHand = EQUIP_NO_CHANGE, int32 ranged = EQUIP_NO_CHANGE);
 
-    //Generally used to control if MoveChase() is to be used or not in AttackStart(). Some creatures does not chase victims
+    // Used to control if MoveChase() is to be used or not in AttackStart(). Some creatures does not chase victims
+    // NOTE: If you use SetCombatMovement while the creature is in combat, it will do NOTHING - This only affects AttackStart
+    //       You should make the necessary to make it happen so.
+    //       Remember that if you modified _isCombatMovementAllowed (e.g: using SetCombatMovement) it will not be reset at Reset().
+    //       It will keep the last value you set.
     void SetCombatMovement(bool allowMovement);
     bool IsCombatMovementAllowed() const { return _isCombatMovementAllowed; }
 
@@ -267,15 +274,6 @@ struct ScriptedAI : public CreatureAI
         uint32 _evadeCheckCooldown;
         bool _isCombatMovementAllowed;
         bool _isHeroic;
-};
-
-struct Scripted_NoMovementAI : public ScriptedAI
-{
-    Scripted_NoMovementAI(Creature* creature) : ScriptedAI(creature) {}
-    virtual ~Scripted_NoMovementAI() {}
-
-    //Called at each attack of me by any victim
-    void AttackStart(Unit* target);
 };
 
 class BossAI : public ScriptedAI

@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+# Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -9,18 +9,11 @@
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 # Enable precompiled headers when using the GCC compiler.
-if( USE_SCRIPTPCH )
-  include_directories(
-    ${CMAKE_CURRENT_BINARY_DIR}
-  )
-endif()
 
-if( USE_SCRIPTPCH AND MSVC )
-  set(scripts_STAT_SRCS
-    PrecompiledHeaders/ScriptPCH.cpp
-    PrecompiledHeaders/ScriptPCH.h
-  )
-endif()
+if (USE_SCRIPTPCH)
+  set(scripts_STAT_PCH_HDR PrecompiledHeaders/ScriptPCH.h)
+  set(scripts_STAT_PCH_SRC PrecompiledHeaders/ScriptPCH.cpp)
+endif ()
 
 message(STATUS "SCRIPT PREPARATIONS")
 include(Spells/CMakeLists.txt)
@@ -44,6 +37,7 @@ if(SCRIPTS)
   include(Kalimdor/CMakeLists.txt)
   include(Outland/CMakeLists.txt)
   include(Northrend/CMakeLists.txt)
+  include(Events/CMakeLists.txt)
 endif()
 
 message(STATUS "SCRIPT PREPARATION COMPLETE")
@@ -51,6 +45,8 @@ message("")
 
 include_directories(
   ${CMAKE_BINARY_DIR}
+  ${CMAKE_SOURCE_DIR}/dep/recastnavigation/Detour
+  ${CMAKE_SOURCE_DIR}/dep/recastnavigation/Recast
   ${CMAKE_SOURCE_DIR}/dep/g3dlite/include
   ${CMAKE_SOURCE_DIR}/dep/SFMT
   ${CMAKE_SOURCE_DIR}/dep/zlib
@@ -147,15 +143,14 @@ include_directories(
   ${MYSQL_INCLUDE_DIR}
 )
 
-add_library(scripts STATIC ${scripts_STAT_SRCS})
+add_library(scripts STATIC
+  ${scripts_STAT_SRCS}
+  ${scripts_STAT_PCH_SRC}
+)
 
 add_dependencies(scripts revision.h)
 
 # Generate precompiled header
-if( USE_SCRIPTPCH )
-  if(CMAKE_COMPILER_IS_GNUCXX)
-    add_precompiled_header(scripts ${CMAKE_CURRENT_SOURCE_DIR}/PrecompiledHeaders/ScriptPCH.h)
-  elseif(MSVC)
-    add_native_precompiled_header(scripts ${CMAKE_CURRENT_SOURCE_DIR}/PrecompiledHeaders/ScriptPCH)
-  endif()
+if (USE_SCRIPTPCH)
+  add_cxx_pch(scripts ${scripts_STAT_PCH_HDR} ${scripts_STAT_PCH_SRC})
 endif()

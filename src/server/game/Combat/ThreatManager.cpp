@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -158,7 +158,7 @@ void HostileReference::addThreat(float modThreat)
 void HostileReference::addThreatPercent(int32 percent)
 {
     float tmpThreat = iThreat;
-    AddPctN(tmpThreat, percent);
+    AddPct(tmpThreat, percent);
     addThreat(tmpThreat - iThreat);
 }
 
@@ -253,25 +253,29 @@ Unit* HostileReference::getSourceUnit()
 
 void ThreatContainer::clearReferences()
 {
-    for (std::list<HostileReference*>::const_iterator i = iThreatList.begin(); i != iThreatList.end(); ++i)
+    for (ThreatContainer::StorageType::const_iterator i = iThreatList.begin(); i != iThreatList.end(); ++i)
     {
         (*i)->unlink();
         delete (*i);
     }
+
     iThreatList.clear();
 }
 
 //============================================================
 // Return the HostileReference of NULL, if not found
-HostileReference* ThreatContainer::getReferenceByTarget(Unit* victim)
+HostileReference* ThreatContainer::getReferenceByTarget(Unit* victim) const
 {
     if (!victim)
         return NULL;
 
-    uint64 guid = victim->GetGUID();
-    for (std::list<HostileReference*>::const_iterator i = iThreatList.begin(); i != iThreatList.end(); ++i)
-        if ((*i) && (*i)->getUnitGuid() == guid)
-            return (*i);
+    uint64 const guid = victim->GetGUID();
+    for (ThreatContainer::StorageType::const_iterator i = iThreatList.begin(); i != iThreatList.end(); ++i)
+    {
+        HostileReference* ref = (*i);
+        if (ref && ref->getUnitGuid() == guid)
+            return ref;
+    }
 
     return NULL;
 }
@@ -310,16 +314,16 @@ void ThreatContainer::update()
 // return the next best victim
 // could be the current victim
 
-HostileReference* ThreatContainer::selectNextVictim(Creature* attacker, HostileReference* currentVictim)
+HostileReference* ThreatContainer::selectNextVictim(Creature* attacker, HostileReference* currentVictim) const
 {
     HostileReference* currentRef = NULL;
     bool found = false;
     bool noPriorityTargetFound = false;
 
-    std::list<HostileReference*>::const_iterator lastRef = iThreatList.end();
+    ThreatContainer::StorageType::const_iterator lastRef = iThreatList.end();
     --lastRef;
 
-    for (std::list<HostileReference*>::const_iterator iter = iThreatList.begin(); iter != iThreatList.end() && !found;)
+    for (ThreatContainer::StorageType::const_iterator iter = iThreatList.begin(); iter != iThreatList.end() && !found;)
     {
         currentRef = (*iter);
 
@@ -412,20 +416,17 @@ void ThreatManager::addThreat(Unit* victim, float threat, SpellSchoolMask school
 
 void ThreatManager::doAddThreat(Unit* victim, float threat)
 {
-    uint32 reducedThreadPercent = victim->GetReducedThreatPercent();
+    uint32 redirectThreadPct = victim->GetRedirectThreatPercent();
 
     // must check > 0.0f, otherwise dead loop
-    if (threat > 0.0f && reducedThreadPercent)
+    if (threat > 0.0f && redirectThreadPct)
     {
-        Unit* redirectTarget = victim->GetMisdirectionTarget();
-        if (redirectTarget)
-            if (Aura* glyphAura = redirectTarget->GetAura(63326)) // Glyph of Vigilance
-                reducedThreadPercent += glyphAura->GetSpellInfo()->Effects[0].CalcValue();
-
-        float reducedThreat = threat * reducedThreadPercent / 100.0f;
-        threat -= reducedThreat;
-        if (redirectTarget)
-            _addThreat(redirectTarget, reducedThreat);
+        if (Unit* redirectTarget = victim->GetRedirectThreatTarget())
+        {
+            float redirectThreat = CalculatePct(threat, redirectThreadPct);
+            threat -= redirectThreat;
+            _addThreat(redirectTarget, redirectThreat);
+        }
     }
 
     _addThreat(victim, threat);
@@ -577,17 +578,15 @@ bool ThreatManager::isNeedUpdateToClient(uint32 time)
     return false;
 }
 
-// Reset all aggro without modifying the threadlist.
+// Reset all aggro without modifying the threatlist.
 void ThreatManager::resetAllAggro()
 {
-    std::list<HostileReference*> &threatList = getThreatList();
+    ThreatContainer::StorageType &threatList = iThreatContainer.iThreatList;
     if (threatList.empty())
         return;
 
-    for (std::list<HostileReference*>::iterator itr = threatList.begin(); itr != threatList.end(); ++itr)
-    {
+    for (ThreatContainer::StorageType::iterator itr = threatList.begin(); itr != threatList.end(); ++itr)
         (*itr)->setThreat(0);
-    }
 
     setDirty(true);
 }

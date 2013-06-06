@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -21,6 +21,7 @@
 
 #include <ace/Singleton.h>
 #include <ace/Null_Mutex.h>
+#include <ace/INET_Addr.h>
 #include "Common.h"
 
 enum RealmFlags
@@ -39,7 +40,9 @@ enum RealmFlags
 // Storage object for a realm
 struct Realm
 {
-    std::string address;
+    ACE_INET_Addr ExternalAddress;
+    ACE_INET_Addr LocalAddress;
+    ACE_INET_Addr LocalSubnetMask;
     std::string name;
     uint8 icon;
     RealmFlags flag;
@@ -71,7 +74,7 @@ public:
 
 private:
     void UpdateRealms(bool init=false);
-    void UpdateRealm(uint32 ID, const std::string& name, const std::string& address, uint16 port, uint8 icon, RealmFlags flag, uint8 timezone, AccountTypes allowedSecurityLevel, float popu, uint32 build);
+    void UpdateRealm(uint32 id, const std::string& name, ACE_INET_Addr const& address, ACE_INET_Addr const& localAddr, ACE_INET_Addr const& localSubmask, uint8 icon, RealmFlags flag, uint8 timezone, AccountTypes allowedSecurityLevel, float popu, uint32 build);
 
     RealmMap m_realms;
     uint32   m_UpdateInterval;

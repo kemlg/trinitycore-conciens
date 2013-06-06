@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -108,7 +108,7 @@ public:
                 m_bVesperonKilled = true;
         }
 
-        uint32 GetData(uint32 uiType)
+        uint32 GetData(uint32 uiType) const
         {
             if (uiType == TYPE_SARTHARION_EVENT)
                 return m_auiEncounter[0];
@@ -122,7 +122,7 @@ public:
             return 0;
         }
 
-        uint64 GetData64(uint32 uiData)
+        uint64 GetData64(uint32 uiData) const
         {
             switch (uiData)
             {

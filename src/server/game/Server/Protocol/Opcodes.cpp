@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -684,11 +684,11 @@ OpcodeHandler opcodeTable[NUM_MSG_TYPES] =
     /*0x28F*/ { "CMSG_GROUP_ASSISTANT_LEADER",                  STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupAssistantLeaderOpcode},
     /*0x290*/ { "CMSG_BUYBACK_ITEM",                            STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleBuybackItem               },
     /*0x291*/ { "SMSG_SERVER_MESSAGE",                          STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
-    /*0x292*/ { "CMSG_SET_SAVED_INSTANCE_EXTEND",               STATUS_UNHANDLED, PROCESS_INPLACE,     &WorldSession::Handle_NULL                     },
+    /*0x292*/ { "CMSG_SET_SAVED_INSTANCE_EXTEND",               STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetSavedInstanceExtend    },
     /*0x293*/ { "SMSG_LFG_OFFER_CONTINUE",                      STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
     /*0x294*/ { "CMSG_TEST_DROP_RATE",                          STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_NULL                     },
     /*0x295*/ { "SMSG_TEST_DROP_RATE_RESULT",                   STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
-    /*0x296*/ { "CMSG_LFG_GET_STATUS",                          STATUS_UNHANDLED, PROCESS_INPLACE,     &WorldSession::Handle_NULL                     },
+    /*0x296*/ { "CMSG_LFG_GET_STATUS",                          STATUS_LOGGEDIN, PROCESS_THREADSAFE,   &WorldSession::HandleLfgGetStatus              },
     /*0x297*/ { "SMSG_SHOW_MAILBOX",                            STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
     /*0x298*/ { "SMSG_RESET_RANGED_COMBAT_TIMER",               STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
     /*0x299*/ { "SMSG_MEETINGSTONE_MEMBER_ADDED",               STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
@@ -763,7 +763,7 @@ OpcodeHandler opcodeTable[NUM_MSG_TYPES] =
     /*0x2DE*/ { "SMSG_FORCE_TURN_RATE_CHANGE",                  STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
     /*0x2DF*/ { "CMSG_FORCE_TURN_RATE_CHANGE_ACK",              STATUS_LOGGEDIN, PROCESS_THREADSAFE,   &WorldSession::HandleForceSpeedChangeAck       },
     /*0x2E0*/ { "MSG_PVP_LOG_DATA",                             STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePVPLogDataOpcode          },
-    /*0x2E1*/ { "CMSG_LEAVE_BATTLEFIELD",                       STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLeaveBattlefieldOpcode    },
+    /*0x2E1*/ { "CMSG_LEAVE_BATTLEFIELD",                       STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleBattlefieldLeaveOpcode    },
     /*0x2E2*/ { "CMSG_AREA_SPIRIT_HEALER_QUERY",                STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAreaSpiritHealerQueryOpcode},
     /*0x2E3*/ { "CMSG_AREA_SPIRIT_HEALER_QUEUE",                STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAreaSpiritHealerQueueOpcode},
     /*0x2E4*/ { "SMSG_AREA_SPIRIT_HEALER_TIME",                 STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
@@ -888,7 +888,7 @@ OpcodeHandler opcodeTable[NUM_MSG_TYPES] =
     /*0x35B*/ { "SMSG_ARENA_TEAM_STATS",                        STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
     /*0x35C*/ { "CMSG_LFG_JOIN",                                STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfgJoinOpcode             },
     /*0x35D*/ { "CMSG_LFG_LEAVE",                               STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfgLeaveOpcode            },
-    /*0x35E*/ { "CMSG_SEARCH_LFG_JOIN",                         STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfrSearchOpcode           },
+    /*0x35E*/ { "CMSG_SEARCH_LFG_JOIN",                         STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfrJoinOpcode             },
     /*0x35F*/ { "CMSG_SEARCH_LFG_LEAVE",                        STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfrLeaveOpcode            },
     /*0x360*/ { "SMSG_UPDATE_LFG_LIST",                         STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
     /*0x361*/ { "SMSG_LFG_PROPOSAL_UPDATE",                     STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
@@ -1249,7 +1249,7 @@ OpcodeHandler opcodeTable[NUM_MSG_TYPES] =
     /*0x4C4*/ { "CMSG_GM_GRANT_ACHIEVEMENT",                    STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_NULL                     },
     /*0x4C5*/ { "CMSG_GM_REMOVE_ACHIEVEMENT",                   STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_NULL                     },
     /*0x4C6*/ { "CMSG_GM_SET_CRITERIA_FOR_PLAYER",              STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_NULL                     },
-    /*0x4C7*/ { "SMSG_ARENA_OPPONENT_UPDATE",                   STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
+    /*0x4C7*/ { "SMSG_ARENA_UNIT_DESTROYED",                    STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
     /*0x4C8*/ { "SMSG_ARENA_TEAM_CHANGE_FAILED_QUEUED",         STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },
     /*0x4C9*/ { "CMSG_PROFILEDATA_REQUEST",                     STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_NULL                     },
     /*0x4CA*/ { "SMSG_PROFILEDATA_RESPONSE",                    STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               },

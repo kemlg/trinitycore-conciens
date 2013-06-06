@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,7 +18,7 @@
 #ifndef OUTDOOR_PVP_H_
 #define OUTDOOR_PVP_H_
 
-#include "Utilities/Util.h"
+#include "Util.h"
 #include "SharedDefines.h"
 #include "ZoneScript.h"
 
@@ -85,7 +85,7 @@ class Unit;
 struct GossipMenuItems;
 class OutdoorPvP;
 
-typedef std::set<Player*> PlayerSet;
+typedef std::set<uint64> PlayerSet;
 
 class OPvPCapturePoint
 {
@@ -285,7 +285,7 @@ class OutdoorPvP : public ZoneScript
 
         void RegisterZone(uint32 zoneid);
 
-        bool HasPlayer(Player* player) const;
+        bool HasPlayer(Player const* player) const;
 
         void TeamCastSpell(TeamId team, int32 spellId);
 };

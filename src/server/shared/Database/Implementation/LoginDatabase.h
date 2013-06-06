@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -83,6 +83,7 @@ enum LoginDatabaseStatements
     LOGIN_UPD_USERNAME,
     LOGIN_UPD_PASSWORD,
     LOGIN_UPD_MUTE_TIME,
+    LOGIN_UPD_MUTE_TIME_LOGIN,
     LOGIN_UPD_LAST_IP,
     LOGIN_UPD_ACCOUNT_ONLINE,
     LOGIN_UPD_UPTIME_PLAYERS,
@@ -108,6 +109,16 @@ enum LoginDatabaseStatements
     LOGIN_SEL_REALMLIST_SECURITY_LEVEL,
     LOGIN_DEL_ACCOUNT,
 
+    LOGIN_SEL_ACCOUNT_ACCESS_BY_ID,
+    LOGIN_SEL_RBAC_ACCOUNT_GROUPS,
+    LOGIN_INS_RBAC_ACCOUNT_GROUP,
+    LOGIN_DEL_RBAC_ACCOUNT_GROUP,
+    LOGIN_SEL_RBAC_ACCOUNT_ROLES,
+    LOGIN_INS_RBAC_ACCOUNT_ROLE,
+    LOGIN_DEL_RBAC_ACCOUNT_ROLE,
+    LOGIN_SEL_RBAC_ACCOUNT_PERMISSIONS,
+    LOGIN_INS_RBAC_ACCOUNT_PERMISSION,
+    LOGIN_DEL_RBAC_ACCOUNT_PERMISSION,
     MAX_LOGINDATABASE_STATEMENTS
 };
 

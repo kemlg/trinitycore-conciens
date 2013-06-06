@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -160,7 +160,7 @@ public:
             }
         }
 
-        uint64 GetData64(uint32 identifier)
+        uint64 GetData64(uint32 identifier) const
         {
             switch (identifier)
             {
@@ -252,7 +252,7 @@ public:
                 SaveToDB();
         }
 
-        uint32 GetData(uint32 type)
+        uint32 GetData(uint32 type) const
         {
             switch (type)
             {
@@ -336,5 +336,5 @@ public:
 
 void AddSC_instance_ahnkahet()
 {
-   new instance_ahnkahet;
+   new instance_ahnkahet();
 }

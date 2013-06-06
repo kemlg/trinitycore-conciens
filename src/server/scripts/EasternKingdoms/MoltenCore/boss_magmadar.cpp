@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -30,7 +30,7 @@ EndScriptData */
 
 enum Texts
 {
-    EMOTE_FRENZY        = -1409001,
+    EMOTE_FRENZY        = 0
 };
 
 enum Spells
@@ -88,7 +88,7 @@ class boss_magmadar : public CreatureScript
                     switch (eventId)
                     {
                         case EVENT_FRENZY:
-                            DoScriptText(EMOTE_FRENZY, me);
+                            Talk(EMOTE_FRENZY);
                             DoCast(me, SPELL_FRENZY);
                             events.ScheduleEvent(EVENT_FRENZY, 15000);
                             break;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -567,8 +567,8 @@ void Aura::UpdateTargetMap(Unit* caster, bool apply)
             {
                 //TODO: There is a crash caused by shadowfiend load addon
                 sLog->outFatal(LOG_FILTER_SPELLS_AURAS, "Aura %u: Owner %s (map %u) is not in the same map as target %s (map %u).", GetSpellInfo()->Id,
-                    GetOwner()->GetName(), GetOwner()->IsInWorld() ? GetOwner()->GetMap()->GetId() : uint32(-1),
-                    itr->first->GetName(), itr->first->IsInWorld() ? itr->first->GetMap()->GetId() : uint32(-1));
+                    GetOwner()->GetName().c_str(), GetOwner()->IsInWorld() ? GetOwner()->GetMap()->GetId() : uint32(-1),
+                    itr->first->GetName().c_str(), itr->first->IsInWorld() ? itr->first->GetMap()->GetId() : uint32(-1));
                 ASSERT(false);
             }
             itr->first->_CreateAuraApplication(this, itr->second);
@@ -910,8 +910,16 @@ bool Aura::CanBeSaved() const
 
     // Incanter's Absorbtion - considering the minimal duration and problems with aura stacking
     // we skip saving this aura
-    if (GetId() == 44413)
-        return false;
+    // Also for some reason other auras put as MultiSlot crash core on keeping them after restart,
+    // so put here only these for which you are sure they get removed
+    switch (GetId())
+    {
+        case 44413: // Incanter's Absorption
+        case 40075: // Fel Flak Fire
+        case 55849: // Power Spark
+            return false;
+            break;
+    }
 
     // don't save auras removed by proc system
     if (IsUsingCharges() && !GetCharges())
@@ -1215,7 +1223,7 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
                         uint32 damage = caster->SpellDamageBonusDone(target, GetSpellInfo(), GetEffect(0)->GetAmount(), DOT);
                         damage = target->SpellDamageBonusTaken(caster, GetSpellInfo(), damage, DOT);
                         int32 basepoints0 = aurEff->GetAmount() * GetEffect(0)->GetTotalTicks() * int32(damage) / 100;
-                        int32 heal = int32(CalculatePctN(basepoints0, 15));
+                        int32 heal = int32(CalculatePct(basepoints0, 15));
 
                         caster->CastCustomSpell(target, 63675, &basepoints0, NULL, NULL, true, NULL, GetEffect(0));
                         caster->CastCustomSpell(caster, 75999, &heal, NULL, NULL, true, NULL, GetEffect(0));
@@ -1342,7 +1350,7 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
                 if (removeMode == AURA_REMOVE_BY_ENEMY_SPELL && GetSpellInfo()->SpellFamilyFlags[1] & 0x1)
                 {
                     // Shattered Barrier
-                    if (AuraEffect * dummy = caster->GetDummyAuraEffect(SPELLFAMILY_MAGE, 2945, 0))
+                    if (AuraEffect* dummy = caster->GetDummyAuraEffect(SPELLFAMILY_MAGE, 2945, 0))
                         if (roll_chance_i(dummy->GetSpellInfo()->ProcChance))
                             caster->CastSpell(target, 55080, true, NULL, GetEffect(0));
                 }
@@ -1433,7 +1441,7 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
                             else if (aurEff->GetId() == 47537)
                                 multiplier += 0.5f;
 
-                            int32 basepoints0 = int32(CalculatePctF(caster->GetMaxPower(POWER_MANA), multiplier));
+                            int32 basepoints0 = int32(CalculatePct(caster->GetMaxPower(POWER_MANA), multiplier));
                             caster->CastCustomSpell(caster, 47755, &basepoints0, NULL, NULL, true);
                         }
                         // effect on aura target
@@ -1447,7 +1455,7 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
                             {
                                 case POWER_MANA:
                                 {
-                                    int32 basepoints0 = int32(CalculatePctN(target->GetMaxPower(POWER_MANA), 2));
+                                    int32 basepoints0 = int32(CalculatePct(target->GetMaxPower(POWER_MANA), 2));
                                     caster->CastCustomSpell(target, 63654, &basepoints0, NULL, NULL, true);
                                     break;
                                 }
@@ -1529,17 +1537,6 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
     // mods at aura apply or remove
     switch (GetSpellInfo()->SpellFamilyName)
     {
-        case SPELLFAMILY_GENERIC:
-            switch (GetId())
-            {
-                case 50720: // Vigilance
-                    if (apply)
-                        target->CastSpell(caster, 59665, true, 0, 0, caster->GetGUID());
-                    else
-                        target->SetReducedThreatPercent(0, 0);
-                    break;
-            }
-            break;
         case SPELLFAMILY_DRUID:
             // Enrage
             if ((GetSpellInfo()->SpellFamilyFlags[0] & 0x80000) && GetSpellInfo()->SpellIconID == 961)
@@ -1637,6 +1634,9 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
             }
             if (GetSpellInfo()->GetSpellSpecific() == SPELL_SPECIFIC_AURA)
             {
+                if (!caster)
+                    break;
+
                 // Improved devotion aura
                 if (caster->HasAura(20140) || caster->HasAura(20138) || caster->HasAura(20139))
                 {
@@ -1929,9 +1929,12 @@ void Aura::AddProcCooldown(uint32 /*msec*/)
     //m_procCooldown = time(NULL) + msec;
 }
 
-void Aura::PrepareProcToTrigger()
+void Aura::PrepareProcToTrigger(AuraApplication* aurApp, ProcEventInfo& eventInfo)
 {
-    // TODO: allow scripts to prevent charge drop/cooldown
+    bool prepare = CallScriptPrepareProcHandlers(aurApp, eventInfo);
+    if (!prepare)
+        return;
+
     // take one charge, aura expiration will be handled in Aura::TriggerProcOnEvent (if needed)
     if (IsUsingCharges())
     {
@@ -1969,10 +1972,19 @@ bool Aura::IsProcTriggeredOnEvent(AuraApplication* aurApp, ProcEventInfo& eventI
     if (!sSpellMgr->CanSpellTriggerProcOnEvent(*procEntry, eventInfo))
         return false;
 
+    // do checks using conditions table
+    ConditionList conditions = sConditionMgr->GetConditionsForNotGroupedEntry(CONDITION_SOURCE_TYPE_SPELL_PROC, GetId());
+    ConditionSourceInfo condInfo = ConditionSourceInfo(eventInfo.GetActor(), eventInfo.GetActionTarget());
+    if (!sConditionMgr->IsObjectMeetToConditions(condInfo, conditions))
+        return false;
+
+    // AuraScript Hook
+    bool check = const_cast<Aura*>(this)->CallScriptCheckProcHandlers(aurApp, eventInfo);
+    if (!check)
+        return false;
+
     // TODO:
-    // - do checks using conditions table for eventInfo->GetActor() and eventInfo->GetActionTarget()
-    // - add DoCheckProc() AuraScript hook
-    // to allow additional requirements for procs
+    // do allow additional requirements for procs
     // this is needed because this is the last moment in which you can prevent aura charge drop on proc
     // and possibly a way to prevent default checks (if there're going to be any)
 
@@ -2036,14 +2048,14 @@ float Aura::CalcProcChance(SpellProcEntry const& procEntry, ProcEventInfo& event
 
 void Aura::TriggerProcOnEvent(AuraApplication* aurApp, ProcEventInfo& eventInfo)
 {
-    // TODO: OnProc hook here
+    CallScriptProcHandlers(aurApp, eventInfo);
+
     for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
         if (aurApp->HasEffect(i))
-            // TODO: OnEffectProc hook here (allowing prevention of selected effects)
+            // OnEffectProc / AfterEffectProc hooks handled in AuraEffect::HandleProc()
             GetEffect(i)->HandleProc(aurApp, eventInfo);
-            // TODO: AfterEffectProc hook here
 
-    // TODO: AfterProc hook here
+    CallScriptAfterProcHandlers(aurApp, eventInfo);
 
     // Remove aura if we've used last charge to proc
     if (IsUsingCharges() && !GetCharges())
@@ -2319,6 +2331,110 @@ void Aura::CallScriptEffectAfterManaShieldHandlers(AuraEffect* aurEff, AuraAppli
         {
             if ((*effItr).IsEffectAffected(m_spellInfo, aurEff->GetEffIndex()))
                 (*effItr).Call(*scritr, aurEff, dmgInfo, absorbAmount);
+        }
+        (*scritr)->_FinishScriptCall();
+    }
+}
+
+void Aura::CallScriptEffectSplitHandlers(AuraEffect* aurEff, AuraApplication const* aurApp, DamageInfo & dmgInfo, uint32 & splitAmount)
+{
+    for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
+    {
+        (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_SPLIT, aurApp);
+        std::list<AuraScript::EffectSplitHandler>::iterator effEndItr = (*scritr)->OnEffectSplit.end(), effItr = (*scritr)->OnEffectSplit.begin();
+        for (; effItr != effEndItr; ++effItr)
+        {
+            if ((*effItr).IsEffectAffected(m_spellInfo, aurEff->GetEffIndex()))
+                (*effItr).Call(*scritr, aurEff, dmgInfo, splitAmount);
+        }
+        (*scritr)->_FinishScriptCall();
+    }
+}
+
+bool Aura::CallScriptCheckProcHandlers(AuraApplication const* aurApp, ProcEventInfo& eventInfo)
+{
+    for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
+    {
+        (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_CHECK_PROC, aurApp);
+        std::list<AuraScript::CheckProcHandler>::iterator hookItrEnd = (*scritr)->DoCheckProc.end(), hookItr = (*scritr)->DoCheckProc.begin();
+        for (; hookItr != hookItrEnd; ++hookItr)
+            if (!(*hookItr).Call(*scritr, eventInfo))
+                return false;
+        (*scritr)->_FinishScriptCall();
+    }
+    return true;
+}
+
+bool Aura::CallScriptPrepareProcHandlers(AuraApplication const* aurApp, ProcEventInfo& eventInfo)
+{
+    bool prepare = true;
+    for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
+    {
+        (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_PREPARE_PROC, aurApp);
+        std::list<AuraScript::AuraProcHandler>::iterator effEndItr = (*scritr)->DoPrepareProc.end(), effItr = (*scritr)->DoPrepareProc.begin();
+        for (; effItr != effEndItr; ++effItr)
+            (*effItr).Call(*scritr, eventInfo);
+
+        if (prepare && (*scritr)->_IsDefaultActionPrevented())
+            prepare = false;
+        (*scritr)->_FinishScriptCall();
+    }
+    return prepare;
+}
+
+void Aura::CallScriptProcHandlers(AuraApplication const* aurApp, ProcEventInfo& eventInfo)
+{
+    for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
+    {
+        (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_PROC, aurApp);
+        std::list<AuraScript::AuraProcHandler>::iterator hookItrEnd = (*scritr)->OnProc.end(), hookItr = (*scritr)->OnProc.begin();
+        for (; hookItr != hookItrEnd; ++hookItr)
+            (*hookItr).Call(*scritr, eventInfo);
+        (*scritr)->_FinishScriptCall();
+    }
+}
+
+void Aura::CallScriptAfterProcHandlers(AuraApplication const* aurApp, ProcEventInfo& eventInfo)
+{
+    for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
+    {
+        (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_AFTER_PROC, aurApp);
+        std::list<AuraScript::AuraProcHandler>::iterator hookItrEnd = (*scritr)->AfterProc.end(), hookItr = (*scritr)->AfterProc.begin();
+        for (; hookItr != hookItrEnd; ++hookItr)
+            (*hookItr).Call(*scritr, eventInfo);
+        (*scritr)->_FinishScriptCall();
+    }
+}
+
+bool Aura::CallScriptEffectProcHandlers(AuraEffect const* aurEff, AuraApplication const* aurApp, ProcEventInfo& eventInfo)
+{
+    bool preventDefault = false;
+    for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
+    {
+        (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_PROC, aurApp);
+        std::list<AuraScript::EffectProcHandler>::iterator effEndItr = (*scritr)->OnEffectProc.end(), effItr = (*scritr)->OnEffectProc.begin();
+        for (; effItr != effEndItr; ++effItr)
+        {
+            if ((*effItr).IsEffectAffected(m_spellInfo, aurEff->GetEffIndex()))
+                (*effItr).Call(*scritr, aurEff, eventInfo);
+        }
+        if (!preventDefault)
+            preventDefault = (*scritr)->_IsDefaultActionPrevented();
+        (*scritr)->_FinishScriptCall();
+    }
+    return preventDefault;
+}
+
+void Aura::CallScriptAfterEffectProcHandlers(AuraEffect const* aurEff, AuraApplication const* aurApp, ProcEventInfo& eventInfo)
+{
+    for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
+    {
+        (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_AFTER_PROC, aurApp);
+        std::list<AuraScript::EffectProcHandler>::iterator effEndItr = (*scritr)->AfterEffectProc.end(), effItr = (*scritr)->AfterEffectProc.begin();
+        for (; effItr != effEndItr; ++effItr)
+        {
+            if ((*effItr).IsEffectAffected(m_spellInfo, aurEff->GetEffIndex()))
+                (*effItr).Call(*scritr, aurEff, eventInfo);
         }
         (*scritr)->_FinishScriptCall();
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,16 +21,12 @@
 
 enum Spells
 {
-    SPELL_MIND_BLAST                                       = 15587,
-    SPELL_SLEEP                                            = 8399,
-};
+    SPELL_MIND_BLAST        = 15587,
+    SPELL_SLEEP             = 8399,
 
-//Id's from ACID
-enum Yells
-{
-    SAY_AGGRO                                              = -1048002,
-    SAY_SLEEP                                              = -1048001,
-    SAY_DEATH                                              = -1048000
+    SAY_AGGRO               = 0,
+    SAY_SLEEP               = 1,
+    SAY_DEATH               = 2
 };
 
 class boss_kelris : public CreatureScript
@@ -65,14 +61,14 @@ public:
 
         void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(SAY_AGGRO, me);
+            Talk(SAY_AGGRO);
             if (instance)
                 instance->SetData(TYPE_KELRIS, IN_PROGRESS);
         }
 
         void JustDied(Unit* /*killer*/)
         {
-            DoScriptText(SAY_DEATH, me);
+            Talk(SAY_DEATH);
             if (instance)
                 instance->SetData(TYPE_KELRIS, DONE);
         }
@@ -92,7 +88,7 @@ public:
             {
                 if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
                 {
-                    DoScriptText(SAY_SLEEP, me);
+                    Talk(SAY_SLEEP);
                     DoCast(target, SPELL_SLEEP);
                 }
                 sleepTimer = urand(15000, 20000);

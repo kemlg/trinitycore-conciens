@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,7 +22,6 @@
 #include "Creature.h"
 #include "CreatureAI.h"
 #include "Unit.h"
-#include "ConditionMgr.h"
 #include "Spell.h"
 #include "GridNotifiers.h"
 
@@ -46,6 +45,7 @@ class SmartScript
         void UpdateTimer(SmartScriptHolder& e, uint32 const diff);
         void InitTimer(SmartScriptHolder& e);
         void ProcessAction(SmartScriptHolder& e, Unit* unit = NULL, uint32 var0 = 0, uint32 var1 = 0, bool bvar = false, const SpellInfo* spell = NULL, GameObject* gob = NULL);
+        void ProcessTimedAction(SmartScriptHolder& e, uint32 const& min, uint32 const& max, Unit* unit = NULL, uint32 var0 = 0, uint32 var1 = 0, bool bvar = false, const SpellInfo* spell = NULL, GameObject* gob = NULL);
         ObjectList* GetTargets(SmartScriptHolder const& e, Unit* invoker = NULL);
         ObjectList* GetWorldObjectsInDist(float dist);
         void InstallTemplate(SmartScriptHolder const& e);

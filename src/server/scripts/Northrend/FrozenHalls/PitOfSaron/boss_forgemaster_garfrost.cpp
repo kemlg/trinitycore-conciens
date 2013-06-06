@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,15 +23,15 @@
 
 enum Yells
 {
-    SAY_AGGRO             = 0,
-    SAY_PHASE2            = 1,
-    SAY_PHASE3            = 2,
-    SAY_DEATH             = 3,
-    SAY_SLAY              = 4,
-    SAY_THROW_SARONITE    = 5,
-    SAY_CAST_DEEP_FREEZE  = 6,
+    SAY_AGGRO               = 0,
+    SAY_PHASE2              = 1,
+    SAY_PHASE3              = 2,
+    SAY_DEATH               = 3,
+    SAY_SLAY                = 4,
+    SAY_THROW_SARONITE      = 5,
+    SAY_CAST_DEEP_FREEZE    = 6,
 
-    SAY_TYRANNUS_DEATH  = -1658007, // todo
+    SAY_TYRANNUS_DEATH      = 0
 };
 
 enum Spells
@@ -48,25 +48,11 @@ enum Spells
 #define SPELL_PERMAFROST_HELPER RAID_MODE<uint32>(68786, 70336)
 #define SPELL_FORGE_BLADE_HELPER RAID_MODE<uint32>(68774, 70334)
 
-enum Events
-{
-    EVENT_THROW_SARONITE    = 1,
-    EVENT_CHILLING_WAVE     = 2,
-    EVENT_DEEP_FREEZE       = 3,
-    EVENT_JUMP              = 4,
-    EVENT_FORGING           = 5,
-    EVENT_RESUME_ATTACK     = 6,
-};
-
 enum Phases
 {
     PHASE_ONE           = 1,
     PHASE_TWO           = 2,
-    PHASE_THREE         = 3,
-
-    PHASE_ONE_MASK      = 1 << PHASE_ONE,
-    PHASE_TWO_MASK      = 1 << PHASE_TWO,
-    PHASE_THREE_MASK    = 1 << PHASE_THREE,
+    PHASE_THREE         = 3
 };
 
 enum MiscData
@@ -82,6 +68,15 @@ Position const southForgePos = {639.257f, -210.1198f, 529.015f, 0.523599f};
 
 class boss_garfrost : public CreatureScript
 {
+enum Events
+{
+    EVENT_THROW_SARONITE    = 1,
+    EVENT_CHILLING_WAVE     = 2,
+    EVENT_DEEP_FREEZE       = 3,
+    EVENT_JUMP              = 4,
+    EVENT_FORGING           = 5,
+    EVENT_RESUME_ATTACK     = 6,
+};
     public:
         boss_garfrost() : CreatureScript("boss_garfrost") { }
 
@@ -130,14 +125,14 @@ class boss_garfrost : public CreatureScript
                 Talk(SAY_DEATH);
 
                 if (Creature* tyrannus = me->GetCreature(*me, instance->GetData64(DATA_TYRANNUS)))
-                    DoScriptText(SAY_TYRANNUS_DEATH, tyrannus);
+                    tyrannus->AI()->Talk(SAY_TYRANNUS_DEATH);
 
                 instance->SetBossState(DATA_GARFROST, DONE);
             }
 
             void DamageTaken(Unit* /*attacker*/, uint32& /*uiDamage*/)
             {
-                if (events.GetPhaseMask() & PHASE_ONE_MASK && !HealthAbovePct(66))
+                if (events.IsInPhase(PHASE_ONE) && !HealthAbovePct(66))
                 {
                     events.SetPhase(PHASE_TWO);
                     Talk(SAY_PHASE2);
@@ -147,7 +142,7 @@ class boss_garfrost : public CreatureScript
                     return;
                 }
 
-                if (events.GetPhaseMask() & PHASE_TWO_MASK && !HealthAbovePct(33))
+                if (events.IsInPhase(PHASE_TWO) && !HealthAbovePct(33))
                 {
                     events.SetPhase(PHASE_THREE);
                     Talk(SAY_PHASE3);
@@ -163,12 +158,12 @@ class boss_garfrost : public CreatureScript
                 if (type != EFFECT_MOTION_TYPE || id != POINT_FORGE)
                     return;
 
-                if (events.GetPhaseMask() & PHASE_TWO_MASK)
+                if (events.IsInPhase(PHASE_TWO))
                 {
                     DoCast(me, SPELL_FORGE_BLADE);
                     SetEquipmentSlots(false, EQUIP_ID_SWORD);
                 }
-                if (events.GetPhaseMask() & PHASE_THREE_MASK)
+                if (events.IsInPhase(PHASE_THREE))
                 {
                     me->RemoveAurasDueToSpell(SPELL_FORGE_BLADE_HELPER);
                     DoCast(me, SPELL_FORGE_MACE);
@@ -186,7 +181,7 @@ class boss_garfrost : public CreatureScript
                 }
             }
 
-            uint32 GetData(uint32 /*type*/)
+            uint32 GetData(uint32 /*type*/) const
             {
                 return _permafrostStack;
             }
@@ -227,15 +222,15 @@ class boss_garfrost : public CreatureScript
                             break;
                         case EVENT_JUMP:
                             me->AttackStop();
-                            if (events.GetPhaseMask() & PHASE_TWO_MASK)
+                            if (events.IsInPhase(PHASE_TWO))
                                 me->GetMotionMaster()->MoveJump(northForgePos.GetPositionX(), northForgePos.GetPositionY(), northForgePos.GetPositionZ(), 25.0f, 15.0f);
-                            else if (events.GetPhaseMask() & PHASE_THREE_MASK)
+                            else if (events.IsInPhase(PHASE_THREE))
                                 me->GetMotionMaster()->MoveJump(southForgePos.GetPositionX(), southForgePos.GetPositionY(), southForgePos.GetPositionZ(), 25.0f, 15.0f);
                             break;
                         case EVENT_RESUME_ATTACK:
-                            if (events.GetPhaseMask() & PHASE_TWO_MASK)
+                            if (events.IsInPhase(PHASE_THREE))
                                 events.ScheduleEvent(EVENT_CHILLING_WAVE, 5000, 0, PHASE_TWO);
-                            else if (events.GetPhaseMask() & PHASE_THREE_MASK)
+                            else if (events.IsInPhase(PHASE_THREE))
                                 events.ScheduleEvent(EVENT_DEEP_FREEZE, 10000, 0, PHASE_THREE);
                             AttackStart(me->getVictim());
                             break;

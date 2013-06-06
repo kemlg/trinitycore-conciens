@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -91,6 +91,7 @@ enum WorldBoolConfigs
     CONFIG_GRID_UNLOAD,
     CONFIG_STATS_SAVE_ONLY_ON_LOGOUT,
     CONFIG_ALLOW_TWO_SIDE_ACCOUNTS,
+    CONFIG_ALLOW_TWO_SIDE_INTERACTION_CALENDAR,
     CONFIG_ALLOW_TWO_SIDE_INTERACTION_CHAT,
     CONFIG_ALLOW_TWO_SIDE_INTERACTION_CHANNEL,
     CONFIG_ALLOW_TWO_SIDE_INTERACTION_GROUP,
@@ -137,7 +138,6 @@ enum WorldBoolConfigs
     CONFIG_ARENA_LOG_EXTENDED_INFO,
     CONFIG_OFFHAND_CHECK_AT_SPELL_UNLEARN,
     CONFIG_VMAP_INDOOR_CHECK,
-    CONFIG_PET_LOS,
     CONFIG_START_ALL_SPELLS,
     CONFIG_START_ALL_EXPLORED,
     CONFIG_START_ALL_REP,
@@ -154,7 +154,6 @@ enum WorldBoolConfigs
     CONFIG_CHATLOG_PUBLIC,
     CONFIG_CHATLOG_ADDON,
     CONFIG_CHATLOG_BGROUND,
-    CONFIG_DUNGEON_FINDER_ENABLE,
     CONFIG_AUTOBROADCAST,
     CONFIG_ALLOW_TICKETS,
     CONFIG_DBC_ENFORCE_ITEM_ATTRIBUTES,
@@ -164,7 +163,9 @@ enum WorldBoolConfigs
     CONFIG_QUEST_IGNORE_AUTO_ACCEPT,
     CONFIG_QUEST_IGNORE_AUTO_COMPLETE,
     CONFIG_WARDEN_ENABLED,
+    CONFIG_ENABLE_MMAPS,
     CONFIG_WINTERGRASP_ENABLE,
+    CONFIG_UI_QUESTLEVELS_IN_DIALOGS,     // Should we add quest levels to the title in the NPC dialogs?
     BOOL_CONFIG_VALUE_COUNT
 };
 
@@ -303,6 +304,7 @@ enum WorldIntConfigs
     CONFIG_GUILD_BANK_EVENT_LOG_COUNT,
     CONFIG_MIN_LEVEL_STAT_SAVE,
     CONFIG_RANDOM_BG_RESET_HOUR,
+    CONFIG_GUILD_RESET_HOUR,
     CONFIG_CHARDELETE_KEEP_DAYS,
     CONFIG_CHARDELETE_METHOD,
     CONFIG_CHARDELETE_MIN_LEVEL,
@@ -312,6 +314,7 @@ enum WorldIntConfigs
     CONFIG_DB_PING_INTERVAL,
     CONFIG_PRESERVE_CUSTOM_CHANNEL_DURATION,
     CONFIG_PERSISTENT_CHARACTER_CLEAN_FLAGS,
+    CONFIG_LFG_OPTIONSMASK,
     CONFIG_MAX_INSTANCES_PER_HOUR,
     CONFIG_WARDEN_CLIENT_RESPONSE_DELAY,
     CONFIG_WARDEN_CLIENT_CHECK_HOLDOFF,
@@ -467,43 +470,11 @@ enum RealmZone
 
 enum WorldStates
 {
-    WS_WEEKLY_QUEST_RESET_TIME = 20002,                      // Next weekly reset time
-    WS_BG_DAILY_RESET_TIME     = 20003                       // Next daily BG reset time
-};
-
-// DB scripting commands
-enum ScriptCommands
-{
-    SCRIPT_COMMAND_TALK                  = 0,                // source/target = Creature, target = any, datalong = talk type (0=say, 1=whisper, 2=yell, 3=emote text, 4=boss emote text), datalong2 & 1 = player talk (instead of creature), dataint = string_id
-    SCRIPT_COMMAND_EMOTE                 = 1,                // source/target = Creature, datalong = emote id, datalong2 = 0: set emote state; > 0: play emote state
-    SCRIPT_COMMAND_FIELD_SET             = 2,                // source/target = Creature, datalong = field id, datalog2 = value
-    SCRIPT_COMMAND_MOVE_TO               = 3,                // source/target = Creature, datalong2 = time to reach, x/y/z = destination
-    SCRIPT_COMMAND_FLAG_SET              = 4,                // source/target = Creature, datalong = field id, datalog2 = bitmask
-    SCRIPT_COMMAND_FLAG_REMOVE           = 5,                // source/target = Creature, datalong = field id, datalog2 = bitmask
-    SCRIPT_COMMAND_TELEPORT_TO           = 6,                // source/target = Creature/Player (see datalong2), datalong = map_id, datalong2 = 0: Player; 1: Creature, x/y/z = destination, o = orientation
-    SCRIPT_COMMAND_QUEST_EXPLORED        = 7,                // target/source = Player, target/source = GO/Creature, datalong = quest id, datalong2 = distance or 0
-    SCRIPT_COMMAND_KILL_CREDIT           = 8,                // target/source = Player, datalong = creature entry, datalong2 = 0: personal credit, 1: group credit
-    SCRIPT_COMMAND_RESPAWN_GAMEOBJECT    = 9,                // source = WorldObject (summoner), datalong = GO guid, datalong2 = despawn delay
-    SCRIPT_COMMAND_TEMP_SUMMON_CREATURE  = 10,               // source = WorldObject (summoner), datalong = creature entry, datalong2 = despawn delay, x/y/z = summon position, o = orientation
-    SCRIPT_COMMAND_OPEN_DOOR             = 11,               // source = Unit, datalong = GO guid, datalong2 = reset delay (min 15)
-    SCRIPT_COMMAND_CLOSE_DOOR            = 12,               // source = Unit, datalong = GO guid, datalong2 = reset delay (min 15)
-    SCRIPT_COMMAND_ACTIVATE_OBJECT       = 13,               // source = Unit, target = GO
-    SCRIPT_COMMAND_REMOVE_AURA           = 14,               // source (datalong2 != 0) or target (datalong2 == 0) = Unit, datalong = spell id
-    SCRIPT_COMMAND_CAST_SPELL            = 15,               // source and/or target = Unit, datalong2 = cast direction (0: s->t 1: s->s 2: t->t 3: t->s 4: s->creature with dataint entry), dataint & 1 = triggered flag
-    SCRIPT_COMMAND_PLAY_SOUND            = 16,               // source = WorldObject, target = none/Player, datalong = sound id, datalong2 (bitmask: 0/1=anyone/player, 0/2=without/with distance dependency, so 1|2 = 3 is target with distance dependency)
-    SCRIPT_COMMAND_CREATE_ITEM           = 17,               // target/source = Player, datalong = item entry, datalong2 = amount
-    SCRIPT_COMMAND_DESPAWN_SELF          = 18,               // target/source = Creature, datalong = despawn delay
-
-    SCRIPT_COMMAND_LOAD_PATH             = 20,               // source = Unit, datalong = path id, datalong2 = is repeatable
-    SCRIPT_COMMAND_CALLSCRIPT_TO_UNIT    = 21,               // source = WorldObject (if present used as a search center), datalong = script id, datalong2 = unit lowguid, dataint = script table to use (see ScriptsType)
-    SCRIPT_COMMAND_KILL                  = 22,               // source/target = Creature, dataint = remove corpse attribute
-
-    // TrinityCore only
-    SCRIPT_COMMAND_ORIENTATION           = 30,               // source = Unit, target (datalong > 0) = Unit, datalong = > 0 turn source to face target, o = orientation
-    SCRIPT_COMMAND_EQUIP                 = 31,               // soucre = Creature, datalong = equipment id
-    SCRIPT_COMMAND_MODEL                 = 32,               // source = Creature, datalong = model id
-    SCRIPT_COMMAND_CLOSE_GOSSIP          = 33,               // source = Player
-    SCRIPT_COMMAND_PLAYMOVIE             = 34                // source = Player, datalong = movie id
+    WS_WEEKLY_QUEST_RESET_TIME  = 20002,                     // Next weekly reset time
+    WS_BG_DAILY_RESET_TIME      = 20003,                     // Next daily BG reset time
+    WS_CLEANING_FLAGS           = 20004,                     // Cleaning Flags
+    WS_GUILD_DAILY_RESET_TIME   = 20006,                     // Next guild cap reset time
+    WS_MONTHLY_QUEST_RESET_TIME = 20007,                     // Next monthly reset time
 };
 
 /// Storage class for commands issued for delayed execution
@@ -537,6 +508,7 @@ struct CharacterNameData
     uint8 m_class;
     uint8 m_race;
     uint8 m_gender;
+    uint8 m_level;
 };
 
 /// The World
@@ -603,19 +575,19 @@ class World
         void SetAllowMovement(bool allow) { m_allowMovement = allow; }
 
         /// Set a new Message of the Day
-        void SetMotd(const std::string& motd);
+        void SetMotd(std::string const& motd);
         /// Get the current Message of the Day
         const char* GetMotd() const;
 
         /// Set the string for new characters (first login)
-        void SetNewCharString(std::string str) { m_newCharString = str; }
+        void SetNewCharString(std::string const& str) { m_newCharString = str; }
         /// Get the string for new characters (first login)
-        const std::string& GetNewCharString() const { return m_newCharString; }
+        std::string const& GetNewCharString() const { return m_newCharString; }
 
         LocaleConstant GetDefaultDbcLocale() const { return m_defaultDbcLocale; }
 
         /// Get the path where data (dbc, maps) are stored on disk
-        std::string GetDataPath() const { return m_dataPath; }
+        std::string const& GetDataPath() const { return m_dataPath; }
 
         /// When server started?
         time_t const& GetStartTime() const { return m_startTime; }
@@ -635,8 +607,8 @@ class World
         /// Get the maximum skill level a player can reach
         uint16 GetConfigMaxSkillValue() const
         {
-            uint8 lvl = getIntConfig(CONFIG_MAX_PLAYER_LEVEL);
-            return lvl > 60 ? 300 + ((lvl - 60) * 75) / 10 : lvl*5;
+            uint16 lvl = uint16(getIntConfig(CONFIG_MAX_PLAYER_LEVEL));
+            return lvl > 60 ? 300 + ((lvl - 60) * 75) / 10 : lvl * 5;
         }
 
         void SetInitialWorldSettings();
@@ -718,10 +690,10 @@ class World
 
         void KickAll();
         void KickAllLess(AccountTypes sec);
-        BanReturn BanAccount(BanMode mode, std::string nameOrIP, std::string duration, std::string reason, std::string author);
-        bool RemoveBanAccount(BanMode mode, std::string nameOrIP);
-        BanReturn BanCharacter(std::string name, std::string duration, std::string reason, std::string author);
-        bool RemoveBanCharacter(std::string name);
+        BanReturn BanAccount(BanMode mode, std::string const& nameOrIP, std::string const& duration, std::string const& reason, std::string const& author);
+        bool RemoveBanAccount(BanMode mode, std::string const& nameOrIP);
+        BanReturn BanCharacter(std::string const& name, std::string const& duration, std::string const& reason, std::string const& author);
+        bool RemoveBanCharacter(std::string const& name);
 
         // for max speed access
         static float GetMaxVisibleDistanceOnContinents()    { return m_MaxVisibleDistanceOnContinents; }
@@ -758,9 +730,11 @@ class World
         bool isEventKillStart;
 
         CharacterNameData const* GetCharacterNameData(uint32 guid) const;
-        void AddCharacterNameData(uint32 guid, std::string const& name, uint8 gender, uint8 race, uint8 playerClass);
+        void AddCharacterNameData(uint32 guid, std::string const& name, uint8 gender, uint8 race, uint8 playerClass, uint8 level);
         void UpdateCharacterNameData(uint32 guid, std::string const& name, uint8 gender = GENDER_NONE, uint8 race = RACE_NONE);
+        void UpdateCharacterNameDataLevel(uint32 guid, uint8 level);
         void DeleteCharaceterNameData(uint32 guid) { _characterNameDataMap.erase(guid); }
+        bool HasCharacterNameData(uint32 guid) { return _characterNameDataMap.find(guid) != _characterNameDataMap.end(); }
 
         uint32 GetCleaningFlags() const { return m_CleaningFlags; }
         void   SetCleaningFlags(uint32 flags) { m_CleaningFlags = flags; }
@@ -772,10 +746,14 @@ class World
 
         void InitDailyQuestResetTime();
         void InitWeeklyQuestResetTime();
+        void InitMonthlyQuestResetTime();
         void InitRandomBGResetTime();
+        void InitGuildResetTime();
         void ResetDailyQuests();
         void ResetWeeklyQuests();
+        void ResetMonthlyQuests();
         void ResetRandomBG();
+        void ResetGuildCap();
     private:
         static ACE_Atomic_Op<ACE_Thread_Mutex, bool> m_stopEvent;
         static uint8 m_ExitCode;
@@ -835,7 +813,9 @@ class World
         // next daily quests and random bg reset time
         time_t m_NextDailyQuestReset;
         time_t m_NextWeeklyQuestReset;
+        time_t m_NextMonthlyQuestReset;
         time_t m_NextRandomBGReset;
+        time_t m_NextGuildReset;
 
         //Player Queue
         Queue m_QueuedPlayer;

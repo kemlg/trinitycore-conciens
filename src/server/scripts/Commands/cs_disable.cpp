@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,11 +22,15 @@ Comment: All disable related commands
 Category: commandscripts
 EndScriptData */
 
-#include "ScriptMgr.h"
-#include "ObjectMgr.h"
-#include "Chat.h"
 #include "DisableMgr.h"
+#include "AchievementMgr.h"
+#include "Chat.h"
+#include "Language.h"
+#include "ObjectMgr.h"
 #include "OutdoorPvP.h"
+#include "Player.h"
+#include "ScriptMgr.h"
+#include "SpellMgr.h"
 
 class disable_commandscript : public CommandScript
 {
@@ -44,6 +48,7 @@ public:
             { "achievement_criteria",   SEC_ADMINISTRATOR,      true,   &HandleRemoveDisableAchievementCriteriaCommand, "", NULL },
             { "outdoorpvp",             SEC_ADMINISTRATOR,      true,   &HandleRemoveDisableOutdoorPvPCommand,          "", NULL },
             { "vmap",                   SEC_ADMINISTRATOR,      true,   &HandleRemoveDisableVmapCommand,                "", NULL },
+            { "mmap",                   SEC_ADMINISTRATOR,      true,   &HandleRemoveDisableMMapCommand,                "", NULL },
             { NULL,                     0,                      false,  NULL,                                           "", NULL }
         };
         static ChatCommand addDisableCommandTable[] =
@@ -55,6 +60,7 @@ public:
             { "achievement_criteria",   SEC_ADMINISTRATOR,      true,   &HandleAddDisableAchievementCriteriaCommand,    "", NULL },
             { "outdoorpvp",             SEC_ADMINISTRATOR,      true,   &HandleAddDisableOutdoorPvPCommand,             "", NULL },
             { "vmap",                   SEC_ADMINISTRATOR,      true,   &HandleAddDisableVmapCommand,                   "", NULL },
+            { "mmap",                   SEC_ADMINISTRATOR,      true,   &HandleAddDisableMMapCommand,                   "", NULL },
             { NULL,                     0,                      false,  NULL,                                           "", NULL }
         };
         static ChatCommand disableCommandTable[] =
@@ -137,7 +143,7 @@ public:
             }
             case DISABLE_TYPE_ACHIEVEMENT_CRITERIA:
             {
-                if (!sAchievementCriteriaStore.LookupEntry(entry))
+                if (!sAchievementMgr->GetAchievementCriteria(entry))
                 {
                     handler->PSendSysMessage(LANG_COMMAND_NO_ACHIEVEMENT_CRITERIA_FOUND);
                     handler->SetSentErrorMessage(true);
@@ -166,6 +172,17 @@ public:
                     return false;
                 }
                 disableTypeStr = "vmap";
+                break;
+            }
+            case DISABLE_TYPE_MMAP:
+            {
+                if (!sMapStore.LookupEntry(entry))
+                {
+                    handler->PSendSysMessage(LANG_COMMAND_NOMAPFOUND);
+                    handler->SetSentErrorMessage(true);
+                    return false;
+                }
+                disableTypeStr = "mmap";
                 break;
             }
             default:
@@ -252,6 +269,14 @@ public:
         return HandleAddDisables(handler, args, DISABLE_TYPE_VMAP);
     }
 
+    static bool HandleAddDisableMMapCommand(ChatHandler* handler, char const* args)
+    {
+        if (!*args)
+            return false;
+
+        return HandleAddDisables(handler, args, DISABLE_TYPE_MMAP);
+    }
+
     static bool HandleRemoveDisables(ChatHandler* handler, char const* args, uint8 disableType)
     {
         char* entryStr = strtok((char*)args, " ");
@@ -284,6 +309,9 @@ public:
                 break;
             case DISABLE_TYPE_VMAP:
                 disableTypeStr = "vmap";
+                break;
+            case DISABLE_TYPE_MMAP:
+                disableTypeStr = "mmap";
                 break;
         }
 
@@ -362,6 +390,14 @@ public:
             return false;
 
         return HandleRemoveDisables(handler, args, DISABLE_TYPE_VMAP);
+    }
+
+    static bool HandleRemoveDisableMMapCommand(ChatHandler* handler, char const* args)
+    {
+        if (!*args)
+            return false;
+
+        return HandleRemoveDisables(handler, args, DISABLE_TYPE_MMAP);
     }
 };
 

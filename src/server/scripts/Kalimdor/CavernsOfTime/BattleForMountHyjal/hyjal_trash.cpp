@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -1369,8 +1369,7 @@ public:
                 forcemove = false;
                 if (forcemove)
                 {
-                    Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0);
-                    if (target)
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                         me->Attack(target, false);
                 }
                 if (MoveTimer <= diff)
@@ -1409,11 +1408,11 @@ public:
         return new alliance_riflemanAI(creature);
     }
 
-    struct alliance_riflemanAI : public Scripted_NoMovementAI
+    struct alliance_riflemanAI : public ScriptedAI
     {
-        alliance_riflemanAI(Creature* creature) : Scripted_NoMovementAI(creature)
+        alliance_riflemanAI(Creature* creature) : ScriptedAI(creature)
         {
-            Reset();
+            SetCombatMovement(false);
         }
 
         uint32 ExplodeTimer;

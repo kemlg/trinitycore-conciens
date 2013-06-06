@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -35,7 +35,7 @@ enum eSpels
     EQUIP_SWORD             = 5191,
     EQUIP_MACE              = 7230,
 
-    SAY_AGGRO               = -1036001
+    SAY_AGGRO               = 0,
 };
 
 class boss_mr_smite : public CreatureScript
@@ -82,7 +82,7 @@ public:
 
         void EnterCombat(Unit* /*who*/)
         {
-           DoScriptText(SAY_AGGRO, me);
+           Talk(SAY_AGGRO);
         }
 
         bool bCheckChances()

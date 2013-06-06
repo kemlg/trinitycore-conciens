@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -76,6 +76,8 @@ struct map_fileheader
     uint32 heightMapSize;
     uint32 liquidMapOffset;
     uint32 liquidMapSize;
+    uint32 holesOffset;
+    uint32 holesSize;
 };
 
 #define MAP_AREA_NO_AREA      0x0001
@@ -176,7 +178,7 @@ class GridMap
 
 
     bool loadAreaData(FILE* in, uint32 offset, uint32 size);
-    bool loadHeihgtData(FILE* in, uint32 offset, uint32 size);
+    bool loadHeightData(FILE* in, uint32 offset, uint32 size);
     bool loadLiquidData(FILE* in, uint32 offset, uint32 size);
 
     // Get height functions and pointers
@@ -479,6 +481,7 @@ class Map : public GridRefManager<NGridType>
         void LoadMapAndVMap(int gx, int gy);
         void LoadVMap(int gx, int gy);
         void LoadMap(int gx, int gy, bool reload = false);
+        void LoadMMap(int gx, int gy);
         GridMap* GetGrid(float x, float y);
 
         void SetTimer(uint32 t) { i_gridExpiry = t < MIN_GRID_DELAY ? MIN_GRID_DELAY : t; }
@@ -499,6 +502,7 @@ class Map : public GridRefManager<NGridType>
 
         bool IsGridLoaded(const GridCoord &) const;
         void EnsureGridCreated(const GridCoord &);
+        void EnsureGridCreated_i(const GridCoord &);
         bool EnsureGridLoaded(Cell const&);
         void EnsureGridLoadedForActiveObject(Cell const&, WorldObject* object);
 
@@ -525,6 +529,7 @@ class Map : public GridRefManager<NGridType>
         void SetUnloadReferenceLock(const GridCoord &p, bool on) { getNGrid(p.x_coord, p.y_coord)->setUnloadReferenceLock(on); }
 
         ACE_Thread_Mutex Lock;
+        ACE_Thread_Mutex GridLock;
 
         MapEntry const* i_mapEntry;
         uint8 i_spawnMode;

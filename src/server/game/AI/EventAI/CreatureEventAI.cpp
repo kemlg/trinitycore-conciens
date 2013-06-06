@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -497,33 +497,16 @@ void CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
             }
             break;
         }
-        case ACTION_T_SUMMON:
-        {
-            Unit* target = GetTargetByType(action.summon.target, actionInvoker);
-
-            Creature* creature = NULL;
-
-            if (action.summon.duration)
-                creature = me->SummonCreature(action.summon.creatureId, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, action.summon.duration);
-            else
-                creature = me->SummonCreature(action.summon.creatureId, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 0);
-
-            if (!creature)
-                sLog->outError(LOG_FILTER_SQL, "CreatureEventAI: failed to spawn creature %u. Spawn event %d is on creature %d", action.summon.creatureId, eventId, me->GetEntry());
-            else if (action.summon.target != TARGET_T_SELF && target)
-                creature->AI()->AttackStart(target);
-            break;
-        }
         case ACTION_T_THREAT_SINGLE_PCT:
             if (Unit* target = GetTargetByType(action.threat_single_pct.target, actionInvoker))
                 me->getThreatManager().modifyThreatPercent(target, action.threat_single_pct.percent);
             break;
         case ACTION_T_THREAT_ALL_PCT:
         {
-            std::list<HostileReference*>& threatList = me->getThreatManager().getThreatList();
-            for (std::list<HostileReference*>::iterator i = threatList.begin(); i != threatList.end(); ++i)
-                if (Unit* Temp = Unit::GetUnit(*me, (*i)->getUnitGuid()))
-                    me->getThreatManager().modifyThreatPercent(Temp, action.threat_all_pct.percent);
+            ThreatContainer::StorageType const& threatList = me->getThreatManager().getThreatList();
+            for (ThreatContainer::StorageType::const_iterator i = threatList.begin(); i != threatList.end(); ++i)
+                if (Unit* unit = Unit::GetUnit(*me, (*i)->getUnitGuid()))
+                    me->getThreatManager().modifyThreatPercent(unit, action.threat_all_pct.percent);
             break;
         }
         case ACTION_T_QUEST_EVENT:
@@ -634,11 +617,11 @@ void CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
             break;
         case ACTION_T_CAST_EVENT_ALL:
         {
-            std::list<HostileReference*>& threatList = me->getThreatManager().getThreatList();
-            for (std::list<HostileReference*>::iterator i = threatList.begin(); i != threatList.end(); ++i)
-                if (Unit* Temp = Unit::GetUnit(*me, (*i)->getUnitGuid()))
-                    if (Temp->GetTypeId() == TYPEID_PLAYER)
-                        Temp->ToPlayer()->CastedCreatureOrGO(action.cast_event_all.creatureId, me->GetGUID(), action.cast_event_all.spellId);
+            ThreatContainer::StorageType const& threatList = me->getThreatManager().getThreatList();
+            for (ThreatContainer::StorageType::const_iterator i = threatList.begin(); i != threatList.end(); ++i)
+                if (Unit* unit = Unit::GetUnit(*me, (*i)->getUnitGuid()))
+                    if (unit->GetTypeId() == TYPEID_PLAYER)
+                        unit->ToPlayer()->CastedCreatureOrGO(action.cast_event_all.creatureId, me->GetGUID(), action.cast_event_all.spellId);
             break;
         }
         case ACTION_T_REMOVEAURASFROMSPELL:
@@ -663,30 +646,6 @@ void CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
             else
                 sLog->outError(LOG_FILTER_SQL, "CreatureEventAI: ACTION_T_RANDOM_PHASE_RANGE cannot have Param2 < Param1. Event = %d. CreatureEntry = %d", eventId, me->GetEntry());
             break;
-        case ACTION_T_SUMMON_ID:
-        {
-            Unit* target = GetTargetByType(action.summon_id.target, actionInvoker);
-
-            CreatureEventAI_Summon_Map::const_iterator i = sEventAIMgr->GetCreatureEventAISummonMap().find(action.summon_id.spawnId);
-            if (i == sEventAIMgr->GetCreatureEventAISummonMap().end())
-            {
-                sLog->outError(LOG_FILTER_SQL, "CreatureEventAI: failed to spawn creature %u. Summon map index %u does not exist. EventID %d. CreatureID %d", action.summon_id.creatureId, action.summon_id.spawnId, eventId, me->GetEntry());
-                return;
-            }
-
-            Creature* creature = NULL;
-            if ((*i).second.SpawnTimeSecs)
-                creature = me->SummonCreature(action.summon_id.creatureId, (*i).second.position_x, (*i).second.position_y, (*i).second.position_z, (*i).second.orientation, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, (*i).second.SpawnTimeSecs);
-            else
-                creature = me->SummonCreature(action.summon_id.creatureId, (*i).second.position_x, (*i).second.position_y, (*i).second.position_z, (*i).second.orientation, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 0);
-
-            if (!creature)
-                sLog->outError(LOG_FILTER_SQL, "CreatureEventAI: failed to spawn creature %u. EventId %d.Creature %d", action.summon_id.creatureId, eventId, me->GetEntry());
-            else if (action.summon_id.target != TARGET_T_SELF && target)
-                creature->AI()->AttackStart(target);
-
-            break;
-        }
         case ACTION_T_KILLED_MONSTER:
             //first attempt player who tapped creature
             if (Player* player = me->GetLootRecipient())
@@ -787,18 +746,14 @@ void CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
             break;
         case ACTION_T_SUMMON_GO:
         {
-            GameObject* object = NULL;
-
             float x, y, z;
             me->GetPosition(x, y, z);
-            object = me->SummonGameObject(action.raw.param1, x, y, z, 0, 0, 0, 0, 0, action.raw.param2);
+            GameObject* object = me->SummonGameObject(action.raw.param1, x, y, z, 0, 0, 0, 0, 0, action.raw.param2);
             if (!object)
-            {
                 sLog->outError(LOG_FILTER_TSCR, "EventAI failed to spawn object %u. Spawn event %d is on creature %d", action.raw.param1, eventId, me->GetEntry());
-            }
+
             break;
         }
-
         case ACTION_T_SET_SHEATH:
         {
             me->SetSheath(SheathState(action.set_sheath.sheath));
@@ -884,11 +839,11 @@ void CreatureEventAI::Reset()
                     (*i).Enabled = true;
                 break;
             }
-            //default:
-            //TODO: enable below code line / verify this is correct to enable events previously disabled (ex. aggro yell), instead of enable this in void EnterCombat()
-            //(*i).Enabled = true;
-            //(*i).Time = 0;
-            //break;
+            default:
+                //TODO: enable below code line / verify this is correct to enable events previously disabled (ex. aggro yell), instead of enable this in void EnterCombat()
+                //(*i).Enabled = true;
+                //(*i).Time = 0;
+                break;
         }
     }
 }
@@ -1310,7 +1265,7 @@ bool CreatureEventAI::CanCast(Unit* target, SpellInfo const* spell, bool trigger
         return false;
 
     //Check for power
-    if (!triggered && me->GetPower((Powers)spell->PowerType) < spell->CalcPowerCost(me, spell->GetSchoolMask()))
+    if (!triggered && me->GetPower((Powers)spell->PowerType) < uint32(spell->CalcPowerCost(me, spell->GetSchoolMask())))
         return false;
 
     //Unit is out of range of this spell

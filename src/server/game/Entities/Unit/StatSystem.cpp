@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -78,16 +78,16 @@ bool Player::UpdateStats(Stats stat)
             UpdateAllCritPercentages();
             UpdateDodgePercentage();
             break;
-        case STAT_STAMINA:   UpdateMaxHealth(); break;
+        case STAT_STAMINA:
+            UpdateMaxHealth();
+            break;
         case STAT_INTELLECT:
             UpdateMaxPower(POWER_MANA);
             UpdateAllSpellCritChances();
             UpdateArmor();                                  //SPELL_AURA_MOD_RESISTANCE_OF_INTELLECT_PERCENT, only armor currently
             break;
-
         case STAT_SPIRIT:
             break;
-
         default:
             break;
     }
@@ -200,10 +200,9 @@ void Player::UpdateResistances(uint32 school)
 
 void Player::UpdateArmor()
 {
-    float value = 0.0f;
     UnitMods unitMod = UNIT_MOD_ARMOR;
 
-    value  = GetModifierValue(unitMod, BASE_VALUE);         // base armor (from items)
+    float value = GetModifierValue(unitMod, BASE_VALUE);    // base armor (from items)
     value *= GetModifierValue(unitMod, BASE_PCT);           // armor percent from items
     value += GetStat(STAT_AGILITY) * 2.0f;                  // armor bonus from stats
     value += GetModifierValue(unitMod, TOTAL_VALUE);
@@ -213,7 +212,7 @@ void Player::UpdateArmor()
     for (AuraEffectList::const_iterator i = mResbyIntellect.begin(); i != mResbyIntellect.end(); ++i)
     {
         if ((*i)->GetMiscValue() & SPELL_SCHOOL_MASK_NORMAL)
-            value += CalculatePctN(GetStat(Stats((*i)->GetMiscValueB())), (*i)->GetAmount());
+            value += CalculatePct(GetStat(Stats((*i)->GetMiscValueB())), (*i)->GetAmount());
     }
 
     value *= GetModifierValue(unitMod, TOTAL_PCT);
@@ -230,8 +229,7 @@ void Player::UpdateArmor()
 float Player::GetHealthBonusFromStamina()
 {
     float stamina = GetStat(STAT_STAMINA);
-
-    float baseStam = stamina < 20 ? stamina : 20;
+    float baseStam = std::min(20.0f, stamina);
     float moreStam = stamina - baseStam;
 
     return baseStam + (moreStam*10.0f);
@@ -241,10 +239,10 @@ float Player::GetManaBonusFromIntellect()
 {
     float intellect = GetStat(STAT_INTELLECT);
 
-    float baseInt = intellect < 20 ? intellect : 20;
+    float baseInt = std::min(20.0f, intellect);
     float moreInt = intellect - baseInt;
 
-    return baseInt + (moreInt*15.0f);
+    return baseInt + (moreInt * 15.0f);
 }
 
 void Player::UpdateMaxHealth()
@@ -359,7 +357,7 @@ void Player::UpdateAttackPowerAndDamage(bool ranged)
                             switch (aurEff->GetEffIndex())
                             {
                                 case 0: // Predatory Strikes (effect 0)
-                                    mLevelMult = CalculatePctN(1.0f, aurEff->GetAmount());
+                                    mLevelMult = CalculatePct(1.0f, aurEff->GetAmount());
                                     break;
                                 case 1: // Predatory Strikes (effect 1)
                                     if (Item* mainHand = m_items[EQUIPMENT_SLOT_MAINHAND])
@@ -369,7 +367,7 @@ void Player::UpdateAttackPowerAndDamage(bool ranged)
                                         if (!proto)
                                             continue;
 
-                                        weapon_bonus = CalculatePctN(float(proto->getFeralBonus()), aurEff->GetAmount());
+                                        weapon_bonus = CalculatePct(float(proto->getFeralBonus()), aurEff->GetAmount());
                                     }
                                     break;
                                 default:
@@ -421,14 +419,14 @@ void Player::UpdateAttackPowerAndDamage(bool ranged)
         {
             AuraEffectList const& mRAPbyStat = GetAuraEffectsByType(SPELL_AURA_MOD_RANGED_ATTACK_POWER_OF_STAT_PERCENT);
             for (AuraEffectList::const_iterator i = mRAPbyStat.begin(); i != mRAPbyStat.end(); ++i)
-                attPowerMod += CalculatePctN(GetStat(Stats((*i)->GetMiscValue())), (*i)->GetAmount());
+                attPowerMod += CalculatePct(GetStat(Stats((*i)->GetMiscValue())), (*i)->GetAmount());
         }
     }
     else
     {
         AuraEffectList const& mAPbyStat = GetAuraEffectsByType(SPELL_AURA_MOD_ATTACK_POWER_OF_STAT_PERCENT);
         for (AuraEffectList::const_iterator i = mAPbyStat.begin(); i != mAPbyStat.end(); ++i)
-            attPowerMod += CalculatePctN(GetStat(Stats((*i)->GetMiscValue())), (*i)->GetAmount());
+            attPowerMod += CalculatePct(GetStat(Stats((*i)->GetMiscValue())), (*i)->GetAmount());
 
         AuraEffectList const& mAPbyArmor = GetAuraEffectsByType(SPELL_AURA_MOD_ATTACK_POWER_OF_ARMOR);
         for (AuraEffectList::const_iterator iter = mAPbyArmor.begin(); iter != mAPbyArmor.end(); ++iter)
@@ -856,7 +854,7 @@ void Player::UpdateManaRegen()
     int32 modManaRegenInterrupt = GetTotalAuraModifier(SPELL_AURA_MOD_MANA_REGEN_INTERRUPT);
     if (modManaRegenInterrupt > 100)
         modManaRegenInterrupt = 100;
-    SetStatFloatValue(UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER, power_regen_mp5 + CalculatePctN(power_regen, modManaRegenInterrupt));
+    SetStatFloatValue(UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER, power_regen_mp5 + CalculatePct(power_regen, modManaRegenInterrupt));
 
     SetStatFloatValue(UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER, power_regen_mp5 + power_regen);
 }
@@ -1091,19 +1089,18 @@ bool Guardian::UpdateStats(Stats stat)
             case STAT_STRENGTH: mod = 0.7f; break;                // Default Owner's Strength scale
             default: break;
         }
-        // Ravenous Dead
-        AuraEffect const* aurEff = NULL;
+
         // Check just if owner has Ravenous Dead since it's effect is not an aura
-        aurEff = owner->GetAuraEffect(SPELL_AURA_MOD_TOTAL_STAT_PERCENTAGE, SPELLFAMILY_DEATHKNIGHT, 3010, 0);
+        AuraEffect const* aurEff = owner->GetAuraEffect(SPELL_AURA_MOD_TOTAL_STAT_PERCENTAGE, SPELLFAMILY_DEATHKNIGHT, 3010, 0);
         if (aurEff)
         {
             SpellInfo const* spellInfo = aurEff->GetSpellInfo();                                                 // Then get the SpellProto and add the dummy effect value
-            AddPctN(mod, spellInfo->Effects[EFFECT_1].CalcValue());                                              // Ravenous Dead edits the original scale
+            AddPct(mod, spellInfo->Effects[EFFECT_1].CalcValue());                                              // Ravenous Dead edits the original scale
         }
         // Glyph of the Ghoul
         aurEff = owner->GetAuraEffect(58686, 0);
         if (aurEff)
-            mod += CalculatePctN(1.0f, aurEff->GetAmount());                                                    // Glyph of the Ghoul adds a flat value to the scale mod
+            mod += CalculatePct(1.0f, aurEff->GetAmount());                                                    // Glyph of the Ghoul adds a flat value to the scale mod
         ownersBonus = float(owner->GetStat(stat)) * mod;
         value += ownersBonus;
     }
@@ -1111,7 +1108,7 @@ bool Guardian::UpdateStats(Stats stat)
     {
         if (owner->getClass() == CLASS_WARLOCK && isPet())
         {
-            ownersBonus = CalculatePctN(owner->GetStat(STAT_STAMINA), 75);
+            ownersBonus = CalculatePct(owner->GetStat(STAT_STAMINA), 75);
             value += ownersBonus;
         }
         else
@@ -1126,7 +1123,7 @@ bool Guardian::UpdateStats(Stats stat)
                 if (itr != ToPet()->m_spells.end())                                 // If pet has Wild Hunt
                 {
                     SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(itr->first); // Then get the SpellProto and add the dummy effect value
-                    AddPctN(mod, spellInfo->Effects[EFFECT_0].CalcValue());
+                    AddPct(mod, spellInfo->Effects[EFFECT_0].CalcValue());
                 }
             }
             ownersBonus = float(owner->GetStat(stat)) * mod;
@@ -1138,7 +1135,7 @@ bool Guardian::UpdateStats(Stats stat)
     {
         if (owner->getClass() == CLASS_WARLOCK || owner->getClass() == CLASS_MAGE)
         {
-            ownersBonus = CalculatePctN(owner->GetStat(stat), 30);
+            ownersBonus = CalculatePct(owner->GetStat(stat), 30);
             value += ownersBonus;
         }
     }
@@ -1190,7 +1187,7 @@ void Guardian::UpdateResistances(uint32 school)
 
         // hunter and warlock pets gain 40% of owner's resistance
         if (isPet())
-            value += float(CalculatePctN(m_owner->GetResistance(SpellSchools(school)), 40));
+            value += float(CalculatePct(m_owner->GetResistance(SpellSchools(school)), 40));
 
         SetResistance(SpellSchools(school), int32(value));
     }
@@ -1206,7 +1203,7 @@ void Guardian::UpdateArmor()
 
     // hunter and warlock pets gain 35% of owner's armor value
     if (isPet())
-        bonus_armor = float(CalculatePctN(m_owner->GetArmor(), 35));
+        bonus_armor = float(CalculatePct(m_owner->GetArmor(), 35));
 
     value  = GetModifierValue(unitMod, BASE_VALUE);
     value *= GetModifierValue(unitMod, BASE_PCT);
@@ -1296,7 +1293,7 @@ void Guardian::UpdateAttackPowerAndDamage(bool ranged)
                 if (itr != ToPet()->m_spells.end())                                 // If pet has Wild Hunt
                 {
                     SpellInfo const* sProto = sSpellMgr->GetSpellInfo(itr->first); // Then get the SpellProto and add the dummy effect value
-                    mod += CalculatePctN(1.0f, sProto->Effects[1].CalcValue());
+                    mod += CalculatePct(1.0f, sProto->Effects[1].CalcValue());
                 }
             }
 
@@ -1414,8 +1411,8 @@ void Guardian::UpdateDamagePhysical(WeaponAttackType attType)
         {
             case 61682:
             case 61683:
-                AddPctN(mindamage, -(*itr)->GetAmount());
-                AddPctN(maxdamage, -(*itr)->GetAmount());
+                AddPct(mindamage, -(*itr)->GetAmount());
+                AddPct(maxdamage, -(*itr)->GetAmount());
                 break;
             default:
                 break;

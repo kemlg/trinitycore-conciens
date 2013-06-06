@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -27,13 +27,6 @@
 #include "DatabaseEnv.h"
 
 class GameObjectAI;
-
-// GCC have alternative #pragma pack(N) syntax and old gcc version not support pack(push, N), also any gcc version not support it at some platform
-#if defined(__GNUC__)
-#pragma pack(1)
-#else
-#pragma pack(push, 1)
-#endif
 
 #define MAX_GAMEOBJECT_QUEST_ITEMS 6
 
@@ -549,13 +542,6 @@ union GameObjectValue
     } Building;
 };
 
-// GCC have alternative #pragma pack() syntax and old gcc version not support pack(pop), also any gcc version not support it at some platform
-#if defined(__GNUC__)
-#pragma pack()
-#else
-#pragma pack(pop)
-#endif
-
 struct GameObjectLocale
 {
     StringVector Name;
@@ -628,7 +614,7 @@ class GameObject : public WorldObject, public GridObject<GameObject>
         static GameObject* GetGameObject(WorldObject& object, uint64 guid);
         GameObjectTemplate const* GetGOInfo() const { return m_goInfo; }
         GameObjectData const* GetGOData() const { return m_goData; }
-        GameObjectValue * GetGOValue() const { return m_goValue; }
+        GameObjectValue const* GetGOValue() const { return &m_goValue; }
 
         bool IsTransport() const;
         bool IsDynTransport() const;
@@ -645,7 +631,7 @@ class GameObject : public WorldObject, public GridObject<GameObject>
         void YellToZone(int32 textId, uint32 language, uint64 TargetGuid) { MonsterYellToZone(textId, language, TargetGuid); }
 
         // overwrite WorldObject function for proper name localization
-        const char* GetNameForLocaleIdx(LocaleConstant locale_idx) const;
+        std::string const& GetNameForLocaleIdx(LocaleConstant locale_idx) const;
 
         void SaveToDB();
         void SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask);
@@ -802,8 +788,9 @@ class GameObject : public WorldObject, public GridObject<GameObject>
 
         std::string GetAIName() const;
         void SetDisplayId(uint32 displayid);
+        uint32 GetDisplayId() const { return GetUInt32Value(GAMEOBJECT_DISPLAYID); }
 
-        GameObjectModel * m_model;
+        GameObjectModel* m_model;
     protected:
         bool AIM_Initialize();
         uint32      m_spellId;
@@ -825,7 +812,7 @@ class GameObject : public WorldObject, public GridObject<GameObject>
         uint32 m_DBTableGuid;                               ///< For new or temporary gameobjects is 0 for saved it is lowguid
         GameObjectTemplate const* m_goInfo;
         GameObjectData const* m_goData;
-        GameObjectValue * const m_goValue;
+        GameObjectValue m_goValue;
 
         uint64 m_rotation;
 

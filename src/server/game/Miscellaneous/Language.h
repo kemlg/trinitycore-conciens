@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -86,8 +86,40 @@ enum TrinityStrings
     LANG_CONNECTED_PLAYERS              = 60,
     LANG_ACCOUNT_ADDON                  = 61,
     LANG_IMPROPER_VALUE                 = 62,
-    LANG_CANT_DO_NOW                    = 63,
-    // Room for more level 0              64-99 not used
+    LANG_RBAC_WRONG_PARAMETER_ID        = 63,
+    LANG_RBAC_WRONG_PARAMETER_REALM     = 64,
+    LANG_RBAC_GROUP_IN_LIST             = 65,
+    LANG_RBAC_GROUP_NOT_IN_LIST         = 66,
+    LANG_RBAC_GROUP_ADDED               = 67,
+    LANG_RBAC_GROUP_REMOVED             = 68,
+    LANG_RBAC_GROUP_LIST_HEADER         = 69,
+    LANG_RBAC_LIST_EMPTY                = 70,
+    LANG_RBAC_LIST_ELEMENT              = 71,
+    LANG_RBAC_ROLE_GRANTED_IN_LIST      = 72,
+    LANG_RBAC_ROLE_GRANTED_IN_DENIED_LIST = 73,
+    LANG_RBAC_ROLE_GRANTED              = 74,
+    LANG_RBAC_ROLE_DENIED_IN_LIST       = 75,
+    LANG_RBAC_ROLE_DENIED_IN_GRANTED_LIST = 76,
+    LANG_RBAC_ROLE_DENIED               = 77,
+    LANG_RBAC_ROLE_REVOKED              = 78,
+    LANG_RBAC_ROLE_REVOKED_NOT_IN_LIST  = 79,
+    LANG_RBAC_ROLE_LIST_HEADER_GRANTED  = 80,
+    LANG_RBAC_ROLE_LIST_HEADER_DENIED   = 81,
+    LANG_RBAC_PERM_GRANTED_IN_LIST      = 82,
+    LANG_RBAC_PERM_GRANTED_IN_DENIED_LIST = 83,
+    LANG_RBAC_PERM_GRANTED              = 84,
+    LANG_RBAC_PERM_DENIED_IN_LIST       = 85,
+    LANG_RBAC_PERM_DENIED_IN_GRANTED_LIST = 86,
+    LANG_RBAC_PERM_DENIED               = 87,
+    LANG_RBAC_PERM_REVOKED              = 88,
+    LANG_RBAC_PERM_REVOKED_NOT_IN_LIST  = 89,
+    LANG_RBAC_PERM_LIST_HEADER_GRANTED  = 90,
+    LANG_RBAC_PERM_LIST_HEADER_DENIED   = 91,
+    LANG_RBAC_PERM_LIST_GLOBAL          = 92,
+    LANG_RBAC_LIST_GROUPS_HEADER        = 93,
+    LANG_RBAC_LIST_ROLES_HEADER         = 94,
+    LANG_RBAC_LIST_PERMISSIONS_HEADER   = 95,
+    // Room for more level 0            96-99 not used
 
     // level 1 chat
     LANG_GLOBAL_NOTIFY                  = 100,
@@ -523,6 +555,7 @@ enum TrinityStrings
     LANG_PINFO_BAN                      = 453,
     LANG_PINFO_MAP_ONLINE               = 714,
     LANG_PINFO_MAP_OFFLINE              = 716,
+    LANG_PINFO_GUILD_INFO               = 749,
 
     LANG_YOU_SET_EXPLORE_ALL            = 551,
     LANG_YOU_SET_EXPLORE_NOTHING        = 552,
@@ -532,7 +565,7 @@ enum TrinityStrings
     LANG_NPC_SETDATA                    = 555,
 
     //! Old ones now free:
-    // LANG_HOVER_DISABLED              = 556,
+    LANG_COMMAND_NEAR_NPC_MESSAGE       = 556,
 
     LANG_YOURS_LEVEL_UP                 = 557,
     LANG_YOURS_LEVEL_DOWN               = 558,
@@ -743,7 +776,32 @@ enum TrinityStrings
     LANG_COMMAND_CREATURESTORAGE_NOTFOUND  = 818,
 
     LANG_CHANNEL_CITY                   = 819,
-    // Room for in-game strings           820-999 not used
+
+    LANG_NPCINFO_GOSSIP                 = 820,
+    LANG_NPCINFO_QUESTGIVER             = 821,
+    LANG_NPCINFO_TRAINER_CLASS          = 822,
+    LANG_NPCINFO_TRAINER_PROFESSION     = 823,
+    LANG_NPCINFO_VENDOR_AMMO            = 824,
+    LANG_NPCINFO_VENDOR_FOOD            = 825,
+    LANG_NPCINFO_VENDOR_POISON          = 826,
+    LANG_NPCINFO_VENDOR_REAGENT         = 827,
+    LANG_NPCINFO_REPAIR                 = 828,
+    LANG_NPCINFO_FLIGHTMASTER           = 829,
+    LANG_NPCINFO_SPIRITHEALER           = 830,
+    LANG_NPCINFO_SPIRITGUIDE            = 831,
+    LANG_NPCINFO_INNKEEPER              = 832,
+    LANG_NPCINFO_BANKER                 = 833,
+    LANG_NPCINFO_PETITIONER             = 834,
+    LANG_NPCINFO_TABARDDESIGNER         = 835,
+    LANG_NPCINFO_BATTLEMASTER           = 836,
+    LANG_NPCINFO_AUCTIONEER             = 837,
+    LANG_NPCINFO_STABLEMASTER           = 838,
+    LANG_NPCINFO_GUILD_BANKER           = 839,
+    LANG_NPCINFO_SPELLCLICK             = 840,
+    LANG_NPCINFO_MAILBOX                = 841,
+    LANG_NPCINFO_PLAYER_VEHICLE         = 842,
+
+    // Room for in-game strings           843-999 not used
 
     // Level 4 (CLI only commands)
     LANG_COMMAND_EXIT                   = 1000,
@@ -823,7 +881,13 @@ enum TrinityStrings
     LANG_MOVEGENS_EFFECT                = 1142,
     LANG_MOVEFLAGS_GET                  = 1143,
     LANG_MOVEFLAGS_SET                  = 1144,
-    // Room for more level 3              1144-1199 not used
+    LANG_GROUP_ALREADY_IN_GROUP         = 1145,
+    LANG_GROUP_PLAYER_JOINED            = 1146,
+    LANG_GROUP_NOT_IN_GROUP             = 1147,
+    LANG_GROUP_FULL                     = 1148,
+    LANG_GROUP_TYPE                     = 1149,
+    LANG_GROUP_PLAYER_NAME_GUID         = 1150,
+    // Room for more level 3              1151-1199 not used
 
     // Debug commands
     LANG_CINEMATIC_NOT_EXIST            = 1200,
@@ -929,6 +993,7 @@ enum TrinityStrings
     LANG_COMMAND_TICKETSHOWESCALATEDLIST = 2026,
     LANG_COMMAND_TICKETPENDING          = 2027,
     LANG_COMMAND_TICKETRESET            = 2028,
+    LANG_COMMAND_TICKETLISTRESPONSE     = 2029,
 
     // Trinity strings                    5000-9999
     LANG_COMMAND_FREEZE                 = 5000,
@@ -950,8 +1015,8 @@ enum TrinityStrings
     LANG_BATTLEGROUND                   = 5015,
     LANG_ARENA                          = 5016,
     LANG_RAID                           = 5017,
-    LANG_HEROIC                         = 5018,
-    LANG_MOUNTABLE                      = 5019,
+                                        //= 5018,
+                                        //= 5019,
     LANG_NPCINFO_PHASEMASK              = 5020,
     LANG_NPCINFO_ARMOR                  = 5021,
     LANG_CHANNEL_ENABLE_OWNERSHIP       = 5022,
@@ -967,7 +1032,8 @@ enum TrinityStrings
     LANG_COMMAND_NO_BATTLEGROUND_FOUND  = 5032,
     LANG_COMMAND_NO_ACHIEVEMENT_CRITERIA_FOUND = 5033,
     LANG_COMMAND_NO_OUTDOOR_PVP_FORUND  = 5034,
-    // Room for more Trinity strings      5035-9999
+    LANG_CALL_FOR_HELP                  = 5035,
+    // Room for more Trinity strings      5036-9999
 
     // Level requirement notifications
     LANG_SAY_REQ                        = 6604,
@@ -989,6 +1055,27 @@ enum TrinityStrings
 
     LANG_WORLD_CLOSED                    = 7523,
     LANG_WORLD_OPENED                    = 7524,
+
+    LANG_LFG_PLAYER_INFO                = 9980,
+    LANG_LFG_GROUP_INFO                 = 9981,
+    LANG_LFG_NOT_IN_GROUP               = 9982,
+    LANG_LFG_CLEAN                      = 9983,
+    LANG_LFG_OPTIONS                    = 9984,
+    LANG_LFG_OPTIONS_CHANGED            = 9985,
+    LANG_LFG_STATE_NONE                 = 9986,
+    LANG_LFG_STATE_ROLECHECK            = 9987,
+    LANG_LFG_STATE_QUEUED               = 9988,
+    LANG_LFG_STATE_PROPOSAL             = 9989,
+    LANG_LFG_STATE_BOOT                 = 9990,
+    LANG_LFG_STATE_DUNGEON              = 9991,
+    LANG_LFG_STATE_FINISHED_DUNGEON     = 9992,
+    LANG_LFG_STATE_RAIDBROWSER          = 9993,
+    LANG_LFG_ROLE_TANK                  = 9994,
+    LANG_LFG_ROLE_HEALER                = 9995,
+    LANG_LFG_ROLE_DAMAGE                = 9996,
+    LANG_LFG_ROLE_LEADER                = 9997,
+    LANG_LFG_ROLE_NONE                  = 9998,
+    LANG_LFG_ERROR                      = 9999,
 
     // Use for not-in-offcial-sources patches
     //                                    10000-10999
@@ -1076,11 +1163,10 @@ enum TrinityStrings
 
     // Use for custom patches             11000-11999
     LANG_AUTO_BROADCAST                 = 11000,
-    LANG_INVALID_REALMID                = 11001
+    LANG_INVALID_REALMID                = 11001,
 
     // NOT RESERVED IDS                   12000-1999999999
     // `db_script_string` table index     2000000000-2000009999 (MIN_DB_SCRIPT_STRING_ID-MAX_DB_SCRIPT_STRING_ID)
     // For other tables maybe             2000010000-2147483647 (max index)
 };
 #endif
-

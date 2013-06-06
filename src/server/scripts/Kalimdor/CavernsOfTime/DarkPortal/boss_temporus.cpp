@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -29,12 +29,11 @@ EndScriptData */
 
 enum eEnums
 {
-    SAY_ENTER               = -1269000,
-    SAY_AGGRO               = -1269001,
-    SAY_BANISH              = -1269002,
-    SAY_SLAY1               = -1269003,
-    SAY_SLAY2               = -1269004,
-    SAY_DEATH               = -1269005,
+    SAY_ENTER               = 0,
+    SAY_AGGRO               = 1,
+    SAY_BANISH              = 2,
+    SAY_SLAY                = 3,
+    SAY_DEATH               = 4,
 
     SPELL_HASTE             = 31458,
     SPELL_MORTAL_WOUND      = 31464,
@@ -77,17 +76,17 @@ public:
 
         void EnterCombat(Unit* /*who*/)
         {
-            DoScriptText(SAY_AGGRO, me);
+            Talk(SAY_AGGRO);
         }
 
         void KilledUnit(Unit* /*victim*/)
         {
-            DoScriptText(RAND(SAY_SLAY1, SAY_SLAY2), me);
+            Talk(SAY_SLAY);
         }
 
         void JustDied(Unit* /*killer*/)
         {
-            DoScriptText(SAY_DEATH, me);
+            Talk(SAY_DEATH);
 
             if (instance)
                 instance->SetData(TYPE_RIFT, SPECIAL);
@@ -100,7 +99,7 @@ public:
             {
                 if (me->IsWithinDistInMap(who, 20.0f))
                 {
-                    DoScriptText(SAY_BANISH, me);
+                    Talk(SAY_BANISH);
 
                     me->DealDamage(who, who->GetHealth(), NULL, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, NULL, false);
                 }

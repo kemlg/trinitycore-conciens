@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -37,6 +37,7 @@ enum Texts
     SAY_WIPE                    = 9,
     SAY_BERSERK                 = 10,
     SAY_DEATH                   = 11,
+    EMOTE_BERSERK_RAID          = 12
 };
 
 enum Spells
@@ -45,6 +46,7 @@ enum Spells
     SPELL_FRENZIED_BLOODTHIRST_VISUAL       = 71949,
     SPELL_VAMPIRIC_BITE                     = 71726,
     SPELL_ESSENCE_OF_THE_BLOOD_QUEEN_PLR    = 70879,
+    SPELL_ESSENCE_OF_THE_BLOOD_QUEEN_HEAL   = 70872,
     SPELL_FRENZIED_BLOODTHIRST              = 70877,
     SPELL_UNCONTROLLABLE_FRENZY             = 70923,
     SPELL_PRESENCE_OF_THE_DARKFALLEN        = 71952,
@@ -61,6 +63,9 @@ enum Spells
     SPELL_INCITE_TERROR                     = 73070,
     SPELL_BLOODBOLT_WHIRL                   = 71772,
     SPELL_ANNIHILATE                        = 71322,
+
+    // Blood Infusion
+    SPELL_BLOOD_INFUSION_CREDIT             = 72934
 };
 
 enum Shadowmourne
@@ -181,6 +186,10 @@ class boss_blood_queen_lana_thel : public CreatureScript
             {
                 _JustDied();
                 Talk(SAY_DEATH);
+
+                if (Is25ManRaid() && me->HasAura(SPELL_SHADOWS_FATE))
+                    DoCastAOE(SPELL_BLOOD_INFUSION_CREDIT, true);
+
                 CleanAuras();
                 // Blah, credit the quest
                 if (_creditBloodQuickening)
@@ -336,7 +345,7 @@ class boss_blood_queen_lana_thel : public CreatureScript
                     switch (eventId)
                     {
                         case EVENT_BERSERK:
-                            DoScriptText(EMOTE_GENERIC_BERSERK_RAID, me);
+                            Talk(EMOTE_BERSERK_RAID);
                             Talk(SAY_BERSERK);
                             DoCast(me, SPELL_BERSERK);
                             break;
@@ -690,6 +699,42 @@ class spell_blood_queen_bloodbolt : public SpellScriptLoader
         }
 };
 
+// 70871 - Essence of the Blood Queen
+class spell_blood_queen_essence_of_the_blood_queen : public SpellScriptLoader
+{
+    public:
+        spell_blood_queen_essence_of_the_blood_queen() : SpellScriptLoader("spell_blood_queen_essence_of_the_blood_queen") { }
+
+        class spell_blood_queen_essence_of_the_blood_queen_AuraScript : public AuraScript
+        {
+            PrepareAuraScript(spell_blood_queen_essence_of_the_blood_queen_AuraScript);
+
+            bool Validate(SpellInfo const* /*spellInfo*/)
+            {
+                if (!sSpellMgr->GetSpellInfo(SPELL_ESSENCE_OF_THE_BLOOD_QUEEN_HEAL))
+                    return false;
+                return true;
+            }
+
+            void OnProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+            {
+                PreventDefaultAction();
+                int32 heal = CalculatePct(int32(eventInfo.GetDamageInfo()->GetDamage()), aurEff->GetAmount());
+                GetTarget()->CastCustomSpell(SPELL_ESSENCE_OF_THE_BLOOD_QUEEN_HEAL, SPELLVALUE_BASE_POINT0, heal, GetTarget(), TRIGGERED_FULL_MASK, NULL, aurEff);
+            }
+
+            void Register()
+            {
+                OnEffectProc += AuraEffectProcFn(spell_blood_queen_essence_of_the_blood_queen_AuraScript::OnProc, EFFECT_1, SPELL_AURA_DUMMY);
+            }
+        };
+
+        AuraScript* GetAuraScript() const
+        {
+            return new spell_blood_queen_essence_of_the_blood_queen_AuraScript();
+        }
+};
+
 class spell_blood_queen_pact_of_the_darkfallen : public SpellScriptLoader
 {
     public:
@@ -841,6 +886,7 @@ void AddSC_boss_blood_queen_lana_thel()
     new spell_blood_queen_vampiric_bite();
     new spell_blood_queen_frenzied_bloodthirst();
     new spell_blood_queen_bloodbolt();
+    new spell_blood_queen_essence_of_the_blood_queen();
     new spell_blood_queen_pact_of_the_darkfallen();
     new spell_blood_queen_pact_of_the_darkfallen_dmg();
     new spell_blood_queen_pact_of_the_darkfallen_dmg_target();
