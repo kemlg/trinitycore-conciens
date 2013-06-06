@@ -48,54 +48,16 @@
 
 enum RBACPermissions
 {
-    RBAC_PERM_INSTANT_LOGOUT                                 = 1,
-    RBAC_PERM_SKIP_QUEUE                                     = 2,
-    RBAC_PERM_JOIN_NORMAL_BG                                 = 3,
-    RBAC_PERM_JOIN_RANDOM_BG                                 = 4,
-    RBAC_PERM_JOIN_ARENAS                                    = 5,
-    RBAC_PERM_JOIN_DUNGEON_FINDER                            = 6,
-    RBAC_PERM_PLAYER_COMMANDS                                = 7,
-    RBAC_PERM_MODERATOR_COMMANDS                             = 8,
-    RBAC_PERM_GAMEMASTER_COMMANDS                            = 9,
-    RBAC_PERM_ADMINISTRATOR_COMMANDS                         = 10,
-    RBAC_PERM_LOG_GM_TRADE                                   = 11,
-    // Free = 12
-    RBAC_PERM_SKIP_CHECK_INSTANCE_REQUIRED_BOSSES            = 13,
-    RBAC_PERM_SKIP_CHECK_CHARACTER_CREATION_TEAMMASK         = 14,
-    RBAC_PERM_SKIP_CHECK_CHARACTER_CREATION_CLASSMASK        = 15,
-    RBAC_PERM_SKIP_CHECK_CHARACTER_CREATION_RACEMASK         = 16,
-    RBAC_PERM_SKIP_CHECK_CHARACTER_CREATION_RESERVEDNAME     = 17,
-    RBAC_PERM_SKIP_CHECK_CHARACTER_CREATION_HEROIC_CHARACTER = 18,
-    RBAC_PERM_SKIP_CHECK_CHAT_CHANNEL_REQ                    = 19,
-    RBAC_PERM_SKIP_CHECK_DISABLE_MAP                         = 20,
-    RBAC_PERM_SKIP_CHECK_MORE_TALENTS_THAN_ALLOWED           = 21,
-    RBAC_PERM_SKIP_CHECK_CHAT_SPAM                           = 22,
-    RBAC_PERM_SKIP_CHECK_OVERSPEED_PING                      = 23,
-    RBAC_PERM_TWO_SIDE_CHARACTER_CREATION                    = 24,
-    RBAC_PERM_TWO_SIDE_INTERACTION_CHAT                      = 25,
-    RBAC_PERM_TWO_SIDE_INTERACTION_CHANNEL                   = 26,
-    RBAC_PERM_TWO_SIDE_INTERACTION_MAIL                      = 27,
-    RBAC_PERM_TWO_SIDE_WHO_LIST                              = 28,
-    RBAC_PERM_TWO_SIDE_ADD_FRIEND                            = 29,
-    RBAC_PERM_COMMANDS_SAVE_WITHOUT_DELAY                    = 30,
-    RBAC_PERM_COMMANDS_USE_UNSTUCK_WITH_ARGS                 = 31,
-    RBAC_PERM_COMMANDS_BE_ASSIGNED_TICKET                    = 32,
-    RBAC_PERM_COMMANDS_NOTIFY_COMMAND_NOT_FOUND_ERROR        = 33,
-    RBAC_PERM_COMMANDS_APPEAR_IN_GM_LIST                     = 34,
-    RBAC_PERM_WHO_SEE_ALL_SEC_LEVELS                         = 35,
-    RBAC_PERM_CAN_FILTER_WHISPERS                            = 36,
-    RBAC_PERM_CHAT_USE_STAFF_BADGE                           = 37,
-    RBAC_PERM_RESURRECT_WITH_FULL_HPS                        = 38,
-    RBAC_PERM_RESTORE_SAVED_GM_STATE                         = 39,
-    RBAC_PERM_ALLOW_GM_FRIEND                                = 40,
-    RBAC_PERM_USE_START_GM_LEVEL                             = 41,
-    RBAC_PERM_OPCODE_WORLD_TELEPORT                          = 42,
-    RBAC_PERM_OPCODE_WHOIS                                   = 43,
-    RBAC_PERM_RECEIVE_GLOBAL_GM_TEXTMESSAGE                  = 44,
-    RBAC_PERM_SILENTLY_JOIN_CHANNEL                          = 45,
-    RBAC_PERM_CHANGE_CHANNEL_NOT_MODERATOR                   = 46,
-    RBAC_PERM_CHECK_FOR_LOWER_SECURITY                       = 47,
-    RBAC_PERM_COMMANDS_PINFO_CHECK_PERSONAL_DATA             = 48,
+    RBAC_PERM_INSTANT_LOGOUT = 1,
+    RBAC_PERM_SKIP_QUEUE,
+    RBAC_PERM_JOIN_NORMAL_BG,
+    RBAC_PERM_JOIN_RANDOM_BG,
+    RBAC_PERM_JOIN_ARENAS,
+    RBAC_PERM_JOIN_DUNGEON_FINDER,
+    RBAC_PERM_PLAYER_COMMANDS,
+    RBAC_PERM_MODERATOR_COMMANDS,
+    RBAC_PERM_GAMEMASTER_COMMANDS,
+    RBAC_PERM_ADMINISTRATOR_COMMANDS,
     RBAC_PERM_MAX
 };
 
@@ -147,9 +109,9 @@ class RBACRole: public RBACObject
         /// Gets the Permissions assigned to this role
         RBACPermissionContainer const& GetPermissions() const { return _perms; }
         /// Grants a Permission (Adds)
-        void GrantPermission(uint32 id);
+        void GrantPermission(uint32 id) { _perms.set(id); }
         /// Revokes a Permission (Removes)
-        void RevokePermission(uint32 id);
+        void RevokePermission(uint32 id) { _perms.reset(id); }
 
     private:
         RBACPermissionContainer _perms;                    ///> Set of permissions
@@ -165,15 +127,15 @@ class RBACGroup: public RBACObject
         /// Gets the Roles assigned to this group
         RBACRoleContainer const& GetRoles() const { return _roles; }
         /// Grants a Role (Adds)
-        void GrantRole(uint32 role);
+        void GrantRole(uint32 role) { _roles.insert(role); }
         /// Revokes a Role (Removes)
-        void RevokeRole(uint32 role);
+        void RevokeRole(uint32 role) { _roles.erase(role); }
 
     private:
         RBACRoleContainer _roles;                          ///> Set of Roles
 };
 
-/**
+/*
  * @name RBACData
  * @brief Contains all needed information about the acccount
  *
@@ -246,7 +208,7 @@ class RBACData: public RBACObject
          * // previously defined "RBACData* rbac" with proper initialization
          * uint32 groupId = 2;
          * if (rbac->AddGroup(groupId) == RBAC_OK)
-         *     TC_LOG_DEBUG(LOG_FILTER_PLAYER, "Group %u succesfully added", groupId);
+         *     sLog->outDebug(LOG_FILTER_PLAYER, "Group %u succesfully added", groupId);
          * @endcode
          */
         RBACCommandResult AddGroup(uint32 groupId, int32 realmId = 0);
@@ -270,7 +232,7 @@ class RBACData: public RBACObject
          * // previously defined "RBACData* rbac" with proper initialization
          * uint32 groupId = 2;
          * if (rbac->RemoveGroup(groupId) == RBAC_OK)
-         *     TC_LOG_DEBUG(LOG_FILTER_PLAYER, "Group %u succesfully removed", groupId);
+         *     sLog->outDebug(LOG_FILTER_PLAYER, "Group %u succesfully removed", groupId);
          * @endcode
          */
         RBACCommandResult RemoveGroup(uint32 groupId, int32 realmId = 0);
@@ -293,7 +255,7 @@ class RBACData: public RBACObject
          * // previously defined "RBACData* rbac" with proper initialization
          * uint32 roleId = 2;
          * if (rbac->GrantRole(roleId) == RBAC_IN_DENIED_LIST)
-         *     TC_LOG_DEBUG(LOG_FILTER_PLAYER, "Failed to grant role %u, already denied", roleId);
+         *     sLog->outDebug(LOG_FILTER_PLAYER, "Failed to grant role %u, already denied", roleId);
          * @endcode
          */
         RBACCommandResult GrantRole(uint32 roleId, int32 realmId = 0);
@@ -316,7 +278,7 @@ class RBACData: public RBACObject
          * // previously defined "RBACData* rbac" with proper initialization
          * uint32 roleId = 2;
          * if (rbac->DenyRole(roleId) == RBAC_ID_DOES_NOT_EXISTS)
-         *     TC_LOG_DEBUG(LOG_FILTER_PLAYER, "Role Id %u does not exists", roleId);
+         *     sLog->outDebug(LOG_FILTER_PLAYER, "Role Id %u does not exists", roleId);
          * @endcode
          */
         RBACCommandResult DenyRole(uint32 roleId, int32 realmId = 0);
@@ -340,7 +302,7 @@ class RBACData: public RBACObject
          * // previously defined "RBACData* rbac" with proper initialization
          * uint32 roleId = 2;
          * if (rbac->RevokeRole(roleId) == RBAC_OK)
-         *     TC_LOG_DEBUG(LOG_FILTER_PLAYER, "Role %u succesfully removed", roleId);
+         *     sLog->outDebug(LOG_FILTER_PLAYER, "Role %u succesfully removed", roleId);
          * @endcode
          */
         RBACCommandResult RevokeRole(uint32 roleId, int32 realmId = 0);
@@ -363,7 +325,7 @@ class RBACData: public RBACObject
          * // previously defined "RBACData* rbac" with proper initialization
          * uint32 permissionId = 2;
          * if (rbac->GrantRole(permissionId) == RBAC_IN_DENIED_LIST)
-         *     TC_LOG_DEBUG(LOG_FILTER_PLAYER, "Failed to grant permission %u, already denied", permissionId);
+         *     sLog->outDebug(LOG_FILTER_PLAYER, "Failed to grant permission %u, already denied", permissionId);
          * @endcode
          */
         RBACCommandResult GrantPermission(uint32 permissionId, int32 realmId = 0);
@@ -386,7 +348,7 @@ class RBACData: public RBACObject
          * // previously defined "RBACData* rbac" with proper initialization
          * uint32 permissionId = 2;
          * if (rbac->DenyRole(permissionId) == RBAC_ID_DOES_NOT_EXISTS)
-         *     TC_LOG_DEBUG(LOG_FILTER_PLAYER, "Role Id %u does not exists", permissionId);
+         *     sLog->outDebug(LOG_FILTER_PLAYER, "Role Id %u does not exists", permissionId);
          * @endcode
          */
         RBACCommandResult DenyPermission(uint32 permissionId, int32 realmId = 0);
@@ -410,7 +372,7 @@ class RBACData: public RBACObject
          * // previously defined "RBACData* rbac" with proper initialization
          * uint32 permissionId = 2;
          * if (rbac->RevokeRole(permissionId) == RBAC_OK)
-         *     TC_LOG_DEBUG(LOG_FILTER_PLAYER, "Permission %u succesfully removed", permissionId);
+         *     sLog->outDebug(LOG_FILTER_PLAYER, "Permission %u succesfully removed", permissionId);
          * @endcode
          */
         RBACCommandResult RevokePermission(uint32 permissionId, int32 realmId = 0);

@@ -156,7 +156,7 @@ public:
             me->ResetPlayerDamageReq();
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             //Speech
             if (DoingSpeech)

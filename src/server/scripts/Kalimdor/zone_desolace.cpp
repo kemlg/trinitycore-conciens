@@ -109,7 +109,7 @@ public:
             }
         }
     };
-
+    
     CreatureAI* GetAI(Creature* creature) const
     {
         return new npc_aged_dying_ancient_kodoAI(creature);
@@ -205,7 +205,7 @@ public:
             return;
         }
 
-        void UpdateAI(uint32 Diff)
+        void UpdateAI(const uint32 Diff)
         {
             npc_escortAI::UpdateAI(Diff);
             if (!UpdateVictim())

@@ -24,28 +24,26 @@ struct TSpellSummary
 
 void SummonList::DoZoneInCombat(uint32 entry)
 {
-    for (StorageType::iterator i = storage_.begin(); i != storage_.end();)
+    for (iterator i = begin(); i != end();)
     {
         Creature* summon = Unit::GetCreature(*me, *i);
         ++i;
         if (summon && summon->IsAIEnabled
-                && (!entry || summon->GetEntry() == entry))
-        {
+            && (!entry || summon->GetEntry() == entry))
             summon->AI()->DoZoneInCombat();
-        }
     }
 }
 
 void SummonList::DespawnEntry(uint32 entry)
 {
-    for (StorageType::iterator i = storage_.begin(); i != storage_.end();)
+    for (iterator i = begin(); i != end();)
     {
         Creature* summon = Unit::GetCreature(*me, *i);
         if (!summon)
-            i = storage_.erase(i);
+            erase(i++);
         else if (summon->GetEntry() == entry)
         {
-            i = storage_.erase(i);
+            erase(i++);
             summon->DespawnOrUnsummon();
         }
         else
@@ -55,29 +53,33 @@ void SummonList::DespawnEntry(uint32 entry)
 
 void SummonList::DespawnAll()
 {
-    while (!storage_.empty())
+    while (!empty())
     {
-        Creature* summon = Unit::GetCreature(*me, storage_.front());
-        storage_.pop_front();
-        if (summon)
+        Creature* summon = Unit::GetCreature(*me, *begin());
+        if (!summon)
+            erase(begin());
+        else
+        {
+            erase(begin());
             summon->DespawnOrUnsummon();
+        }
     }
 }
 
 void SummonList::RemoveNotExisting()
 {
-    for (StorageType::iterator i = storage_.begin(); i != storage_.end();)
+    for (iterator i = begin(); i != end();)
     {
         if (Unit::GetCreature(*me, *i))
             ++i;
         else
-            i = storage_.erase(i);
+            erase(i++);
     }
 }
 
 bool SummonList::HasEntry(uint32 entry) const
 {
-    for (StorageType::const_iterator i = storage_.begin(); i != storage_.end(); ++i)
+    for (const_iterator i = begin(); i != end(); ++i)
     {
         Creature* summon = Unit::GetCreature(*me, *i);
         if (summon && summon->GetEntry() == entry)
@@ -114,7 +116,7 @@ void ScriptedAI::AttackStart(Unit* who)
         AttackStartNoMove(who);
 }
 
-void ScriptedAI::UpdateAI(uint32 /*diff*/)
+void ScriptedAI::UpdateAI(uint32 const /*diff*/)
 {
     //Check if we have a current target
     if (!UpdateVictim())
@@ -159,7 +161,7 @@ void ScriptedAI::DoPlaySoundToSet(WorldObject* source, uint32 soundId)
 
     if (!sSoundEntriesStore.LookupEntry(soundId))
     {
-        TC_LOG_ERROR(LOG_FILTER_TSCR, "Invalid soundId %u used in DoPlaySoundToSet (Source: TypeId %u, GUID %u)", soundId, source->GetTypeId(), source->GetGUIDLow());
+        sLog->outError(LOG_FILTER_TSCR, "Invalid soundId %u used in DoPlaySoundToSet (Source: TypeId %u, GUID %u)", soundId, source->GetTypeId(), source->GetGUIDLow());
         return;
     }
 
@@ -252,7 +254,7 @@ void ScriptedAI::DoResetThreat()
 {
     if (!me->CanHaveThreatList() || me->getThreatManager().isThreatListEmpty())
     {
-        TC_LOG_ERROR(LOG_FILTER_TSCR, "DoResetThreat called for creature that either cannot have threat list or has empty threat list (me entry = %d)", me->GetEntry());
+        sLog->outError(LOG_FILTER_TSCR, "DoResetThreat called for creature that either cannot have threat list or has empty threat list (me entry = %d)", me->GetEntry());
         return;
     }
 
@@ -300,7 +302,7 @@ void ScriptedAI::DoTeleportPlayer(Unit* unit, float x, float y, float z, float o
     if (Player* player = unit->ToPlayer())
         player->TeleportTo(unit->GetMapId(), x, y, z, o, TELE_TO_NOT_LEAVE_COMBAT);
     else
-        TC_LOG_ERROR(LOG_FILTER_TSCR, "Creature " UI64FMTD " (Entry: %u) Tried to teleport non-player unit (Type: %u GUID: " UI64FMTD ") to x: %f y:%f z: %f o: %f. Aborted.",
+        sLog->outError(LOG_FILTER_TSCR, "Creature " UI64FMTD " (Entry: %u) Tried to teleport non-player unit (Type: %u GUID: " UI64FMTD ") to x: %f y:%f z: %f o: %f. Aborted.",
             me->GetGUID(), me->GetEntry(), unit->GetTypeId(), unit->GetGUID(), x, y, z, o);
 }
 
@@ -368,7 +370,9 @@ void ScriptedAI::SetEquipmentSlots(bool loadDefault, int32 mainHand /*= EQUIP_NO
 {
     if (loadDefault)
     {
-        me->LoadEquipment(me->GetOriginalEquipmentId(), true);
+        if (CreatureTemplate const* creatureInfo = sObjectMgr->GetCreatureTemplate(me->GetEntry()))
+            me->LoadEquipment(creatureInfo->equipmentId, true);
+
         return;
     }
 
@@ -433,7 +437,7 @@ bool ScriptedAI::EnterEvadeIfOutOfCombatArea(uint32 const diff)
                 return false;
             break;
         default: // For most of creatures that certain area is their home area.
-            TC_LOG_INFO(LOG_FILTER_GENERAL, "TSCR: EnterEvadeIfOutOfCombatArea used for creature entry %u, but does not have any definition. Using the default one.", me->GetEntry());
+            sLog->outInfo(LOG_FILTER_GENERAL, "TSCR: EnterEvadeIfOutOfCombatArea used for creature entry %u, but does not have any definition. Using the default one.", me->GetEntry());
             uint32 homeAreaId = me->GetMap()->GetAreaId(me->GetHomePosition().GetPositionX(), me->GetHomePosition().GetPositionY(), me->GetHomePosition().GetPositionZ());
             if (me->GetAreaId() == homeAreaId)
                 return false;
@@ -513,35 +517,35 @@ bool BossAI::CheckBoundary(Unit* who)
         switch (itr->first)
         {
             case BOUNDARY_N:
-                if (who->GetPositionX() > itr->second)
+                if (me->GetPositionX() > itr->second)
                     return false;
                 break;
             case BOUNDARY_S:
-                if (who->GetPositionX() < itr->second)
+                if (me->GetPositionX() < itr->second)
                     return false;
                 break;
             case BOUNDARY_E:
-                if (who->GetPositionY() < itr->second)
+                if (me->GetPositionY() < itr->second)
                     return false;
                 break;
             case BOUNDARY_W:
-                if (who->GetPositionY() > itr->second)
+                if (me->GetPositionY() > itr->second)
                     return false;
                 break;
             case BOUNDARY_NW:
-                if (who->GetPositionX() + who->GetPositionY() > itr->second)
+                if (me->GetPositionX() + me->GetPositionY() > itr->second)
                     return false;
                 break;
             case BOUNDARY_SE:
-                if (who->GetPositionX() + who->GetPositionY() < itr->second)
+                if (me->GetPositionX() + me->GetPositionY() < itr->second)
                     return false;
                 break;
             case BOUNDARY_NE:
-                if (who->GetPositionX() - who->GetPositionY() > itr->second)
+                if (me->GetPositionX() - me->GetPositionY() > itr->second)
                     return false;
                 break;
             case BOUNDARY_SW:
-                if (who->GetPositionX() - who->GetPositionY() < itr->second)
+                if (me->GetPositionX() - me->GetPositionY() < itr->second)
                     return false;
                 break;
             default:
@@ -564,7 +568,7 @@ void BossAI::SummonedCreatureDespawn(Creature* summon)
     summons.Despawn(summon);
 }
 
-void BossAI::UpdateAI(uint32 diff)
+void BossAI::UpdateAI(uint32 const diff)
 {
     if (!UpdateVictim())
         return;
@@ -623,7 +627,7 @@ void WorldBossAI::SummonedCreatureDespawn(Creature* summon)
     summons.Despawn(summon);
 }
 
-void WorldBossAI::UpdateAI(uint32 diff)
+void WorldBossAI::UpdateAI(uint32 const diff)
 {
     if (!UpdateVictim())
         return;

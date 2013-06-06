@@ -274,7 +274,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 uiDiff)
+        void UpdateAI(const uint32 uiDiff)
         {
             npc_escortAI::UpdateAI(uiDiff);
             if (!me->getVictim())
@@ -339,15 +339,17 @@ public:
             if (!who)
                 return;
 
-            Player* player = who->ToPlayer();
-            if (player && player->GetQuestStatus(10085) == QUEST_STATUS_INCOMPLETE)
+            if (who->GetTypeId() == TYPEID_PLAYER)
             {
-                uint32 creditMarkerId = me->GetEntry();
-                if (creditMarkerId >= 18840 && creditMarkerId <= 18843)
+                if (CAST_PLR(who)->GetQuestStatus(10085) == QUEST_STATUS_INCOMPLETE)
                 {
-                    // 18840: Sunspring, 18841: Laughing, 18842: Garadar, 18843: Bleeding
-                    if (!player->GetReqKillOrCastCurrentCount(10085, creditMarkerId))
-                        player->KilledMonsterCredit(creditMarkerId, me->GetGUID());
+                    uint32 creditMarkerId = me->GetEntry();
+                    if ((creditMarkerId >= 18840) && (creditMarkerId <= 18843))
+                    {
+                        // 18840: Sunspring, 18841: Laughing, 18842: Garadar, 18843: Bleeding
+                        if (!CAST_PLR(who)->GetReqKillOrCastCurrentCount(10085, creditMarkerId))
+                            CAST_PLR(who)->KilledMonsterCredit(creditMarkerId, me->GetGUID());
+                    }
                 }
             }
         }
@@ -443,7 +445,7 @@ public:
           ReleasedFromCage = false;
       }
 
-      void UpdateAI(uint32 diff)
+      void UpdateAI(uint32 const diff)
       {
           if (ReleasedFromCage)
           {
@@ -626,7 +628,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!UpdateVictim())
                 return;

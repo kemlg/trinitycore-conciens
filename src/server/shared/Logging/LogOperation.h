@@ -25,7 +25,8 @@ class LogOperation
 {
     public:
         LogOperation(Logger* _logger, LogMessage* _msg)
-            : logger(_logger), msg(_msg)
+            : logger(_logger)
+            , msg(_msg)
         { }
 
         ~LogOperation();

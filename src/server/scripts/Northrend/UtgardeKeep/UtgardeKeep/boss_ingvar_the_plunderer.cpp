@@ -30,12 +30,13 @@ enum Yells
 {
     //Yells Ingvar
     YELL_AGGRO_1                                = 0,
-    YELL_KILL_1                                 = 1,
-    YELL_DEAD_1                                 = 2,
+    YELL_AGGRO_2                                = 1,
 
-    YELL_AGGRO_2                                = 0,
-    YELL_KILL_2                                 = 1,
-    YELL_DEAD_2                                 = 2
+    YELL_DEAD_1                                 = 2,
+    YELL_DEAD_2                                 = 3,
+
+    YELL_KILL_1                                 = 4,
+    YELL_KILL_2                                 = 5,
 };
 
 enum Creatures
@@ -203,7 +204,7 @@ public:
             Talk(bIsUndead ? YELL_KILL_1 : YELL_KILL_2);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!UpdateVictim() && !events.IsInPhase(PHASE_EVENT))
                 return;
@@ -357,7 +358,7 @@ public:
         void AttackStart(Unit* /*who*/) {}
         void MoveInLineOfSight(Unit* /*who*/) {}
         void EnterCombat(Unit* /*who*/) {}
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (uiResurectTimer)
             {

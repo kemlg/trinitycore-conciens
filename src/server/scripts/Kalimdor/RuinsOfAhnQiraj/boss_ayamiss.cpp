@@ -34,13 +34,13 @@ enum Spells
 
 enum Events
 {
-    EVENT_STINGER_SPRAY         = 1,
-    EVENT_POISON_STINGER        = 2,
-    EVENT_SUMMON_SWARMER        = 3,
-    EVENT_SWARMER_ATTACK        = 4,
-    EVENT_PARALYZE              = 5,
-    EVENT_LASH                  = 6,
-    EVENT_TRASH                 = 7
+    EVENT_STINGER_SPRAY         = 0,
+    EVENT_POISON_STINGER        = 1,
+    EVENT_SUMMON_SWARMER        = 2,
+    EVENT_SWARMER_ATTACK        = 3,
+    EVENT_PARALYZE              = 4,
+    EVENT_LASH                  = 5,
+    EVENT_TRASH                 = 6
 };
 
 enum Emotes
@@ -63,7 +63,7 @@ enum Points
 
 const Position AyamissAirPos =  { -9689.292f, 1547.912f, 48.02729f, 0.0f };
 const Position AltarPos =       { -9717.18f, 1517.72f, 27.4677f, 0.0f };
-/// @todo These below are probably incorrect, taken from SD2
+// TODO: These below are probably incorrect, taken from SD2
 const Position SwarmerPos =     { -9647.352f, 1578.062f, 55.32f, 0.0f };
 const Position LarvaPos[2] =
 {
@@ -144,7 +144,7 @@ class boss_ayamiss : public CreatureScript
                 me->GetMotionMaster()->MovePoint(POINT_AIR, AyamissAirPos);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -272,7 +272,7 @@ class npc_hive_zara_larva : public CreatureScript
                 ScriptedAI::AttackStart(victim);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (_instance->GetBossState(DATA_AYAMISS) == IN_PROGRESS)
                     return;

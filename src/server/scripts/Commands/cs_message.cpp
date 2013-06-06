@@ -27,7 +27,6 @@ EndScriptData */
 #include "ChannelMgr.h"
 #include "Language.h"
 #include "Player.h"
-#include "ObjectMgr.h"
 
 class message_commandscript : public CommandScript
 {
@@ -187,7 +186,7 @@ public:
             return true;
         }
 
-        std::string argStr = strtok((char*)args, " ");
+        std::string argStr = (char*)args;
         // whisper on
         if (argStr == "on")
         {
@@ -206,25 +205,6 @@ public:
             return true;
         }
 
-        if (argStr == "remove")
-        {
-            std::string name = strtok(NULL, " ");
-            if (normalizePlayerName(name))
-            {
-                if (Player* player = sObjectAccessor->FindPlayerByName(name))
-                {
-                    handler->GetSession()->GetPlayer()->RemoveFromWhisperWhiteList(player->GetGUID());
-                    handler->PSendSysMessage(LANG_COMMAND_WHISPEROFFPLAYER, name.c_str());
-                    return true;
-                }
-                else
-                {
-                    handler->PSendSysMessage(LANG_PLAYER_NOT_FOUND, name.c_str());
-                    handler->SetSentErrorMessage(true);
-                    return false;
-                }
-            }
-        }
         handler->SendSysMessage(LANG_USE_BOL);
         handler->SetSentErrorMessage(true);
         return false;

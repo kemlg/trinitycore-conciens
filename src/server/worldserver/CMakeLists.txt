@@ -29,18 +29,11 @@ set(worldserver_SRCS
 )
 
 if( WIN32 )
-  if ( MSVC )
-    set(worldserver_SRCS
-      ${worldserver_SRCS}
-      ${sources_Debugging}
-      worldserver.rc
-    )
-  else ( )
-    set(worldserver_SRCS
-      ${worldserver_SRCS}
-      ${sources_Debugging}
-    )
-  endif ()
+  set(worldserver_SRCS
+    ${worldserver_SRCS}
+    ${sources_Debugging}
+    worldserver.rc
+  )
 endif()
 
 include_directories(
@@ -122,10 +115,6 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/server/game/PrecompiledHeaders
   ${CMAKE_SOURCE_DIR}/src/server/game/Quests
   ${CMAKE_SOURCE_DIR}/src/server/game/Reputation
-
-  # cOncienS
-  ${CMAKE_SOURCE_DIR}/src/server/game/cOncienS
-
   ${CMAKE_SOURCE_DIR}/src/server/game/Scripting
   ${CMAKE_SOURCE_DIR}/src/server/game/Server/Protocol
   ${CMAKE_SOURCE_DIR}/src/server/game/Server
@@ -183,26 +172,18 @@ target_link_libraries(worldserver
   ${MYSQL_LIBRARY}
   ${OPENSSL_LIBRARIES}
   ${ZLIB_LIBRARIES}
-  ${CMAKE_THREAD_LIBS_INIT}
 )
 
 if( WIN32 )
-  if ( MSVC )
-    add_custom_command(TARGET worldserver
-      POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/worldserver.conf.dist ${CMAKE_BINARY_DIR}/bin/$(ConfigurationName)/
-    )
-  elseif ( MINGW )
-    add_custom_command(TARGET worldserver
-      POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/worldserver.conf.dist ${CMAKE_BINARY_DIR}/bin/
-    )
-  endif()
+  add_custom_command(TARGET worldserver
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/worldserver.conf.dist ${CMAKE_BINARY_DIR}/bin/$(ConfigurationName)/
+  )
 endif()
 
 if( UNIX )
   install(TARGETS worldserver DESTINATION bin)
-  install(FILES worldserver.conf.dist DESTINATION ${CONF_DIR})
+  install(FILES worldserver.conf.dist DESTINATION etc)
 elseif( WIN32 )
   install(TARGETS worldserver DESTINATION "${CMAKE_INSTALL_PREFIX}")
   install(FILES worldserver.conf.dist DESTINATION "${CMAKE_INSTALL_PREFIX}")

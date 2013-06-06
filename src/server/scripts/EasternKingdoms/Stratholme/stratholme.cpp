@@ -151,15 +151,14 @@ public:
 
         void SpellHit(Unit* caster, const SpellInfo* spell)
         {
-            if (Tagged || spell->Id != SPELL_EGAN_BLASTER)
-                return;
-
-            Player* player = caster->ToPlayer();
-            if (!player || player->GetQuestStatus(QUEST_RESTLESS_SOUL) != QUEST_STATUS_INCOMPLETE)
-                return;
-
-            Tagged = true;
-            Tagger = caster->GetGUID();
+            if (caster->GetTypeId() == TYPEID_PLAYER)
+            {
+                if (!Tagged && spell->Id == SPELL_EGAN_BLASTER && CAST_PLR(caster)->GetQuestStatus(QUEST_RESTLESS_SOUL) == QUEST_STATUS_INCOMPLETE)
+                {
+                    Tagged = true;
+                    Tagger = caster->GetGUID();
+                }
+            }
         }
 
         void JustSummoned(Creature* summoned)
@@ -173,7 +172,7 @@ public:
                 me->SummonCreature(ENTRY_FREED, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), me->GetOrientation(), TEMPSUMMON_TIMED_DESPAWN, 300000);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (Tagged)
             {
@@ -181,13 +180,10 @@ public:
                 {
                     if (Unit* temp = Unit::GetUnit(*me, Tagger))
                     {
-                        if (Player* player = temp->ToPlayer())
-                            player->KilledMonsterCredit(ENTRY_RESTLESS, me->GetGUID());
+                        CAST_PLR(temp)->KilledMonsterCredit(ENTRY_RESTLESS, me->GetGUID());
                         me->Kill(me);
                     }
-                }
-                else
-                    Die_Timer -= diff;
+                } else Die_Timer -= diff;
             }
         }
     };
@@ -248,7 +244,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (Tagged)
             {

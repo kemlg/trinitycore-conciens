@@ -182,7 +182,7 @@ public:
             ScriptedAI::EnterEvadeMode();
         }
 
-        void DoAction(int32 param)
+        void DoAction(const int32 param)
         {
             switch (param)
             {
@@ -197,7 +197,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (TalkTimer)
             {
@@ -264,7 +264,7 @@ public:
                         }
                         else
                         {
-                            TC_LOG_ERROR(LOG_FILTER_TSCR, "Didn't find Shathrowar. Kalecgos event reseted.");
+                            sLog->outError(LOG_FILTER_TSCR, "Didn't find Shathrowar. Kalecgos event reseted.");
                             EnterEvadeMode();
                             return;
                         }
@@ -485,7 +485,7 @@ public:
                 damage *= 3;
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!me->HasAura(AURA_SPECTRAL_INVISIBILITY))
                 me->CastSpell(me, AURA_SPECTRAL_INVISIBILITY, true);
@@ -691,7 +691,7 @@ public:
             }
         }
 
-        void DoAction(int32 param)
+        void DoAction(const int32 param)
         {
             switch (param)
             {
@@ -706,7 +706,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!me->HasAura(AURA_SPECTRAL_INVISIBILITY))
                 me->CastSpell(me, AURA_SPECTRAL_INVISIBILITY, true);
@@ -716,27 +716,27 @@ public:
             if (CheckTimer <= diff)
             {
                 Creature* Kalec = Unit::GetCreature(*me, KalecGUID);
-                if (!Kalec || !Kalec->isAlive())
+                if (!Kalec || (Kalec && !Kalec->isAlive()))
                 {
                     if (Creature* Kalecgos = Unit::GetCreature(*me, KalecgosGUID))
                         Kalecgos->AI()->EnterEvadeMode();
-                    return;
+                        return;
                 }
-
                 if (HealthBelowPct(10) && !isEnraged)
                 {
                     if (Creature* Kalecgos = Unit::GetCreature(*me, KalecgosGUID))
                         Kalecgos->AI()->DoAction(DO_ENRAGE);
                     DoAction(DO_ENRAGE);
                 }
-
                 Creature* Kalecgos = Unit::GetCreature(*me, KalecgosGUID);
-                if (Kalecgos && !Kalecgos->isInCombat())
+                if (Kalecgos)
                 {
-                    me->AI()->EnterEvadeMode();
-                    return;
+                    if (!Kalecgos->isInCombat())
+                    {
+                        me->AI()->EnterEvadeMode();
+                        return;
+                    }
                 }
-
                 if (!isBanished && HealthBelowPct(1))
                 {
                     if (Kalecgos)
@@ -746,7 +746,8 @@ public:
                             me->DealDamage(me, me->GetHealth());
                             return;
                         }
-                        DoAction(DO_BANISH);
+                        else
+                            DoAction(DO_BANISH);
                     }
                     else
                     {

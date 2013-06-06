@@ -338,8 +338,7 @@ public:
         }
         else
             sWorld->ShutdownServ(time, SHUTDOWN_MASK_IDLE, SHUTDOWN_EXIT_CODE);
-
-        return true;
+            return true;
     }
 
     // Exit the realm

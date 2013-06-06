@@ -813,41 +813,7 @@ class spell_item_scroll_of_recall : public SpellScriptLoader
 enum ShadowsFate
 {
     SPELL_SOUL_FEAST        = 71203,
-    NPC_SINDRAGOSA          = 36853
-};
-
-class spell_item_unsated_craving : public SpellScriptLoader
-{
-    public:
-        spell_item_unsated_craving() : SpellScriptLoader("spell_item_unsated_craving") { }
-
-        class spell_item_unsated_craving_AuraScript : public AuraScript
-        {
-            PrepareAuraScript(spell_item_unsated_craving_AuraScript);
-
-            bool CheckProc(ProcEventInfo& procInfo)
-            {
-                Unit* caster = procInfo.GetActor();
-                if (!caster || caster->GetTypeId() != TYPEID_PLAYER)
-                    return false;
-
-                Unit* target = procInfo.GetActionTarget();
-                if (!target || target->GetTypeId() != TYPEID_UNIT || target->GetCreatureType() == CREATURE_TYPE_CRITTER || (target->GetEntry() != NPC_SINDRAGOSA && target->isSummon()))
-                    return false;
-
-                return true;
-            }
-
-            void Register()
-            {
-                DoCheckProc += AuraCheckProcFn(spell_item_unsated_craving_AuraScript::CheckProc);
-            }
-        };
-
-        AuraScript* GetAuraScript() const
-        {
-            return new spell_item_unsated_craving_AuraScript();
-        }
+    QUEST_A_FEAST_OF_SOULS  = 24547
 };
 
 class spell_item_shadows_fate : public SpellScriptLoader
@@ -859,20 +825,41 @@ class spell_item_shadows_fate : public SpellScriptLoader
         {
             PrepareAuraScript(spell_item_shadows_fate_AuraScript);
 
-            void HandleProc(ProcEventInfo& procInfo)
+            bool Validate(SpellInfo const* /*spellInfo*/)
             {
-                Unit* caster = procInfo.GetActor();
-                Unit* target = GetCaster();
-                if (!caster || !target)
-                    return;
+                if (!sSpellMgr->GetSpellInfo(SPELL_SOUL_FEAST))
+                    return false;
+                if (!sObjectMgr->GetQuestTemplate(QUEST_A_FEAST_OF_SOULS))
+                    return false;
+                return true;
+            }
 
-                caster->CastSpell(target, SPELL_SOUL_FEAST, TRIGGERED_FULL_MASK);
+            bool Load()
+            {
+                _procTarget = NULL;
+                return true;
+            }
+
+            bool CheckProc(ProcEventInfo& /*eventInfo*/)
+            {
+                _procTarget = GetCaster();
+                return _procTarget && _procTarget->GetTypeId() == TYPEID_PLAYER && _procTarget->ToPlayer()->GetQuestStatus(QUEST_A_FEAST_OF_SOULS) == QUEST_STATUS_INCOMPLETE;
+            }
+
+            void HandleProc(AuraEffect const* /*aurEff*/, ProcEventInfo& /*eventInfo*/)
+            {
+                PreventDefaultAction();
+                GetTarget()->CastSpell(_procTarget, SPELL_SOUL_FEAST, true);
             }
 
             void Register()
             {
-                OnProc += AuraProcFn(spell_item_shadows_fate_AuraScript::HandleProc);
+                DoCheckProc += AuraCheckProcFn(spell_item_shadows_fate_AuraScript::CheckProc);
+                OnEffectProc += AuraEffectProcFn(spell_item_shadows_fate_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
             }
+
+        private:
+            Unit* _procTarget;
         };
 
         AuraScript* GetAuraScript() const
@@ -2494,7 +2481,6 @@ void AddSC_item_spell_scripts()
     new spell_item_piccolo_of_the_flaming_fire();
     new spell_item_savory_deviate_delight();
     new spell_item_scroll_of_recall();
-    new spell_item_unsated_craving();
     new spell_item_shadows_fate();
     new spell_item_shadowmourne();
     new spell_item_shadowmourne_soul_fragment();

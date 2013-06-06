@@ -108,7 +108,7 @@ class boss_doomlord_kazzak : public CreatureScript
                 Talk(SAY_DEATH);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 // Return since we have no target
                 if (!UpdateVictim())

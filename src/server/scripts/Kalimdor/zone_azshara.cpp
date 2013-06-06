@@ -66,30 +66,19 @@ public:
 
         void EnterCombat(Unit* /*who*/) { }
 
-        void SpellHit(Unit* unit, const SpellInfo* spell)
+        void SpellHit(Unit* Hitter, const SpellInfo* Spellkind)
         {
-            if (spellhit)
-                return;
-
-            switch (spell->Id)
+            if (!spellhit &&
+                Hitter->GetTypeId() == TYPEID_PLAYER &&
+                CAST_PLR(Hitter)->GetQuestStatus(9364) == QUEST_STATUS_INCOMPLETE &&
+                (Spellkind->Id == 118 || Spellkind->Id == 12824 || Spellkind->Id == 12825 || Spellkind->Id == 12826))
             {
-                case 118:
-                case 12824:
-                case 12825:
-                case 12826:
-                    if (Player* player = unit->ToPlayer())
-                        if (player->GetQuestStatus(9364) == QUEST_STATUS_INCOMPLETE)
-                        {
-                            spellhit = true;
-                            DoCast(me, 29124);
-                        }
-                    break;
-                default:
-                    break;
+                spellhit=true;
+                DoCast(me, 29124);                       //become a sheep
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             // we mustn't remove the Creature in the same round in which we cast the summon spell, otherwise there will be no summons
             if (spellhit && morphtimer >= 5000)
@@ -110,7 +99,7 @@ public:
             if (!UpdateVictim())
                 return;
 
-            /// @todo add abilities for the different creatures
+            //TODO: add abilities for the different creatures
             DoMeleeAttackIfReady();
         }
     };
@@ -343,7 +332,7 @@ public:
             Reached = false;
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (MustDie)
             {
@@ -440,9 +429,7 @@ public:
             if (!who || PlayerGUID)
                 return;
 
-            Player* player = who->ToPlayer();
-
-            if (player && player->GetQuestStatus(QUEST_CHASING_THE_MOONSTONE) == QUEST_STATUS_INCOMPLETE)
+            if (who->GetTypeId() == TYPEID_PLAYER && CAST_PLR(who)->GetQuestStatus(QUEST_CHASING_THE_MOONSTONE) == QUEST_STATUS_INCOMPLETE)
             {
                 PlayerGUID = who->GetGUID();
                 Talk(SAY_RIZZLE_START);
@@ -498,7 +485,7 @@ public:
             WeMustDieTimer = 1000;
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (WeMustDie)
             {

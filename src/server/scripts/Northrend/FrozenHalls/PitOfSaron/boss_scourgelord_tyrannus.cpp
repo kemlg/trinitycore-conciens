@@ -54,7 +54,7 @@ enum Yells
     SAY_SYLVANAS_OUTRO_4            = 4
 };
 
-enum Spells
+enum Spelsl
 {
     SPELL_OVERLORD_BRAND            = 69172,
     SPELL_OVERLORD_BRAND_HEAL       = 69190,
@@ -136,7 +136,9 @@ class boss_tyrannus : public CreatureScript
 
             void InitializeAI()
             {
-                if (instance->GetBossState(DATA_TYRANNUS) != DONE)
+                if (!instance || static_cast<InstanceMap*>(me->GetMap())->GetScriptId() != sObjectMgr->GetScriptId(PoSScriptName))
+                    me->IsAIEnabled = false;
+                else if (instance->GetBossState(DATA_TYRANNUS) != DONE)
                     Reset();
                 else
                     me->DespawnOrUnsummon();
@@ -199,7 +201,7 @@ class boss_tyrannus : public CreatureScript
                     rimefang->AI()->DoAction(ACTION_END_COMBAT);
             }
 
-            void DoAction(int32 actionId)
+            void DoAction(const int32 actionId)
             {
                 if (actionId == ACTION_START_INTRO)
                 {
@@ -213,7 +215,7 @@ class boss_tyrannus : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(const uint32 diff)
             {
                 if (!UpdateVictim() && !events.IsInPhase(PHASE_INTRO))
                     return;
@@ -279,7 +281,7 @@ class boss_tyrannus : public CreatureScript
 
         CreatureAI* GetAI(Creature* creature) const
         {
-            return GetPitOfSaronAI<boss_tyrannusAI>(creature);
+            return new boss_tyrannusAI(creature);
         }
 };
 
@@ -311,7 +313,7 @@ class boss_rimefang : public CreatureScript
                 _vehicle->InstallAllAccessories(false);
             }
 
-            void DoAction(int32 actionId)
+            void DoAction(const int32 actionId)
             {
                 if (actionId == ACTION_START_RIMEFANG)
                 {
@@ -333,7 +335,7 @@ class boss_rimefang : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(const uint32 diff)
             {
                 if (!UpdateVictim() && !_events.IsInPhase(PHASE_COMBAT))
                     return;
@@ -385,32 +387,32 @@ class boss_rimefang : public CreatureScript
 class player_overlord_brandAI : public PlayerAI
 {
     public:
-        player_overlord_brandAI(Player* player) : PlayerAI(player), _tyrannus(0)
+        player_overlord_brandAI(Player* player) : PlayerAI(player)
         {
+            tyrannus = NULL;
         }
 
         void SetGUID(uint64 guid, int32 /*type*/)
         {
-            _tyrannus = guid;
+            tyrannus = ObjectAccessor::GetCreature(*me, guid);
+            me->IsAIEnabled = tyrannus != NULL;
         }
 
         void DamageDealt(Unit* /*victim*/, uint32& damage, DamageEffectType /*damageType*/)
         {
-            if (Creature* tyrannus = ObjectAccessor::GetCreature(*me, _tyrannus))
-                if (tyrannus->getVictim())
-                    me->CastCustomSpell(SPELL_OVERLORD_BRAND_DAMAGE, SPELLVALUE_BASE_POINT0, damage, tyrannus->getVictim(), true, NULL, NULL, tyrannus->GetGUID());
+            if (tyrannus->getVictim())
+                me->CastCustomSpell(SPELL_OVERLORD_BRAND_DAMAGE, SPELLVALUE_BASE_POINT0, damage, tyrannus->getVictim(), true, NULL, NULL, tyrannus->GetGUID());
         }
 
         void HealDone(Unit* /*target*/, uint32& addHealth)
         {
-            if (Creature* tyrannus = ObjectAccessor::GetCreature(*me, _tyrannus))
-                me->CastCustomSpell(SPELL_OVERLORD_BRAND_HEAL, SPELLVALUE_BASE_POINT0, int32(addHealth*5.5f), tyrannus, true, NULL, NULL, tyrannus->GetGUID());
+            me->CastCustomSpell(SPELL_OVERLORD_BRAND_HEAL, SPELLVALUE_BASE_POINT0, int32(addHealth*5.5f), tyrannus, true, NULL, NULL, tyrannus->GetGUID());
         }
 
-        void UpdateAI(uint32 /*diff*/) { }
+        void UpdateAI(const uint32 /*diff*/) { }
 
     private:
-        uint64 _tyrannus;
+        Creature* tyrannus;
 };
 
 class spell_tyrannus_overlord_brand : public SpellScriptLoader
@@ -421,11 +423,6 @@ class spell_tyrannus_overlord_brand : public SpellScriptLoader
         class spell_tyrannus_overlord_brand_AuraScript : public AuraScript
         {
             PrepareAuraScript(spell_tyrannus_overlord_brand_AuraScript);
-
-            bool Load()
-            {
-                return GetCaster() && GetCaster()->GetEntry() == NPC_TYRANNUS;
-            }
 
             void OnApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
             {
@@ -443,10 +440,9 @@ class spell_tyrannus_overlord_brand : public SpellScriptLoader
                 if (GetTarget()->GetTypeId() != TYPEID_PLAYER)
                     return;
 
-                GetTarget()->IsAIEnabled = oldAIState;
-                UnitAI* thisAI = GetTarget()->GetAI();
+                delete GetTarget()->GetAI();
                 GetTarget()->SetAI(oldAI);
-                delete thisAI;
+                GetTarget()->IsAIEnabled = oldAIState;
             }
 
             void Register()

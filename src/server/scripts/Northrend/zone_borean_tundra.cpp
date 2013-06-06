@@ -79,11 +79,11 @@ public:
 
         void SpellHit(Unit* caster, const SpellInfo* spell)
         {
-            if (phase || spell->Id != SPELL_SET_CART)
+            if (phase)
                 return;
 
-            Player* player = caster->ToPlayer();
-            if (player && player->GetQuestStatus(11897) == QUEST_STATUS_INCOMPLETE)
+            if (spell->Id == SPELL_SET_CART && caster->GetTypeId() == TYPEID_PLAYER
+                && CAST_PLR(caster)->GetQuestStatus(11897) == QUEST_STATUS_INCOMPLETE)
             {
                 phase = 1;
                 casterGuid = caster->GetGUID();
@@ -92,7 +92,7 @@ public:
 
         void EnterCombat(Unit* /*who*/){}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!phase)
                 return;
@@ -190,7 +190,7 @@ public:
                     if (owner->GetTypeId() == TYPEID_PLAYER)
                     {
                         owner->CastSpell(owner, 46231, true);
-                        who->ToCreature()->DespawnOrUnsummon();
+                        CAST_CRE(who)->DespawnOrUnsummon();
                     }
                 }
             }
@@ -419,7 +419,7 @@ public:
 
             me->SetReactState(REACT_PASSIVE);
 
-            switch (me->GetOwner()->ToPlayer()->GetTeamId())
+            switch (CAST_PLR(me->GetOwner())->GetTeamId())
             {
                 case TEAM_ALLIANCE:
                     me->setFaction(FACTION_ESCORT_A_NEUTRAL_ACTIVE);
@@ -436,7 +436,7 @@ public:
             DoCast(me, SPELL_DROP_CRATE, true);
         }
 
-        void UpdateAI(uint32 /*diff*/)
+        void UpdateAI(const uint32 /*diff*/)
         {
             if (setCrateNumber)
             {
@@ -475,18 +475,23 @@ public:
         {
             ScriptedAI::MoveInLineOfSight(who);
 
-            if (who->GetEntry() != NPC_JENNY || !who->HasAura(SPELL_CRATES_CARRIED))
+            if (who->GetTypeId() != TYPEID_UNIT)
                 return;
 
-            Unit* owner = who->GetOwner();
-            if (!owner || !me->IsWithinDistInMap(who, 10.0f))
-                return;
-
-            if (Player* player = owner->ToPlayer())
+            if (who->GetEntry() == NPC_JENNY && me->IsWithinDistInMap(who, 10.0f))
             {
-                owner->CastSpell(owner, SPELL_GIVE_JENNY_CREDIT, true); // Maybe is not working.
-                player->CompleteQuest(QUEST_LOADER_UP);
-                who->ToCreature()->DisappearAndDie();
+                if (Unit* owner = who->GetOwner())
+                {
+                    if (owner->GetTypeId() == TYPEID_PLAYER)
+                    {
+                        if (who->HasAura(SPELL_CRATES_CARRIED))
+                        {
+                            owner->CastSpell(owner, SPELL_GIVE_JENNY_CREDIT, true); // Maybe is not working.
+                            CAST_PLR(owner)->CompleteQuest(QUEST_LOADER_UP);
+                            CAST_CRE(who)->DisappearAndDie();
+                        }
+                    }
+                }
             }
         }
     };
@@ -564,14 +569,14 @@ public:
             if (TempSummon* summon = me->ToTempSummon())
                 if (summon->isSummon())
                     if (Unit* temp = summon->GetSummoner())
-                        if (Player* player = temp->ToPlayer())
-                            player->KilledMonsterCredit(me->GetEntry(), 0);
+                        if (temp->GetTypeId() == TYPEID_PLAYER)
+                            CAST_PLR(temp)->KilledMonsterCredit(me->GetEntry(), 0);
 
             if (GameObject* go_caribou = me->GetMap()->GetGameObject(go_caribouGUID))
                 go_caribou->SetGoState(GO_STATE_READY);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (phaseTimer <= diff)
             {
@@ -696,7 +701,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (IntroPhase)
             {
@@ -862,7 +867,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 /*diff*/)
+        void UpdateAI(const uint32 /*diff*/)
         {
             if (WithRedDragonBlood && HarpoonerGUID && !me->HasAura(SPELL_RED_DRAGONBLOOD))
             {
@@ -1012,7 +1017,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 uiDiff)
+        void UpdateAI(const uint32 uiDiff)
         {
             npc_escortAI::UpdateAI(uiDiff);
 
@@ -1263,7 +1268,7 @@ public:
 
             if (me->isSummon())
                 if (Unit* summoner = me->ToTempSummon()->GetSummoner())
-                    CAST_AI(npc_thassarian::npc_thassarianAI, summoner->ToCreature()->AI())->arthasInPosition = true;
+                    CAST_AI(npc_thassarian::npc_thassarianAI, CAST_CRE(summoner)->AI())->arthasInPosition = true;
         }
     };
 
@@ -1295,7 +1300,7 @@ public:
             me->CastSpell(me, SPELL_STUN, true);
             if (me->isSummon())
                 if (Unit* summoner = me->ToTempSummon()->GetSummoner())
-                    CAST_AI(npc_thassarian::npc_thassarianAI, summoner->ToCreature()->AI())->arlosInPosition = true;
+                    CAST_AI(npc_thassarian::npc_thassarianAI, CAST_CRE(summoner)->AI())->arlosInPosition = true;
         }
     };
 
@@ -1352,10 +1357,10 @@ public:
 
             if (me->isSummon())
                 if (Unit* summoner = me->ToTempSummon()->GetSummoner())
-                    CAST_AI(npc_thassarian::npc_thassarianAI, summoner->ToCreature()->AI())->talbotInPosition = true;
+                    CAST_AI(npc_thassarian::npc_thassarianAI, CAST_CRE(summoner)->AI())->talbotInPosition = true;
         }
 
-        void UpdateAI(uint32 uiDiff)
+        void UpdateAI(const uint32 uiDiff)
         {
             if (bCheck)
             {
@@ -1477,7 +1482,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 uiDiff)
+        void UpdateAI(const uint32 uiDiff)
         {
             ScriptedAI::UpdateAI(uiDiff);
 
@@ -1617,7 +1622,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 /*uiDiff*/)
+        void UpdateAI(const uint32 /*uiDiff*/)
         {
             if (!UpdateVictim())
                 return;
@@ -1669,7 +1674,7 @@ public:
             rebuff = 0;
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             UpdateVictim();
 
@@ -1985,7 +1990,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (bStarted)
             {
@@ -2000,7 +2005,7 @@ public:
             }
         }
 
-        void DoAction(int32 param)
+        void DoAction(const int32 param)
         {
             if (param == 1)
                 bStarted = true;
@@ -2100,7 +2105,7 @@ public:
             uiExplosionTimer = urand(5000, 10000);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (uiExplosionTimer < diff)
             {
@@ -2155,7 +2160,7 @@ public:
             uiTimer = urand(13000, 18000);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (uiTimer <= diff)
             {
@@ -2217,7 +2222,7 @@ public:
 
         void AttackStart(Unit* /*who*/) {}
 
-        void UpdateAI(uint32 uiDiff)
+        void UpdateAI(const uint32 uiDiff)
         {
             if (m_uiTimer <= uiDiff)
             {
@@ -2353,7 +2358,7 @@ public:
             me->RestoreFaction();
         }
 
-        void DoAction(int32 /*iParam*/)
+        void DoAction(const int32 /*iParam*/)
         {
             me->StopMoving();
             me->SetUInt32Value(UNIT_NPC_FLAGS, 0);
@@ -2378,7 +2383,7 @@ public:
                 me->AI()->AttackStart(player);
         }
 
-        void UpdateAI(uint32 uiDiff)
+        void UpdateAI(const uint32 uiDiff)
         {
             if (uiEventTimer && uiEventTimer <= uiDiff)
             {

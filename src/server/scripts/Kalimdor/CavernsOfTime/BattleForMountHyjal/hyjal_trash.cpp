@@ -191,7 +191,7 @@ hyjal_trashAI::hyjal_trashAI(Creature* creature) : npc_escortAI(creature)
 
 void hyjal_trashAI::DamageTaken(Unit* done_by, uint32 &damage)
 {
-    if (done_by->GetTypeId() == TYPEID_PLAYER || done_by->isPet())
+    if (done_by->GetTypeId() == TYPEID_PLAYER || (done_by->GetTypeId() == TYPEID_UNIT && CAST_CRE(done_by)->isPet()))
     {
         damageTaken += damage;
         if (instance)
@@ -199,7 +199,7 @@ void hyjal_trashAI::DamageTaken(Unit* done_by, uint32 &damage)
     }
 }
 
-void hyjal_trashAI::UpdateAI(uint32 /*diff*/)
+void hyjal_trashAI::UpdateAI(const uint32 /*diff*/)
 {
     if (IsOverrun && !SetupOverrun)
     {
@@ -458,7 +458,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (Delay <= diff)
             {
@@ -596,7 +596,7 @@ public:
 
         void EnterCombat(Unit* /*who*/) {}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             hyjal_trashAI::UpdateAI(diff);
             if (IsEvent || IsOverrun)
@@ -699,7 +699,7 @@ public:
 
         void EnterCombat(Unit* /*who*/) {}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             hyjal_trashAI::UpdateAI(diff);
             if (IsEvent || IsOverrun)
@@ -773,7 +773,7 @@ public:
         void JustSummoned(Creature* summon)
         {
             Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 30, true);
-            if (target)
+            if (target && summon)
                 summon->Attack(target, false);
             summons.Summon(summon);
         }
@@ -822,7 +822,7 @@ public:
 
         void EnterCombat(Unit* /*who*/) {}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             hyjal_trashAI::UpdateAI(diff);
 
@@ -920,7 +920,7 @@ public:
 
         void EnterCombat(Unit* /*who*/) {}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             hyjal_trashAI::UpdateAI(diff);
             if (IsEvent || IsOverrun)
@@ -1019,7 +1019,7 @@ public:
 
         void EnterCombat(Unit* /*who*/) {}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             hyjal_trashAI::UpdateAI(diff);
             if (IsEvent || IsOverrun)
@@ -1109,7 +1109,7 @@ public:
 
         void EnterCombat(Unit* /*who*/) {}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             hyjal_trashAI::UpdateAI(diff);
             if (IsEvent || IsOverrun)
@@ -1208,7 +1208,7 @@ public:
 
         void EnterCombat(Unit* /*who*/) {}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             hyjal_trashAI::UpdateAI(diff);
             if (IsEvent || IsOverrun)
@@ -1321,7 +1321,7 @@ public:
             hyjal_trashAI::JustDied(killer);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             hyjal_trashAI::UpdateAI(diff);
             if (IsEvent || IsOverrun)
@@ -1443,7 +1443,7 @@ public:
         {
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             //Check if we have a target
             if (!UpdateVictim())

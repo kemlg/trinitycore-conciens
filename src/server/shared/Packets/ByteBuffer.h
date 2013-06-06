@@ -19,47 +19,64 @@
 #ifndef _BYTEBUFFER_H
 #define _BYTEBUFFER_H
 
-#include "Define.h"
-#include "Errors.h"
-#include "ByteConverter.h"
+#include "Common.h"
+#include "Debugging/Errors.h"
+#include "Logging/Log.h"
+#include "Utilities/ByteConverter.h"
 
-#include <exception>
-#include <list>
-#include <map>
-#include <string>
-#include <vector>
-#include <cstring>
-#include <time.h>
-
-// Root of ByteBuffer exception hierarchy
-class ByteBufferException : public std::exception
+class ByteBufferException
 {
-public:
-    ~ByteBufferException() throw() { }
+    public:
+        ByteBufferException(size_t pos, size_t size, size_t valueSize)
+            : Pos(pos), Size(size), ValueSize(valueSize)
+        {
+        }
 
-    char const* what() const throw() { return msg_.c_str(); }
-
-protected:
-    std::string & message() throw() { return msg_; }
-
-private:
-    std::string msg_;
+    protected:
+        size_t Pos;
+        size_t Size;
+        size_t ValueSize;
 };
 
 class ByteBufferPositionException : public ByteBufferException
 {
-public:
-    ByteBufferPositionException(bool add, size_t pos, size_t size, size_t valueSize);
+    public:
+        ByteBufferPositionException(bool add, size_t pos, size_t size, size_t valueSize)
+        : ByteBufferException(pos, size, valueSize), _add(add)
+        {
+            PrintError();
+        }
 
-    ~ByteBufferPositionException() throw() { }
+    protected:
+        void PrintError() const
+        {
+            ACE_Stack_Trace trace;
+
+            sLog->outError(LOG_FILTER_NETWORKIO, "Attempted to %s value with size: "SIZEFMTD" in ByteBuffer (pos: " SIZEFMTD " size: "SIZEFMTD")\n[Stacktrace: %s]",
+                (_add ? "put" : "get"), ValueSize, Pos, Size, trace.c_str());
+        }
+
+    private:
+        bool _add;
 };
 
 class ByteBufferSourceException : public ByteBufferException
 {
-public:
-    ByteBufferSourceException(size_t pos, size_t size, size_t valueSize);
+    public:
+        ByteBufferSourceException(size_t pos, size_t size, size_t valueSize)
+        : ByteBufferException(pos, size, valueSize)
+        {
+            PrintError();
+        }
 
-    ~ByteBufferSourceException() throw() { }
+    protected:
+        void PrintError() const
+        {
+            ACE_Stack_Trace trace;
+
+            sLog->outError(LOG_FILTER_NETWORKIO, "Attempted to put a %s in ByteBuffer (pos: "SIZEFMTD" size: "SIZEFMTD")\n[Stacktrace: %s]",
+                (ValueSize > 0 ? "NULL-pointer" : "zero-sized value"), Pos, Size, trace.c_str());
+        }
 };
 
 class ByteBuffer
@@ -68,21 +85,19 @@ class ByteBuffer
         const static size_t DEFAULT_SIZE = 0x1000;
 
         // constructor
-        ByteBuffer() : _rpos(0), _wpos(0)
+        ByteBuffer(): _rpos(0), _wpos(0)
         {
             _storage.reserve(DEFAULT_SIZE);
         }
 
-        ByteBuffer(size_t reserve) : _rpos(0), _wpos(0)
+        // constructor
+        ByteBuffer(size_t res): _rpos(0), _wpos(0)
         {
-            _storage.reserve(reserve);
+            _storage.reserve(res);
         }
 
         // copy constructor
-        ByteBuffer(const ByteBuffer &buf) : _rpos(buf._rpos), _wpos(buf._wpos),
-            _storage(buf._storage)
-        {
-        }
+        ByteBuffer(const ByteBuffer &buf): _rpos(buf._rpos), _wpos(buf._wpos), _storage(buf._storage) { }
 
         void clear()
         {
@@ -260,18 +275,9 @@ class ByteBuffer
             return *this;
         }
 
-        uint8& operator[](size_t const pos)
+        uint8 operator[](size_t pos) const
         {
-            if (pos >= size())
-                throw ByteBufferPositionException(false, pos, 1, size());
-            return _storage[pos];
-        }
-
-        uint8 const& operator[](size_t const pos) const
-        {
-            if (pos >= size())
-                throw ByteBufferPositionException(false, pos, 1, size());
-            return _storage[pos];
+            return read<uint8>(pos);
         }
 
         size_t rpos() const { return _rpos; }
@@ -325,7 +331,7 @@ class ByteBuffer
         {
             if (_rpos  + len > size())
                throw ByteBufferPositionException(false, _rpos, len, size());
-            std::memcpy(dest, &_storage[_rpos], len);
+            memcpy(dest, &_storage[_rpos], len);
             _rpos += len;
         }
 
@@ -356,7 +362,8 @@ class ByteBuffer
         uint32 ReadPackedTime()
         {
             uint32 packedDate = read<uint32>();
-            tm lt = tm();
+            tm lt;
+            memset(&lt, 0, sizeof(lt));
 
             lt.tm_min = packedDate & 0x3F;
             lt.tm_hour = (packedDate >> 6) & 0x1F;
@@ -416,7 +423,7 @@ class ByteBuffer
 
             if (_storage.size() < _wpos + cnt)
                 _storage.resize(_wpos + cnt);
-            std::memcpy(&_storage[_wpos], src, cnt);
+            memcpy(&_storage[_wpos], src, cnt);
             _wpos += cnt;
         }
 
@@ -469,14 +476,71 @@ class ByteBuffer
             if (!src)
                 throw ByteBufferSourceException(_wpos, size(), cnt);
 
-            std::memcpy(&_storage[pos], src, cnt);
+            memcpy(&_storage[pos], src, cnt);
         }
 
-        void print_storage() const;
+        void print_storage() const
+        {
+            if (!sLog->ShouldLog(LOG_FILTER_NETWORKIO, LOG_LEVEL_TRACE)) // optimize disabled debug output
+                return;
 
-        void textlike() const;
+            std::ostringstream o;
+            o << "STORAGE_SIZE: " << size();
+            for (uint32 i = 0; i < size(); ++i)
+                o << read<uint8>(i) << " - ";
+            o << " ";
 
-        void hexlike() const;
+            sLog->outTrace(LOG_FILTER_NETWORKIO, "%s", o.str().c_str());
+        }
+
+        void textlike() const
+        {
+            if (!sLog->ShouldLog(LOG_FILTER_NETWORKIO, LOG_LEVEL_TRACE)) // optimize disabled debug output
+                return;
+
+            std::ostringstream o;
+            o << "STORAGE_SIZE: " << size();
+            for (uint32 i = 0; i < size(); ++i)
+            {
+                char buf[1];
+                snprintf(buf, 1, "%c", read<uint8>(i));
+                o << buf;
+            }
+            o << " ";
+            sLog->outTrace(LOG_FILTER_NETWORKIO, "%s", o.str().c_str());
+        }
+
+        void hexlike() const
+        {
+            if (!sLog->ShouldLog(LOG_FILTER_NETWORKIO, LOG_LEVEL_TRACE)) // optimize disabled debug output
+                return;
+
+            uint32 j = 1, k = 1;
+
+            std::ostringstream o;
+            o << "STORAGE_SIZE: " << size();
+
+            for (uint32 i = 0; i < size(); ++i)
+            {
+                char buf[3];
+                snprintf(buf, 1, "%2X ", read<uint8>(i));
+                if ((i == (j * 8)) && ((i != (k * 16))))
+                {
+                    o << "| ";
+                    ++j;
+                }
+                else if (i == (k * 16))
+                {
+                    o << "\n";
+                    ++k;
+                    ++j;
+                }
+
+                o << buf;
+            }
+            o << " ";
+            sLog->outTrace(LOG_FILTER_NETWORKIO, "%s", o.str().c_str());
+        }
 
     protected:
         size_t _rpos, _wpos;
@@ -562,7 +626,7 @@ inline ByteBuffer &operator>>(ByteBuffer &b, std::map<K, V> &m)
     return b;
 }
 
-/// @todo Make a ByteBuffer.cpp and move all this inlining to it.
+// TODO: Make a ByteBuffer.cpp and move all this inlining to it.
 template<> inline std::string ByteBuffer::read<std::string>()
 {
     std::string tmp;
@@ -588,6 +652,5 @@ inline void ByteBuffer::read_skip<std::string>()
 {
     read_skip<char*>();
 }
-
 #endif
 

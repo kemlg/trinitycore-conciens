@@ -35,7 +35,7 @@ Totem::Totem(SummonPropertiesEntry const* properties, Unit* owner) : Minion(prop
 
 void Totem::Update(uint32 time)
 {
-    if (!GetOwner()->isAlive() || !isAlive())
+    if (!m_owner->isAlive() || !isAlive())
     {
         UnSummon();                                         // remove self
         return;
@@ -55,19 +55,19 @@ void Totem::Update(uint32 time)
 void Totem::InitStats(uint32 duration)
 {
     // client requires SMSG_TOTEM_CREATED to be sent before adding to world and before removing old totem
-    if (GetOwner()->GetTypeId() == TYPEID_PLAYER
-            && m_Properties->Slot >= SUMMON_SLOT_TOTEM
-            && m_Properties->Slot < MAX_TOTEM_SLOT)
+    if (m_owner->GetTypeId() == TYPEID_PLAYER
+        && m_Properties->Slot >= SUMMON_SLOT_TOTEM
+        && m_Properties->Slot < MAX_TOTEM_SLOT)
     {
         WorldPacket data(SMSG_TOTEM_CREATED, 1 + 8 + 4 + 4);
         data << uint8(m_Properties->Slot - 1);
         data << uint64(GetGUID());
         data << uint32(duration);
         data << uint32(GetUInt32Value(UNIT_CREATED_BY_SPELL));
-        GetOwner()->ToPlayer()->SendDirectMessage(&data);
+        m_owner->ToPlayer()->SendDirectMessage(&data);
 
         // set display id depending on caster's race
-        SetDisplayId(GetOwner()->GetModelForTotem(PlayerTotemType(m_Properties->Id)));
+        SetDisplayId(m_owner->GetModelForTotem(PlayerTotemType(m_Properties->Id)));
     }
 
     Minion::InitStats(duration);
@@ -82,7 +82,7 @@ void Totem::InitStats(uint32 duration)
 
     m_duration = duration;
 
-    SetLevel(GetOwner()->getLevel());
+    SetLevel(m_owner->getLevel());
 }
 
 void Totem::InitSummon()
@@ -111,21 +111,21 @@ void Totem::UnSummon(uint32 msTime)
     // clear owner's totem slot
     for (int i = SUMMON_SLOT_TOTEM; i < MAX_TOTEM_SLOT; ++i)
     {
-        if (GetOwner()->m_SummonSlot[i] == GetGUID())
+        if (m_owner->m_SummonSlot[i] == GetGUID())
         {
-            GetOwner()->m_SummonSlot[i] = 0;
+            m_owner->m_SummonSlot[i] = 0;
             break;
         }
     }
 
-    GetOwner()->RemoveAurasDueToSpell(GetSpell(), GetGUID());
+    m_owner->RemoveAurasDueToSpell(GetSpell(), GetGUID());
 
     // Remove Sentry Totem Aura
     if (GetEntry() == SENTRY_TOTEM_ENTRY)
-        GetOwner()->RemoveAurasDueToSpell(SENTRY_TOTEM_SPELLID);
+        m_owner->RemoveAurasDueToSpell(SENTRY_TOTEM_SPELLID);
 
     //remove aura all party members too
-    if (Player* owner = GetOwner()->ToPlayer())
+    if (Player* owner = m_owner->ToPlayer())
     {
         owner->SendAutoRepeatCancel(this);
 
@@ -148,7 +148,7 @@ void Totem::UnSummon(uint32 msTime)
 
 bool Totem::IsImmunedToSpellEffect(SpellInfo const* spellInfo, uint32 index) const
 {
-    /// @todo possibly all negative auras immune?
+    // TODO: possibly all negative auras immune?
     if (GetEntry() == 5925)
         return false;
 

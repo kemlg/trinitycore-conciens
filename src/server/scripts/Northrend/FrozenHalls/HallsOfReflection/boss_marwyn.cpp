@@ -19,7 +19,7 @@
 #include "ScriptedCreature.h"
 #include "halls_of_reflection.h"
 
-enum Texts
+enum Yells
 {
     SAY_AGGRO                                     = 0,
     SAY_SLAY                                      = 1,
@@ -63,19 +63,19 @@ public:
             boss_horAI::Reset();
 
             if (instance)
-                instance->SetBossState(DATA_MARWYN_EVENT, NOT_STARTED);
+                instance->SetData(DATA_MARWYN_EVENT, NOT_STARTED);
         }
 
         void EnterCombat(Unit* /*who*/)
         {
             Talk(SAY_AGGRO);
             if (instance)
-                instance->SetBossState(DATA_MARWYN_EVENT, IN_PROGRESS);
+                instance->SetData(DATA_MARWYN_EVENT, IN_PROGRESS);
 
-            events.ScheduleEvent(EVENT_OBLITERATE, 30000);          /// @todo Check timer
+            events.ScheduleEvent(EVENT_OBLITERATE, 30000);          // TODO Check timer
             events.ScheduleEvent(EVENT_WELL_OF_CORRUPTION, 13000);
             events.ScheduleEvent(EVENT_CORRUPTED_FLESH, 20000);
-            events.ScheduleEvent(EVENT_SHARED_SUFFERING, 20000);    /// @todo Check timer
+            events.ScheduleEvent(EVENT_SHARED_SUFFERING, 20000);    // TODO Check timer
         }
 
         void JustDied(Unit* /*killer*/)
@@ -83,7 +83,7 @@ public:
             Talk(SAY_DEATH);
 
             if (instance)
-                instance->SetBossState(DATA_MARWYN_EVENT, DONE);
+                instance->SetData(DATA_MARWYN_EVENT, DONE);
         }
 
         void KilledUnit(Unit* /*victim*/)
@@ -91,7 +91,7 @@ public:
             Talk(SAY_SLAY);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             // Return since we have no target
             if (!UpdateVictim())

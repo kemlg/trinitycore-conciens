@@ -18,10 +18,10 @@
 
 #include "AddonMgr.h"
 #include "DatabaseEnv.h"
-#include "DBCStores.h"
 #include "Log.h"
 #include "Timer.h"
-#include <openssl/md5.h>
+
+#include <list>
 
 namespace AddonMgr
 {
@@ -34,8 +34,6 @@ namespace
     typedef std::list<SavedAddon> SavedAddonsList;
 
     SavedAddonsList m_knownAddons;
-
-    BannedAddonList m_bannedAddons;
 }
 
 void LoadFromDB()
@@ -43,57 +41,28 @@ void LoadFromDB()
     uint32 oldMSTime = getMSTime();
 
     QueryResult result = CharacterDatabase.Query("SELECT name, crc FROM addons");
-    if (result)
+    if (!result)
     {
-        uint32 count = 0;
-
-        do
-        {
-            Field* fields = result->Fetch();
-
-            std::string name = fields[0].GetString();
-            uint32 crc = fields[1].GetUInt32();
-
-            m_knownAddons.push_back(SavedAddon(name, crc));
-
-            ++count;
-        }
-        while (result->NextRow());
-
-        TC_LOG_INFO(LOG_FILTER_SERVER_LOADING, ">> Loaded %u known addons in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+        sLog->outInfo(LOG_FILTER_SERVER_LOADING, ">> Loaded 0 known addons. DB table `addons` is empty!");
+        return;
     }
-    else
-        TC_LOG_INFO(LOG_FILTER_SERVER_LOADING, ">> Loaded 0 known addons. DB table `addons` is empty!");
 
-    oldMSTime = getMSTime();
-    result = CharacterDatabase.Query("SELECT id, name, version, UNIX_TIMESTAMP(timestamp) FROM banned_addons");
-    if (result)
+    uint32 count = 0;
+
+    do
     {
-        uint32 count = 0;
-        uint32 dbcMaxBannedAddon = sBannedAddOnsStore.GetNumRows();
+        Field* fields = result->Fetch();
 
-        do
-        {
-            Field* fields = result->Fetch();
+        std::string name = fields[0].GetString();
+        uint32 crc = fields[1].GetUInt32();
 
-            BannedAddon addon;
-            addon.Id = fields[0].GetUInt32() + dbcMaxBannedAddon;
-            addon.Timestamp = uint32(fields[3].GetUInt64());
+        m_knownAddons.push_back(SavedAddon(name, crc));
 
-            std::string name = fields[1].GetString();
-            std::string version = fields[2].GetString();
-
-            MD5(reinterpret_cast<uint8 const*>(name.c_str()), name.length(), addon.NameMD5);
-            MD5(reinterpret_cast<uint8 const*>(version.c_str()), version.length(), addon.VersionMD5);
-
-            m_bannedAddons.push_back(addon);
-
-            ++count;
-        }
-        while (result->NextRow());
-
-        TC_LOG_INFO(LOG_FILTER_SERVER_LOADING, ">> Loaded %u banned addons in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+        ++count;
     }
+    while (result->NextRow());
+
+    sLog->outInfo(LOG_FILTER_SERVER_LOADING, ">> Loaded %u known addons in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
 void SaveAddon(AddonInfo const& addon)
@@ -120,11 +89,6 @@ SavedAddon const* GetAddonInfo(const std::string& name)
     }
 
     return NULL;
-}
-
-BannedAddonList const* GetBannedAddons()
-{
-    return &m_bannedAddons;
 }
 
 } // Namespace

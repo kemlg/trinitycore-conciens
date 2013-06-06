@@ -64,12 +64,10 @@ public:
 
         void SpellHit(Unit* caster, const SpellInfo* spell)
         {
-            if (bReset || spell->Id != 3607)
-                return;
-
-            if (Player* player = caster->ToPlayer())
+            if (caster->GetTypeId() == TYPEID_PLAYER)
             {
-                if (player->GetQuestStatus(592) == QUEST_STATUS_INCOMPLETE) //Yenniku's Release
+                                                                //Yenniku's Release
+                if (!bReset && CAST_PLR(caster)->GetQuestStatus(592) == QUEST_STATUS_INCOMPLETE && spell->Id == 3607)
                 {
                     me->SetUInt32Value(UNIT_NPC_EMOTESTATE, EMOTE_STATE_STUN);
                     me->CombatStop();                   //stop combat
@@ -80,11 +78,12 @@ public:
                     Reset_Timer = 60000;
                 }
             }
+            return;
         }
 
         void EnterCombat(Unit* /*who*/) {}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (bReset)
             {
@@ -95,14 +94,14 @@ public:
                     me->setFaction(28);                     //troll, bloodscalp
                     return;
                 }
-
-                Reset_Timer -= diff;
+                else Reset_Timer -= diff;
 
                 if (me->isInCombat() && me->getVictim())
                 {
-                    if (Player* player = me->getVictim()->ToPlayer())
+                    if (me->getVictim()->GetTypeId() == TYPEID_PLAYER)
                     {
-                        if (player->GetTeam() == HORDE)
+                        Unit* victim = me->getVictim();
+                        if (CAST_PLR(victim)->GetTeam() == HORDE)
                         {
                             me->CombatStop();
                             me->DeleteThreatList();

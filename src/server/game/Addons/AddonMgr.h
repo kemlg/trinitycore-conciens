@@ -21,7 +21,6 @@
 
 #include "Define.h"
 #include <string>
-#include <list>
 
 struct AddonInfo
 {
@@ -38,7 +37,7 @@ struct AddonInfo
 
 struct SavedAddon
 {
-    SavedAddon(std::string const& name, uint32 crc) : Name(name)
+    SavedAddon(const std::string& name, uint32 crc) : Name(name)
     {
         CRC = crc;
     }
@@ -47,24 +46,13 @@ struct SavedAddon
     uint32 CRC;
 };
 
-struct BannedAddon
-{
-    uint32 Id;
-    uint8 NameMD5[16];
-    uint8 VersionMD5[16];
-    uint32 Timestamp;
-};
-
-#define STANDARD_ADDON_CRC 0x4C1C776D
+#define STANDARD_ADDON_CRC 0x4c1c776d
 
 namespace AddonMgr
 {
     void LoadFromDB();
     void SaveAddon(AddonInfo const& addon);
     SavedAddon const* GetAddonInfo(const std::string& name);
-
-    typedef std::list<BannedAddon> BannedAddonList;
-    BannedAddonList const* GetBannedAddons();
 }
 
 #endif

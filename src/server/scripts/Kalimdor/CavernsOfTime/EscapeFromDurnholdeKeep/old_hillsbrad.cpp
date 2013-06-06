@@ -507,7 +507,7 @@ public:
         {
              switch (summoned->GetEntry())
              {
-            /// @todo make Scarloc start into event instead, and not start attack directly
+            //TODO: make Scarloc start into event instead, and not start attack directly
              case MOB_ENTRY_BARN_GUARDSMAN:
              case MOB_ENTRY_BARN_PROTECTOR:
              case MOB_ENTRY_BARN_LOOKOUT:
@@ -536,14 +536,14 @@ public:
             Talk(SAY_TH_RANDOM_DIE);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             npc_escortAI::UpdateAI(diff);
 
             if (!UpdateVictim())
                 return;
 
-                 /// @todo add his abilities'n-crap here
+                 //TODO: add his abilities'n-crap here
                 if (!LowHp && HealthBelowPct(20))
                 {
                     Talk(SAY_TH_RANDOM_LOW_HP);
@@ -642,7 +642,7 @@ public:
         void Reset() {}
         void EnterCombat(Unit* /*who*/) {}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             npc_escortAI::UpdateAI(diff);
         }

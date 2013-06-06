@@ -78,11 +78,11 @@ class boss_thorim : public CreatureScript
                 _EnterCombat();
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim())
                     return;
-                //SPELLS @todo
+                //SPELLS TODO:
 
                 //
                 DoMeleeAttackIfReady();

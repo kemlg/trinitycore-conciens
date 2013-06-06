@@ -47,13 +47,13 @@ class Transport : public GameObject, public TransportBase
         CreatureSet m_NPCPassengerSet;
         uint32 AddNPCPassenger(uint32 tguid, uint32 entry, float x, float y, float z, float o, uint32 anim=0);
         void UpdatePosition(MovementInfo* mi);
-        void UpdatePassengerPositions();
+        void UpdateNPCPositions();
 
         /// This method transforms supplied transport offsets into global coordinates
-        void CalculatePassengerPosition(float& x, float& y, float& z, float* o = NULL) const;
+        void CalculatePassengerPosition(float& x, float& y, float& z, float& o);
 
         /// This method transforms supplied global coordinates into local offsets
-        void CalculatePassengerOffset(float& x, float& y, float& z, float* o = NULL) const;
+        void CalculatePassengerOffset(float& x, float& y, float& z, float& o);
 
         void BuildStartMovePacket(Map const* targetMap);
         void BuildStopMovePacket(Map const* targetMap);

@@ -74,7 +74,7 @@ struct OutdoorPvPData;
 
 
 /*
-    @todo Add more script type classes.
+    TODO: Add more script type classes.
 
     MailScript
     SessionScript
@@ -314,7 +314,7 @@ template<class TMap> class MapScript : public UpdatableScript<TMap>
             : _mapEntry(sMapStore.LookupEntry(mapId))
         {
             if (!_mapEntry)
-                TC_LOG_ERROR(LOG_FILTER_TSCR, "Invalid MapScript for %u; no such map ID.", mapId);
+                sLog->outError(LOG_FILTER_TSCR, "Invalid MapScript for %u; no such map ID.", mapId);
         }
 
     public:
@@ -1073,7 +1073,7 @@ class ScriptMgr
 
     private:
 
-    	// cOncienS
+        // cOncienS
         EventBridge*	eb;
 
         uint32 _scriptCount;

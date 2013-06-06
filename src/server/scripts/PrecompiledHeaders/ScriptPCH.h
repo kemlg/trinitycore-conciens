@@ -5,9 +5,6 @@
 #ifndef SC_PRECOMPILED_H
 #define SC_PRECOMPILED_H
 
-// cOncienS
-#include "EventBridge.h"
-
 #include "ScriptMgr.h"
 #include "Cell.h"
 #include "CellImpl.h"

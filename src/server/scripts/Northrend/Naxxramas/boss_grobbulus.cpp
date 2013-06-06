@@ -33,10 +33,10 @@ enum Spells
 
 enum Events
 {
-    EVENT_BERSERK               = 1,
-    EVENT_CLOUD                 = 2,
-    EVENT_INJECT                = 3,
-    EVENT_SPRAY                 = 4
+    EVENT_BERSERK               = 0,
+    EVENT_CLOUD                 = 1,
+    EVENT_INJECT                = 2,
+    EVENT_SPRAY                 = 3
 };
 
 enum CreatureId
@@ -46,8 +46,7 @@ enum CreatureId
 
 class boss_grobbulus : public CreatureScript
 {
-public:
-    boss_grobbulus() : CreatureScript("boss_grobbulus") { }
+public: boss_grobbulus() : CreatureScript("boss_grobbulus") { }
 
     CreatureAI* GetAI(Creature* creature) const
     {
@@ -79,7 +78,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -141,7 +140,7 @@ public:
             me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (Cloud_Timer <= diff)
             {

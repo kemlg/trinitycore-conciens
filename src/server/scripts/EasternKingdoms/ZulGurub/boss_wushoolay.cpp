@@ -35,8 +35,8 @@ enum Spells
 
 enum Events
 {
-    EVENT_LIGHTNINGCLOUD        = 1,
-    EVENT_LIGHTNINGWAVE         = 2
+    EVENT_LIGHTNINGCLOUD        = 0,
+    EVENT_LIGHTNINGWAVE         = 1
 };
 
 class boss_wushoolay : public CreatureScript
@@ -64,7 +64,7 @@ class boss_wushoolay : public CreatureScript
                 events.ScheduleEvent(EVENT_LIGHTNINGWAVE, urand(8000, 16000));
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim())
                     return;

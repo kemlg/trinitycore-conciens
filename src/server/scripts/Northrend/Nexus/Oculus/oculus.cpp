@@ -110,107 +110,103 @@ class npc_verdisa_beglaristrasz_eternos : public CreatureScript
 public:
     npc_verdisa_beglaristrasz_eternos() : CreatureScript("npc_verdisa_beglaristrasz_eternos") { }
 
+        InstanceScript* instance;
+
     bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
         switch (creature->GetEntry())
         {
-            case NPC_VERDISA: //Verdisa
+        case NPC_VERDISA: //Verdisa
+            switch (action)
             {
-                switch (action)
+            case GOSSIP_ACTION_INFO_DEF + 1:
+                if (!HAS_ESSENCE(player))
                 {
-                    case GOSSIP_ACTION_INFO_DEF + 1:
-                        if (!HAS_ESSENCE(player))
-                        {
-                            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_VERDISA1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
-                            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_VERDISA2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
-                            player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_VERDISA1, creature->GetGUID());
-                        }
-                        else
-                        {
-                            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_VERDISA2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
-                            player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_VERDISA2, creature->GetGUID());
-                        }
-                        break;
-                    case GOSSIP_ACTION_INFO_DEF + 2:
-                    {
-                        ItemPosCountVec dest;
-                        uint8 msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, ITEM_EMERALD_ESSENCE, 1);
-                        if (msg == EQUIP_ERR_OK)
-                            player->StoreNewItem(dest, ITEM_EMERALD_ESSENCE, true);
-                        player->CLOSE_GOSSIP_MENU();
-                        break;
-                    }
-                    case GOSSIP_ACTION_INFO_DEF + 3:
-                        player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_VERDISA3, creature->GetGUID());
-                        break;
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_VERDISA1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_VERDISA2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
+                    player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_VERDISA1, creature->GetGUID());
+                }
+                else
+                {
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_VERDISA2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
+                    player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_VERDISA2, creature->GetGUID());
                 }
                 break;
-            }
-            case NPC_BELGARISTRASZ: //Belgaristrasz
+            case GOSSIP_ACTION_INFO_DEF + 2:
             {
-                switch (action)
-                {
-                    case GOSSIP_ACTION_INFO_DEF + 1:
-                        if (!HAS_ESSENCE(player))
-                        {
-                            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_BELGARISTRASZ1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
-                            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_BELGARISTRASZ2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
-                            player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_BELGARISTRASZ1, creature->GetGUID());
-                        }
-                        else
-                        {
-                            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_BELGARISTRASZ2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
-                            player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_BELGARISTRASZ2, creature->GetGUID());
-                        }
-                        break;
-                    case GOSSIP_ACTION_INFO_DEF + 2:
-                    {
-                        ItemPosCountVec dest;
-                        uint8 msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, ITEM_RUBY_ESSENCE, 1);
-                        if (msg == EQUIP_ERR_OK)
-                            player->StoreNewItem(dest, ITEM_RUBY_ESSENCE, true);
-                        player->CLOSE_GOSSIP_MENU();
-                        break;
-                    }
-                    case GOSSIP_ACTION_INFO_DEF + 3:
-                        player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_BELGARISTRASZ3, creature->GetGUID());
-                        break;
-                }
+                ItemPosCountVec dest;
+                uint8 msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, ITEM_EMERALD_ESSENCE, 1);
+                if (msg == EQUIP_ERR_OK)
+                    player->StoreNewItem(dest, ITEM_EMERALD_ESSENCE, true);
+                player->CLOSE_GOSSIP_MENU();
                 break;
             }
-            case NPC_ETERNOS: //Eternos
-            {
-                switch (action)
-                {
-                    case GOSSIP_ACTION_INFO_DEF + 1:
-                        if (!HAS_ESSENCE(player))
-                        {
-                            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_ETERNOS1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
-                            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_ETERNOS2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
-                            player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_ETERNOS1, creature->GetGUID());
-                        }
-                        else
-                        {
-                            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_ETERNOS2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
-                            player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_ETERNOS2, creature->GetGUID());
-                        }
-                        break;
-                    case GOSSIP_ACTION_INFO_DEF + 2:
-                    {
-                        ItemPosCountVec dest;
-                        uint8 msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, ITEM_AMBER_ESSENCE, 1);
-                        if (msg == EQUIP_ERR_OK)
-                            player->StoreNewItem(dest, ITEM_AMBER_ESSENCE, true);
-                        player->CLOSE_GOSSIP_MENU();
-                        break;
-                    }
-                    case GOSSIP_ACTION_INFO_DEF + 3:
-                        player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_ETERNOS3, creature->GetGUID());
-                        break;
-                }
+            case GOSSIP_ACTION_INFO_DEF + 3:
+                player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_VERDISA3, creature->GetGUID());
                 break;
             }
+            break;
+        case NPC_BELGARISTRASZ: //Belgaristrasz
+            switch (action)
+            {
+            case GOSSIP_ACTION_INFO_DEF + 1:
+                if (!HAS_ESSENCE(player))
+                {
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_BELGARISTRASZ1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_BELGARISTRASZ2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
+                    player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_BELGARISTRASZ1, creature->GetGUID());
+                }
+                else
+                {
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_BELGARISTRASZ2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
+                    player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_BELGARISTRASZ2, creature->GetGUID());
+                }
+                break;
+            case GOSSIP_ACTION_INFO_DEF + 2:
+            {
+                ItemPosCountVec dest;
+                uint8 msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, ITEM_RUBY_ESSENCE, 1);
+                if (msg == EQUIP_ERR_OK)
+                    player->StoreNewItem(dest, ITEM_RUBY_ESSENCE, true);
+                player->CLOSE_GOSSIP_MENU();
+                break;
+            }
+            case GOSSIP_ACTION_INFO_DEF + 3:
+                player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_BELGARISTRASZ3, creature->GetGUID());
+                break;
+            }
+            break;
+        case NPC_ETERNOS: //Eternos
+            switch (action)
+            {
+            case GOSSIP_ACTION_INFO_DEF + 1:
+                if (!HAS_ESSENCE(player))
+                {
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_ETERNOS1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_ETERNOS2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
+                    player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_ETERNOS1, creature->GetGUID());
+                }
+                else
+                {
+                    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_ETERNOS2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
+                    player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_ETERNOS2, creature->GetGUID());
+                }
+                break;
+            case GOSSIP_ACTION_INFO_DEF + 2:
+            {
+                ItemPosCountVec dest;
+                uint8 msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, ITEM_AMBER_ESSENCE, 1);
+                if (msg == EQUIP_ERR_OK)
+                    player->StoreNewItem(dest, ITEM_AMBER_ESSENCE, true);
+                player->CLOSE_GOSSIP_MENU();
+                break;
+            }
+            case GOSSIP_ACTION_INFO_DEF + 3:
+                player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_ETERNOS3, creature->GetGUID());
+                break;
+            }
+            break;
         }
 
         return true;
@@ -239,15 +235,15 @@ public:
 
         void MovementInform(uint32 /*type*/, uint32 id)
         {
-            if (id)
-                return;
-
             // When Belgaristraz finish his moving say grateful text
             if (me->GetEntry() == NPC_BELGARISTRASZ)
-                Talk(SAY_BELGARISTRASZ);
-
+                if (id == 0)
+                {
+                    Talk(SAY_BELGARISTRASZ);
+                }
             // The gossip flag should activate when Drakos die and not from DB
-            me->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+            if (id == 0)
+                me->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
         }
     };
 
@@ -359,7 +355,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!(instance->GetBossState(DATA_VAROS_EVENT) == DONE))
             {

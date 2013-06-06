@@ -25,21 +25,14 @@
 
     // Needed for _findfirst
 #   include <io.h>
-#  ifdef __MINGW32__
-#    define stat64 stat
-#  else
-#    define stat64 _stat64
-#  endif
+
+#define stat64 _stat64
 #else
 #   include <dirent.h>
 #   include <fnmatch.h>
 #   include <unistd.h>
 #   define _getcwd getcwd
 #   define _stat stat
-#endif
-
-#ifdef __CYGWIN__
-#define stat64 stat
 #endif
 
 namespace G3D {

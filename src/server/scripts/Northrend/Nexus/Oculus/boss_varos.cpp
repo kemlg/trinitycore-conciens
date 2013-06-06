@@ -20,6 +20,7 @@
 #include "SpellScript.h"
 #include "SpellAuraEffects.h"
 #include "oculus.h"
+#include "MapManager.h"
 
 enum Says
 {
@@ -95,7 +96,7 @@ public:
             return coreEnergizeOrientation;
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             //Return since we have no target
             if (!UpdateVictim())
@@ -120,7 +121,7 @@ public:
                             coreEnergizeOrientation = me->GetOrientation();
                             firstCoreEnergize = true;
                         } else
-                            coreEnergizeOrientation = Position::NormalizeOrientation(coreEnergizeOrientation - 2.0f);
+                            coreEnergizeOrientation = MapManager::NormalizeOrientation(coreEnergizeOrientation - 2.0f);
 
                         DoCast(me, SPELL_ENERGIZE_CORES_VISUAL);
                         events.ScheduleEvent(EVENT_ENERGIZE_CORES_VISUAL, 5000);
@@ -186,7 +187,7 @@ class npc_azure_ring_captain : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 /*diff*/)
+            void UpdateAI(const uint32 /*diff*/)
             {
                 if (!UpdateVictim())
                     return;
@@ -206,7 +207,7 @@ class npc_azure_ring_captain : public CreatureScript
                     DoCast(target, SPELL_ICE_BEAM);
             }
 
-            void DoAction(int32 action)
+            void DoAction(const int32 action)
             {
                 switch (action)
                 {

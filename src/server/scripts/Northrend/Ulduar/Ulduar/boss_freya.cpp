@@ -287,6 +287,7 @@ class boss_freya : public CreatureScript
             void Reset()
             {
                 _Reset();
+                summons.clear();
                 trioWaveCount = 0;
                 trioWaveController = 0;
                 waveCount = 0;
@@ -386,7 +387,7 @@ class boss_freya : public CreatureScript
                 return 0;
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -493,7 +494,7 @@ class boss_freya : public CreatureScript
                                     {
                                         for (uint8 n = 0; n < 3; ++n)
                                         {
-                                            summons.Despawn(Elemental[n][i]);
+                                            summons.remove(Elemental[n][i]->GetGUID());
                                             Elemental[n][i]->DespawnOrUnsummon(5000);
                                             trioDefeated[i] = true;
                                             Elemental[n][i]->CastSpell(me, SPELL_REMOVE_10STACK, true);
@@ -624,7 +625,7 @@ class boss_freya : public CreatureScript
                     case NPC_ANCIENT_WATER_SPIRIT:
                     case NPC_STORM_LASHER:
                         ElementalGUID[trioWaveController][trioWaveCount] = summoned->GetGUID();
-                        summons.Summon(summoned);
+                        summons.push_back(summoned->GetGUID());
                         ++trioWaveController;
                         if (trioWaveController > 2)
                             trioWaveController = 0;
@@ -632,7 +633,7 @@ class boss_freya : public CreatureScript
                     case NPC_DETONATING_LASHER:
                     case NPC_ANCIENT_CONSERVATOR:
                     default:
-                        summons.Summon(summoned);
+                        summons.push_back(summoned->GetGUID());
                         break;
                 }
 
@@ -653,12 +654,12 @@ class boss_freya : public CreatureScript
                         summoned->CastSpell(me, SPELL_REMOVE_2STACK, true);
                         summoned->CastSpell(who, SPELL_DETONATE, true);
                         summoned->DespawnOrUnsummon(5000);
-                        summons.Despawn(summoned);
+                        summons.remove(summoned->GetGUID());
                         break;
                     case NPC_ANCIENT_CONSERVATOR:
                         summoned->CastSpell(me, SPELL_REMOVE_25STACK, true);
                         summoned->DespawnOrUnsummon(5000);
-                        summons.Despawn(summoned);
+                        summons.remove(summoned->GetGUID());
                         break;
                 }
             }
@@ -721,7 +722,7 @@ class boss_elder_brightleaf : public CreatureScript
                     Talk(SAY_ELDER_AGGRO);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim() || me->HasAura(SPELL_DRAINED_OF_POWER))
                     return;
@@ -764,7 +765,7 @@ class boss_elder_brightleaf : public CreatureScript
                 DoMeleeAttackIfReady();
             }
 
-            void DoAction(int32 action)
+            void DoAction(int32 const action)
             {
                 switch (action)
                 {
@@ -855,7 +856,7 @@ class boss_elder_stonebark : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim() || me->HasAura(SPELL_DRAINED_OF_POWER))
                     return;
@@ -891,7 +892,7 @@ class boss_elder_stonebark : public CreatureScript
                 DoMeleeAttackIfReady();
             }
 
-            void DoAction(int32 action)
+            void DoAction(int32 const action)
             {
                 switch (action)
                 {
@@ -969,7 +970,7 @@ class boss_elder_ironbranch : public CreatureScript
                     Talk(SAY_ELDER_AGGRO);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim() || me->HasAura(SPELL_DRAINED_OF_POWER))
                     return;
@@ -1005,7 +1006,7 @@ class boss_elder_ironbranch : public CreatureScript
                 DoMeleeAttackIfReady();
             }
 
-            void DoAction(int32 action)
+            void DoAction(int32 const action)
             {
                 switch (action)
                 {
@@ -1050,7 +1051,7 @@ class npc_detonating_lasher : public CreatureScript
                 changeTargetTimer = 7500;
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -1109,7 +1110,7 @@ class npc_ancient_water_spirit : public CreatureScript
                 tidalWaveTimer = 10000;
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -1170,7 +1171,7 @@ class npc_storm_lasher : public CreatureScript
                 stormboltTimer = 5000;
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -1231,7 +1232,7 @@ class npc_snaplasher : public CreatureScript
                     waveCount = CAST_AI(boss_freya::boss_freyaAI, Freya->AI())->trioWaveCount;
             }
 
-            void UpdateAI(uint32 /*diff*/)
+            void UpdateAI(uint32 const /*diff*/)
             {
                 if (!UpdateVictim())
                     return;
@@ -1296,7 +1297,7 @@ class npc_ancient_conservator : public CreatureScript
                 DoCast(who, SPELL_CONSERVATOR_GRIP, true);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -1373,7 +1374,7 @@ class npc_healthy_spore : public CreatureScript
                 lifeTimer = urand(22000, 30000);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (lifeTimer <= diff)
                 {
@@ -1412,7 +1413,7 @@ class npc_eonars_gift : public CreatureScript
                 DoCast(me, SPELL_EONAR_VISUAL, true);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (lifeBindersGiftTimer <= diff)
                 {
@@ -1450,7 +1451,7 @@ class npc_nature_bomb : public CreatureScript
                 DoCast(SPELL_OBJECT_BOMB);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (bombTimer <= diff)
                 {
@@ -1495,7 +1496,7 @@ class npc_unstable_sun_beam : public CreatureScript
                 me->SetReactState(REACT_PASSIVE);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (despawnTimer <= diff)
                 {

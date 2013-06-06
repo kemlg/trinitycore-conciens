@@ -22,7 +22,7 @@ SDComment: Sinister Reflection Model, Armageddon Visual, SAY_KJ_SHADOWSPIKE3, Em
 SDCategory: Sunwell_Plateau
 EndScriptData */
 
-/// @todo rewrite Armageddon
+//TODO rewrite Armageddon
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
@@ -105,7 +105,7 @@ enum Spells
     SPELL_ARMAGEDDON_DAMAGE                     = 45915, // This does the area damage
 
     /* Shield Orb Spells*/
-    SPELL_SHADOW_BOLT                           = 45680, //45679 would be correct but triggers to often /// @todo fix console error
+    SPELL_SHADOW_BOLT                           = 45680, //45679 would be correct but triggers to often //TODO fix console error
 
     /* Anveena's spells and cosmetics (Or, generally, everything that has "Anveena" in name) */
     SPELL_ANVEENA_PRISON                        = 46367, // She hovers locked within a bubble
@@ -335,7 +335,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 /*diff*/)
+        void UpdateAI(const uint32 /*diff*/)
         {
         }
 
@@ -454,7 +454,7 @@ public:
             summons.Summon(summoned);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (uiRandomSayTimer < diff)
             {
@@ -666,7 +666,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!UpdateVictim() || Phase < PHASE_NORMAL)
                 return;
@@ -746,7 +746,7 @@ public:
                                 if (pRandomPlayer)
                                     DoCast(pRandomPlayer, SPELL_LEGION_LIGHTNING, false);
                                 else
-                                    TC_LOG_ERROR(LOG_FILTER_TSCR, "try to cast SPELL_LEGION_LIGHTNING on invalid target");
+                                    sLog->outError(LOG_FILTER_TSCR, "try to cast SPELL_LEGION_LIGHTNING on invalid target");
 
                                 Timer[TIMER_LEGION_LIGHTNING] = (Phase == PHASE_SACRIFICE) ? 18000 : 30000; // 18 seconds in PHASE_SACRIFICE
                                 Timer[TIMER_SOUL_FLAY] = 2500;
@@ -784,7 +784,7 @@ public:
                             break;
                         case TIMER_FLAME_DART: //Phase 3
                             DoCastAOE(SPELL_FLAME_DART, false);
-                            Timer[TIMER_FLAME_DART] = 3000; /// @todo Timer
+                            Timer[TIMER_FLAME_DART] = 3000; //TODO Timer
                             break;
                         case TIMER_DARKNESS: //Phase 3
                             if (!me->IsNonMeleeSpellCasted(false))
@@ -918,7 +918,7 @@ public:
 
         void Reset()
         {
-            /// @todo Timers!
+            // TODO: Timers!
             ShadowBoltVolleyTimer = urand(8000, 14000); // So they don't all cast it in the same moment.
             FelfirePortalTimer = 20000;
             if (instance)
@@ -951,7 +951,7 @@ public:
                 ++(CAST_AI(mob_kiljaeden_controller::mob_kiljaeden_controllerAI, pControl->AI())->deceiverDeathCount);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!me->isInCombat())
                 DoCast(me, SPELL_SHADOW_CHANNELING);
@@ -1025,7 +1025,7 @@ public:
             summoned->SetLevel(me->getLevel());
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -1071,7 +1071,7 @@ public:
                 DoCast(me, SPELL_FELFIRE_FISSION, true);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -1124,7 +1124,7 @@ public:
             uiTimer = 0;
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (uiTimer <= diff)
             {
@@ -1193,7 +1193,7 @@ public:
             bClockwise = urand(0, 1);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (bPointReached)
             {
@@ -1267,7 +1267,7 @@ public:
             victimClass = 0;
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -1404,7 +1404,7 @@ public:
                     DoMeleeAttackIfReady();
                     break;
             }
-            TC_LOG_DEBUG(LOG_FILTER_TSCR, "Sinister-Timer");
+            sLog->outDebug(LOG_FILTER_TSCR, "Sinister-Timer");
             for (uint8 i = 0; i < 3; ++i)
                 uiTimer[i] -= diff;
         }

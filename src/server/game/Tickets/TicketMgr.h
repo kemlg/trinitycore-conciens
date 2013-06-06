@@ -82,7 +82,7 @@ class GmTicket
 {
 public:
     GmTicket();
-    GmTicket(Player* player, WorldPacket& recvData);
+    explicit GmTicket(Player* player, WorldPacket& recvData);
     ~GmTicket();
 
     bool IsClosed() const { return _closedBy; }
@@ -119,8 +119,7 @@ public:
         else if (_escalatedStatus == TICKET_UNASSIGNED)
             _escalatedStatus = TICKET_ASSIGNED;
     }
-    void SetClosedBy(int64 value) { _closedBy = value; }
-    void SetCompleted() { _completed = true; }
+    void SetClosedBy(const int64& value) { _closedBy = value; }
     void SetMessage(std::string const& message)
     {
         _message = message;
@@ -163,7 +162,7 @@ private:
     bool _completed;
     GMTicketEscalationStatus _escalatedStatus;
     bool _viewed;
-    bool _needResponse; /// @todo find out the use of this, and then store it in DB
+    bool _needResponse; // TODO: find out the use of this, and then store it in DB
     bool _haveTicket;
     std::string _response;
     std::string _chatLog; // No need to store in db, will be refreshed every session client side

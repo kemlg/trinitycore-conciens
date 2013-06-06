@@ -124,7 +124,7 @@ public:
             me->setFaction(FACTION_FRIENDLY);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (postGossipStep>0 && postGossipStep<4)
             {
@@ -182,7 +182,7 @@ public:
             DoMeleeAttackIfReady();
         }
 
-        void DoAction(int32 /*param*/)
+        void DoAction(const int32 /*param*/)
         {
             postGossipStep=1;
             Text_Timer = 0;
@@ -331,7 +331,7 @@ public:
                 instance->SetData(0, DONE);*/
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -370,13 +370,13 @@ public:
                     if (destroyingDoor)
                     {
                         instance->DoUseDoorOrButton(instance->GetData64(GO_END_DOOR));
-                        /// @todo leave the area...
+                        //TODO: leave the area...
                         me->DespawnOrUnsummon();
                     };
             }
         }
 
-        void DoAction(int32 /*param*/)
+        void DoAction(const int32 /*param*/)
         {
             DestroyDoor();
         }

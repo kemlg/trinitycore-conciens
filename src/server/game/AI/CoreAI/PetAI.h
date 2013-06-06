@@ -31,7 +31,7 @@ class PetAI : public CreatureAI
 
         explicit PetAI(Creature* c);
 
-        void UpdateAI(uint32);
+        void UpdateAI(const uint32);
         static int Permissible(const Creature*);
 
         void KilledUnit(Unit* /*victim*/);

@@ -113,7 +113,7 @@ public:
             {
                 Unit* dalronn = Unit::GetUnit(*me, instance->GetData64(DATA_DALRONN));
                 if (dalronn && dalronn->isDead())
-                    dalronn->ToCreature()->Respawn();
+                    CAST_CRE(dalronn)->Respawn();
 
                 instance->SetData(DATA_SKARVALD_DALRONN_EVENT, NOT_STARTED);
             }
@@ -180,7 +180,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (ghost)
             {
@@ -280,7 +280,7 @@ public:
             {
                 Unit* skarvald = Unit::GetUnit(*me, instance->GetData64(DATA_SKARVALD));
                 if (skarvald && skarvald->isDead())
-                    skarvald->ToCreature()->Respawn();
+                    CAST_CRE(skarvald)->Respawn();
 
                 instance->SetData(DATA_SKARVALD_DALRONN_EVENT, NOT_STARTED);
             }
@@ -340,7 +340,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (ghost)
             {

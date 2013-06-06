@@ -19,6 +19,7 @@
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "SpellAuras.h"
+#include "MapManager.h"
 #include "MoveSplineInit.h"
 #include "Player.h"
 #include "icecrown_citadel.h"
@@ -188,7 +189,7 @@ class boss_lord_marrowgar : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim() || !CheckInRoom())
                     return;
@@ -321,7 +322,7 @@ class boss_lord_marrowgar : public CreatureScript
                 }
             }
 
-            void DoAction(int32 action)
+            void DoAction(int32 const action)
             {
                 if (action != ACTION_CLEAR_SPIKE_IMMUNITIES)
                     return;
@@ -371,7 +372,7 @@ class npc_coldflame : public CreatureScript
 
                 if (owner->HasAura(SPELL_BONE_STORM))
                 {
-                    float ang = Position::NormalizeOrientation(pos.GetAngle(me));
+                    float ang = MapManager::NormalizeOrientation(pos.GetAngle(me));
                     me->SetOrientation(ang);
                     owner->GetNearPoint2D(pos.m_positionX, pos.m_positionY, 5.0f - owner->GetObjectSize(), ang);
                 }
@@ -384,7 +385,7 @@ class npc_coldflame : public CreatureScript
                         return;
                     }
 
-                    float ang = Position::NormalizeOrientation(pos.GetAngle(target));
+                    float ang = MapManager::NormalizeOrientation(pos.GetAngle(target));
                     me->SetOrientation(ang);
                     owner->GetNearPoint2D(pos.m_positionX, pos.m_positionY, 15.0f - owner->GetObjectSize(), ang);
                 }
@@ -394,7 +395,7 @@ class npc_coldflame : public CreatureScript
                 _events.ScheduleEvent(EVENT_COLDFLAME_TRIGGER, 500);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 _events.Update(diff);
 
@@ -473,7 +474,7 @@ class npc_bone_spike : public CreatureScript
                 passenger->ClearUnitState(UNIT_STATE_ONVEHICLE);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!_hasTrappedUnit)
                     return;

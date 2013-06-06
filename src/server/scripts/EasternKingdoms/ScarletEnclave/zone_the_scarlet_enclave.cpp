@@ -69,14 +69,15 @@ public:
             me->SetPosition(x, y, z, 0.0f);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (FlyBackTimer <= diff)
             {
                 Player* player = NULL;
                 if (me->isSummon())
                     if (Unit* summoner = me->ToTempSummon()->GetSummoner())
-                        player = summoner->ToPlayer();
+                        if (summoner->GetTypeId() == TYPEID_PLAYER)
+                            player = CAST_PLR(summoner);
 
                 if (!player)
                     phase = 3;

@@ -362,7 +362,7 @@ class boss_flame_leviathan : public CreatureScript
                     Unbroken = data ? true : false;
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim() || !CheckInRoom())
                     return;
@@ -467,7 +467,7 @@ class boss_flame_leviathan : public CreatureScript
                     _pursueTarget = target->GetGUID();
             }
 
-            void DoAction(int32 action)
+            void DoAction(int32 const action)
             {
                 if (action && action <= 4) // Tower destruction, debuff leviathan loot and reduce active tower count
                 {
@@ -638,7 +638,7 @@ class boss_flame_leviathan_defense_cannon : public CreatureScript
                 DoCast(me, AURA_STEALTH_DETECTION);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -709,11 +709,8 @@ class boss_flame_leviathan_overload_device : public CreatureScript
             {
             }
 
-            void OnSpellClick(Unit* /*clicker*/, bool& result)
+            void OnSpellClick(Unit* /*clicker*/)
             {
-                if (!result)
-                    return;
-
                 if (me->GetVehicle())
                 {
                     me->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_SPELLCLICK);
@@ -755,7 +752,7 @@ class boss_flame_leviathan_safety_container : public CreatureScript
                 me->SetPosition(x, y, z, 0);
             }
 
-            void UpdateAI(uint32 /*diff*/)
+            void UpdateAI(uint32 const /*diff*/)
             {
             }
         };
@@ -805,7 +802,7 @@ class npc_mechanolift : public CreatureScript
                         container->EnterVehicle(me);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(const uint32 diff)
             {
                 if (MoveTimer <= diff)
                 {
@@ -854,7 +851,7 @@ class npc_pool_of_tar : public CreatureScript
                     me->CastSpell(me, SPELL_BLAZE, true);
             }
 
-            void UpdateAI(uint32 /*diff*/) {}
+            void UpdateAI(uint32 const /*diff*/) {}
         };
 
         CreatureAI* GetAI(Creature* creature) const
@@ -883,7 +880,7 @@ class npc_colossus : public CreatureScript
                     instance->SetData(DATA_COLOSSUS, instance->GetData(DATA_COLOSSUS)+1);
             }
 
-            void UpdateAI(uint32 /*diff*/)
+            void UpdateAI(uint32 const /*diff*/)
             {
                 if (!UpdateVictim())
                     return;
@@ -920,7 +917,7 @@ class npc_thorims_hammer : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 /*diff*/)
+            void UpdateAI(uint32 const /*diff*/)
             {
                 if (!me->HasAura(AURA_DUMMY_BLUE))
                     me->CastSpell(me, AURA_DUMMY_BLUE, true);
@@ -966,7 +963,7 @@ public:
 
         uint32 infernoTimer;
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
             npc_escortAI::UpdateAI(diff);
 
@@ -1015,7 +1012,7 @@ class npc_hodirs_fury : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 /*diff*/)
+            void UpdateAI(uint32 const /*diff*/)
             {
                 if (!me->HasAura(AURA_DUMMY_GREEN))
                     me->CastSpell(me, AURA_DUMMY_GREEN, true);
@@ -1049,7 +1046,7 @@ class npc_freyas_ward : public CreatureScript
                 summonTimer = 5000;
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (summonTimer <= diff)
                 {
@@ -1092,7 +1089,7 @@ class npc_freya_ward_summon : public CreatureScript
                 lashTimer = 5000;
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -1130,7 +1127,7 @@ class npc_lorekeeper : public CreatureScript
             {
             }
 
-            void DoAction(int32 action)
+            void DoAction(int32 const action)
             {
                 // Start encounter
                 if (action == ACTION_SPAWN_VEHICLES)
@@ -1179,7 +1176,7 @@ class npc_lorekeeper : public CreatureScript
                             if (Creature* Branz = creature->FindNearestCreature(NPC_BRANZ_BRONZBEARD, 1000, true))
                             {
                                 Delorah->GetMotionMaster()->MovePoint(0, Branz->GetPositionX()-4, Branz->GetPositionY(), Branz->GetPositionZ());
-                                /// @todo Delorah->AI()->Talk(xxxx, Branz->GetGUID()); when reached at branz
+                                //TODO Delorah->AI()->Talk(xxxx, Branz->GetGUID()); when reached at branz
                             }
                         }
                     }
@@ -1611,7 +1608,7 @@ class FlameLeviathanPursuedTargetSelector
 
         bool operator()(WorldObject* target) const
         {
-            //! No players, only vehicles (@todo check if blizzlike)
+            //! No players, only vehicles (todo: check if blizzlike)
             Creature* creatureTarget = target->ToCreature();
             if (!creatureTarget)
                 return true;

@@ -119,7 +119,8 @@ public:
                 case 45:
                     Talk(SAY_WIN, player->GetGUID());
                     me->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
-                    player->GroupEventHappens(QUEST_WILLIX_THE_IMPORTER, me);
+                    if (player->GetTypeId() == TYPEID_PLAYER)
+                        CAST_PLR(player)->GroupEventHappens(QUEST_WILLIX_THE_IMPORTER, me);
                     break;
                 case 46:
                     Talk(SAY_END, player->GetGUID());
@@ -142,7 +143,7 @@ public:
         void JustDied(Unit* /*killer*/)
         {
             if (Player* player = GetPlayerForEscort())
-                player->FailQuest(QUEST_WILLIX_THE_IMPORTER);
+                CAST_PLR(player)->FailQuest(QUEST_WILLIX_THE_IMPORTER);
         }
     };
 

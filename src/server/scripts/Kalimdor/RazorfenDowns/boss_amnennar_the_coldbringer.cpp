@@ -81,7 +81,7 @@ public:
             Talk(SAY_KILL);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!UpdateVictim())
                 return;

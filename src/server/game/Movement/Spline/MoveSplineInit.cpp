@@ -29,7 +29,11 @@ namespace Movement
 {
     UnitMoveType SelectSpeedType(uint32 moveFlags)
     {
-        if (moveFlags & MOVEMENTFLAG_FLYING)
+        /*! Not sure about MOVEMENTFLAG_CAN_FLY here - do creatures that can fly
+            but are on ground right now also have it? If yes, this needs a more
+            dynamic check, such as is flying now
+        */
+        if (moveFlags & (MOVEMENTFLAG_FLYING | MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY))
         {
             if (moveFlags & MOVEMENTFLAG_BACKWARD /*&& speed_obj.flight >= speed_obj.flight_back*/)
                 return MOVE_FLIGHT_BACK;
@@ -51,8 +55,6 @@ namespace Movement
         else if (moveFlags & MOVEMENTFLAG_BACKWARD /*&& speed_obj.run >= speed_obj.run_back*/)
             return MOVE_RUN_BACK;
 
-        // Flying creatures use MOVEMENTFLAG_CAN_FLY or MOVEMENTFLAG_DISABLE_GRAVITY
-        // Run speed is their default flight speed.
         return MOVE_RUN;
     }
 
@@ -88,24 +90,21 @@ namespace Movement
         move_spline.onTransport = transport;
 
         uint32 moveFlags = unit->m_movementInfo.GetMovementFlags();
+        if (args.flags.walkmode)
+            moveFlags |= MOVEMENTFLAG_WALKING;
+        else
+            moveFlags &= ~MOVEMENTFLAG_WALKING;
+
         moveFlags |= (MOVEMENTFLAG_SPLINE_ENABLED|MOVEMENTFLAG_FORWARD);
 
-        if (moveFlags & MOVEMENTFLAG_ROOT)
-            moveFlags &= ~MOVEMENTFLAG_MASK_MOVING;
-
         if (!args.HasVelocity)
-        {
-            // If spline is initialized with SetWalk method it only means we need to select
-            // walk move speed for it but not add walk flag to unit
-            uint32 moveFlagsForSpeed = moveFlags;
-            if (args.flags.walkmode)
-                moveFlagsForSpeed |= MOVEMENTFLAG_WALKING;
-
-            args.velocity = unit->GetSpeed(SelectSpeedType(moveFlagsForSpeed));
-        }
+            args.velocity = unit->GetSpeed(SelectSpeedType(moveFlags));
 
         if (!args.Validate(unit))
             return 0;
+
+        if (moveFlags & MOVEMENTFLAG_ROOT)
+            moveFlags &= ~MOVEMENTFLAG_MASK_MOVING;
 
         unit->m_movementInfo.SetMovementFlags((MovementFlags)moveFlags);
         move_spline.Initialize(args);
@@ -119,14 +118,13 @@ namespace Movement
         }
 
         PacketBuilder::WriteMonsterMove(move_spline, data);
-        unit->SendMessageToSet(&data, true);
+        unit->SendMessageToSet(&data,true);
 
         return move_spline.Duration();
     }
 
     MoveSplineInit::MoveSplineInit(Unit* m) : unit(m)
     {
-        args.splineId = splineIdGen.NewId();
         // Elevators also use MOVEMENTFLAG_ONTRANSPORT but we do not keep track of their position changes
         args.TransformForTransport = unit->HasUnitMovementFlag(MOVEMENTFLAG_ONTRANSPORT) && unit->GetTransGUID();
         // mix existing state into new
@@ -176,8 +174,13 @@ namespace Movement
     Vector3 TransportPathTransform::operator()(Vector3 input)
     {
         if (_transformForTransport)
+        {
             if (TransportBase* transport = _owner->GetDirectTransport())
-                transport->CalculatePassengerOffset(input.x, input.y, input.z);
+            {
+                float unused = 0.0f; // need reference
+                transport->CalculatePassengerOffset(input.x, input.y, input.z, unused);
+            }
+        }
 
         return input;
     }

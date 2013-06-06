@@ -59,32 +59,30 @@ public:
     // Enables or disables hiding of the staff badge
     static bool HandleGMChatCommand(ChatHandler* handler, char const* args)
     {
-        if (WorldSession* session = handler->GetSession())
+        if (!*args)
         {
-            if (!*args)
-            {
-                if (session->HasPermission(RBAC_PERM_CHAT_USE_STAFF_BADGE) && session->GetPlayer()->isGMChat())
-                    session->SendNotification(LANG_GM_CHAT_ON);
-                else
-                    session->SendNotification(LANG_GM_CHAT_OFF);
-                return true;
-            }
-
-            std::string param = (char*)args;
-
-            if (param == "on")
-            {
-                session->GetPlayer()->SetGMChat(true);
+            WorldSession* session = handler->GetSession();
+            if (!AccountMgr::IsPlayerAccount(session->GetSecurity()) && session->GetPlayer()->isGMChat())
                 session->SendNotification(LANG_GM_CHAT_ON);
-                return true;
-            }
-
-            if (param == "off")
-            {
-                session->GetPlayer()->SetGMChat(false);
+            else
                 session->SendNotification(LANG_GM_CHAT_OFF);
-                return true;
-            }
+            return true;
+        }
+
+        std::string param = (char*)args;
+
+        if (param == "on")
+        {
+            handler->GetSession()->GetPlayer()->SetGMChat(true);
+            handler->GetSession()->SendNotification(LANG_GM_CHAT_ON);
+            return true;
+        }
+
+        if (param == "off")
+        {
+            handler->GetSession()->GetPlayer()->SetGMChat(false);
+            handler->GetSession()->SendNotification(LANG_GM_CHAT_OFF);
+            return true;
         }
 
         handler->SendSysMessage(LANG_USE_BOL);
@@ -128,9 +126,7 @@ public:
         for (HashMapHolder<Player>::MapType::const_iterator itr = m.begin(); itr != m.end(); ++itr)
         {
             AccountTypes itrSec = itr->second->GetSession()->GetSecurity();
-            if ((itr->second->isGameMaster() ||
-                (itr->second->GetSession()->HasPermission(RBAC_PERM_COMMANDS_APPEAR_IN_GM_LIST) &&
-                 itrSec <= AccountTypes(sWorld->getIntConfig(CONFIG_GM_LEVEL_IN_GM_LIST)))) &&
+            if ((itr->second->isGameMaster() || (!AccountMgr::IsPlayerAccount(itrSec) && itrSec <= AccountTypes(sWorld->getIntConfig(CONFIG_GM_LEVEL_IN_GM_LIST)))) &&
                 (!handler->GetSession() || itr->second->IsVisibleGloballyFor(handler->GetSession()->GetPlayer())))
             {
                 if (first)

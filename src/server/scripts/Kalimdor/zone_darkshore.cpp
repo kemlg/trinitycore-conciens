@@ -57,7 +57,7 @@ enum Kerlonian
     FACTION_KER_ESCORTEE        = 113
 };
 
-/// @todo make concept similar as "ringo" -escort. Find a way to run the scripted attacks, _if_ player are choosing road.
+//TODO: make concept similar as "ringo" -escort. Find a way to run the scripted attacks, _if_ player are choosing road.
 class npc_kerlonian : public CreatureScript
 {
 public:
@@ -143,7 +143,7 @@ public:
             SetFollowPaused(false);
         }
 
-        void UpdateFollowerAI(uint32 Diff)
+        void UpdateFollowerAI(const uint32 Diff)
         {
             if (!UpdateVictim())
             {

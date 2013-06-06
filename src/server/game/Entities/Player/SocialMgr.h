@@ -104,6 +104,7 @@ class PlayerSocial
     friend class SocialMgr;
     public:
         PlayerSocial();
+        ~PlayerSocial();
         // adding/removing
         bool AddToSocialList(uint32 friend_guid, bool ignore);
         void RemoveFromSocialList(uint32 friend_guid, bool ignore);

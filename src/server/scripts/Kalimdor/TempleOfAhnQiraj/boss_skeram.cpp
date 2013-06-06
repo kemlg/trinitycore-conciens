@@ -40,10 +40,10 @@ enum Spells
 
 enum Events
 {
-    EVENT_ARCANE_EXPLOSION      = 1,
-    EVENT_FULLFILMENT           = 2,
-    EVENT_BLINK                 = 3,
-    EVENT_EARTH_SHOCK           = 4
+    EVENT_ARCANE_EXPLOSION      = 0,
+    EVENT_FULLFILMENT           = 1,
+    EVENT_BLINK                 = 2,
+    EVENT_EARTH_SHOCK           = 3
 };
 
 uint32 const BlinkSpells[3] = { 4801, 8195, 20449 };
@@ -134,7 +134,7 @@ class boss_skeram : public CreatureScript
                 Talk(SAY_AGGRO);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim())
                     return;
@@ -150,7 +150,7 @@ class boss_skeram : public CreatureScript
                             events.ScheduleEvent(EVENT_ARCANE_EXPLOSION, urand(8000, 18000));
                             break;
                         case EVENT_FULLFILMENT:
-                            /// @todo For some weird reason boss does not cast this
+                            // TODO: For some weird reason boss does not cast this
                             // Spell actually works, tested in duel
                             DoCast(SelectTarget(SELECT_TARGET_RANDOM, 0, 0.0f, true), SPELL_TRUE_FULFILLMENT, true);
                             events.ScheduleEvent(EVENT_FULLFILMENT, urand(20000, 30000));

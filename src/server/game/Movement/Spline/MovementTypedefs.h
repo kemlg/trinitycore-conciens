@@ -76,7 +76,6 @@ namespace Movement
 
     extern double gravity;
     extern float computeFallElevation(float t_passed, bool isSafeFall, float start_velocity);
-    extern UInt32Counter splineIdGen;
 }
 
 #endif // TRINITYSERVER_TYPEDEFS_H

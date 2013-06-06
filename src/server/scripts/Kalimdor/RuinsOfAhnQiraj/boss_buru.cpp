@@ -42,11 +42,11 @@ enum Spells
 
 enum Events
 {
-    EVENT_DISMEMBER             = 1,
-    EVENT_GATHERING_SPEED       = 2,
-    EVENT_FULL_SPEED            = 3,
-    EVENT_CREEPING_PLAGUE       = 4,
-    EVENT_RESPAWN_EGG           = 5
+    EVENT_DISMEMBER             = 0,
+    EVENT_GATHERING_SPEED       = 1,
+    EVENT_FULL_SPEED            = 2,
+    EVENT_CREEPING_PLAGUE       = 3,
+    EVENT_RESPAWN_EGG           = 4
 };
 
 enum Phases
@@ -95,7 +95,7 @@ class boss_buru : public CreatureScript
                 _phase = PHASE_EGG;
             }
 
-            void DoAction(int32 action)
+            void DoAction(int32 const action)
             {
                 if (action == ACTION_EXPLODE)
                     if (_phase == PHASE_EGG)
@@ -133,7 +133,7 @@ class boss_buru : public CreatureScript
                 events.ScheduleEvent(EVENT_RESPAWN_EGG, 100000);
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(uint32 const diff)
             {
                 if (!UpdateVictim())
                     return;

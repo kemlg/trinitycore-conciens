@@ -87,17 +87,15 @@ public:
 
         void SendItem(Unit* receiver)
         {
-            Player* player = receiver->ToPlayer();
-
-            if (player && player->HasItemCount(11169, 1, false) &&
-                player->HasItemCount(11172, 11, false) &&
-                player->HasItemCount(11173, 1, false) &&
-                !player->HasItemCount(11522, 1, true))
+            if (CAST_PLR(receiver)->HasItemCount(11169, 1, false) &&
+                CAST_PLR(receiver)->HasItemCount(11172, 11, false) &&
+                CAST_PLR(receiver)->HasItemCount(11173, 1, false) &&
+                !CAST_PLR(receiver)->HasItemCount(11522, 1, true))
             {
                 ItemPosCountVec dest;
-                uint8 msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, 11522, 1, NULL);
+                uint8 msg = CAST_PLR(receiver)->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, 11522, 1, NULL);
                 if (msg == EQUIP_ERR_OK)
-                    player->StoreNewItem(dest, 11522, 1, true);
+                    CAST_PLR(receiver)->StoreNewItem(dest, 11522, 1, true);
             }
         }
 
@@ -106,7 +104,7 @@ public:
             Talk(AGGRO_YELL_AQUE, who->GetGUID());
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (isFriendly)
             {
@@ -256,9 +254,9 @@ public:
             if (HasEscortState(STATE_ESCORT_ESCORTING))
                 return;
 
-            if (Player* player = who->ToPlayer())
+            if (who->GetTypeId() == TYPEID_PLAYER)
             {
-                if (who->HasAura(34877) && player->GetQuestStatus(10277) == QUEST_STATUS_INCOMPLETE)
+                if (who->HasAura(34877) && CAST_PLR(who)->GetQuestStatus(10277) == QUEST_STATUS_INCOMPLETE)
                 {
                     float Radius = 10.0f;
                     if (me->IsWithinDistInMap(who, Radius))
@@ -272,7 +270,7 @@ public:
         void EnterCombat(Unit* /*who*/) {}
         void Reset() {}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             npc_escortAI::UpdateAI(diff);
         }
@@ -605,7 +603,7 @@ public:
                 SetFollowComplete();
         }
 
-        void UpdateFollowerAI(uint32 Diff)
+        void UpdateFollowerAI(const uint32 Diff)
         {
             if (!UpdateVictim())
             {

@@ -142,14 +142,14 @@ public:
             }
 
             if (!SpawnAssoc)
-                TC_LOG_ERROR(LOG_FILTER_SQL, "TCSR: Creature template entry %u has ScriptName npc_air_force_bots, but it's not handled by that script", creature->GetEntry());
+                sLog->outError(LOG_FILTER_SQL, "TCSR: Creature template entry %u has ScriptName npc_air_force_bots, but it's not handled by that script", creature->GetEntry());
             else
             {
                 CreatureTemplate const* spawnedTemplate = sObjectMgr->GetCreatureTemplate(SpawnAssoc->spawnedCreatureEntry);
 
                 if (!spawnedTemplate)
                 {
-                    TC_LOG_ERROR(LOG_FILTER_SQL, "TCSR: Creature template entry %u does not exist in DB, which is required by npc_air_force_bots", SpawnAssoc->spawnedCreatureEntry);
+                    sLog->outError(LOG_FILTER_SQL, "TCSR: Creature template entry %u does not exist in DB, which is required by npc_air_force_bots", SpawnAssoc->spawnedCreatureEntry);
                     SpawnAssoc = NULL;
                     return;
                 }
@@ -169,7 +169,7 @@ public:
                 SpawnedGUID = summoned->GetGUID();
             else
             {
-                TC_LOG_ERROR(LOG_FILTER_SQL, "TCSR: npc_air_force_bots: wasn't able to spawn Creature %u", SpawnAssoc->spawnedCreatureEntry);
+                sLog->outError(LOG_FILTER_SQL, "TCSR: npc_air_force_bots: wasn't able to spawn Creature %u", SpawnAssoc->spawnedCreatureEntry);
                 SpawnAssoc = NULL;
             }
 
@@ -344,7 +344,7 @@ public:
 
         void EnterCombat(Unit* /*who*/) {}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
             // Reset flags after a certain time has passed so that the next player has to start the 'event' again
             if (me->HasFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER))
@@ -444,7 +444,7 @@ public:
             me->SendMessageToSet(&data, true);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
             if (!Active)
             {
@@ -689,7 +689,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff);
+        void UpdateAI(uint32 const diff);
 
         void EnterCombat(Unit* /*who*/){}
     };
@@ -761,45 +761,44 @@ public:
 
         void SpellHit(Unit* caster, SpellInfo const* spell)
         {
-            Player* player = caster->ToPlayer();
-            if (!player || !me->isAlive() || spell->Id != 20804)
-                return;
-
-            if (player->GetQuestStatus(6624) == QUEST_STATUS_INCOMPLETE || player->GetQuestStatus(6622) == QUEST_STATUS_INCOMPLETE)
-                if (DoctorGUID)
-                    if (Creature* doctor = Unit::GetCreature(*me, DoctorGUID))
-                        CAST_AI(npc_doctor::npc_doctorAI, doctor->AI())->PatientSaved(me, player, Coord);
-
-            //make not selectable
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-
-            //regen health
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IN_COMBAT);
-
-            //stand up
-            me->SetUInt32Value(UNIT_FIELD_BYTES_1, UNIT_STAND_STATE_STAND);
-
-            Talk(SAY_DOC);
-
-            uint32 mobId = me->GetEntry();
-            me->SetWalk(false);
-
-            switch (mobId)
+            if (caster->GetTypeId() == TYPEID_PLAYER && me->isAlive() && spell->Id == 20804)
             {
-                case 12923:
-                case 12924:
-                case 12925:
-                    me->GetMotionMaster()->MovePoint(0, H_RUNTOX, H_RUNTOY, H_RUNTOZ);
-                    break;
-                case 12936:
-                case 12937:
-                case 12938:
-                    me->GetMotionMaster()->MovePoint(0, A_RUNTOX, A_RUNTOY, A_RUNTOZ);
-                    break;
+                if ((CAST_PLR(caster)->GetQuestStatus(6624) == QUEST_STATUS_INCOMPLETE) || (CAST_PLR(caster)->GetQuestStatus(6622) == QUEST_STATUS_INCOMPLETE))
+                    if (DoctorGUID)
+                        if (Creature* doctor = Unit::GetCreature(*me, DoctorGUID))
+                            CAST_AI(npc_doctor::npc_doctorAI, doctor->AI())->PatientSaved(me, CAST_PLR(caster), Coord);
+
+                //make not selectable
+                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+
+                //regen health
+                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IN_COMBAT);
+
+                //stand up
+                me->SetUInt32Value(UNIT_FIELD_BYTES_1, UNIT_STAND_STATE_STAND);
+
+                Talk(SAY_DOC);
+
+                uint32 mobId = me->GetEntry();
+                me->SetWalk(false);
+
+                switch (mobId)
+                {
+                    case 12923:
+                    case 12924:
+                    case 12925:
+                        me->GetMotionMaster()->MovePoint(0, H_RUNTOX, H_RUNTOY, H_RUNTOZ);
+                        break;
+                    case 12936:
+                    case 12937:
+                    case 12938:
+                        me->GetMotionMaster()->MovePoint(0, A_RUNTOX, A_RUNTOY, A_RUNTOZ);
+                        break;
+                }
             }
         }
 
-        void UpdateAI(uint32 /*diff*/)
+        void UpdateAI(uint32 const /*diff*/)
         {
             //lower HP on every world tick makes it a useful counter, not officlone though
             if (me->isAlive() && me->GetHealth() > 6)
@@ -825,7 +824,7 @@ public:
     }
 };
 
-void npc_doctor::npc_doctorAI::UpdateAI(uint32 diff)
+void npc_doctor::npc_doctorAI::UpdateAI(uint32 const diff)
 {
     if (Event && SummonPatientCount >= 20)
     {
@@ -852,7 +851,7 @@ void npc_doctor::npc_doctorAI::UpdateAI(uint32 diff)
                     patientEntry = HordeSoldierId[rand() % 3];
                     break;
                 default:
-                    TC_LOG_ERROR(LOG_FILTER_TSCR, "Invalid entry for Triage doctor. Please check your database");
+                    sLog->outError(LOG_FILTER_TSCR, "Invalid entry for Triage doctor. Please check your database");
                     return;
             }
 
@@ -882,7 +881,7 @@ void npc_doctor::npc_doctorAI::UpdateAI(uint32 diff)
 ## npc_garments_of_quests
 ######*/
 
-/// @todo get text for each NPC
+//TODO: get text for each NPC
 
 enum Garments
 {
@@ -1057,7 +1056,7 @@ public:
 
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
             if (CanRun && !me->isInCombat())
             {
@@ -1129,7 +1128,7 @@ public:
         {
         }
 
-        void UpdateAI(uint32 /*diff*/)
+        void UpdateAI(uint32 const /*diff*/)
         {
             if (!UpdateVictim())
                 return;
@@ -1263,10 +1262,10 @@ public:
         if (creature->isTrainer())
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_TRAINER, GOSSIP_TEXT_TRAIN, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRAIN);
 
-        if (player->getClass() == CLASS_ROGUE)
+        if (creature->isCanTrainingAndResetTalentsOf(player))
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_TRAINER, GOSSIP_HELLO_ROGUE1, GOSSIP_SENDER_MAIN, GOSSIP_OPTION_UNLEARNTALENTS);
 
-        if (player->GetSpecsCount() == 1 && player->getLevel() >= sWorld->getIntConfig(CONFIG_MIN_DUALSPEC_LEVEL))
+        if (player->GetSpecsCount() == 1 && creature->isCanTrainingAndResetTalentsOf(player) && player->getLevel() >= sWorld->getIntConfig(CONFIG_MIN_DUALSPEC_LEVEL))
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_TRAINER, GOSSIP_HELLO_ROGUE3, GOSSIP_SENDER_MAIN, GOSSIP_OPTION_LEARNDUALSPEC);
 
         if (player->getClass() == CLASS_ROGUE && player->getLevel() >= 24 && !player->HasItemCount(17126) && !player->GetQuestRewardStatus(6681))
@@ -1541,7 +1540,7 @@ public:
         void AttackStart(Unit* /*who*/) {}
         void MoveInLineOfSight(Unit* /*who*/) {}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
             if (ExplosionTimer <= diff)
             {
@@ -1657,7 +1656,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
             if (!UpdateVictim())
                 return;
@@ -1735,7 +1734,7 @@ public:
 
         void EnterCombat(Unit* /*who*/){}
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
             if (me->HasAura(20372))
             {
@@ -1750,53 +1749,52 @@ public:
         void ReceiveEmote(Player* player, uint32 emote)
         {
             me->HandleEmoteCommand(emote);
-            Unit* owner = me->GetOwner();
-            if (emote != TEXT_EMOTE_KISS || !owner || owner->GetTypeId() != TYPEID_PLAYER ||
-                owner->ToPlayer()->GetTeam() != player->GetTeam())
-            {
+            Unit* own = me->GetOwner();
+            if (!own || own->GetTypeId() != TYPEID_PLAYER || CAST_PLR(own)->GetTeam() != player->GetTeam())
                 return;
-            }
-
-            std::string whisp = "";
-            switch (rand() % 8)
+            if (emote == TEXT_EMOTE_KISS)
             {
-                case 0:
-                    whisp.append(SAY_RANDOM_MOJO0);
-                    break;
-                case 1:
-                    whisp.append(SAY_RANDOM_MOJO1);
-                    break;
-                case 2:
-                    whisp.append(SAY_RANDOM_MOJO2);
-                    break;
-                case 3:
-                    whisp.append(SAY_RANDOM_MOJO3);
-                    break;
-                case 4:
-                    whisp.append(SAY_RANDOM_MOJO4);
-                    break;
-                case 5:
-                    whisp.append(SAY_RANDOM_MOJO5);
-                    break;
-                case 6:
-                    whisp.append(SAY_RANDOM_MOJO6a);
-                    whisp.append(player->GetName());
-                    whisp.append(SAY_RANDOM_MOJO6b);
-                    break;
-                case 7:
-                    whisp.append(SAY_RANDOM_MOJO7);
-                    break;
-            }
+                std::string whisp = "";
+                switch (rand() % 8)
+                {
+                    case 0:
+                        whisp.append(SAY_RANDOM_MOJO0);
+                        break;
+                    case 1:
+                        whisp.append(SAY_RANDOM_MOJO1);
+                        break;
+                    case 2:
+                        whisp.append(SAY_RANDOM_MOJO2);
+                        break;
+                    case 3:
+                        whisp.append(SAY_RANDOM_MOJO3);
+                        break;
+                    case 4:
+                        whisp.append(SAY_RANDOM_MOJO4);
+                        break;
+                    case 5:
+                        whisp.append(SAY_RANDOM_MOJO5);
+                        break;
+                    case 6:
+                        whisp.append(SAY_RANDOM_MOJO6a);
+                        whisp.append(player->GetName());
+                        whisp.append(SAY_RANDOM_MOJO6b);
+                        break;
+                    case 7:
+                        whisp.append(SAY_RANDOM_MOJO7);
+                        break;
+                }
 
-            me->MonsterWhisper(whisp.c_str(), player->GetGUID());
-            if (victimGUID)
-                if (Player* victim = Unit::GetPlayer(*me, victimGUID))
-                    victim->RemoveAura(43906); // remove polymorph frog thing
-            me->AddAura(43906, player); // add polymorph frog thing
-            victimGUID = player->GetGUID();
-            DoCast(me, 20372, true); // tag.hearts
-            me->GetMotionMaster()->MoveFollow(player, 0, 0);
-            hearts = 15000;
+                me->MonsterWhisper(whisp.c_str(), player->GetGUID());
+                if (victimGUID)
+                    if (Player* victim = Unit::GetPlayer(*me, victimGUID))
+                        victim->RemoveAura(43906);//remove polymorph frog thing
+                me->AddAura(43906, player);//add polymorph frog thing
+                victimGUID = player->GetGUID();
+                DoCast(me, 20372, true);//tag.hearts
+                me->GetMotionMaster()->MoveFollow(player, 0, 0);
+                hearts = 15000;
+            }
         }
     };
 
@@ -1923,7 +1921,7 @@ public:
             despawnTimer = 4 * IN_MILLISECONDS;
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (despawnTimer > 0)
             {
@@ -2018,7 +2016,7 @@ public:
             damage = 0;
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(uint32 const diff)
         {
             if (!UpdateVictim())
                 return;
@@ -2112,7 +2110,7 @@ public:
             me->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_FIRE, true);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -2176,7 +2174,7 @@ public:
             me->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_NATURE, true);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (!UpdateVictim())
                 return;
@@ -2906,14 +2904,14 @@ public:
 
         void EnterCombat(Unit* /*who*/) { }
 
-        void DoAction(int32 /*param*/)
+        void DoAction(const int32 /*param*/)
         {
             inLove = true;
             if (Unit* owner = me->GetOwner())
                 owner->CastSpell(owner, SPELL_SPRING_FLING, true);
         }
 
-        void UpdateAI(uint32 diff)
+        void UpdateAI(const uint32 diff)
         {
             if (inLove)
             {
@@ -2953,6 +2951,31 @@ public:
     };
 };
 
+/*######
+## npc_generic_harpoon_cannon
+######*/
+
+class npc_generic_harpoon_cannon : public CreatureScript
+{
+public:
+    npc_generic_harpoon_cannon() : CreatureScript("npc_generic_harpoon_cannon") { }
+
+    struct npc_generic_harpoon_cannonAI : public ScriptedAI
+    {
+        npc_generic_harpoon_cannonAI(Creature* creature) : ScriptedAI(creature) {}
+
+        void Reset()
+        {
+            me->SetUnitMovementFlags(MOVEMENTFLAG_ROOT);
+        }
+    };
+
+    CreatureAI* GetAI(Creature* creature) const
+    {
+        return new npc_generic_harpoon_cannonAI(creature);
+    }
+};
+
 void AddSC_npcs_special()
 {
     new npc_air_force_bots();
@@ -2984,4 +3007,5 @@ void AddSC_npcs_special()
     new npc_earth_elemental();
     new npc_firework();
     new npc_spring_rabbit();
+    new npc_generic_harpoon_cannon();
 }

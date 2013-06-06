@@ -98,32 +98,34 @@ public:
         npc_shadowfang_prisonerAI(Creature* creature) : npc_escortAI(creature)
         {
             instance = creature->GetInstanceScript();
+            uiNpcEntry = creature->GetEntry();
         }
 
         InstanceScript* instance;
+        uint32 uiNpcEntry;
 
         void WaypointReached(uint32 waypointId)
         {
             switch (waypointId)
             {
                 case 0:
-                    if (me->GetEntry() == NPC_ASH)
+                    if (uiNpcEntry == NPC_ASH)
                         Talk(SAY_FREE_AS);
                     else
                         Talk(SAY_FREE_AD);
                     break;
                 case 10:
-                    if (me->GetEntry() == NPC_ASH)
+                    if (uiNpcEntry == NPC_ASH)
                         Talk(SAY_OPEN_DOOR_AS);
                     else
                         Talk(SAY_OPEN_DOOR_AD);
                     break;
                 case 11:
-                    if (me->GetEntry() == NPC_ASH)
+                    if (uiNpcEntry == NPC_ASH)
                         DoCast(me, SPELL_UNLOCK);
                     break;
                 case 12:
-                    if (me->GetEntry() == NPC_ASH)
+                    if (uiNpcEntry == NPC_ASH)
                         Talk(SAY_POST_DOOR_AS);
                     else
                         Talk(SAY_POST1_DOOR_AD);
@@ -132,7 +134,7 @@ public:
                         instance->SetData(TYPE_FREE_NPC, DONE);
                     break;
                 case 13:
-                    if (me->GetEntry() != NPC_ASH)
+                    if (uiNpcEntry != NPC_ASH)
                         Talk(SAY_POST2_DOOR_AD);
                     break;
             }
@@ -170,7 +172,7 @@ public:
             uiDarkOffering = urand(200, 1000);
         }
 
-        void UpdateAI(uint32 uiDiff)
+        void UpdateAI(uint32 const uiDiff)
         {
             if (!UpdateVictim())
                 return;

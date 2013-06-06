@@ -44,7 +44,7 @@ void ObjectGridEvacuator::Visit(CreatureMapType &m)
 }
 
 // for loading world object at grid loading (Corpses)
-/// @todo to implement npc on transport, also need to load npcs at grid loading
+//TODO: to implement npc on transport, also need to load npcs at grid loading
 class ObjectWorldLoader
 {
     public:
@@ -94,7 +94,7 @@ void LoadHelper(CellGuidSet const& guid_set, CellCoord &cell, GridRefManager<T> 
     {
         T* obj = new T;
         uint32 guid = *i_guid;
-        //TC_LOG_INFO(LOG_FILTER_GENERAL, "DEBUG: LoadHelper from table: %s for (guid: %u) Loading", table, guid);
+        //sLog->outInfo(LOG_FILTER_GENERAL, "DEBUG: LoadHelper from table: %s for (guid: %u) Loading", table, guid);
         if (!obj->LoadFromDB(guid, map))
         {
             delete obj;
@@ -121,7 +121,7 @@ void LoadHelper(CellCorpseSet const& cell_corpses, CellCoord &cell, CorpseMapTyp
         if (!obj)
             continue;
 
-        /// @todo this is a hack
+        // TODO: this is a hack
         // corpse's map should be reset when the map is unloaded
         // but it may still exist when the grid is unloaded but map is not
         // in that case map == currMap
@@ -185,7 +185,7 @@ void ObjectGridLoader::LoadN(void)
             }
         }
     }
-    TC_LOG_DEBUG(LOG_FILTER_MAPS, "%u GameObjects, %u Creatures, and %u Corpses/Bones loaded for grid %u on map %u", i_gameObjects, i_creatures, i_corpses, i_grid.GetGridId(), i_map->GetId());
+    sLog->outDebug(LOG_FILTER_MAPS, "%u GameObjects, %u Creatures, and %u Corpses/Bones loaded for grid %u on map %u", i_gameObjects, i_creatures, i_corpses, i_grid.GetGridId(), i_map->GetId());
 }
 
 template<class T>
@@ -200,7 +200,7 @@ void ObjectGridUnloader::Visit(GridRefManager<T> &m)
         //Some creatures may summon other temp summons in CleanupsBeforeDelete()
         //So we need this even after cleaner (maybe we can remove cleaner)
         //Example: Flame Leviathan Turret 33139 is summoned when a creature is deleted
-        /// @todo Check if that script has the correct logic. Do we really need to summons something before deleting?
+        //TODO: Check if that script has the correct logic. Do we really need to summons something before deleting?
         obj->CleanupsBeforeDelete();
         ///- object will get delinked from the manager when deleted
         delete obj;
@@ -210,15 +210,14 @@ void ObjectGridUnloader::Visit(GridRefManager<T> &m)
 void ObjectGridStoper::Visit(CreatureMapType &m)
 {
     // stop any fights at grid de-activation and remove dynobjects created at cast by creatures
-    for (CreatureMapType::iterator iter = m.begin(); iter != m.end(); ++iter)
+    for (CreatureMapType::iterator iter=m.begin(); iter != m.end(); ++iter)
     {
         iter->getSource()->RemoveAllDynObjects();
         if (iter->getSource()->isInCombat())
         {
             iter->getSource()->CombatStop();
             iter->getSource()->DeleteThreatList();
-            if (iter->getSource()->IsAIEnabled)
-                iter->getSource()->AI()->EnterEvadeMode();
+            iter->getSource()->AI()->EnterEvadeMode();
         }
     }
 }

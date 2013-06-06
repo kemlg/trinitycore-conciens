@@ -23,7 +23,7 @@
 #include "zulgurub.h"
 
 /*
- * @todo
+ * TODO:
  * - Fix timers (research some more)
  */
 
@@ -147,7 +147,7 @@ class boss_venoxis : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff)
+            void UpdateAI(const uint32 diff)
             {
                 if (!UpdateVictim())
                     return;

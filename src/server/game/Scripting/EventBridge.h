@@ -18,11 +18,47 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include "Spell.h"
+#include "Common.h"
+#include <ace/Singleton.h>
+#include <ace/Atomic_Op.h>
+
+#include "DBCStores.h"
+#include "SharedDefines.h"
+#include "World.h"
 #include "Weather.h"
-#include "Player.h"
-#include "Creature.h"
-#include "Item.h"
+
+class AuctionHouseObject;
+class AuraScript;
+class Battleground;
+class BattlegroundMap;
+class Channel;
+class ChatCommand;
+class Creature;
+class CreatureAI;
+class DynamicObject;
+class GameObject;
+class GameObjectAI;
+class Guild;
+class GridMap;
+class Group;
+class InstanceMap;
+class InstanceScript;
+class Item;
+class ItemTemplate;
+class Map;
+class OutdoorPvP;
+class Player;
+class Quest;
+class ScriptMgr;
+class Spell;
+class SpellScript;
+class SpellCastTargets;
+class Transport;
+class Unit;
+class Vehicle;
+class WorldPacket;
+class WorldSocket;
+class WorldObject;
 
 // Event Types
 enum ConciensEventTypes

@@ -18,7 +18,6 @@
 #ifndef TRINITY_CONTAINERS_H
 #define TRINITY_CONTAINERS_H
 
-#include "Define.h"
 #include <list>
 
 //! Because circular includes are bad
