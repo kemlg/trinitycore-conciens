@@ -9,67 +9,82 @@
 #include <stdlib.h>
 
 #include "EventBridge.h"
-#include "Log.h"
-#include "GameObject.h"
+#include "Config.h"
+#include "DatabaseEnv.h"
+#include "DBCStores.h"
+#include "ObjectMgr.h"
+#include "OutdoorPvPMgr.h"
+#include "ScriptLoader.h"
+#include "ScriptSystem.h"
+#include "Transport.h"
+#include "Vehicle.h"
+#include "SpellInfo.h"
+#include "SpellScript.h"
+#include "GossipDef.h"
+#include "CreatureAI.h"
+#include "Player.h"
+#include "WorldPacket.h"
 
 const char*	endMsg		= "\n";
 const int	port_out	= 6969;
 const int	port_in		= 6970;
+const char*	ebServerHost	= "192.168.1.101";
+struct hostent*		host;
+struct sockaddr_in	server_addr;
 
 void* processMessages(void* ptr)
 {
-	int		bytes_recieved;
-	char	recv_data[1024];
-	int		sock;
+	int		bytes_received;
+	char		recv_data[1024];
+	int		sock, conn;
+	pthread_t	thread1;
 
 	sock = *(int*)ptr;
-	while(1)
+	bytes_received = recv(sock, recv_data, 1022, 0);
+	while(bytes_received >= 0)
 	{
-		bytes_recieved = recv(sock, recv_data, 1022, 0);
 
-		if(bytes_recieved < 1)
-		{
-			struct hostent*		host;
-			struct sockaddr_in	server_addr;
-
-			host = gethostbyname("127.0.0.1");
-
-			sock = socket(AF_INET, SOCK_STREAM, 0);
-
-			server_addr.sin_family = AF_INET;
-			server_addr.sin_addr = *((struct in_addr *) host->h_addr);
-			bzero(&(server_addr.sin_zero), 8);
-
-			server_addr.sin_port = htons(port_in);
-			connect(sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
-			if(sock < 1)
-			{
-				sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockin < 1");
-			}
-			else
-			{
-				sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockin >= 1");
-			}
-		}
-		else
-		{
-			recv_data[bytes_recieved] = '\n';
-			recv_data[bytes_recieved+1] = '\0';
-			sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridgeThread [%s]", recv_data);
-		}
-
-		//if (strcmp(recv_data, "q") == 0 || strcmp(recv_data, "Q") == 0)
-		//{
-		//	close(sock);
-		//	break;
-		//}
-
-		//else
-		//	printf("\nRecieved data = %s ", recv_data);
-
-		//printf("\nSEND (q or Q to quit) : ");
-		//gets(send_data);
+		recv_data[bytes_received] = '\n';
+		recv_data[bytes_received+1] = '\0';
+		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridgeThread [%s]", recv_data);
+		bytes_received = recv(sock, recv_data, 1022, 0);
 	}
+
+	struct hostent*		host;
+	struct sockaddr_in	server_addr;
+
+	host = gethostbyname(ebServerHost);
+
+	close(sock);
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr = *((struct in_addr *) host->h_addr);
+	bzero(&(server_addr.sin_zero), 8);
+
+	server_addr.sin_port = htons(port_in);
+	conn = connect(sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
+	while(conn < 1)
+	{
+		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: conn < 1, errno: %d", errno);
+		close(sock);
+		sock = socket(AF_INET, SOCK_STREAM, 0);
+		conn = connect(sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
+	}
+	sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockin >= 1");
+	pthread_create(&thread1, NULL, processMessages, (void*)&sock);
+	
+	//if (strcmp(recv_data, "q") == 0 || strcmp(recv_data, "Q") == 0)
+	//{
+	//	close(sock);
+	//	break;
+	//}
+
+	//else
+	//	printf("\nRecieved data = %s ", recv_data);
+
+	//printf("\nSEND (q or Q to quit) : ");
+	//gets(send_data);
 }
 
 void EventBridge::createSocketIn()
@@ -77,7 +92,7 @@ void EventBridge::createSocketIn()
 	struct hostent*		host;
 	struct sockaddr_in	server_addr;
 
-	host = gethostbyname("127.0.0.1");
+	host = gethostbyname(ebServerHost);
 
 	this->sockin = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -99,19 +114,7 @@ void EventBridge::createSocketIn()
 
 void EventBridge::createSocketOut()
 {
-	struct hostent*		host;
-	struct sockaddr_in	server_addr;
-
-	host = gethostbyname("127.0.0.1");
-
-	this->sockout = socket(AF_INET, SOCK_STREAM, 0);
-
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr = *((struct in_addr *) host->h_addr);
-	bzero(&(server_addr.sin_zero), 8);
-
-	server_addr.sin_port = htons(port_out);
-	connect(sockout, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
+	connect(this->sockout, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
 	if(sockout < 1)
 	{
 		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockout < 1");
@@ -130,20 +133,29 @@ void EventBridge::createSocket()
 
 EventBridge::EventBridge()
 {
-	pthread_t			thread1;
-	int					iret;
+	pthread_t	thread1;
+	int		iret;
 
 	sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: Starting EventBridge...");
+	host = gethostbyname(ebServerHost);
+
+	this->sockout = socket(AF_INET, SOCK_STREAM, 0);
+
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr = *((struct in_addr *) host->h_addr);
+	bzero(&(server_addr.sin_zero), 8);
+
+	server_addr.sin_port = htons(port_out);
 
 	this->createSocket();
 
 	/* Create independent threads each of which will execute function */
 	iret = pthread_create(&thread1, NULL, processMessages, (void*)&this->sockin);
 
-    /* Wait till threads are complete before main continues. Unless we  */
-    /* wait we run the risk of executing an exit which will terminate   */
-    /* the process and all threads before the threads have completed.   */
-    //pthread_join( thread1, NULL);
+	/* Wait till threads are complete before main continues. Unless we  */
+	/* wait we run the risk of executing an exit which will terminate   */
+	/* the process and all threads before the threads have completed.   */
+	//pthread_join( thread1, NULL);
 }
 
 EventBridge::~EventBridge()
@@ -158,12 +170,16 @@ void EventBridge::sendMessage(char* send_data)
 	ret = send(sockout, send_data, strlen(send_data), 0);
 	if(ret == -1)
 	{
+		sLog->outError(LOG_FILTER_NETWORKIO, "Regenerating socket\n");
+		close(sockout);
+		sockout = socket(AF_INET, SOCK_STREAM, 0);
 		this->createSocketOut();
+		ret = send(sockout, send_data, strlen(send_data), 0);
 	}
 	else
 	{
 		send(sockout, endMsg, strlen(endMsg), 0);
-
+	
 		if(strcmp(send_data, "q") == 0 || strcmp(send_data, "Q") == 0)
 		{
 			send(sockout, send_data, strlen(send_data), 0);
@@ -281,7 +297,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 
 	if(done)
 	{
-		sLog->outInfo(LOG_FILTER_NETWORKIO, "Sending: [%s]", msg);
+		//sLog->outInfo(LOG_FILTER_NETWORKIO, "Sending: [%s]", msg);
 		this->sendMessage(msg);
 	}
 }
