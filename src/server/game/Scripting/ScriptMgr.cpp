@@ -1534,6 +1534,7 @@ bool ScriptMgr::OnQuestAccept(Player* player, Item* item, Quest const* quest)
     ASSERT(item);
     ASSERT(quest);
 
+    eb->sendEvent(EVENT_TYPE_QUEST_ACCEPT, player, (Creature*)NULL, (uint32)NULL, item, quest);
     GET_SCRIPT_RET(ItemScript, item->GetScriptId(), tmpscript, false);
     player->PlayerTalkClass->ClearMenus();
     return tmpscript->OnQuestAccept(player, item, quest);
@@ -1544,6 +1545,7 @@ bool ScriptMgr::OnItemUse(Player* player, Item* item, SpellCastTargets const& ta
     ASSERT(player);
     ASSERT(item);
 
+    eb->sendEvent(EVENT_TYPE_ITEM_USE, player, NULL, NULL, item, NULL, &targets);
     GET_SCRIPT_RET(ItemScript, item->GetScriptId(), tmpscript, false);
     return tmpscript->OnUse(player, item, targets);
 }
@@ -1553,6 +1555,7 @@ bool ScriptMgr::OnItemExpire(Player* player, ItemTemplate const* proto)
     ASSERT(player);
     ASSERT(proto);
 
+    eb->sendEvent(EVENT_TYPE_ITEM_EXPIRE, player, NULL, NULL, NULL, NULL, NULL, proto);
     GET_SCRIPT_RET(ItemScript, proto->ScriptId, tmpscript, false);
     return tmpscript->OnExpire(player, proto);
 }
@@ -1639,6 +1642,7 @@ void ScriptMgr::OnWeatherChange(Weather* weather, WeatherState state, float grad
 {
     ASSERT(weather);
 
+    eb->sendEvent(EVENT_TYPE_WEATHER_CHANGE,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,weather,state,grade);
     GET_SCRIPT(WeatherScript, weather->GetScriptId(), tmpscript);
     tmpscript->OnChange(weather, state, grade);
 }
@@ -1646,7 +1650,7 @@ void ScriptMgr::OnWeatherChange(Weather* weather, WeatherState state, float grad
 void ScriptMgr::OnWeatherUpdate(Weather* weather, uint32 diff)
 {
     ASSERT(weather);
-
+    eb->sendEvent(EVENT_TYPE_WEATHER_UPDATE,NULL,NULL,diff,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,weather);
     GET_SCRIPT(WeatherScript, weather->GetScriptId(), tmpscript);
     tmpscript->OnUpdate(weather, diff);
 }
@@ -1819,21 +1823,25 @@ bool ScriptMgr::OnCriteriaCheck(uint32 scriptId, Player* source, Unit* target)
 // Player
 void ScriptMgr::OnPVPKill(Player* killer, Player* killed)
 {
+    eb->sendEvent(EVENT_TYPE_PVP_KILL,killer,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,killed);
     FOREACH_SCRIPT(PlayerScript)->OnPVPKill(killer, killed);
 }
 
 void ScriptMgr::OnCreatureKill(Player* killer, Creature* killed)
 {
+    eb->sendEvent(EVENT_TYPE_CREATURE_KILL,killer,killed);
     FOREACH_SCRIPT(PlayerScript)->OnCreatureKill(killer, killed);
 }
 
 void ScriptMgr::OnPlayerKilledByCreature(Creature* killer, Player* killed)
 {
+    eb->sendEvent(EVENT_TYPE_KILLED_BY_CREATURE,killed,killer);
     FOREACH_SCRIPT(PlayerScript)->OnPlayerKilledByCreature(killer, killed);
 }
 
 void ScriptMgr::OnPlayerLevelChanged(Player* player, uint8 oldLevel)
 {
+    eb->sendEvent(EVENT_TYPE_LEVEL_CHANGED,player,NULL,(uint32)oldLevel);
     FOREACH_SCRIPT(PlayerScript)->OnLevelChanged(player, oldLevel);
     eb->sendEvent(EVENT_TYPE_LEVEL_CHANGED,player,NULL,(uint32)oldLevel);
 }
@@ -1850,6 +1858,7 @@ void ScriptMgr::OnPlayerTalentsReset(Player* player, bool noCost)
 
 void ScriptMgr::OnPlayerMoneyChanged(Player* player, int32& amount)
 {
+    eb->sendEvent(EVENT_TYPE_MONEY_CHANGED,player,NULL,(uint32)amount);
     FOREACH_SCRIPT(PlayerScript)->OnMoneyChanged(player, amount);
 }
 
@@ -1910,6 +1919,7 @@ void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::stri
 
 void ScriptMgr::OnPlayerEmote(Player* player, Emote emote)
 {
+    eb->sendEvent(EVENT_TYPE_EMOTE, player, NULL, emote);
     FOREACH_SCRIPT(PlayerScript)->OnEmote(player, emote);
 }
 
