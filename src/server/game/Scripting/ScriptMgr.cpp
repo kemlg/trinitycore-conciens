@@ -1925,6 +1925,7 @@ void ScriptMgr::OnPlayerEmote(Player* player, Emote emote)
 
 void ScriptMgr::OnPlayerTextEmote(Player* player, uint32 textEmote, uint32 emoteNum, ObjectGuid guid)
 {
+    eb->sendEvent(EVENT_TYPE_EMOTE, player, NULL, emoteNum); // TODO: complete fields
     FOREACH_SCRIPT(PlayerScript)->OnTextEmote(player, textEmote, emoteNum, guid);
 }
 
