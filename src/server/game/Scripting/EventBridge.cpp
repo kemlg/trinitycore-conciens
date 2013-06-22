@@ -202,22 +202,22 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	switch(event_type)
 	{
 	case EVENT_TYPE_PVP_KILL:
-		sprintf(msg, "PVP_KILL|%lu|%lu", player->GetGUID(), other->GetGUID());
+		sprintf(msg, "PVP_KILL|%u|%u", player->GetGUIDLow(), other->GetGUIDLow());
 		break;
 	case EVENT_TYPE_CREATURE_KILL:
-		sprintf(msg, "CREATURE_KILL|%lu|%lu", player->GetGUID(), creature->GetGUID());
+		sprintf(msg, "CREATURE_KILL|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow());
 		break;
 	case EVENT_TYPE_KILLED_BY_CREATURE:
-		sprintf(msg, "KILLED_BY_CREATURE|%lu|%lu", player->GetGUID(), creature->GetGUID());
+		sprintf(msg, "KILLED_BY_CREATURE|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow());
 		break;
 	case EVENT_TYPE_LEVEL_CHANGED:
-		sprintf(msg, "LEVEL_CHANGED|%lu|%u", player->GetGUID(), num);
+		sprintf(msg, "LEVEL_CHANGED|%u|%u", player->GetGUIDLow(), num);
 		break;
 	case EVENT_TYPE_MONEY_CHANGED:
-		sprintf(msg, "MONEY_CHANGED|%lu|%u", player->GetGUID(), num);
+		sprintf(msg, "MONEY_CHANGED|%u|%u", player->GetGUIDLow(), num);
 		break;
 	case EVENT_TYPE_AREA_TRIGGER:
-		sprintf(msg, "AREA_TRIGGER|%lu|%u", player->GetGUID(), area->id);
+		sprintf(msg, "AREA_TRIGGER|%u|%u", player->GetGUIDLow(), area->id);
 		break;
 	case EVENT_TYPE_WEATHER_CHANGE:
 		sprintf(msg, "WEATHER_CHANGE|%u|%d|%f", weather->GetZone(), state, grade);
@@ -226,69 +226,69 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 		sprintf(msg, "WEATHER_UPDATE|%u|%u", weather->GetZone(), num);
 		break;
 	case EVENT_TYPE_EMOTE:
-		sprintf(msg, "EMOTE|%lu|%u", player->GetGUID(), num);
+		sprintf(msg, "EMOTE|%u|%u", player->GetGUIDLow(), num);
 		break;
 	case EVENT_TYPE_GOSSIP_HELLO:
-		sprintf(msg, "HELLO|%lu|%lu", player->GetGUID(), creature->GetGUID());
+		sprintf(msg, "HELLO|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow());
 		break;
 	case EVENT_TYPE_OBJECT_UPDATE:
-		sprintf(msg, "OBJECT_UPDATE|%lu|%u", go->GetGUID(), num);
+		sprintf(msg, "OBJECT_UPDATE|%u|%u", go->GetGUIDLow(), num);
 		break;
 	case EVENT_TYPE_CREATURE_UPDATE:
 		creature->GetPosition(x, y, z, o);
-		sprintf(msg, "CREATURE_UPDATE|%lu|%f|%f|%f|%f", creature->GetGUID(), x, y, z, o);
+		sprintf(msg, "CREATURE_UPDATE|%u|%f|%f|%f|%f", creature->GetGUIDLow(), x, y, z, o);
 		break;
 	case EVENT_TYPE_QUEST_ACCEPT:
 		if(creature == NULL)
 		{
-			sprintf(msg, "QUEST_ACCEPT_ITEM|%lu|%lu|%u", player->GetGUID(), item->GetGUID(), quest->GetQuestId());
+			sprintf(msg, "QUEST_ACCEPT_ITEM|%u|%u|%u", player->GetGUIDLow(), item->GetGUIDLow(), quest->GetQuestId());
 		}
 		else
 		{
-			sprintf(msg, "QUEST_ACCEPT_ITEM|%lu|%lu|%u", player->GetGUID(), creature->GetGUID(), quest->GetQuestId());
+			sprintf(msg, "QUEST_ACCEPT_ITEM|%u|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow(), quest->GetQuestId());
 		}
 		break;
 	case EVENT_TYPE_QUEST_ACCEPT_OBJECT:
-		sprintf(msg, "QUEST_ACCEPT_OBJECT|%lu|%lu|%u", player->GetGUID(), go->GetGUID(), quest->GetQuestId());
+		sprintf(msg, "QUEST_ACCEPT_OBJECT|%u|%u|%u", player->GetGUIDLow(), go->GetGUIDLow(), quest->GetQuestId());
 		break;
 	case EVENT_TYPE_ITEM_USE: // TODO: Verify use of targets info
-		sprintf(msg, "ITEM_USE|%lu|%lu|%lu", player->GetGUID(), item->GetGUID(), targets->GetUnitTarget()->GetGUID());
+		sprintf(msg, "ITEM_USE|%u|%u|%u", player->GetGUIDLow(), item->GetGUIDLow(), targets->GetUnitTarget()->GetGUIDLow());
 		break;
 	case EVENT_TYPE_ITEM_EXPIRE:
-		sprintf(msg, "ITEM_EXPIRE|%lu|%u", player->GetGUID(), proto->ItemId);
+		sprintf(msg, "ITEM_EXPIRE|%u|%u", player->GetGUIDLow(), proto->ItemId);
 		break;
 	case EVENT_TYPE_GOSSIP_SELECT:
-		sprintf(msg, "GOSSIP_SELECT|%lu|%lu|%u|%u", player->GetGUID(), creature->GetGUID(), num, num2);
+		sprintf(msg, "GOSSIP_SELECT|%u|%u|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow(), num, num2);
 		break;
 	case EVENT_TYPE_GOSSIP_SELECT_OBJECT:
-		sprintf(msg, "GOSSIP_SELECT_OBJECT|%lu|%lu|%u|%u", player->GetGUID(), go->GetGUID(), num, num2);
+		sprintf(msg, "GOSSIP_SELECT_OBJECT|%u|%u|%u|%u", player->GetGUIDLow(), go->GetGUIDLow(), num, num2);
 		break;
 	case EVENT_TYPE_GOSSIP_SELECT_CODE:
-		sprintf(msg, "GOSSIP_SELECT_CODE|%lu|%lu|%u|%u|%s", player->GetGUID(), creature->GetGUID(), num, num2, st);
+		sprintf(msg, "GOSSIP_SELECT_CODE|%u|%u|%u|%u|%s", player->GetGUIDLow(), creature->GetGUIDLow(), num, num2, st);
 		break;
 	case EVENT_TYPE_GOSSIP_SELECT_CODE_OBJECT:
-		sprintf(msg, "GOSSIP_SELECT_CODE_OBJECT|%lu|%lu|%u|%u|%s", player->GetGUID(), go->GetGUID(), num, num2, st);
+		sprintf(msg, "GOSSIP_SELECT_CODE_OBJECT|%u|%u|%u|%u|%s", player->GetGUIDLow(), go->GetGUIDLow(), num, num2, st);
 		break;
 	case EVENT_TYPE_QUEST_SELECT:
-		sprintf(msg, "QUEST_SELECT|%lu|%lu|%u", player->GetGUID(), creature->GetGUID(), quest->GetQuestId());
+		sprintf(msg, "QUEST_SELECT|%u|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow(), quest->GetQuestId());
 		break;
 	case EVENT_TYPE_QUEST_COMPLETE:
-		sprintf(msg, "QUEST_COMPLETE|%lu|%lu|%u", player->GetGUID(), creature->GetGUID(), quest->GetQuestId());
+		sprintf(msg, "QUEST_COMPLETE|%u|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow(), quest->GetQuestId());
 		break;
 	case EVENT_TYPE_QUEST_REWARD:
-		sprintf(msg, "QUEST_REWARD|%lu|%lu|%u|%u", player->GetGUID(), creature->GetGUID(), quest->GetQuestId(), num);
+		sprintf(msg, "QUEST_REWARD|%u|%u|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow(), quest->GetQuestId(), num);
 		break;
 	case EVENT_TYPE_QUEST_REWARD_OBJECT:
-		sprintf(msg, "QUEST_REWARD_OBJECT|%lu|%lu|%u|%u", player->GetGUID(), go->GetGUID(), quest->GetQuestId(), num);
+		sprintf(msg, "QUEST_REWARD_OBJECT|%u|%u|%u|%u", player->GetGUIDLow(), go->GetGUIDLow(), quest->GetQuestId(), num);
 		break;
 	case EVENT_TYPE_GET_DIALOG_STATUS:
-		sprintf(msg, "GET_DIALOG_STATUS|%lu|%lu", player->GetGUID(), creature->GetGUID());
+		sprintf(msg, "GET_DIALOG_STATUS|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow());
 		break;
 	case EVENT_TYPE_GET_DIALOG_STATUS_OBJECT:
-		sprintf(msg, "GET_DIALOG_STATUS_OBJECT|%lu|%lu", player->GetGUID(), go->GetGUID());
+		sprintf(msg, "GET_DIALOG_STATUS_OBJECT|%u|%u", player->GetGUIDLow(), go->GetGUIDLow());
 		break;
 	case EVENT_TYPE_OBJECT_CHANGED:
-		sprintf(msg, "OBJECT_CHANGED|%lu|%u", go->GetGUID(), num);
+		sprintf(msg, "OBJECT_CHANGED|%u|%u", go->GetGUIDLow(), num);
 		break;
 	default:
 		sprintf(msg, "UNDEF|%d", event_type);
