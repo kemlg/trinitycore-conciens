@@ -290,6 +290,10 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	case EVENT_TYPE_OBJECT_CHANGED:
 		sprintf(msg, "OBJECT_CHANGED|%u|%u", go->GetGUIDLow(), num);
 		break;
+	case EVENT_TYPE_PLAYER_UPDATE:
+		player->GetPosition(x, y, z, o);
+		sprintf(msg, "PLAYER_UPDATE|%u|%f|%f|%f|%f", player->GetGUIDLow(), x, y, z, o);
+		break;
 	default:
 		sprintf(msg, "UNDEF|%d", event_type);
 //		done = false;

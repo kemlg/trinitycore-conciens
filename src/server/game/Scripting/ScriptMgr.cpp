@@ -1284,6 +1284,12 @@ void ScriptMgr::OnPlayerUpdateZone(Player* player, uint32 newZone, uint32 newAre
     FOREACH_SCRIPT(PlayerScript)->OnUpdateZone(player, newZone, newArea);
 }
 
+//cOncienS
+void ScriptMgr::OnPlayerUpdatePosition(Player* player)
+{
+    eb->sendEvent(EVENT_TYPE_PLAYER_UPDATE, player);
+}
+
 // Guild
 void ScriptMgr::OnGuildAddMember(Guild* guild, Player* player, uint8& plRank)
 {
