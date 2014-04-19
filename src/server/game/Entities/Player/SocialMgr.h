@@ -104,7 +104,6 @@ class TC_GAME_API PlayerSocial
 
     public:
         PlayerSocial();
-        ~PlayerSocial();
         // adding/removing
         bool AddToSocialList(ObjectGuid const& guid, SocialFlag flag);
         void RemoveFromSocialList(ObjectGuid const& guid, SocialFlag flag);

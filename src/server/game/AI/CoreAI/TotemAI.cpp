@@ -38,7 +38,7 @@ TotemAI::TotemAI(Creature* creature) : NullCreatureAI(creature), _victimGUID()
     ASSERT(creature->IsTotem(), "TotemAI: AI assigned to a non-totem creature (%s)!", creature->GetGUID().ToString().c_str());
 }
 
-void TotemAI::UpdateAI(uint32 const /*diff*/)
+void TotemAI::UpdateAI(uint32 /*diff*/)
 {
     if (me->ToTotem()->GetTotemType() != TOTEM_ACTIVE)
         return;
