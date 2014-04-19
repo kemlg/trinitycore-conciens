@@ -73,7 +73,7 @@ std::string DBC::GetStringByOffset( int offset )
     strcpy(d, (const char*)(StringBlock + offset));
     d[len] = '\0';
     std::string val = std::string(d);
-    delete d;
+    delete [] d;
     return val;
 }
 

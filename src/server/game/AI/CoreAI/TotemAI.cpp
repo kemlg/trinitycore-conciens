@@ -47,7 +47,7 @@ void TotemAI::EnterEvadeMode()
     me->CombatStop(true);
 }
 
-void TotemAI::UpdateAI(uint32 const /*diff*/)
+void TotemAI::UpdateAI(uint32 /*diff*/)
 {
     if (me->ToTotem()->GetTotemType() != TOTEM_ACTIVE)
         return;

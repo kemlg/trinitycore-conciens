@@ -88,7 +88,7 @@ namespace VMAP
                 }
                 else if (entry->second.flags & MOD_WORLDSPAWN) // WMO maps and terrain maps use different origin, so we need to adapt :/
                 {
-                    // TODO: remove extractor hack and uncomment below line:
+                    /// @todo remove extractor hack and uncomment below line:
                     //entry->second.iPos += Vector3(533.33333f*32, 533.33333f*32, 0.f);
                     entry->second.iBound = entry->second.iBound + Vector3(533.33333f*32, 533.33333f*32, 0.f);
                 }
@@ -161,23 +161,25 @@ namespace VMAP
                 uint32 x, y;
                 StaticMapTree::unpackTileID(tile->first, x, y);
                 tilefilename << std::setw(2) << x << '_' << std::setw(2) << y << ".vmtile";
-                FILE* tilefile = fopen(tilefilename.str().c_str(), "wb");
-                // file header
-                if (success && fwrite(VMAP_MAGIC, 1, 8, tilefile) != 8) success = false;
-                // write number of tile spawns
-                if (success && fwrite(&nSpawns, sizeof(uint32), 1, tilefile) != 1) success = false;
-                // write tile spawns
-                for (uint32 s=0; s<nSpawns; ++s)
+                if (FILE* tilefile = fopen(tilefilename.str().c_str(), "wb"))
                 {
-                    if (s)
-                        ++tile;
-                    const ModelSpawn &spawn2 = map_iter->second->UniqueEntries[tile->second];
-                    success = success && ModelSpawn::writeToFile(tilefile, spawn2);
-                    // MapTree nodes to update when loading tile:
-                    std::map<uint32, uint32>::iterator nIdx = modelNodeIdx.find(spawn2.ID);
-                    if (success && fwrite(&nIdx->second, sizeof(uint32), 1, tilefile) != 1) success = false;
+                    // file header
+                    if (success && fwrite(VMAP_MAGIC, 1, 8, tilefile) != 8) success = false;
+                    // write number of tile spawns
+                    if (success && fwrite(&nSpawns, sizeof(uint32), 1, tilefile) != 1) success = false;
+                    // write tile spawns
+                    for (uint32 s=0; s<nSpawns; ++s)
+                    {
+                        if (s)
+                            ++tile;
+                        const ModelSpawn &spawn2 = map_iter->second->UniqueEntries[tile->second];
+                        success = success && ModelSpawn::writeToFile(tilefile, spawn2);
+                        // MapTree nodes to update when loading tile:
+                        std::map<uint32, uint32>::iterator nIdx = modelNodeIdx.find(spawn2.ID);
+                        if (success && fwrite(&nIdx->second, sizeof(uint32), 1, tilefile) != 1) success = false;
+                    }
+                    fclose(tilefile);
                 }
-                fclose(tilefile);
             }
             // break; //test, extract only first map; TODO: remvoe this line
         }
@@ -526,7 +528,8 @@ namespace VMAP
         for (uint32 g = 0; g < groups && succeed; ++g)
             succeed = groupsArray[g].Read(rf);
 
-        fclose(rf);
+        if (succeed) /// rf will be freed inside Read if the function had any errors.
+            fclose(rf);
         return succeed;
     }
 

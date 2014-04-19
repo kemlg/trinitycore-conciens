@@ -44,13 +44,13 @@ set(shared_STAT_SRCS
   ${sources_Cryptography}
   ${sources_Database}
   ${sources_DataStores}
+  ${sources_Debugging}
   ${sources_Dynamic}
   ${sources_Logging}
   ${sources_Packets}
   ${sources_Threading}
   ${sources_Utilities}
   ${sources_localdir}
-  Debugging/Errors.h
 )
 
 include_directories(

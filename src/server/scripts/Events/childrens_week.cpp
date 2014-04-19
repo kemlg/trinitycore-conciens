@@ -174,7 +174,7 @@ class npc_winterfin_playmate : public CreatureScript
                         }
             }
 
-            void UpdateAI(const uint32 diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!phase)
                     return;
@@ -273,7 +273,7 @@ class npc_snowfall_glade_playmate : public CreatureScript
                         }
             }
 
-            void UpdateAI(const uint32 diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!phase)
                     return;
@@ -374,7 +374,7 @@ class npc_the_biggest_tree : public CreatureScript
                         }
             }
 
-            void UpdateAI(const uint32 diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!phase)
                     return;
@@ -461,7 +461,7 @@ class npc_high_oracle_soo_roo : public CreatureScript
                         }
             }
 
-            void UpdateAI(const uint32 diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!phase)
                     return;
@@ -550,7 +550,7 @@ class npc_elder_kekek : public CreatureScript
                         }
             }
 
-            void UpdateAI(const uint32 diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!phase)
                     return;
@@ -606,7 +606,7 @@ class npc_elder_kekek : public CreatureScript
 
 /*######
 ## npc_the_etymidian
-## TODO: A red crystal as a gift for the great one should be spawned during the event.
+## @todo A red crystal as a gift for the great one should be spawned during the event.
 ######*/
 class npc_the_etymidian : public CreatureScript
 {
@@ -639,7 +639,7 @@ class npc_the_etymidian : public CreatureScript
                         }
             }
 
-            void UpdateAI(const uint32 diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!phase)
                     return;
@@ -690,7 +690,6 @@ class npc_the_etymidian : public CreatureScript
         private:
             uint32 timer;
             int8 phase;
-            uint32 GOtimer;
             uint64 playerGUID;
             uint64 orphanGUID;
 
@@ -762,7 +761,7 @@ class npc_alexstraza_the_lifebinder : public CreatureScript
                     }
             }
 
-            void UpdateAI(const uint32 diff)
+            void UpdateAI(uint32 diff)
             {
                 if (!phase)
                     return;
@@ -854,7 +853,6 @@ class npc_alexstraza_the_lifebinder : public CreatureScript
                 uint32 timer;
                 uint64 playerGUID;
                 uint64 orphanGUID;
-                uint64 alexstraszaGUID;
 
         };
 

@@ -67,6 +67,7 @@ struct GameEventData
     GameEventConditionMap conditions;  // conditions to finish
     std::set<uint16 /*gameevent id*/> prerequisite_events;  // events that must be completed before starting this event
     std::string description;
+    uint8 announce;         // if 0 dont announce, if 1 announce, if 2 take config value
 
     bool isValid() const { return length > 0 || state > GAMEEVENT_NORMAL; }
 };
@@ -74,9 +75,9 @@ struct GameEventData
 struct ModelEquip
 {
     uint32 modelid;
-    uint32 equipment_id;
     uint32 modelid_prev;
-    uint32 equipement_id_prev;
+    uint8 equipment_id;
+    uint8 equipement_id_prev;
 };
 
 struct NPCVendorEntry
