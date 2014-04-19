@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -45,7 +45,9 @@ ChannelMgr* ChannelMgr::forTeam(uint32 team)
 Channel* ChannelMgr::GetJoinChannel(std::string const& name, uint32 channelId)
 {
     std::wstring wname;
-    Utf8toWStr(name, wname);
+    if (!Utf8toWStr(name, wname))
+        return NULL;
+
     wstrToLower(wname);
 
     ChannelMap::const_iterator i = channels.find(wname);
@@ -63,7 +65,9 @@ Channel* ChannelMgr::GetJoinChannel(std::string const& name, uint32 channelId)
 Channel* ChannelMgr::GetChannel(std::string const& name, Player* player, bool pkt)
 {
     std::wstring wname;
-    Utf8toWStr(name, wname);
+    if (!Utf8toWStr(name, wname))
+        return NULL;
+
     wstrToLower(wname);
 
     ChannelMap::const_iterator i = channels.find(wname);
@@ -86,7 +90,9 @@ Channel* ChannelMgr::GetChannel(std::string const& name, Player* player, bool pk
 void ChannelMgr::LeftChannel(std::string const& name)
 {
     std::wstring wname;
-    Utf8toWStr(name, wname);
+    if (!Utf8toWStr(name, wname))
+        return;
+
     wstrToLower(wname);
 
     ChannelMap::const_iterator i = channels.find(wname);

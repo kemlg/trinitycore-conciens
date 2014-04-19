@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -689,12 +689,25 @@ class SpellMgr
 
         // SpellInfo object management
         SpellInfo const* GetSpellInfo(uint32 spellId) const { return spellId < GetSpellInfoStoreSize() ?  mSpellInfoMap[spellId] : NULL; }
+        // Use this only with 100% valid spellIds
+        SpellInfo const* EnsureSpellInfo(uint32 spellId) const
+        {
+            ASSERT(spellId < GetSpellInfoStoreSize());
+            SpellInfo const* spellInfo = mSpellInfoMap[spellId];
+            ASSERT(spellInfo);
+            return spellInfo;
+        }
         uint32 GetSpellInfoStoreSize() const { return mSpellInfoMap.size(); }
+
+    private:
+        SpellInfo* _GetSpellInfo(uint32 spellId) { return spellId < GetSpellInfoStoreSize() ?  mSpellInfoMap[spellId] : NULL; }
 
     // Modifiers
     public:
 
         // Loading data at server startup
+        void UnloadSpellInfoChains();
+        void LoadSpellTalentRanks();
         void LoadSpellRanks();
         void LoadSpellRequired();
         void LoadSpellLearnSkills();
@@ -717,8 +730,8 @@ class SpellMgr
         void LoadSpellInfoStore();
         void UnloadSpellInfoStore();
         void UnloadSpellInfoImplicitTargetConditionLists();
-        void LoadSpellCustomAttr();
-        void LoadDbcDataCorrections();
+        void LoadSpellInfoCustomAttributes();
+        void LoadSpellInfoCorrections();
 
     private:
         SpellDifficultySearcherMap mSpellDifficultySearcherMap;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -29,7 +29,7 @@ class icecrown_citadel_teleport : public GameObjectScript
     public:
         icecrown_citadel_teleport() : GameObjectScript("icecrown_citadel_teleport") { }
 
-        bool OnGossipHello(Player* player, GameObject* go)
+        bool OnGossipHello(Player* player, GameObject* go) OVERRIDE
         {
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Teleport to Light's Hammer.", GOSSIP_SENDER_ICC_PORT, LIGHT_S_HAMMER_TELEPORT);
             if (InstanceScript* instance = go->GetInstanceScript())
@@ -38,7 +38,7 @@ class icecrown_citadel_teleport : public GameObjectScript
                     player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Teleport to the Oratory of the Damned.", GOSSIP_SENDER_ICC_PORT, ORATORY_OF_THE_DAMNED_TELEPORT);
                 if (instance->GetBossState(DATA_LADY_DEATHWHISPER) == DONE)
                     player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Teleport to the Rampart of Skulls.", GOSSIP_SENDER_ICC_PORT, RAMPART_OF_SKULLS_TELEPORT);
-                if (instance->GetBossState(DATA_GUNSHIP_EVENT) == DONE)
+                if (instance->GetBossState(DATA_ICECROWN_GUNSHIP_BATTLE) == DONE)
                     player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Teleport to the Deathbringer's Rise.", GOSSIP_SENDER_ICC_PORT, DEATHBRINGER_S_RISE_TELEPORT);
                 if (instance->GetData(DATA_COLDFLAME_JETS) == DONE)
                     player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Teleport to the Upper Spire.", GOSSIP_SENDER_ICC_PORT, UPPER_SPIRE_TELEPORT);
@@ -51,7 +51,7 @@ class icecrown_citadel_teleport : public GameObjectScript
             return true;
         }
 
-        bool OnGossipSelect(Player* player, GameObject* /*go*/, uint32 sender, uint32 action)
+        bool OnGossipSelect(Player* player, GameObject* /*go*/, uint32 sender, uint32 action) OVERRIDE
         {
             player->PlayerTalkClass->ClearMenus();
             player->CLOSE_GOSSIP_MENU();
@@ -59,7 +59,7 @@ class icecrown_citadel_teleport : public GameObjectScript
             if (!spell)
                 return false;
 
-            if (player->isInCombat())
+            if (player->IsInCombat())
             {
                 Spell::SendCastResult(player, spell, 0, SPELL_FAILED_AFFECTING_COMBAT);
                 return true;
@@ -77,9 +77,9 @@ class at_frozen_throne_teleport : public AreaTriggerScript
     public:
         at_frozen_throne_teleport() : AreaTriggerScript("at_frozen_throne_teleport") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/)
+        bool OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/) OVERRIDE
         {
-            if (player->isInCombat())
+            if (player->IsInCombat())
             {
                 if (SpellInfo const* spell = sSpellMgr->GetSpellInfo(FROZEN_THRONE_TELEPORT))
                     Spell::SendCastResult(player, spell, 0, SPELL_FAILED_AFFECTING_COMBAT);

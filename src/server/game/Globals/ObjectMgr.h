@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -25,6 +25,7 @@
 #include "Creature.h"
 #include "DynamicObject.h"
 #include "GameObject.h"
+#include "TemporarySummon.h"
 #include "Corpse.h"
 #include "QuestDef.h"
 #include "ItemPrototype.h"
@@ -60,6 +61,26 @@ struct PageText
 {
     std::string Text;
     uint16 NextPage;
+};
+
+/// Key for storing temp summon data in TempSummonDataContainer
+struct TempSummonGroupKey
+{
+    TempSummonGroupKey(uint32 summonerEntry, SummonerType summonerType, uint8 group)
+        : _summonerEntry(summonerEntry), _summonerType(summonerType), _summonGroup(group)
+    {
+    }
+
+    bool operator<(TempSummonGroupKey const& rhs) const
+    {
+        // memcmp is only reliable if struct doesn't have any padding (packed)
+        return memcmp(this, &rhs, sizeof(TempSummonGroupKey)) < 0;
+    }
+
+private:
+    uint32 _summonerEntry;      ///< Summoner's entry
+    SummonerType _summonerType; ///< Summoner's type, see SummonerType for available types
+    uint8 _summonGroup;         ///< Summon's group id
 };
 
 // GCC have alternative #pragma pack() syntax and old gcc version not support pack(pop), also any gcc version not support it at some platform
@@ -419,6 +440,7 @@ struct TrinityStringLocale
 typedef std::map<uint64, uint64> LinkedRespawnContainer;
 typedef UNORDERED_MAP<uint32, CreatureData> CreatureDataContainer;
 typedef UNORDERED_MAP<uint32, GameObjectData> GameObjectDataContainer;
+typedef std::map<TempSummonGroupKey, std::vector<TempSummonData> > TempSummonDataContainer;
 typedef UNORDERED_MAP<uint32, CreatureLocale> CreatureLocaleContainer;
 typedef UNORDERED_MAP<uint32, GameObjectLocale> GameObjectLocaleContainer;
 typedef UNORDERED_MAP<uint32, ItemLocale> ItemLocaleContainer;
@@ -435,7 +457,7 @@ typedef std::pair<QuestRelations::const_iterator, QuestRelations::const_iterator
 
 struct PetLevelInfo
 {
-    PetLevelInfo() : health(0), mana(0) { for (uint8 i=0; i < MAX_STATS; ++i) stats[i] = 0; }
+    PetLevelInfo() : health(0), mana(0), armor(0) { for (uint8 i=0; i < MAX_STATS; ++i) stats[i] = 0; }
 
     uint16 stats[MAX_STATS];
     uint16 health;
@@ -445,8 +467,8 @@ struct PetLevelInfo
 
 struct MailLevelReward
 {
-    MailLevelReward() : raceMask(0), mailTemplateId(0), senderEntry(0) {}
-    MailLevelReward(uint32 _raceMask, uint32 _mailTemplateId, uint32 _senderEntry) : raceMask(_raceMask), mailTemplateId(_mailTemplateId), senderEntry(_senderEntry) {}
+    MailLevelReward() : raceMask(0), mailTemplateId(0), senderEntry(0) { }
+    MailLevelReward(uint32 _raceMask, uint32 _mailTemplateId, uint32 _senderEntry) : raceMask(_raceMask), mailTemplateId(_mailTemplateId), senderEntry(_senderEntry) { }
 
     uint32 raceMask;
     uint32 mailTemplateId;
@@ -463,6 +485,7 @@ struct RepRewardRate
     float questDailyRate;
     float questWeeklyRate;
     float questMonthlyRate;
+    float questRepeatableRate;
     float creatureRate;         // no reputation are given at all for this faction/rate type.
     float spellRate;
 };
@@ -533,8 +556,8 @@ struct QuestPOIPoint
     int32 x;
     int32 y;
 
-    QuestPOIPoint() : x(0), y(0) {}
-    QuestPOIPoint(int32 _x, int32 _y) : x(_x), y(_y) {}
+    QuestPOIPoint() : x(0), y(0) { }
+    QuestPOIPoint(int32 _x, int32 _y) : x(_x), y(_y) { }
 };
 
 struct QuestPOI
@@ -543,13 +566,13 @@ struct QuestPOI
     int32 ObjectiveIndex;
     uint32 MapId;
     uint32 AreaId;
-    uint32 Unk2;
+    uint32 FloorId;
     uint32 Unk3;
     uint32 Unk4;
     std::vector<QuestPOIPoint> points;
 
-    QuestPOI() : Id(0), ObjectiveIndex(0), MapId(0), AreaId(0), Unk2(0), Unk3(0), Unk4(0) {}
-    QuestPOI(uint32 id, int32 objIndex, uint32 mapId, uint32 areaId, uint32 unk2, uint32 unk3, uint32 unk4) : Id(id), ObjectiveIndex(objIndex), MapId(mapId), AreaId(areaId), Unk2(unk2), Unk3(unk3), Unk4(unk4) {}
+    QuestPOI() : Id(0), ObjectiveIndex(0), MapId(0), AreaId(0), FloorId(0), Unk3(0), Unk4(0) { }
+    QuestPOI(uint32 id, int32 objIndex, uint32 mapId, uint32 areaId, uint32 floorId, uint32 unk3, uint32 unk4) : Id(id), ObjectiveIndex(objIndex), MapId(mapId), AreaId(areaId), FloorId(floorId), Unk3(unk3), Unk4(unk4) { }
 };
 
 typedef std::vector<QuestPOI> QuestPOIVector;
@@ -661,9 +684,9 @@ class ObjectMgr
         CreatureTemplateContainer const* GetCreatureTemplates() const { return &_creatureTemplateStore; }
         CreatureModelInfo const* GetCreatureModelInfo(uint32 modelId);
         CreatureModelInfo const* GetCreatureModelRandomGender(uint32* displayID);
-        static uint32 ChooseDisplayId(uint32 team, const CreatureTemplate* cinfo, const CreatureData* data = NULL);
-        static void ChooseCreatureFlags(const CreatureTemplate* cinfo, uint32& npcflag, uint32& unit_flags, uint32& dynamicflags, const CreatureData* data = NULL);
-        EquipmentInfo const* GetEquipmentInfo(uint32 entry);
+        static uint32 ChooseDisplayId(CreatureTemplate const* cinfo, CreatureData const* data = NULL);
+        static void ChooseCreatureFlags(CreatureTemplate const* cinfo, uint32& npcflag, uint32& unit_flags, uint32& dynamicflags, CreatureData const* data = NULL);
+        EquipmentInfo const* GetEquipmentInfo(uint32 entry, int8& id);
         CreatureAddon const* GetCreatureAddon(uint32 lowguid);
         CreatureAddon const* GetCreatureTemplateAddon(uint32 entry);
         ItemTemplate const* GetItemTemplate(uint32 entry);
@@ -694,7 +717,21 @@ class ObjectMgr
         void GetPlayerLevelInfo(uint32 race, uint32 class_, uint8 level, PlayerLevelInfo* info) const;
 
         uint64 GetPlayerGUIDByName(std::string const& name) const;
-        bool GetPlayerNameByGUID(uint64 guid, std::string &name) const;
+
+        /**
+        * Retrieves the player name by guid.
+        *
+        * If the player is online, the name is retrieved immediately otherwise
+        * a database query is done.
+        *
+        * @remark Use sWorld->GetCharacterNameData because it doesn't require a database query when player is offline
+        *
+        * @param guid player full guid
+        * @param name returned name
+        *
+        * @return true if player was found, false otherwise
+        */
+        bool GetPlayerNameByGUID(uint64 guid, std::string& name) const;
         uint32 GetPlayerTeamByGUID(uint64 guid) const;
         uint32 GetPlayerAccountIdByGUID(uint64 guid) const;
         uint32 GetPlayerAccountIdByPlayerName(std::string const& name) const;
@@ -758,7 +795,7 @@ class ObjectMgr
         AreaTrigger const* GetMapEntranceTrigger(uint32 Map) const;
 
         uint32 GetAreaTriggerScriptId(uint32 trigger_id);
-        SpellScriptsBounds GetSpellScriptsBounds(uint32 spell_id);
+        SpellScriptsBounds GetSpellScriptsBounds(uint32 spellId);
 
         RepRewardRate const* GetRepRewardRate(uint32 factionId) const
         {
@@ -777,7 +814,7 @@ class ObjectMgr
             return NULL;
         }
 
-        int32 GetBaseReputationOff(FactionEntry const* factionEntry, uint8 race, uint8 playerClass);
+        int32 GetBaseReputationOf(FactionEntry const* factionEntry, uint8 race, uint8 playerClass);
 
         RepSpilloverTemplate const* GetRepSpilloverTemplate(uint32 factionId) const
         {
@@ -815,21 +852,21 @@ class ObjectMgr
         }
 
         void LoadQuests();
-        void LoadQuestRelations()
+        void LoadQuestStartersAndEnders()
         {
-            sLog->outInfo(LOG_FILTER_SERVER_LOADING, "Loading GO Start Quest Data...");
-            LoadGameobjectQuestRelations();
-            sLog->outInfo(LOG_FILTER_SERVER_LOADING, "Loading GO End Quest Data...");
-            LoadGameobjectInvolvedRelations();
-            sLog->outInfo(LOG_FILTER_SERVER_LOADING, "Loading Creature Start Quest Data...");
-            LoadCreatureQuestRelations();
-            sLog->outInfo(LOG_FILTER_SERVER_LOADING, "Loading Creature End Quest Data...");
-            LoadCreatureInvolvedRelations();
+            TC_LOG_INFO("server.loading", "Loading GO Start Quest Data...");
+            LoadGameobjectQuestStarters();
+            TC_LOG_INFO("server.loading", "Loading GO End Quest Data...");
+            LoadGameobjectQuestEnders();
+            TC_LOG_INFO("server.loading", "Loading Creature Start Quest Data...");
+            LoadCreatureQuestStarters();
+            TC_LOG_INFO("server.loading", "Loading Creature End Quest Data...");
+            LoadCreatureQuestEnders();
         }
-        void LoadGameobjectQuestRelations();
-        void LoadGameobjectInvolvedRelations();
-        void LoadCreatureQuestRelations();
-        void LoadCreatureInvolvedRelations();
+        void LoadGameobjectQuestStarters();
+        void LoadGameobjectQuestEnders();
+        void LoadCreatureQuestStarters();
+        void LoadCreatureQuestEnders();
 
         QuestRelations* GetGOQuestRelationMap()
         {
@@ -876,6 +913,7 @@ class ObjectMgr
         void LoadCreatureTemplates();
         void LoadCreatureTemplateAddons();
         void CheckCreatureTemplate(CreatureTemplate const* cInfo);
+        void LoadTempSummons();
         void LoadCreatures();
         void LoadLinkedRespawn();
         bool SetCreatureLinkedRespawn(uint32 guid, uint32 linkedGuid);
@@ -981,6 +1019,29 @@ class ObjectMgr
             return _mapObjectGuidsStore[MAKE_PAIR32(mapid, spawnMode)][cell_id];
         }
 
+        CellObjectGuidsMap const& GetMapObjectGuids(uint16 mapid, uint8 spawnMode)
+        {
+            return _mapObjectGuidsStore[MAKE_PAIR32(mapid, spawnMode)];
+        }
+
+        /**
+         * Gets temp summon data for all creatures of specified group.
+         *
+         * @param summonerId   Summoner's entry.
+         * @param summonerType Summoner's type, see SummonerType for available types.
+         * @param group        Id of required group.
+         *
+         * @return null if group was not found, otherwise reference to the creature group data
+         */
+        std::vector<TempSummonData> const* GetSummonGroup(uint32 summonerId, SummonerType summonerType, uint8 group) const
+        {
+            TempSummonDataContainer::const_iterator itr = _tempSummonDataStore.find(TempSummonGroupKey(summonerId, summonerType, group));
+            if (itr != _tempSummonDataStore.end())
+                return &itr->second;
+
+            return NULL;
+        }
+
         CreatureData const* GetCreatureData(uint32 guid) const
         {
             CreatureDataContainer::const_iterator itr = _creatureDataStore.find(guid);
@@ -1080,7 +1141,7 @@ class ObjectMgr
         void RemoveGameobjectFromGrid(uint32 guid, GameObjectData const* data);
         uint32 AddGOData(uint32 entry, uint32 map, float x, float y, float z, float o, uint32 spawntimedelay = 0, float rotation0 = 0, float rotation1 = 0, float rotation2 = 0, float rotation3 = 0);
         uint32 AddCreData(uint32 entry, uint32 team, uint32 map, float x, float y, float z, float o, uint32 spawntimedelay = 0);
-        bool MoveCreData(uint32 guid, uint32 map, Position pos);
+        bool MoveCreData(uint32 guid, uint32 map, const Position& pos);
 
         // reserved names
         void LoadReservedPlayersNames();
@@ -1091,7 +1152,7 @@ class ObjectMgr
         static PetNameInvalidReason CheckPetName(std::string const& name);
         static bool IsValidCharterName(std::string const& name);
 
-        static bool CheckDeclinedNames(std::wstring w_ownname, DeclinedName const& names);
+        static bool CheckDeclinedNames(const std::wstring& w_ownname, DeclinedName const& names);
 
         GameTele const* GetGameTele(uint32 id) const
         {
@@ -1100,6 +1161,7 @@ class ObjectMgr
             return &itr->second;
         }
         GameTele const* GetGameTele(std::string const& name) const;
+        GameTele const* GetGameTeleExactName(std::string const& name) const;
         GameTeleContainer const& GetGameTeleMap() const { return _gameTeleStore; }
         bool AddGameTele(GameTele& data);
         bool DeleteGameTele(std::string const& name);
@@ -1164,16 +1226,18 @@ class ObjectMgr
                 value = data[loc_idx];
         }
 
-        CharacterConversionMap FactionChange_Achievements;
-        CharacterConversionMap FactionChange_Items;
-        CharacterConversionMap FactionChange_Spells;
-        CharacterConversionMap FactionChange_Reputation;
-        CharacterConversionMap FactionChange_Titles;
+        CharacterConversionMap FactionChangeAchievements;
+        CharacterConversionMap FactionChangeItems;
+        CharacterConversionMap FactionChangeQuests;
+        CharacterConversionMap FactionChangeReputation;
+        CharacterConversionMap FactionChangeSpells;
+        CharacterConversionMap FactionChangeTitles;
 
         void LoadFactionChangeAchievements();
         void LoadFactionChangeItems();
-        void LoadFactionChangeSpells();
+        void LoadFactionChangeQuests();
         void LoadFactionChangeReputations();
+        void LoadFactionChangeSpells();
         void LoadFactionChangeTitles();
 
     private:
@@ -1294,6 +1358,8 @@ class ObjectMgr
         GameObjectDataContainer _gameObjectDataStore;
         GameObjectLocaleContainer _gameObjectLocaleStore;
         GameObjectTemplateContainer _gameObjectTemplateStore;
+        /// Stores temp summon data grouped by summoner's entry, summoner's type and group id
+        TempSummonDataContainer _tempSummonDataStore;
 
         ItemTemplateContainer _itemTemplateStore;
         ItemLocaleContainer _itemLocaleStore;
@@ -1318,6 +1384,8 @@ class ObjectMgr
             GO_TO_GO,
             GO_TO_CREATURE          // GO is dependant on creature
         };
+
+        std::set<uint32> _transportMaps; // Helper container storing map ids that are for transports only, loaded from gameobject_template
 };
 
 #define sObjectMgr ACE_Singleton<ObjectMgr, ACE_Null_Mutex>::instance()

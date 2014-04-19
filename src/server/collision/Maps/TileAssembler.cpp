@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2010 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -98,7 +98,16 @@ namespace VMAP
 
             printf("Creating map tree for map %u...\n", map_iter->first);
             BIH pTree;
-            pTree.build(mapSpawns, BoundsTrait<ModelSpawn*>::getBounds);
+
+            try
+            {
+                pTree.build(mapSpawns, BoundsTrait<ModelSpawn*>::getBounds);
+            }
+            catch (std::exception& e)
+            {
+                printf("Exception ""%s"" when calling pTree.build", e.what());
+                return false;
+            }
 
             // ===> possibly move this code to StaticMapTree class
             std::map<uint32, uint32> modelNodeIdx;
@@ -497,7 +506,8 @@ namespace VMAP
             return false;
         }
 
-        char ident[8];
+        char ident[9];
+        ident[8] = '\0';
         int readOperation = 0;
 
         READ_OR_RETURN(&ident, 8);

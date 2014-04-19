@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -152,7 +152,7 @@ struct InstanceGroupBind
     bool perm;
     /* permanent InstanceGroupBinds exist if the leader has a permanent
        PlayerInstanceBind for the same instance. */
-    InstanceGroupBind() : save(NULL), perm(false) {}
+    InstanceGroupBind() : save(NULL), perm(false) { }
 };
 
 /** request member stats checken **/
@@ -195,6 +195,7 @@ class Group
         void   ChangeLeader(uint64 guid);
         void   SetLootMethod(LootMethod method);
         void   SetLooterGuid(uint64 guid);
+        void   SetMasterLooterGuid(uint64 guid);
         void   UpdateLooterGuid(WorldObject* pLootedObject, bool ifneed = false);
         void   SetLootThreshold(ItemQualities threshold);
         void   Disband(bool hideDestroy=false);
@@ -213,6 +214,7 @@ class Group
         const char * GetLeaderName() const;
         LootMethod GetLootMethod() const;
         uint64 GetLooterGuid() const;
+        uint64 GetMasterLooterGuid() const;
         ItemQualities GetLootThreshold() const;
 
         uint32 GetDbStoreId() const { return m_dbStoreId; };
@@ -332,6 +334,7 @@ class Group
         LootMethod          m_lootMethod;
         ItemQualities       m_lootThreshold;
         uint64              m_looterGuid;
+        uint64              m_masterLooterGuid;
         Rolls               RollId;
         BoundInstancesMap   m_boundInstances[MAX_DIFFICULTY];
         uint8*              m_subGroupsCounts;

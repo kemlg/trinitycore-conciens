@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -19,14 +19,13 @@
 /* ScriptData
 SDName: Tanaris
 SD%Complete: 80
-SDComment: Quest support: 648, 1560, 2954, 4005, 10277, 10279(Special flight path). Noggenfogger vendor
+SDComment: Quest support: 648, 1560, 2954, 4005, 10277, 10279(Special flight path).
 SDCategory: Tanaris
 EndScriptData */
 
 /* ContentData
-mob_aquementas
+npc_aquementas
 npc_custodian_of_time
-npc_marin_noggenfogger
 npc_steward_of_time
 npc_stone_watcher_of_norgannon
 npc_OOX17
@@ -42,7 +41,7 @@ EndContentData */
 #include "WorldSession.h"
 
 /*######
-## mob_aquementas
+## npc_aquementas
 ######*/
 
 enum Aquementas
@@ -53,19 +52,19 @@ enum Aquementas
     SPELL_FROST_SHOCK   = 15089
 };
 
-class mob_aquementas : public CreatureScript
+class npc_aquementas : public CreatureScript
 {
 public:
-    mob_aquementas() : CreatureScript("mob_aquementas") { }
+    npc_aquementas() : CreatureScript("npc_aquementas") { }
 
-    CreatureAI* GetAI(Creature* creature) const
+    CreatureAI* GetAI(Creature* creature) const OVERRIDE
     {
-        return new mob_aquementasAI (creature);
+        return new npc_aquementasAI(creature);
     }
 
-    struct mob_aquementasAI : public ScriptedAI
+    struct npc_aquementasAI : public ScriptedAI
     {
-        mob_aquementasAI(Creature* creature) : ScriptedAI(creature) {}
+        npc_aquementasAI(Creature* creature) : ScriptedAI(creature) { }
 
         uint32 SendItemTimer;
         uint32 SwitchFactionTimer;
@@ -74,7 +73,7 @@ public:
         uint32 FrostShockTimer;
         uint32 AquaJetTimer;
 
-        void Reset()
+        void Reset() OVERRIDE
         {
             SendItemTimer = 0;
             SwitchFactionTimer = 10000;
@@ -87,24 +86,26 @@ public:
 
         void SendItem(Unit* receiver)
         {
-            if (CAST_PLR(receiver)->HasItemCount(11169, 1, false) &&
-                CAST_PLR(receiver)->HasItemCount(11172, 11, false) &&
-                CAST_PLR(receiver)->HasItemCount(11173, 1, false) &&
-                !CAST_PLR(receiver)->HasItemCount(11522, 1, true))
+            Player* player = receiver->ToPlayer();
+
+            if (player && player->HasItemCount(11169, 1, false) &&
+                player->HasItemCount(11172, 11, false) &&
+                player->HasItemCount(11173, 1, false) &&
+                !player->HasItemCount(11522, 1, true))
             {
                 ItemPosCountVec dest;
-                uint8 msg = CAST_PLR(receiver)->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, 11522, 1, NULL);
+                uint8 msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, 11522, 1, NULL);
                 if (msg == EQUIP_ERR_OK)
-                    CAST_PLR(receiver)->StoreNewItem(dest, 11522, 1, true);
+                    player->StoreNewItem(dest, 11522, 1, true);
             }
         }
 
-        void EnterCombat(Unit* who)
+        void EnterCombat(Unit* who) OVERRIDE
         {
-            Talk(AGGRO_YELL_AQUE, who->GetGUID());
+            Talk(AGGRO_YELL_AQUE, who);
         }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff) OVERRIDE
         {
             if (isFriendly)
             {
@@ -122,15 +123,15 @@ public:
             {
                 if (SendItemTimer <= diff)
                 {
-                    if (me->getVictim()->GetTypeId() == TYPEID_PLAYER)
-                        SendItem(me->getVictim());
+                    if (me->GetVictim()->GetTypeId() == TYPEID_PLAYER)
+                        SendItem(me->GetVictim());
                     SendItemTimer = 5000;
                 } else SendItemTimer -= diff;
             }
 
             if (FrostShockTimer <= diff)
             {
-                DoCast(me->getVictim(), SPELL_FROST_SHOCK);
+                DoCastVictim(SPELL_FROST_SHOCK);
                 FrostShockTimer = 15000;
             } else FrostShockTimer -= diff;
 
@@ -173,74 +174,74 @@ class npc_custodian_of_time : public CreatureScript
 public:
     npc_custodian_of_time() : CreatureScript("npc_custodian_of_time") { }
 
-    CreatureAI* GetAI(Creature* creature) const
+    CreatureAI* GetAI(Creature* creature) const OVERRIDE
     {
         return new npc_custodian_of_timeAI(creature);
     }
 
     struct npc_custodian_of_timeAI : public npc_escortAI
     {
-        npc_custodian_of_timeAI(Creature* creature) : npc_escortAI(creature) {}
+        npc_custodian_of_timeAI(Creature* creature) : npc_escortAI(creature) { }
 
-        void WaypointReached(uint32 waypointId)
+        void WaypointReached(uint32 waypointId) OVERRIDE
         {
             if (Player* player = GetPlayerForEscort())
             {
                 switch (waypointId)
                 {
                     case 0:
-                        Talk(WHISPER_CUSTODIAN_1, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_1, player);
                         break;
                     case 1:
-                        Talk(WHISPER_CUSTODIAN_2, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_2, player);
                         break;
                     case 2:
-                        Talk(WHISPER_CUSTODIAN_3, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_3, player);
                         break;
                     case 3:
-                        Talk(WHISPER_CUSTODIAN_4, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_4, player);
                         break;
                     case 5:
-                        Talk(WHISPER_CUSTODIAN_5, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_5, player);
                         break;
                     case 6:
-                        Talk(WHISPER_CUSTODIAN_6, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_6, player);
                         break;
                     case 7:
-                        Talk(WHISPER_CUSTODIAN_7, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_7, player);
                         break;
                     case 8:
-                        Talk(WHISPER_CUSTODIAN_8, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_8, player);
                         break;
                     case 9:
-                        Talk(WHISPER_CUSTODIAN_9, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_9, player);
                         break;
                     case 10:
-                        Talk(WHISPER_CUSTODIAN_4, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_4, player);
                         break;
                     case 13:
-                        Talk(WHISPER_CUSTODIAN_10, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_10, player);
                         break;
                     case 14:
-                        Talk(WHISPER_CUSTODIAN_4, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_4, player);
                         break;
                     case 16:
-                        Talk(WHISPER_CUSTODIAN_11, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_11, player);
                         break;
                     case 17:
-                        Talk(WHISPER_CUSTODIAN_12, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_12, player);
                         break;
                     case 18:
-                        Talk(WHISPER_CUSTODIAN_4, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_4, player);
                         break;
                     case 22:
-                        Talk(WHISPER_CUSTODIAN_13, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_13, player);
                         break;
                     case 23:
-                        Talk(WHISPER_CUSTODIAN_4, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_4, player);
                         break;
                     case 24:
-                        Talk(WHISPER_CUSTODIAN_14, player->GetGUID());
+                        Talk(WHISPER_CUSTODIAN_14, player);
                         DoCast(player, 34883);
                         // below here is temporary workaround, to be removed when spell works properly
                         player->AreaExploredOrEventHappens(10277);
@@ -249,14 +250,15 @@ public:
             }
         }
 
-        void MoveInLineOfSight(Unit* who)
+        void MoveInLineOfSight(Unit* who) OVERRIDE
+
         {
             if (HasEscortState(STATE_ESCORT_ESCORTING))
                 return;
 
-            if (who->GetTypeId() == TYPEID_PLAYER)
+            if (Player* player = who->ToPlayer())
             {
-                if (who->HasAura(34877) && CAST_PLR(who)->GetQuestStatus(10277) == QUEST_STATUS_INCOMPLETE)
+                if (who->HasAura(34877) && player->GetQuestStatus(10277) == QUEST_STATUS_INCOMPLETE)
                 {
                     float Radius = 10.0f;
                     if (me->IsWithinDistInMap(who, Radius))
@@ -267,47 +269,14 @@ public:
             }
         }
 
-        void EnterCombat(Unit* /*who*/) {}
-        void Reset() {}
+        void EnterCombat(Unit* /*who*/) OVERRIDE { }
+        void Reset() OVERRIDE { }
 
-        void UpdateAI(const uint32 diff)
+        void UpdateAI(uint32 diff) OVERRIDE
         {
             npc_escortAI::UpdateAI(diff);
         }
     };
-
-};
-
-/*######
-## npc_marin_noggenfogger
-######*/
-
-class npc_marin_noggenfogger : public CreatureScript
-{
-public:
-    npc_marin_noggenfogger() : CreatureScript("npc_marin_noggenfogger") { }
-
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
-    {
-        player->PlayerTalkClass->ClearMenus();
-        if (action == GOSSIP_ACTION_TRADE)
-            player->GetSession()->SendListInventory(creature->GetGUID());
-
-        return true;
-    }
-
-    bool OnGossipHello(Player* player, Creature* creature)
-    {
-        if (creature->isQuestGiver())
-            player->PrepareQuestMenu(creature->GetGUID());
-
-        if (creature->isVendor() && player->GetQuestRewardStatus(2662))
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_VENDOR, GOSSIP_TEXT_BROWSE_GOODS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
-
-        player->SEND_GOSSIP_MENU(player->GetGossipTextId(creature), creature->GetGUID());
-
-        return true;
-    }
 
 };
 
@@ -322,7 +291,7 @@ class npc_steward_of_time : public CreatureScript
 public:
     npc_steward_of_time() : CreatureScript("npc_steward_of_time") { }
 
-    bool OnQuestAccept(Player* player, Creature* /*creature*/, Quest const* quest)
+    bool OnQuestAccept(Player* player, Creature* /*creature*/, Quest const* quest) OVERRIDE
     {
         if (quest->GetQuestId() == 10279)                      //Quest: To The Master's Lair
             player->CastSpell(player, 34891, true);               //(Flight through Caverns)
@@ -330,7 +299,7 @@ public:
         return false;
     }
 
-    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action)
+    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action) OVERRIDE
     {
         player->PlayerTalkClass->ClearMenus();
         if (action == GOSSIP_ACTION_INFO_DEF + 1)
@@ -339,9 +308,9 @@ public:
         return true;
     }
 
-    bool OnGossipHello(Player* player, Creature* creature)
+    bool OnGossipHello(Player* player, Creature* creature) OVERRIDE
     {
-        if (creature->isQuestGiver())
+        if (creature->IsQuestGiver())
             player->PrepareQuestMenu(creature->GetGUID());
 
         if (player->GetQuestStatus(10279) == QUEST_STATUS_INCOMPLETE || player->GetQuestRewardStatus(10279))
@@ -373,7 +342,7 @@ class npc_stone_watcher_of_norgannon : public CreatureScript
 public:
     npc_stone_watcher_of_norgannon() : CreatureScript("npc_stone_watcher_of_norgannon") { }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) OVERRIDE
     {
         player->PlayerTalkClass->ClearMenus();
         switch (action)
@@ -406,9 +375,9 @@ public:
         return true;
     }
 
-    bool OnGossipHello(Player* player, Creature* creature)
+    bool OnGossipHello(Player* player, Creature* creature) OVERRIDE
     {
-        if (creature->isQuestGiver())
+        if (creature->IsQuestGiver())
             player->PrepareQuestMenu(creature->GetGUID());
 
         if (player->GetQuestStatus(2954) == QUEST_STATUS_INCOMPLETE)
@@ -444,7 +413,7 @@ class npc_OOX17 : public CreatureScript
 public:
     npc_OOX17() : CreatureScript("npc_OOX17") { }
 
-    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
+    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) OVERRIDE
     {
         if (quest->GetQuestId() == Q_OOX17)
         {
@@ -460,16 +429,16 @@ public:
         return true;
     }
 
-    CreatureAI* GetAI(Creature* creature) const
+    CreatureAI* GetAI(Creature* creature) const OVERRIDE
     {
         return new npc_OOX17AI(creature);
     }
 
     struct npc_OOX17AI : public npc_escortAI
     {
-        npc_OOX17AI(Creature* creature) : npc_escortAI(creature) {}
+        npc_OOX17AI(Creature* creature) : npc_escortAI(creature) { }
 
-        void WaypointReached(uint32 waypointId)
+        void WaypointReached(uint32 waypointId) OVERRIDE
         {
             if (Player* player = GetPlayerForEscort())
             {
@@ -497,14 +466,14 @@ public:
             }
         }
 
-        void Reset(){}
+        void Reset() OVERRIDE { }
 
-        void EnterCombat(Unit* /*who*/)
+        void EnterCombat(Unit* /*who*/) OVERRIDE
         {
             Talk(SAY_OOX_AGGRO);
         }
 
-        void JustSummoned(Creature* summoned)
+        void JustSummoned(Creature* summoned) OVERRIDE
         {
             summoned->AI()->AttackStart(me);
         }
@@ -539,7 +508,7 @@ class npc_tooga : public CreatureScript
 public:
     npc_tooga() : CreatureScript("npc_tooga") { }
 
-    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest)
+    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest) OVERRIDE
     {
         if (quest->GetQuestId() == QUEST_TOOGA)
         {
@@ -550,7 +519,7 @@ public:
         return true;
     }
 
-    CreatureAI* GetAI(Creature* creature) const
+    CreatureAI* GetAI(Creature* creature) const OVERRIDE
     {
         return new npc_toogaAI(creature);
     }
@@ -565,7 +534,7 @@ public:
 
         uint64 TortaGUID;
 
-        void Reset()
+        void Reset() OVERRIDE
         {
             CheckSpeechTimer = 2500;
             PostEventTimer = 1000;
@@ -574,11 +543,12 @@ public:
             TortaGUID = 0;
         }
 
-        void MoveInLineOfSight(Unit* who)
+        void MoveInLineOfSight(Unit* who) OVERRIDE
+
         {
             FollowerAI::MoveInLineOfSight(who);
 
-            if (!me->getVictim() && !HasFollowState(STATE_FOLLOW_COMPLETE | STATE_FOLLOW_POSTEVENT) && who->GetEntry() == NPC_TORTA)
+            if (!me->GetVictim() && !HasFollowState(STATE_FOLLOW_COMPLETE | STATE_FOLLOW_POSTEVENT) && who->GetEntry() == NPC_TORTA)
             {
                 if (me->IsWithinDistInMap(who, INTERACTION_DISTANCE))
                 {
@@ -592,7 +562,7 @@ public:
             }
         }
 
-        void MovementInform(uint32 MotionType, uint32 PointId)
+        void MovementInform(uint32 MotionType, uint32 PointId) OVERRIDE
         {
             FollowerAI::MovementInform(MotionType, PointId);
 
@@ -603,7 +573,7 @@ public:
                 SetFollowComplete();
         }
 
-        void UpdateFollowerAI(const uint32 Diff)
+        void UpdateFollowerAI(uint32 Diff) OVERRIDE
         {
             if (!UpdateVictim())
             {
@@ -615,7 +585,7 @@ public:
                         PostEventTimer = 5000;
 
                         Creature* torta = Creature::GetCreature(*me, TortaGUID);
-                        if (!torta || !torta->isAlive())
+                        if (!torta || !torta->IsAlive())
                         {
                             //something happened, so just complete
                             SetFollowComplete();
@@ -675,9 +645,8 @@ public:
 
 void AddSC_tanaris()
 {
-    new mob_aquementas();
+    new npc_aquementas();
     new npc_custodian_of_time();
-    new npc_marin_noggenfogger();
     new npc_steward_of_time();
     new npc_stone_watcher_of_norgannon();
     new npc_OOX17();

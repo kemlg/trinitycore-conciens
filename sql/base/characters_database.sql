@@ -214,6 +214,32 @@ LOCK TABLES `auctionhouse` WRITE;
 UNLOCK TABLES;
 
 --
+-- Table structure for table `banned_addons`
+--
+
+DROP TABLE IF EXISTS `banned_addons`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `banned_addons` (
+  `Id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `Name` varchar(255) NOT NULL,
+  `Version` varchar(255) NOT NULL DEFAULT '',
+  `Timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Id`),
+  UNIQUE KEY `idx_name_ver` (`Name`,`Version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `banned_addons`
+--
+
+LOCK TABLES `banned_addons` WRITE;
+/*!40000 ALTER TABLE `banned_addons` DISABLE KEYS */;
+/*!40000 ALTER TABLE `banned_addons` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `bugreport`
 --
 
@@ -938,6 +964,7 @@ DROP TABLE IF EXISTS `character_queststatus_rewarded`;
 CREATE TABLE `character_queststatus_rewarded` (
   `guid` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Global Unique Identifier',
   `quest` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Quest Identifier',
+  `active` tinyint(10) unsigned NOT NULL DEFAULT '1',
   PRIMARY KEY (`guid`,`quest`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Player System';
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1312,7 +1339,7 @@ CREATE TABLE `corpse` (
   `posZ` float NOT NULL DEFAULT '0',
   `orientation` float NOT NULL DEFAULT '0',
   `mapId` smallint(5) unsigned NOT NULL DEFAULT '0' COMMENT 'Map Identifier',
-  `phaseMask` smallint(5) unsigned NOT NULL DEFAULT '1',
+  `phaseMask` int(10) unsigned NOT NULL DEFAULT '1',
   `displayId` int(10) unsigned NOT NULL DEFAULT '0',
   `itemCache` text NOT NULL,
   `bytes1` int(10) unsigned NOT NULL DEFAULT '0',
@@ -1605,6 +1632,7 @@ CREATE TABLE `groups` (
   `groupType` tinyint(3) unsigned NOT NULL,
   `difficulty` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `raiddifficulty` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `masterLooterGuid` int(10) unsigned NOT NULL,
   PRIMARY KEY (`guid`),
   KEY `leaderGuid` (`leaderGuid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Groups';
@@ -1635,7 +1663,7 @@ CREATE TABLE `guild` (
   `BorderStyle` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `BorderColor` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `BackgroundColor` tinyint(3) unsigned NOT NULL DEFAULT '0',
-  `info` text NOT NULL,
+  `info` varchar(500) NOT NULL DEFAULT '',
   `motd` varchar(128) NOT NULL DEFAULT '',
   `createdate` int(10) unsigned NOT NULL DEFAULT '0',
   `BankMoney` bigint(20) unsigned NOT NULL DEFAULT '0',
@@ -2429,4 +2457,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2013-02-04 16:22:06
+-- Dump completed on 2014-01-26 14:39:20

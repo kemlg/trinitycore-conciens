@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -53,7 +53,7 @@ class npcs_dithers_and_arbington : public CreatureScript
 public:
     npcs_dithers_and_arbington() : CreatureScript("npcs_dithers_and_arbington") { }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) OVERRIDE
     {
         player->PlayerTalkClass->ClearMenus();
         switch (action)
@@ -85,12 +85,12 @@ public:
         return true;
     }
 
-    bool OnGossipHello(Player* player, Creature* creature)
+    bool OnGossipHello(Player* player, Creature* creature) OVERRIDE
     {
-        if (creature->isQuestGiver())
+        if (creature->IsQuestGiver())
             player->PrepareQuestMenu(creature->GetGUID());
 
-        if (creature->isVendor())
+        if (creature->IsVendor())
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_VENDOR, GOSSIP_TEXT_BROWSE_GOODS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
 
         if (player->GetQuestRewardStatus(5237) || player->GetQuestRewardStatus(5238))
@@ -112,7 +112,7 @@ public:
 ## npc_myranda_the_hag
 ######*/
 
-enum eMyranda
+enum Myranda
 {
     QUEST_SUBTERFUGE        = 5862,
     QUEST_IN_DREAMS         = 5944,
@@ -126,7 +126,7 @@ class npc_myranda_the_hag : public CreatureScript
 public:
     npc_myranda_the_hag() : CreatureScript("npc_myranda_the_hag") { }
 
-    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action)
+    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action) OVERRIDE
     {
         player->PlayerTalkClass->ClearMenus();
         if (action == GOSSIP_ACTION_INFO_DEF + 1)
@@ -137,9 +137,9 @@ public:
         return true;
     }
 
-    bool OnGossipHello(Player* player, Creature* creature)
+    bool OnGossipHello(Player* player, Creature* creature) OVERRIDE
     {
-        if (creature->isQuestGiver())
+        if (creature->IsQuestGiver())
             player->PrepareQuestMenu(creature->GetGUID());
 
         if (player->GetQuestStatus(QUEST_SUBTERFUGE) == QUEST_STATUS_COMPLETE &&
@@ -165,18 +165,18 @@ class npc_the_scourge_cauldron : public CreatureScript
 public:
     npc_the_scourge_cauldron() : CreatureScript("npc_the_scourge_cauldron") { }
 
-    CreatureAI* GetAI(Creature* creature) const
+    CreatureAI* GetAI(Creature* creature) const OVERRIDE
     {
-        return new npc_the_scourge_cauldronAI (creature);
+        return new npc_the_scourge_cauldronAI(creature);
     }
 
     struct npc_the_scourge_cauldronAI : public ScriptedAI
     {
-        npc_the_scourge_cauldronAI(Creature* creature) : ScriptedAI(creature) {}
+        npc_the_scourge_cauldronAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Reset() {}
+        void Reset() OVERRIDE { }
 
-        void EnterCombat(Unit* /*who*/) {}
+        void EnterCombat(Unit* /*who*/) OVERRIDE { }
 
         void DoDie()
         {
@@ -188,48 +188,49 @@ public:
                 me->SetRespawnDelay(600);
         }
 
-        void MoveInLineOfSight(Unit* who)
+        void MoveInLineOfSight(Unit* who) OVERRIDE
         {
-            if (!who || who->GetTypeId() != TYPEID_PLAYER)
+            if (!who)
                 return;
 
-            if (who->GetTypeId() == TYPEID_PLAYER)
+            Player* player = who->ToPlayer();
+            if (!player)
+                return;
+
+            switch (me->GetAreaId())
             {
-                switch (me->GetAreaId())
-                {
-                    case 199:                                   //felstone
-                        if (CAST_PLR(who)->GetQuestStatus(5216) == QUEST_STATUS_INCOMPLETE ||
-                            CAST_PLR(who)->GetQuestStatus(5229) == QUEST_STATUS_INCOMPLETE)
-                        {
-                            me->SummonCreature(11075, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 600000);
-                            DoDie();
-                        }
-                        break;
-                    case 200:                                   //dalson
-                        if (CAST_PLR(who)->GetQuestStatus(5219) == QUEST_STATUS_INCOMPLETE ||
-                            CAST_PLR(who)->GetQuestStatus(5231) == QUEST_STATUS_INCOMPLETE)
-                        {
-                            me->SummonCreature(11077, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 600000);
-                            DoDie();
-                        }
-                        break;
-                    case 201:                                   //gahrron
-                        if (CAST_PLR(who)->GetQuestStatus(5225) == QUEST_STATUS_INCOMPLETE ||
-                            CAST_PLR(who)->GetQuestStatus(5235) == QUEST_STATUS_INCOMPLETE)
-                        {
-                            me->SummonCreature(11078, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 600000);
-                            DoDie();
-                        }
-                        break;
-                    case 202:                                   //writhing
-                        if (CAST_PLR(who)->GetQuestStatus(5222) == QUEST_STATUS_INCOMPLETE ||
-                            CAST_PLR(who)->GetQuestStatus(5233) == QUEST_STATUS_INCOMPLETE)
-                        {
-                            me->SummonCreature(11076, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 600000);
-                            DoDie();
-                        }
-                        break;
-                }
+                case 199:                                   //felstone
+                    if (player->GetQuestStatus(5216) == QUEST_STATUS_INCOMPLETE ||
+                        player->GetQuestStatus(5229) == QUEST_STATUS_INCOMPLETE)
+                    {
+                        me->SummonCreature(11075, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 600000);
+                        DoDie();
+                    }
+                    break;
+                case 200:                                   //dalson
+                    if (player->GetQuestStatus(5219) == QUEST_STATUS_INCOMPLETE ||
+                        player->GetQuestStatus(5231) == QUEST_STATUS_INCOMPLETE)
+                    {
+                        me->SummonCreature(11077, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 600000);
+                        DoDie();
+                    }
+                    break;
+                case 201:                                   //gahrron
+                    if (player->GetQuestStatus(5225) == QUEST_STATUS_INCOMPLETE ||
+                        player->GetQuestStatus(5235) == QUEST_STATUS_INCOMPLETE)
+                    {
+                        me->SummonCreature(11078, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 600000);
+                        DoDie();
+                    }
+                    break;
+                case 202:                                   //writhing
+                    if (player->GetQuestStatus(5222) == QUEST_STATUS_INCOMPLETE ||
+                        player->GetQuestStatus(5233) == QUEST_STATUS_INCOMPLETE)
+                    {
+                        me->SummonCreature(11076, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 600000);
+                        DoDie();
+                    }
+                    break;
             }
         }
     };
@@ -239,7 +240,7 @@ public:
 ##    npcs_andorhal_tower
 ######*/
 
-enum eAndorhalTower
+enum AndorhalTower
 {
     GO_BEACON_TORCH                             = 176093
 };
@@ -249,9 +250,9 @@ class npc_andorhal_tower : public CreatureScript
 public:
     npc_andorhal_tower() : CreatureScript("npc_andorhal_tower") { }
 
-    CreatureAI* GetAI(Creature* creature) const
+    CreatureAI* GetAI(Creature* creature) const OVERRIDE
     {
-        return new npc_andorhal_towerAI (creature);
+        return new npc_andorhal_towerAI(creature);
     }
 
     struct npc_andorhal_towerAI : public ScriptedAI
@@ -261,13 +262,15 @@ public:
             SetCombatMovement(false);
         }
 
-        void MoveInLineOfSight(Unit* who)
+        void MoveInLineOfSight(Unit* who) OVERRIDE
+
         {
             if (!who || who->GetTypeId() != TYPEID_PLAYER)
                 return;
 
             if (me->FindNearestGameObject(GO_BEACON_TORCH, 10.0f))
-                CAST_PLR(who)->KilledMonsterCredit(me->GetEntry(), me->GetGUID());
+                if (Player* player = who->ToPlayer())
+                    player->KilledMonsterCredit(me->GetEntry(), me->GetGUID());
         }
     };
 };
@@ -276,7 +279,7 @@ public:
 ##  npc_anchorite_truuen
 ######*/
 
-enum eTruuen
+enum Truuen
 {
     NPC_GHOST_UTHER             = 17233,
     NPC_THEL_DANIS              = 1854,
@@ -298,7 +301,7 @@ class npc_anchorite_truuen : public CreatureScript
 public:
     npc_anchorite_truuen() : CreatureScript("npc_anchorite_truuen") { }
 
-    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
+    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) OVERRIDE
     {
         npc_escortAI* pEscortAI = CAST_AI(npc_anchorite_truuen::npc_anchorite_truuenAI, creature->AI());
 
@@ -307,7 +310,7 @@ public:
         return false;
     }
 
-    CreatureAI* GetAI(Creature* creature) const
+    CreatureAI* GetAI(Creature* creature) const OVERRIDE
     {
         return new npc_anchorite_truuenAI(creature);
     }
@@ -324,18 +327,18 @@ public:
         Creature* Ughost;
         Creature* Theldanis;
 
-        void Reset()
+        void Reset() OVERRIDE
         {
             m_uiChatTimer = 7000;
         }
 
-        void JustSummoned(Creature* summoned)
+        void JustSummoned(Creature* summoned) OVERRIDE
         {
             if (summoned->GetEntry() == NPC_GHOUL)
                 summoned->AI()->AttackStart(me);
         }
 
-        void WaypointReached(uint32 waypointId)
+        void WaypointReached(uint32 waypointId) OVERRIDE
         {
             Player* player = GetPlayerForEscort();
 
@@ -357,30 +360,29 @@ public:
                     break;
                 case 15:
                     Talk(SAY_WP_2);
+                    break;
                 case 21:
                     Theldanis = GetClosestCreatureWithEntry(me, NPC_THEL_DANIS, 150);
                     if (Theldanis)
                         Theldanis->AI()->Talk(SAY_WP_3);
-                    break;
-                case 22:
                     break;
                 case 23:
                     Ughost = me->SummonCreature(NPC_GHOST_UTHER, 971.86f, -1825.42f, 81.99f, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000);
                     if (Ughost)
                     {
                         Ughost->SetDisableGravity(true);
-                        Ughost->AI()->Talk(SAY_WP_4, me->GetGUID());
+                        Ughost->AI()->Talk(SAY_WP_4, me);
                     }
                     m_uiChatTimer = 4000;
                     break;
                 case 24:
                     if (Ughost)
-                        Ughost->AI()->Talk(SAY_WP_5, me->GetGUID());
+                        Ughost->AI()->Talk(SAY_WP_5, me);
                     m_uiChatTimer = 4000;
                     break;
                 case 25:
                     if (Ughost)
-                        Ughost->AI()->Talk(SAY_WP_6, me->GetGUID());
+                        Ughost->AI()->Talk(SAY_WP_6, me);
                     m_uiChatTimer = 4000;
                     break;
                 case 26:
@@ -390,15 +392,15 @@ public:
             }
         }
 
-        void EnterCombat(Unit* /*who*/){}
+        void EnterCombat(Unit* /*who*/) OVERRIDE { }
 
-         void JustDied(Unit* /*killer*/)
+         void JustDied(Unit* /*killer*/) OVERRIDE
         {
             if (Player* player = GetPlayerForEscort())
                 player->FailQuest(QUEST_TOMB_LIGHTBRINGER);
         }
 
-        void UpdateAI(const uint32 uiDiff)
+        void UpdateAI(uint32 uiDiff) OVERRIDE
         {
             npc_escortAI::UpdateAI(uiDiff);
             DoMeleeAttackIfReady();
