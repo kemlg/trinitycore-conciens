@@ -136,7 +136,7 @@ EventBridge::EventBridge()
 	pthread_t	thread1;
 	int		iret;
 
-	sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: Starting EventBridge...");
+	TC_LOG_INFO("EventBridge: Starting EventBridge...");
 	host = gethostbyname(ebServerHost);
 
 	this->sockout = socket(AF_INET, SOCK_STREAM, 0);
