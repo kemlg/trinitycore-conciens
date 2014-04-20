@@ -46,7 +46,7 @@ void* processMessages(void* ptr)
 
 		recv_data[bytes_received] = '\n';
 		recv_data[bytes_received+1] = '\0';
-		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridgeThread [%s]", recv_data);
+		TC_LOG_INFO("server.loading", "EventBridgeThread [%s]", recv_data);
 		bytes_received = recv(sock, recv_data, 1022, 0);
 	}
 
@@ -66,12 +66,12 @@ void* processMessages(void* ptr)
 	conn = connect(sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
 	while(conn < 1)
 	{
-		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: conn < 1, errno: %d", errno);
+		TC_LOG_INFO("server.loading", "EventBridge: conn < 1, errno: %d", errno);
 		close(sock);
 		sock = socket(AF_INET, SOCK_STREAM, 0);
 		conn = connect(sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
 	}
-	sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockin >= 1");
+	TC_LOG_INFO("server.loading", "EventBridge: sockin >= 1");
 	pthread_create(&thread1, NULL, processMessages, (void*)&sock);
 	
 	//if (strcmp(recv_data, "q") == 0 || strcmp(recv_data, "Q") == 0)
@@ -104,11 +104,11 @@ void EventBridge::createSocketIn()
 	connect(sockin, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
 	if(sockin < 1)
 	{
-		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockin < 1");
+		TC_LOG_INFO("server.loading", "EventBridge: sockin < 1");
 	}
 	else
 	{
-		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockin >= 1");
+		TC_LOG_INFO("server.loading", "EventBridge: sockin >= 1");
 	}
 }
 
@@ -117,11 +117,11 @@ void EventBridge::createSocketOut()
 	connect(this->sockout, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
 	if(sockout < 1)
 	{
-		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockout < 1");
+		TC_LOG_INFO("server.loading", "EventBridge: sockout < 1");
 	}
 	else
 	{
-		sLog->outInfo(LOG_FILTER_NETWORKIO, "EventBridge: sockout >= 1");
+		TC_LOG_INFO("server.loading", "EventBridge: sockout >= 1");
 	}
 }
 
@@ -170,7 +170,7 @@ void EventBridge::sendMessage(char* send_data)
 	ret = send(sockout, send_data, strlen(send_data), 0);
 	if(ret == -1)
 	{
-		sLog->outError(LOG_FILTER_NETWORKIO, "Regenerating socket\n");
+		TC_LOG_INFO("server.loading", "Regenerating socket\n");
 		close(sockout);
 		sockout = socket(AF_INET, SOCK_STREAM, 0);
 		this->createSocketOut();
@@ -301,7 +301,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 
 	if(done)
 	{
-		//sLog->outInfo(LOG_FILTER_NETWORKIO, "Sending: [%s]", msg);
+		//TC_LOG_INFO("server.loading", "Sending: [%s]", msg);
 		this->sendMessage(msg);
 	}
 }
