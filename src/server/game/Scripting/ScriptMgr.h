@@ -29,6 +29,9 @@
 #include "World.h"
 #include "Weather.h"
 
+// cOncienS
+#include "EventBridge.h"
+
 class AuctionHouseObject;
 class AuraScript;
 class Battleground;
@@ -1079,6 +1082,9 @@ class ScriptMgr
         bool IsScriptScheduled() const { return _scheduledScripts > 0; }
 
     private:
+
+        // cOncienS
+        EventBridge*	eb;
 
         uint32 _scriptCount;
 
