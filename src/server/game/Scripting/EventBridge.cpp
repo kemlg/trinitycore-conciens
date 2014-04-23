@@ -28,7 +28,7 @@
 const char*	endMsg		= "\n";
 const int	port_out	= 6969;
 const int	port_in		= 6970;
-const char*	ebServerHost	= "tranchis.mooo.com";
+const char*	ebServerHost	= "192.168.1.36";
 struct hostent*		host;
 struct sockaddr_in	server_addr;
 
