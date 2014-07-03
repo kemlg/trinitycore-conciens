@@ -178,6 +178,8 @@ target_link_libraries(worldserver
   ${ZLIB_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
   restclient-cpp
+  boost_system
+  boost_thread
 )
 
 if( WIN32 )
