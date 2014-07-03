@@ -7,6 +7,8 @@
 
 #include <pthread.h>
 #include <stdlib.h>
+#include <iostream>
+#include <stdio.h>
 
 #include "EventBridge.h"
 #include "Config.h"
@@ -24,55 +26,46 @@
 #include "CreatureAI.h"
 #include "Player.h"
 #include "WorldPacket.h"
+#include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
+#include "restclient.h"
+
+const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT_TYPE_ITEM_EXPIRE",
+  "EVENT_TYPE_GOSSIP_HELLO", "EVENT_TYPE_GOSSIP_SELECT", "EVENT_TYPE_GOSSIP_SELECT_CODE",
+  "EVENT_TYPE_GOSSIP_HELLO_OBJECT", "EVENT_TYPE_GOSSIP_SELECT_OBJECT", "EVENT_TYPE_GOSSIP_SELECT_CODE_OBJECT",
+  "EVENT_TYPE_QUEST_ACCEPT", "EVENT_TYPE_QUEST_SELECT", "EVENT_TYPE_QUEST_COMPLETE", "EVENT_TYPE_QUEST_REWARD",
+  "EVENT_TYPE_GET_DIALOG_STATUS", "EVENT_TYPE_QUEST_ACCEPT_OBJECT", "EVENT_TYPE_QUEST_SELECT_OBJECT",
+  "EVENT_TYPE_QUEST_COMPLETE_OBJECT", "EVENT_TYPE_QUEST_REWARD_OBJECT", "EVENT_TYPE_GET_DIALOG_STATUS_OBJECT",
+  "EVENT_TYPE_OBJECT_CHANGED", "EVENT_TYPE_OBJECT_UPDATE", "EVENT_TYPE_AREA_TRIGGER", "EVENT_TYPE_WEATHER_CHANGE",
+  "EVENT_TYPE_WEATHER_UPDATE", "EVENT_TYPE_PVP_KILL", "EVENT_TYPE_CREATURE_KILL", "EVENT_TYPE_KILLED_BY_CREATURE",
+  "EVENT_TYPE_MONEY_CHANGED", "EVENT_TYPE_LEVEL_CHANGED", "EVENT_TYPE_CREATURE_UPDATE", "EVENT_TYPE_PLAYER_UPDATE"
+};
 
 const char*	endMsg		= "\n";
 const int	port_out	= 6969;
 const int	port_in		= 6970;
-const char*	ebServerHost	= "192.168.1.36";
+const char*	ebServerHost	= "conciens.mooo.com";
 struct hostent*		host;
 struct sockaddr_in	server_addr;
 
+void processActions(rapidjson::Document& d) {
+  // TODO: Do something with actions!
+}
+
 void* processMessages(void* ptr)
 {
-	int		bytes_received;
-	char		recv_data[1024];
-	int		sock, conn;
-	pthread_t	thread1;
+	// TC_LOG_INFO("server.loading", "Proactively getting actions...");
 
-	sock = *(int*)ptr;
-	bytes_received = recv(sock, recv_data, 1022, 0);
-	while(bytes_received >= 0)
-	{
-
-		recv_data[bytes_received] = '\n';
-		recv_data[bytes_received+1] = '\0';
-		TC_LOG_INFO("server.loading", "EventBridgeThread [%s]", recv_data);
-		bytes_received = recv(sock, recv_data, 1022, 0);
-	}
-
-	struct hostent*		host;
-	struct sockaddr_in	server_addr;
-
-	host = gethostbyname(ebServerHost);
-
-	close(sock);
-	sock = socket(AF_INET, SOCK_STREAM, 0);
-
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr = *((struct in_addr *) host->h_addr);
-	bzero(&(server_addr.sin_zero), 8);
-
-	server_addr.sin_port = htons(port_in);
-	conn = connect(sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
-	while(conn < 1)
-	{
-		TC_LOG_INFO("server.loading", "EventBridge: conn < 1, errno: %d", errno);
-		close(sock);
-		sock = socket(AF_INET, SOCK_STREAM, 0);
-		conn = connect(sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
-	}
-	TC_LOG_INFO("server.loading", "EventBridge: sockin >= 1");
-	pthread_create(&thread1, NULL, processMessages, (void*)&sock);
+	pthread_t thread1;
+	RestClient::response r = RestClient::get("http://conciens.mooo.com:3000/actions");
+	rapidjson::Document actions;
+	
+	actions.Parse(r.body.c_str());
+	processActions(actions);
+	
+	sleep(5);
+	pthread_create(&thread1, NULL, processMessages, NULL);
 	
 	//if (strcmp(recv_data, "q") == 0 || strcmp(recv_data, "Q") == 0)
 	//{
@@ -87,70 +80,15 @@ void* processMessages(void* ptr)
 	//gets(send_data);
 }
 
-void EventBridge::createSocketIn()
-{
-	struct hostent*		host;
-	struct sockaddr_in	server_addr;
-
-	host = gethostbyname(ebServerHost);
-
-	this->sockin = socket(AF_INET, SOCK_STREAM, 0);
-
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr = *((struct in_addr *) host->h_addr);
-	bzero(&(server_addr.sin_zero), 8);
-
-	server_addr.sin_port = htons(port_in);
-	connect(sockin, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
-	if(sockin < 1)
-	{
-		TC_LOG_INFO("server.loading", "EventBridge: sockin < 1");
-	}
-	else
-	{
-		TC_LOG_INFO("server.loading", "EventBridge: sockin >= 1");
-	}
-}
-
-void EventBridge::createSocketOut()
-{
-	connect(this->sockout, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
-	if(sockout < 1)
-	{
-		TC_LOG_INFO("server.loading", "EventBridge: sockout < 1");
-	}
-	else
-	{
-		TC_LOG_INFO("server.loading", "EventBridge: sockout >= 1");
-	}
-}
-
-void EventBridge::createSocket()
-{
-	this->createSocketIn();
-	this->createSocketOut();
-}
-
 EventBridge::EventBridge()
 {
 	pthread_t	thread1;
 	int		iret;
 
 	TC_LOG_INFO("server.loading", "EventBridge: Starting EventBridge...");
-	host = gethostbyname(ebServerHost);
-
-	this->sockout = socket(AF_INET, SOCK_STREAM, 0);
-
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr = *((struct in_addr *) host->h_addr);
-	bzero(&(server_addr.sin_zero), 8);
-
-	server_addr.sin_port = htons(port_out);
-
-	this->createSocket();
 
 	/* Create independent threads each of which will execute function */
-	iret = pthread_create(&thread1, NULL, processMessages, (void*)&this->sockin);
+	iret = pthread_create(&thread1, NULL, processMessages, NULL);
 
 	/* Wait till threads are complete before main continues. Unless we  */
 	/* wait we run the risk of executing an exit which will terminate   */
@@ -163,145 +101,121 @@ EventBridge::~EventBridge()
 	// TODO Auto-generated destructor stub
 }
 
-void EventBridge::sendMessage(char* send_data)
-{
-	int	ret;
-
-	ret = send(sockout, send_data, strlen(send_data), 0);
-	if(ret == -1)
-	{
-		TC_LOG_INFO("server.loading", "Regenerating socket\n");
-		close(sockout);
-		sockout = socket(AF_INET, SOCK_STREAM, 0);
-		this->createSocketOut();
-		ret = send(sockout, send_data, strlen(send_data), 0);
-	}
-	else
-	{
-		send(sockout, endMsg, strlen(endMsg), 0);
-	
-		if(strcmp(send_data, "q") == 0 || strcmp(send_data, "Q") == 0)
-		{
-			send(sockout, send_data, strlen(send_data), 0);
-			close(sockout);
-		}
-	}
-}
-
 void EventBridge::sendEvent(const int event_type, const Player* player, const Creature* creature, const uint32 num,
 	const Item* item, const Quest* quest, const SpellCastTargets* targets, const ItemTemplate *proto,
 	const uint32 num2, const char* st, const GameObject* go, const AreaTriggerEntry* area,
 	const Weather* weather, const int state, const float grade, const Player* other)
 {
-	char	msg[1024];
-	bool	done;
 	float	x, y, z, o;
-	uint64	u1, u2;
 
-	done = true;
-	switch(event_type)
-	{
-	case EVENT_TYPE_PVP_KILL:
-		sprintf(msg, "PVP_KILL|%u|%u", player->GetGUIDLow(), other->GetGUIDLow());
-		break;
-	case EVENT_TYPE_CREATURE_KILL:
-		sprintf(msg, "CREATURE_KILL|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow());
-		break;
-	case EVENT_TYPE_KILLED_BY_CREATURE:
-		sprintf(msg, "KILLED_BY_CREATURE|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow());
-		break;
-	case EVENT_TYPE_LEVEL_CHANGED:
-		sprintf(msg, "LEVEL_CHANGED|%u|%u", player->GetGUIDLow(), num);
-		break;
-	case EVENT_TYPE_MONEY_CHANGED:
-		sprintf(msg, "MONEY_CHANGED|%u|%u", player->GetGUIDLow(), num);
-		break;
-	case EVENT_TYPE_AREA_TRIGGER:
-		sprintf(msg, "AREA_TRIGGER|%u|%u", player->GetGUIDLow(), area->id);
-		break;
-	case EVENT_TYPE_WEATHER_CHANGE:
-		sprintf(msg, "WEATHER_CHANGE|%u|%d|%f", weather->GetZone(), state, grade);
-		break;
-	case EVENT_TYPE_WEATHER_UPDATE:
-		sprintf(msg, "WEATHER_UPDATE|%u|%u", weather->GetZone(), num);
-		break;
-	case EVENT_TYPE_EMOTE:
-		sprintf(msg, "EMOTE|%u|%u", player->GetGUIDLow(), num);
-		break;
-	case EVENT_TYPE_GOSSIP_HELLO:
-		sprintf(msg, "HELLO|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow());
-		break;
-	case EVENT_TYPE_OBJECT_UPDATE:
-		sprintf(msg, "OBJECT_UPDATE|%u|%u", go->GetGUIDLow(), num);
-		break;
-	case EVENT_TYPE_CREATURE_UPDATE:
-		creature->GetPosition(x, y, z, o);
-		sprintf(msg, "CREATURE_UPDATE|%u|%f|%f|%f|%f", creature->GetGUIDLow(), x, y, z, o);
-		break;
-	case EVENT_TYPE_QUEST_ACCEPT:
-		if(creature == NULL)
-		{
-			sprintf(msg, "QUEST_ACCEPT_ITEM|%u|%u|%u", player->GetGUIDLow(), item->GetGUIDLow(), quest->GetQuestId());
-		}
-		else
-		{
-			sprintf(msg, "QUEST_ACCEPT_ITEM|%u|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow(), quest->GetQuestId());
-		}
-		break;
-	case EVENT_TYPE_QUEST_ACCEPT_OBJECT:
-		sprintf(msg, "QUEST_ACCEPT_OBJECT|%u|%u|%u", player->GetGUIDLow(), go->GetGUIDLow(), quest->GetQuestId());
-		break;
-	case EVENT_TYPE_ITEM_USE: // TODO: Verify use of targets info
-		sprintf(msg, "ITEM_USE|%u|%u|%u", player->GetGUIDLow(), item->GetGUIDLow(), targets->GetUnitTarget()->GetGUIDLow());
-		break;
-	case EVENT_TYPE_ITEM_EXPIRE:
-		sprintf(msg, "ITEM_EXPIRE|%u|%u", player->GetGUIDLow(), proto->ItemId);
-		break;
-	case EVENT_TYPE_GOSSIP_SELECT:
-		sprintf(msg, "GOSSIP_SELECT|%u|%u|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow(), num, num2);
-		break;
-	case EVENT_TYPE_GOSSIP_SELECT_OBJECT:
-		sprintf(msg, "GOSSIP_SELECT_OBJECT|%u|%u|%u|%u", player->GetGUIDLow(), go->GetGUIDLow(), num, num2);
-		break;
-	case EVENT_TYPE_GOSSIP_SELECT_CODE:
-		sprintf(msg, "GOSSIP_SELECT_CODE|%u|%u|%u|%u|%s", player->GetGUIDLow(), creature->GetGUIDLow(), num, num2, st);
-		break;
-	case EVENT_TYPE_GOSSIP_SELECT_CODE_OBJECT:
-		sprintf(msg, "GOSSIP_SELECT_CODE_OBJECT|%u|%u|%u|%u|%s", player->GetGUIDLow(), go->GetGUIDLow(), num, num2, st);
-		break;
-	case EVENT_TYPE_QUEST_SELECT:
-		sprintf(msg, "QUEST_SELECT|%u|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow(), quest->GetQuestId());
-		break;
-	case EVENT_TYPE_QUEST_COMPLETE:
-		sprintf(msg, "QUEST_COMPLETE|%u|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow(), quest->GetQuestId());
-		break;
-	case EVENT_TYPE_QUEST_REWARD:
-		sprintf(msg, "QUEST_REWARD|%u|%u|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow(), quest->GetQuestId(), num);
-		break;
-	case EVENT_TYPE_QUEST_REWARD_OBJECT:
-		sprintf(msg, "QUEST_REWARD_OBJECT|%u|%u|%u|%u", player->GetGUIDLow(), go->GetGUIDLow(), quest->GetQuestId(), num);
-		break;
-	case EVENT_TYPE_GET_DIALOG_STATUS:
-		sprintf(msg, "GET_DIALOG_STATUS|%u|%u", player->GetGUIDLow(), creature->GetGUIDLow());
-		break;
-	case EVENT_TYPE_GET_DIALOG_STATUS_OBJECT:
-		sprintf(msg, "GET_DIALOG_STATUS_OBJECT|%u|%u", player->GetGUIDLow(), go->GetGUIDLow());
-		break;
-	case EVENT_TYPE_OBJECT_CHANGED:
-		sprintf(msg, "OBJECT_CHANGED|%u|%u", go->GetGUIDLow(), num);
-		break;
-	case EVENT_TYPE_PLAYER_UPDATE:
-		player->GetPosition(x, y, z, o);
-		sprintf(msg, "PLAYER_UPDATE|%u|%f|%f|%f|%f", player->GetGUIDLow(), x, y, z, o);
-		break;
-	default:
-		sprintf(msg, "UNDEF|%d", event_type);
-//		done = false;
+	rapidjson::Document d;
+	rapidjson::Value jsonNums(rapidjson::kArrayType);
+	rapidjson::Value jsonPlayer(rapidjson::kObjectType);
+	rapidjson::Value jsonTargetPlayer (rapidjson::kObjectType);
+	rapidjson::Value jsonCreature (rapidjson::kObjectType);
+	rapidjson::Value jsonItem (rapidjson::kObjectType);
+	rapidjson::Value jsonQuest (rapidjson::kObjectType);
+	rapidjson::Value jsonTarget (rapidjson::kObjectType);
+	rapidjson::Value jsonItemTemplate (rapidjson::kObjectType);
+	rapidjson::Value jsonGameObject (rapidjson::kObjectType);
+	rapidjson::Value jsonWeather (rapidjson::kObjectType);
+	rapidjson::Document::AllocatorType& a = d.GetAllocator();
+	d.SetObject();
+	
+	d.AddMember("event-type", idToEventType[event_type], a);
+	
+	jsonNums.PushBack(num, a).PushBack(num2, a);
+	d.AddMember("num-values", jsonNums, a);
+	
+	if(st != NULL) {
+	  d.AddMember("string-value", st, a);
+	}
+	
+	if(area != NULL) {
+	  d.AddMember("area", area->id, a);
+	}
+	
+	if(player != NULL) {
+	  player->GetPosition(x, y, z, o);
+	  jsonPlayer.AddMember("guid", player->GetGUIDLow(), a);
+	  jsonPlayer.AddMember("name", player->GetName().c_str(), a);
+	  jsonPlayer.AddMember("level", player->getLevel(), a);
+	  jsonPlayer.AddMember("description", player->ToString().c_str(), a);
+	  jsonPlayer.AddMember("x", x, a);
+	  jsonPlayer.AddMember("y", y, a);
+	  jsonPlayer.AddMember("z", z, a);
+	  jsonPlayer.AddMember("o", o, a);
+	  d.AddMember("player", jsonPlayer, a);
+	}
+	
+	if(other != NULL) {
+	  jsonTargetPlayer.AddMember("guid", other->GetGUIDLow(), a);
+	  jsonTargetPlayer.AddMember("name", other->GetName().c_str(), a);
+	  jsonTargetPlayer.AddMember("level", other->getLevel(), a);
+	  jsonTargetPlayer.AddMember("x", x, a);
+	  jsonTargetPlayer.AddMember("y", y, a);
+	  jsonTargetPlayer.AddMember("z", z, a);
+	  jsonTargetPlayer.AddMember("o", o, a);
+	  d.AddMember("target-player", jsonTargetPlayer, a);
+	}
+	
+	if(creature != NULL) {
+	  jsonCreature.AddMember("guid", creature->GetGUIDLow(), a);
+	  jsonCreature.AddMember("name", creature->GetName().c_str(), a);
+	  jsonCreature.AddMember("level", creature->getLevel(), a);
+	  jsonCreature.AddMember("x", x, a);
+	  jsonCreature.AddMember("y", y, a);
+	  jsonCreature.AddMember("z", z, a);
+	  jsonCreature.AddMember("o", o, a);
+	  d.AddMember("creature", jsonCreature, a);
+	}
+	
+	if(item != NULL) {
+	  jsonItem.AddMember("guid", item->GetGUIDLow(), a);
+	  jsonItem.AddMember("name", item->GetTemplate()->Name1.c_str(), a);
+	  d.AddMember("item", jsonItem, a);
+	}
+	
+	if(quest != NULL) {
+	  jsonQuest.AddMember("id", quest->GetQuestId(), a);
+	  jsonQuest.AddMember("name", quest->GetTitle().c_str(), a);
+	  jsonQuest.AddMember("description", quest->GetDetails().c_str(), a);
+	  d.AddMember("quest", jsonQuest, a);
 	}
 
-	if(done)
-	{
-		//TC_LOG_INFO("server.loading", "Sending: [%s]", msg);
-		this->sendMessage(msg);
+	if(targets != NULL) {
+	  jsonTarget.AddMember("guid", targets->GetUnitTarget()->GetGUIDLow(), a);
+	  jsonTarget.AddMember("name", targets->GetUnitTarget()->GetName().c_str(), a);
+	  jsonTarget.AddMember("level", targets->GetUnitTarget()->getLevel(), a);
+	  d.AddMember("target", jsonTarget, a);
 	}
+
+	if(proto != NULL) {
+	  jsonItemTemplate.AddMember("id", proto->ItemId, a);
+	  jsonItemTemplate.AddMember("name", proto->Name1.c_str(), a);
+	  d.AddMember("item-template", jsonItemTemplate, a);
+	}
+
+	if(go != NULL) {
+	  jsonGameObject.AddMember("guid", go->GetGUIDLow(), a);
+	  jsonGameObject.AddMember("name", go->GetName().c_str(), a);
+	  d.AddMember("game-object", jsonGameObject, a);
+	}
+	 
+	if(weather != NULL) {
+	  jsonWeather.AddMember("zone", weather->GetZone(), a);
+	  jsonWeather.AddMember("state", state, a);
+	  jsonWeather.AddMember("grade", grade, a);
+	  d.AddMember("weather", jsonWeather, a);
+	}  
+	
+	rapidjson::StringBuffer buffer;
+	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+	d.Accept(writer);
+	
+	RestClient::response r = RestClient::post("http://conciens.mooo.com:3000/event", "text/json", buffer.GetString());
+	rapidjson::Document actions;
+	
+	actions.Parse(r.body.c_str());
+	processActions(actions);
 }

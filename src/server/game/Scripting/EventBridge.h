@@ -105,13 +105,13 @@ public:
 	EventBridge();
 	virtual ~EventBridge();
 	void sendMessage(char*);
-	void sendEvent(const int event_type, const Player* player, const Creature* creature = NULL, const uint32 num = NULL,
+	void sendEvent(const int event_type, const Player* player, const Creature* creature = NULL, const uint32 num = 0,
 		const Item* item = NULL, const Quest* quest = NULL, const SpellCastTargets* targets = NULL, const ItemTemplate *proto = NULL,
-		const uint32 num2 = NULL, const char* st = NULL, const GameObject* go = NULL, const AreaTriggerEntry* area = NULL,
-		const Weather* weather = NULL, const int state = NULL, const float grade = NULL, const Player* other = NULL);
+		const uint32 num2 = 0, const char* st = NULL, const GameObject* go = NULL, const AreaTriggerEntry* area = NULL,
+		const Weather* weather = NULL, const int state = 0, const float grade = 0.0, const Player* other = NULL);
 
 private:
-	int		sockout, sockin;
+	int	sockout, sockin;
 	void	createSocket();
 	void	createSocketIn();
 	void	createSocketOut();
