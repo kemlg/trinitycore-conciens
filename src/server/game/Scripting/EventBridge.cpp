@@ -25,6 +25,11 @@
 #include "GossipDef.h"
 #include "CreatureAI.h"
 #include "Player.h"
+#include "Group.h"
+#include "Guild.h"
+#include "Spell.h"
+#include "AuctionHouseMgr.h"
+#include "Channel.h"
 #include "WorldPacket.h"
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
@@ -120,7 +125,13 @@ const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT
   "EVENT_TYPE_QUEST_COMPLETE_OBJECT", "EVENT_TYPE_QUEST_REWARD_OBJECT", "EVENT_TYPE_GET_DIALOG_STATUS_OBJECT",
   "EVENT_TYPE_OBJECT_CHANGED", "EVENT_TYPE_OBJECT_UPDATE", "EVENT_TYPE_AREA_TRIGGER", "EVENT_TYPE_WEATHER_CHANGE",
   "EVENT_TYPE_WEATHER_UPDATE", "EVENT_TYPE_PVP_KILL", "EVENT_TYPE_CREATURE_KILL", "EVENT_TYPE_KILLED_BY_CREATURE",
-  "EVENT_TYPE_MONEY_CHANGED", "EVENT_TYPE_LEVEL_CHANGED", "EVENT_TYPE_CREATURE_UPDATE", "EVENT_TYPE_PLAYER_UPDATE"
+  "EVENT_TYPE_MONEY_CHANGED", "EVENT_TYPE_LEVEL_CHANGED", "EVENT_TYPE_CREATURE_UPDATE", "EVENT_TYPE_PLAYER_UPDATE",
+  "EVENT_TYPE_ITEM_REMOVE", "EVENT_TYPE_GAME_OBJECT_DESTROYED", "EVENT_TYPE_GAME_OBJECT_DAMAGED",
+  "EVENT_TYPE_GAME_OBJECT_LOOT_STATE_CHANGED", "EVENT_TYPE_AUCTION_ADD", "EVENT_TYPE_AUCTION_REMOVE",
+  "EVENT_TYPE_AUCTION_SUCCESSFUL" ,"EVENT_TYPE_AUCTION_EXPIRE", "EVENT_TYPE_PLAYER_CHAT",
+  "EVENT_TYPE_PLAYER_SPELL_CAST", "EVENT_TYPE_PLAYER_LOGIN", "EVENT_TYPE_PLAYER_LOGOUT",
+  "EVENT_TYPE_PLAYER_CREATE", "EVENT_TYPE_PLAYER_DELETE", "EVENT_TYPE_PLAYER_SAVE",
+  "EVENT_TYPE_PLAYER_UPDATE_ZONE", "EVENT_TYPE_HEAL", "EVENT_TYPE_DAMAGE"
 };
 
 const char*					endMsg		= "\n";
@@ -240,16 +251,19 @@ EventBridge::~EventBridge()
 }
 
 void EventBridge::sendEvent(const int event_type, const Player* player, const Creature* creature, const uint32 num,
-	const Item* item, const Quest* quest, const SpellCastTargets* targets, const ItemTemplate *proto,
-	const uint32 num2, const char* st, const GameObject* go, const AreaTriggerEntry* area,
-	const Weather* weather, const int state, const float grade, const Player* other)
+			    const Item* item, const Quest* quest, const SpellCastTargets* targets,
+			    const ItemTemplate* proto, const uint32 num2, const char* st, const GameObject* go,
+			    const AreaTriggerEntry* area, const Weather* weather, const int state,
+			    const float grade, const Unit* target, const AuctionHouseObject* ah,
+			    const AuctionEntry* entry, const Group* group, const Guild* guild,
+			    const Channel* channel, const Spell* spell, const Unit* actor)
 {
 	float	x, y, z, o;
 
 	rapidjson::Document* d = new rapidjson::Document();
 	rapidjson::Value jsonNums(rapidjson::kArrayType);
 	rapidjson::Value jsonPlayer(rapidjson::kObjectType);
-	rapidjson::Value jsonTargetPlayer (rapidjson::kObjectType);
+	rapidjson::Value jsonActor(rapidjson::kObjectType);
 	rapidjson::Value jsonCreature (rapidjson::kObjectType);
 	rapidjson::Value jsonItem (rapidjson::kObjectType);
 	rapidjson::Value jsonQuest (rapidjson::kObjectType);
@@ -257,6 +271,12 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	rapidjson::Value jsonItemTemplate (rapidjson::kObjectType);
 	rapidjson::Value jsonGameObject (rapidjson::kObjectType);
 	rapidjson::Value jsonWeather (rapidjson::kObjectType);
+	rapidjson::Value jsonAuctionHouseObject (rapidjson::kObjectType);
+	rapidjson::Value jsonAuctionEntry (rapidjson::kObjectType);
+	rapidjson::Value jsonGroup (rapidjson::kObjectType);
+	rapidjson::Value jsonGuild (rapidjson::kObjectType);
+	rapidjson::Value jsonChannel (rapidjson::kObjectType);
+	rapidjson::Value jsonSpell (rapidjson::kObjectType);
 	rapidjson::Document::AllocatorType& a = d->GetAllocator();
 	d->SetObject();
 	
@@ -266,7 +286,10 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	d->AddMember("num-values", jsonNums, a);
 	
 	if(st != NULL) {
-	  d->AddMember("string-value", st, a);
+	  TC_LOG_INFO("server.loading", st);
+	  rapidjson::Value s;
+	  s.SetString(st, strlen(st), a);
+	  d->AddMember("string-value", s, a);
 	}
 	
 	if(area != NULL) {
@@ -278,7 +301,10 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	  jsonPlayer.AddMember("guid", player->GetGUIDLow(), a);
 	  jsonPlayer.AddMember("name", player->GetName().c_str(), a);
 	  jsonPlayer.AddMember("level", player->getLevel(), a);
-	  jsonPlayer.AddMember("description", player->ToString().c_str(), a);
+	  rapidjson::Value s;
+	  const char* text = player->ToString().c_str();
+	  s.SetString(text, strlen(text), a);
+	  jsonPlayer.AddMember("description", s, a);
 	  jsonPlayer.AddMember("x", x, a);
 	  jsonPlayer.AddMember("y", y, a);
 	  jsonPlayer.AddMember("z", z, a);
@@ -286,15 +312,31 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	  d->AddMember("player", jsonPlayer, a);
 	}
 	
-	if(other != NULL) {
-	  jsonTargetPlayer.AddMember("guid", other->GetGUIDLow(), a);
-	  jsonTargetPlayer.AddMember("name", other->GetName().c_str(), a);
-	  jsonTargetPlayer.AddMember("level", other->getLevel(), a);
-	  jsonTargetPlayer.AddMember("x", x, a);
-	  jsonTargetPlayer.AddMember("y", y, a);
-	  jsonTargetPlayer.AddMember("z", z, a);
-	  jsonTargetPlayer.AddMember("o", o, a);
-	  d->AddMember("target-player", jsonTargetPlayer, a);
+	if(actor != NULL) {
+	  actor->GetPosition(x, y, z, o);
+	  jsonActor.AddMember("guid", actor->GetGUIDLow(), a);
+	  jsonActor.AddMember("name", actor->GetName().c_str(), a);
+	  jsonActor.AddMember("level", actor->getLevel(), a);
+	  rapidjson::Value s;
+	  const char* text = actor->ToString().c_str();
+	  s.SetString(text, strlen(text), a);
+	  jsonActor.AddMember("description", s, a);
+	  jsonActor.AddMember("x", x, a);
+	  jsonActor.AddMember("y", y, a);
+	  jsonActor.AddMember("z", z, a);
+	  jsonActor.AddMember("o", o, a);
+	  d->AddMember("actor", jsonActor, a);
+	}
+	
+	if(target != NULL) {
+	  jsonTarget.AddMember("guid", target->GetGUIDLow(), a);
+	  jsonTarget.AddMember("name", target->GetName().c_str(), a);
+	  jsonTarget.AddMember("level", target->getLevel(), a);
+	  jsonTarget.AddMember("x", x, a);
+	  jsonTarget.AddMember("y", y, a);
+	  jsonTarget.AddMember("z", z, a);
+	  jsonTarget.AddMember("o", o, a);
+	  d->AddMember("target", jsonTarget, a);
 	}
 	
 	if(creature != NULL) {
@@ -345,7 +387,56 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	  jsonWeather.AddMember("state", state, a);
 	  jsonWeather.AddMember("grade", grade, a);
 	  d->AddMember("weather", jsonWeather, a);
-	}  
+	}
+	
+	if(ah != NULL) {
+	  jsonAuctionHouseObject.AddMember("count", ah->Getcount(), a);
+	  d->AddMember("auction-house-object", jsonAuctionHouseObject, a);
+	}
+	
+	if(entry != NULL) {
+	  jsonAuctionEntry.AddMember("id", entry->itemGUIDLow, a);
+	  jsonAuctionEntry.AddMember("bid", entry->bid, a);
+	  jsonAuctionEntry.AddMember("bidder", entry->bidder, a);
+	  d->AddMember("auction-house-object", jsonAuctionHouseObject, a);
+	}
+	
+	if(group != NULL) {
+	  jsonGroup.AddMember("guid", group->GetLowGUID(), a);
+	  jsonGroup.AddMember("leader-guid", group->GetLeaderGUID(), a);
+	  jsonGroup.AddMember("leader-name", group->GetLeaderName(), a);
+	  rapidjson::Value jsonGroupMemberList(rapidjson::kArrayType);
+	  
+	  const Group::MemberSlotList& msl = group->GetMemberSlots();
+	  for(std::list<Group::MemberSlot>::const_iterator it = msl.cbegin(); it != msl.cend(); it++) {
+	    rapidjson::Value jsonGroupMember(rapidjson::kObjectType);
+	    jsonGroupMember.AddMember("guid", it->guid, a);
+	    jsonGroupMember.AddMember("name", it->name.c_str(), a);
+	    jsonGroupMemberList.PushBack(jsonGroupMember, a);
+	  }
+	  
+	  jsonGroup.AddMember("member-list", jsonGroupMemberList, a);
+	  d->AddMember("group", jsonGroup, a);
+	}
+	
+	if(guild != NULL) {
+	  jsonGuild.AddMember("id", guild->GetId(), a);
+	  jsonGuild.AddMember("name", guild->GetName().c_str(), a);
+	  d->AddMember("guild", jsonGuild, a);
+	}
+	
+	if(channel != NULL) {
+	  jsonChannel.AddMember("id", channel->GetChannelId(), a);
+	  jsonChannel.AddMember("name", channel->GetName().c_str(), a);
+	  d->AddMember("channel", jsonChannel, a);
+	}
+	
+	if(spell != NULL) {
+	  jsonSpell.AddMember("id", spell->GetSpellInfo()->Id, a);
+	  jsonSpell.AddMember("name", spell->GetSpellInfo()->SpellName, a);
+	  jsonSpell.AddMember("family", spell->GetSpellInfo()->SpellFamilyName, a);
+	  d->AddMember("spell", jsonSpell, a);
+	}
 	
 	queue.Enqueue(d);
 }
