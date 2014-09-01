@@ -35,6 +35,7 @@
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
 #include "restclient.h"
+#include "ObjectAccessor.h"
 
 #include <queue>
 #include <boost/thread.hpp>  
@@ -310,6 +311,9 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	  jsonPlayer.AddMember("z", z, a);
 	  jsonPlayer.AddMember("o", o, a);
 	  d->AddMember("player", jsonPlayer, a);
+	  
+	  Player *p = sObjectAccessor->FindPlayer(player->GetGUIDLow());
+	  sWorld->SendServerMessage(SERVER_MSG_STRING, "hello player", p);
 	}
 	
 	if(actor != NULL) {
