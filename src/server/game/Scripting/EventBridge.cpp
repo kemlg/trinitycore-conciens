@@ -36,6 +36,9 @@
 #include "rapidjson/stringbuffer.h"
 #include "restclient.h"
 #include "ObjectAccessor.h"
+#include "MapManager.h"
+#include "DatabaseEnv.h"
+#include "World.h"
 
 #include <queue>
 #include <boost/thread.hpp>  
@@ -59,7 +62,6 @@ public:
             m_queue.push(data);
             m_cond.notify_one();
         }
-
     } 
 
 
@@ -93,7 +95,6 @@ public:
     {
         boost::unique_lock<boost::mutex> lock(m_mutex);
         return m_queue.size();
-
     }
 
 private:
@@ -108,11 +109,9 @@ private:
         }
     }
 
-
-
     std::queue<T> m_queue;              // Use STL queue to store data
     boost::mutex m_mutex;               // The mutex to synchronise on
-    boost::condition_variable m_cond;            // The condition to wait for
+    boost::condition_variable m_cond;   // The condition to wait for
 
     bool RequestToEnd;
     bool EnqueueData;
@@ -143,11 +142,200 @@ struct hostent*					host;
 struct sockaddr_in				server_addr;
 SynchronisedQueue<rapidjson::Document*>		queue;
 
-void processActions(rapidjson::Document& d) {
-  // TODO: Do something with actions!
+static bool removeQuestFromDB() {
+    SQLTransaction trans = WorldDatabase.BeginTransaction();
+    PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_DEL_QUEST_CREATURE_STARTER);
+    stmt->setInt32(0, 999999);
+    trans->Append(stmt);
+    WorldDatabase.DirectCommitTransaction(trans);
+
+    trans = WorldDatabase.BeginTransaction();
+    stmt = WorldDatabase.GetPreparedStatement(WORLD_DEL_QUEST_CREATURE_ENDER);
+    stmt->setInt32(0, 999999);
+    trans->Append(stmt);
+    WorldDatabase.DirectCommitTransaction(trans);
+
+    trans = WorldDatabase.BeginTransaction();
+    WorldDatabase.GetPreparedStatement(WORLD_DEL_QUEST_TEMPLATE);
+    stmt->setInt32(0, 999999);
+    trans->Append(stmt);
+    WorldDatabase.DirectCommitTransaction(trans);
+    
+    return true;
 }
 
-bool checkPortTCP(short int dwPort, const char *ipAddressStr)  
+static bool addQuestToDB() {
+    SQLTransaction trans = WorldDatabase.BeginTransaction();
+    
+    PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_INS_QUEST_TEMPLATE);
+    stmt->setInt32(0, 999999);
+    stmt->setInt8(1, 2);
+    stmt->setInt8(2, 1);
+    stmt->setInt8(3, 1);
+    stmt->setInt8(4, 80);
+    stmt->setInt32(26, 80000000);
+    stmt->setString(82, "Title");
+    stmt->setString(83, "Objectives.");
+    stmt->setString(84, "Details.");
+    stmt->setString(85, "End text.");
+    stmt->setString(86, "Completed.");
+    stmt->setString(87, "Offer reward.");
+    stmt->setString(89, "Completed.");
+    stmt->setInt32(105, 6260);
+    stmt->setInt8(111, 2);    
+    trans->Append(stmt);
+    
+    stmt = WorldDatabase.GetPreparedStatement(WORLD_INS_QUEST_CREATURE_STARTER);
+    stmt->setInt16(0, 295);
+    stmt->setInt32(1, 999999);
+    trans->Append(stmt);
+    
+    stmt = WorldDatabase.GetPreparedStatement(WORLD_INS_QUEST_CREATURE_ENDER);
+    stmt->setInt16(0, 295);
+    stmt->setInt32(1, 999999);
+    trans->Append(stmt);
+    
+    WorldDatabase.DirectCommitTransaction(trans);
+    
+    return true;
+}
+
+static bool reloadAllQuests()
+{
+    TC_LOG_INFO("misc", "Re-Loading Quest Area Triggers...");
+    sObjectMgr->LoadQuestAreaTriggers();
+    TC_LOG_INFO("misc", "DB table `areatrigger_involvedrelation` (quest area triggers) reloaded.");
+    TC_LOG_INFO("misc", "Re-Loading Quest POI ..." );
+    sObjectMgr->LoadQuestPOI();
+    TC_LOG_INFO("misc", "DB Table `quest_poi` and `quest_poi_points` reloaded.");
+    TC_LOG_INFO("misc", "Re-Loading Quest Templates...");
+    sObjectMgr->LoadQuests();
+    TC_LOG_INFO("misc", "DB table `quest_template` (quest definitions) reloaded.");
+
+    /// dependent also from `gameobject` but this table not reloaded anyway
+    TC_LOG_INFO("misc", "Re-Loading GameObjects for quests...");
+    sObjectMgr->LoadGameObjectForQuests();
+    TC_LOG_INFO("misc", "Data GameObjects for quests reloaded.");
+
+    TC_LOG_INFO("misc", "Re-Loading Quests Relations...");
+    sObjectMgr->LoadQuestStartersAndEnders();
+    TC_LOG_INFO("misc", "DB tables `*_queststarter` and `*_questender` reloaded.");
+    
+    return true;
+}
+
+static bool updateCreature(uint64 guid)
+{
+    const SessionMap& sessions = sWorld->GetAllSessions();
+    
+    for(std::unordered_map<uint32, WorldSession* >::const_iterator itr = sessions.begin();itr != sessions.end();++itr)
+    {
+	WorldSession* ws = itr->second;
+	if(ws->GetPlayer())
+	{
+	    Creature *obj = sObjectAccessor->GetCreatureOrPetOrVehicle(*ws->GetPlayer(), guid);
+	    int phaseMask = obj->GetPhaseMask();
+	    int tmpPhaseMask = phaseMask == 2 ? 3 : 2;
+	    obj->SendUpdateToPlayer(ws->GetPlayer());
+	    obj->SetPhaseMask(tmpPhaseMask, true);
+	    obj->SendUpdateToPlayer(ws->GetPlayer());
+	    obj->SetPhaseMask(phaseMask, true);
+	    obj->SendUpdateToPlayer(ws->GetPlayer());
+	}
+    }
+    
+    return true;
+}
+
+static bool createGameObject(int objectId, int mapId, double x, double y, double z, double o)
+{
+    char* spawntimeSecs = strtok(NULL, " ");
+    const GameObjectTemplate* objectInfo = sObjectMgr->GetGameObjectTemplate(objectId);
+
+    if (!objectInfo)
+    {
+	TC_LOG_INFO("server.loading", "LANG_GAMEOBJECT_NOT_EXIST %d", objectId);
+	return false;
+    }
+
+    if (objectInfo->displayId && !sGameObjectDisplayInfoStore.LookupEntry(objectInfo->displayId))
+    {
+	// report to DB errors log as in loading case
+	TC_LOG_ERROR("sql.sql", "Gameobject (Entry %u GoType: %u) have invalid displayId (%u), not spawned.", objectId, objectInfo->type, objectInfo->displayId);
+	TC_LOG_INFO("server.loading", "LANG_GAMEOBJECT_HAVE_INVALID_DATA %d", objectId);
+	return false;
+    }
+    
+    Map* map = sMapMgr->FindMap(mapId, 0);
+  
+    GameObject* object = new GameObject;
+    uint32 guidLow = sObjectMgr->GenerateLowGuid(HIGHGUID_GAMEOBJECT);
+
+    if (!object->Create(guidLow, objectInfo->entry, map, uint32(PHASEMASK_ANYWHERE), x, y, z, o, 0.0f, 0.0f, 0.0f, 0.0f, 0, GO_STATE_READY))
+    {
+	delete object;
+	return false;
+    }
+
+    if (spawntimeSecs)
+    {
+	uint32 value = atoi((char*)spawntimeSecs);
+	object->SetRespawnTime(value);
+    }
+
+    // fill the gameobject data and save to the db
+    object->SaveToDB(map->GetId(), (1 << map->GetSpawnMode()), uint32(PHASEMASK_ANYWHERE));
+    // delete the old object and do a clean load from DB with a fresh new GameObject instance.
+    // this is required to avoid weird behavior and memory leaks
+    delete object;
+
+    object = new GameObject();
+    // this will generate a new guid if the object is in an instance
+    if (!object->LoadGameObjectFromDB(guidLow, map))
+    {
+	delete object;
+	return false;
+    }
+
+    /// @todo is it really necessary to add both the real and DB table guid here ?
+    sObjectMgr->AddGameobjectToGrid(guidLow, sObjectMgr->GetGOData(guidLow));
+
+    TC_LOG_INFO("server.loading", "LANG_GAMEOBJECT_ADD %d %s %d %f %f %f", objectId, objectInfo->name.c_str(), guidLow, x, y, z);
+    return true;
+}
+
+void processActions(rapidjson::Document& d)
+{
+    for(rapidjson::Value::ConstValueIterator itr = d["actions"].Begin(); itr != d["actions"].End(); ++itr)
+    {
+	const rapidjson::Value& action = *itr;
+	const char* actionId = action["action-id"].GetString();
+	
+	if(!strcmp(actionId, "create"))
+	{
+	    createGameObject(action["object-id"].GetInt(), action["map-id"].GetInt(), action["x"].GetDouble(),
+			     action["y"].GetDouble(), action["z"].GetDouble(), action["o"].GetDouble());
+	}
+	else if(!strcmp(actionId, "reload-quests"))
+	{
+	    reloadAllQuests();
+	}
+	else if(!strcmp(actionId, "add-quest"))
+	{
+	    addQuestToDB();
+	    reloadAllQuests();
+	    updateCreature(MAKE_NEW_GUID(80346, 295, HIGHGUID_UNIT));
+	}
+	else if(!strcmp(actionId, "remove-quest"))
+	{
+	    removeQuestFromDB();
+	    reloadAllQuests();
+	    updateCreature(MAKE_NEW_GUID(80346, 295, HIGHGUID_UNIT));
+	}
+    }
+}
+
+bool checkPortTCP(short int dwPort, const char *ipAddressStr)
 {  
     struct sockaddr_in server_addr;         
     int sock;   
@@ -174,7 +362,7 @@ bool checkPortTCP(short int dwPort, const char *ipAddressStr)
     else return false; 
 }  
 
-void* processMessages(void* ptr)
+void* processMessages(void *)
 {
 	pthread_t thread1;
 	rapidjson::Document 	events, actions;
@@ -228,17 +416,18 @@ void* processMessages(void* ptr)
 
 	//printf("\nSEND (q or Q to quit) : ");
 	//gets(send_data);
+	
+	return NULL;
 }
 
 EventBridge::EventBridge()
 {
 	pthread_t	thread1;
-	int		iret;
 
 	TC_LOG_INFO("server.loading", "EventBridge: Starting EventBridge...");
-
+	
 	/* Create independent threads each of which will execute function */
-	iret = pthread_create(&thread1, NULL, processMessages, NULL);
+	pthread_create(&thread1, NULL, processMessages, NULL);
 
 	/* Wait till threads are complete before main continues. Unless we  */
 	/* wait we run the risk of executing an exit which will terminate   */
@@ -260,6 +449,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 			    const Channel* channel, const Spell* spell, const Unit* actor)
 {
 	float	x, y, z, o;
+	x = y = z = o = 0.0;
 
 	rapidjson::Document* d = new rapidjson::Document();
 	rapidjson::Value jsonNums(rapidjson::kArrayType);
@@ -287,7 +477,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	d->AddMember("num-values", jsonNums, a);
 	
 	if(st != NULL) {
-	  TC_LOG_INFO("server.loading", st);
+	  TC_LOG_INFO("server.loading", "%s", st);
 	  rapidjson::Value s;
 	  s.SetString(st, strlen(st), a);
 	  d->AddMember("string-value", s, a);
@@ -310,10 +500,8 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	  jsonPlayer.AddMember("y", y, a);
 	  jsonPlayer.AddMember("z", z, a);
 	  jsonPlayer.AddMember("o", o, a);
+	  jsonPlayer.AddMember("map", player->GetMapId(), a);
 	  d->AddMember("player", jsonPlayer, a);
-	  
-	  Player *p = sObjectAccessor->FindPlayer(player->GetGUIDLow());
-	  sWorld->SendServerMessage(SERVER_MSG_STRING, "hello player", p);
 	}
 	
 	if(actor != NULL) {
