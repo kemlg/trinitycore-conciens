@@ -471,7 +471,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	rapidjson::Document::AllocatorType& a = d->GetAllocator();
 	d->SetObject();
 	
-	d->AddMember("event-type", idToEventType[event_type], a);
+	d->AddMember(rapidjson::StringRef("event-type"), rapidjson::StringRef(idToEventType[event_type]), a);
 	
 	jsonNums.PushBack(num, a).PushBack(num2, a);
 	d->AddMember("num-values", jsonNums, a);
@@ -490,7 +490,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	if(player != NULL) {
 	  player->GetPosition(x, y, z, o);
 	  jsonPlayer.AddMember("guid", player->GetGUIDLow(), a);
-	  jsonPlayer.AddMember("name", player->GetName().c_str(), a);
+	  jsonPlayer.AddMember("name", rapidjson::StringRef(player->GetName().c_str()), a);
 	  jsonPlayer.AddMember("level", player->getLevel(), a);
 	  rapidjson::Value s;
 	  const char* text = player->ToString().c_str();
@@ -507,7 +507,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	if(actor != NULL) {
 	  actor->GetPosition(x, y, z, o);
 	  jsonActor.AddMember("guid", actor->GetGUIDLow(), a);
-	  jsonActor.AddMember("name", actor->GetName().c_str(), a);
+	  jsonActor.AddMember("name", rapidjson::StringRef(actor->GetName().c_str()), a);
 	  jsonActor.AddMember("level", actor->getLevel(), a);
 	  rapidjson::Value s;
 	  const char* text = actor->ToString().c_str();
@@ -522,7 +522,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	
 	if(target != NULL) {
 	  jsonTarget.AddMember("guid", target->GetGUIDLow(), a);
-	  jsonTarget.AddMember("name", target->GetName().c_str(), a);
+	  jsonTarget.AddMember("name", rapidjson::StringRef(target->GetName().c_str()), a);
 	  jsonTarget.AddMember("level", target->getLevel(), a);
 	  jsonTarget.AddMember("x", x, a);
 	  jsonTarget.AddMember("y", y, a);
@@ -533,7 +533,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	
 	if(creature != NULL) {
 	  jsonCreature.AddMember("guid", creature->GetGUIDLow(), a);
-	  jsonCreature.AddMember("name", creature->GetName().c_str(), a);
+	  jsonCreature.AddMember("name", rapidjson::StringRef(creature->GetName().c_str()), a);
 	  jsonCreature.AddMember("level", creature->getLevel(), a);
 	  jsonCreature.AddMember("x", x, a);
 	  jsonCreature.AddMember("y", y, a);
@@ -544,33 +544,33 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	
 	if(item != NULL) {
 	  jsonItem.AddMember("guid", item->GetGUIDLow(), a);
-	  jsonItem.AddMember("name", item->GetTemplate()->Name1.c_str(), a);
+	  jsonItem.AddMember("name", rapidjson::StringRef(item->GetTemplate()->Name1.c_str()), a);
 	  d->AddMember("item", jsonItem, a);
 	}
 	
 	if(quest != NULL) {
 	  jsonQuest.AddMember("id", quest->GetQuestId(), a);
-	  jsonQuest.AddMember("name", quest->GetTitle().c_str(), a);
-	  jsonQuest.AddMember("description", quest->GetDetails().c_str(), a);
+	  jsonQuest.AddMember("name", rapidjson::StringRef(quest->GetTitle().c_str()), a);
+	  jsonQuest.AddMember("description", rapidjson::StringRef(quest->GetDetails().c_str()), a);
 	  d->AddMember("quest", jsonQuest, a);
 	}
 
 	if(targets != NULL) {
 	  jsonTarget.AddMember("guid", targets->GetUnitTarget()->GetGUIDLow(), a);
-	  jsonTarget.AddMember("name", targets->GetUnitTarget()->GetName().c_str(), a);
+	  jsonTarget.AddMember("name", rapidjson::StringRef(targets->GetUnitTarget()->GetName().c_str()), a);
 	  jsonTarget.AddMember("level", targets->GetUnitTarget()->getLevel(), a);
 	  d->AddMember("target", jsonTarget, a);
 	}
 
 	if(proto != NULL) {
 	  jsonItemTemplate.AddMember("id", proto->ItemId, a);
-	  jsonItemTemplate.AddMember("name", proto->Name1.c_str(), a);
+	  jsonItemTemplate.AddMember("name", rapidjson::StringRef(proto->Name1.c_str()), a);
 	  d->AddMember("item-template", jsonItemTemplate, a);
 	}
 
 	if(go != NULL) {
 	  jsonGameObject.AddMember("guid", go->GetGUIDLow(), a);
-	  jsonGameObject.AddMember("name", go->GetName().c_str(), a);
+	  jsonGameObject.AddMember("name", rapidjson::StringRef(go->GetName().c_str()), a);
 	  d->AddMember("game-object", jsonGameObject, a);
 	}
 	 
@@ -596,14 +596,14 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	if(group != NULL) {
 	  jsonGroup.AddMember("guid", group->GetLowGUID(), a);
 	  jsonGroup.AddMember("leader-guid", group->GetLeaderGUID(), a);
-	  jsonGroup.AddMember("leader-name", group->GetLeaderName(), a);
+	  jsonGroup.AddMember("leader-name", rapidjson::StringRef(group->GetLeaderName()), a);
 	  rapidjson::Value jsonGroupMemberList(rapidjson::kArrayType);
 	  
 	  const Group::MemberSlotList& msl = group->GetMemberSlots();
 	  for(std::list<Group::MemberSlot>::const_iterator it = msl.cbegin(); it != msl.cend(); it++) {
 	    rapidjson::Value jsonGroupMember(rapidjson::kObjectType);
 	    jsonGroupMember.AddMember("guid", it->guid, a);
-	    jsonGroupMember.AddMember("name", it->name.c_str(), a);
+	    jsonGroupMember.AddMember("name", rapidjson::StringRef(it->name.c_str()), a);
 	    jsonGroupMemberList.PushBack(jsonGroupMember, a);
 	  }
 	  
@@ -613,19 +613,19 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	
 	if(guild != NULL) {
 	  jsonGuild.AddMember("id", guild->GetId(), a);
-	  jsonGuild.AddMember("name", guild->GetName().c_str(), a);
+	  jsonGuild.AddMember("name",rapidjson::StringRef( guild->GetName().c_str()), a);
 	  d->AddMember("guild", jsonGuild, a);
 	}
 	
 	if(channel != NULL) {
 	  jsonChannel.AddMember("id", channel->GetChannelId(), a);
-	  jsonChannel.AddMember("name", channel->GetName().c_str(), a);
+	  jsonChannel.AddMember("name", rapidjson::StringRef(channel->GetName().c_str()), a);
 	  d->AddMember("channel", jsonChannel, a);
 	}
 	
 	if(spell != NULL) {
 	  jsonSpell.AddMember("id", spell->GetSpellInfo()->Id, a);
-	  jsonSpell.AddMember("name", spell->GetSpellInfo()->SpellName, a);
+	  jsonSpell.AddMember("name", rapidjson::StringRef(*spell->GetSpellInfo()->SpellName), a);
 	  jsonSpell.AddMember("family", spell->GetSpellInfo()->SpellFamilyName, a);
 	  d->AddMember("spell", jsonSpell, a);
 	}
