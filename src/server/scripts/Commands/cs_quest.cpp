@@ -33,7 +33,7 @@ class quest_commandscript : public CommandScript
 public:
     quest_commandscript() : CommandScript("quest_commandscript") { }
 
-    ChatCommand* GetCommands() const OVERRIDE
+    ChatCommand* GetCommands() const override
     {
         static ChatCommand questCommandTable[] =
         {
@@ -53,7 +53,7 @@ public:
 
     static bool HandleQuestAdd(ChatHandler* handler, const char* args)
     {
-        Player* player = handler->getSelectedPlayer();
+        Player* player = handler->getSelectedPlayerOrSelf();
         if (!player)
         {
             handler->SendSysMessage(LANG_NO_CHAR_SELECTED);
@@ -91,12 +91,7 @@ public:
 
         // ok, normal (creature/GO starting) quest
         if (player->CanAddQuest(quest, true))
-        {
             player->AddQuestAndCheckCompletion(quest, NULL);
-
-            if (player->CanCompleteQuest(entry))
-                player->CompleteQuest(entry);
-        }
 
         return true;
     }
@@ -156,7 +151,7 @@ public:
 
     static bool HandleQuestComplete(ChatHandler* handler, const char* args)
     {
-        Player* player = handler->getSelectedPlayer();
+        Player* player = handler->getSelectedPlayerOrSelf();
         if (!player)
         {
             handler->SendSysMessage(LANG_NO_CHAR_SELECTED);
@@ -211,11 +206,11 @@ public:
             {
                 if (CreatureTemplate const* creatureInfo = sObjectMgr->GetCreatureTemplate(creature))
                     for (uint16 z = 0; z < creatureCount; ++z)
-                        player->KilledMonster(creatureInfo, 0);
+                        player->KilledMonster(creatureInfo, ObjectGuid::Empty);
             }
             else if (creature < 0)
                 for (uint16 z = 0; z < creatureCount; ++z)
-                    player->KillCreditGO(creature, 0);
+                    player->KillCreditGO(creature);
         }
 
         // If the quest requires reputation to complete
@@ -242,6 +237,17 @@ public:
         int32 ReqOrRewMoney = quest->GetRewOrReqMoney();
         if (ReqOrRewMoney < 0)
             player->ModifyMoney(-ReqOrRewMoney);
+
+        if (sWorld->getBoolConfig(CONFIG_QUEST_ENABLE_QUEST_TRACKER)) // check if Quest Tracker is enabled
+        {
+            // prepare Quest Tracker datas
+            PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_QUEST_TRACK_GM_COMPLETE);
+            stmt->setUInt32(0, quest->GetQuestId());
+            stmt->setUInt32(1, player->GetGUIDLow());
+
+            // add to Quest Tracker
+            CharacterDatabase.Execute(stmt);
+        }
 
         player->CompleteQuest(entry);
         return true;

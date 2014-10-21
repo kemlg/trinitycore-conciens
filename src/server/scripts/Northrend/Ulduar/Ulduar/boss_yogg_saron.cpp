@@ -427,10 +427,18 @@ class boss_voice_of_yogg_saron : public CreatureScript
         {
             boss_voice_of_yogg_saronAI(Creature* creature) : BossAI(creature, BOSS_YOGG_SARON)
             {
+                Initialize();
                 SetCombatMovement(false);
             }
 
-            void MoveInLineOfSight(Unit* who) OVERRIDE
+            void Initialize()
+            {
+                _guardiansCount = 0;
+                _guardianTimer = 20000;
+                _illusionShattered = false;
+            }
+
+            void MoveInLineOfSight(Unit* who) override
 
             {
                 // TODO: MoveInLineOfSight doesn't work for such a big distance
@@ -438,12 +446,12 @@ class boss_voice_of_yogg_saron : public CreatureScript
                     me->SetInCombatWithZone();
             }
 
-            void EnterEvadeMode() OVERRIDE
+            void EnterEvadeMode() override
             {
                 BossAI::EnterEvadeMode();
 
                 for (uint8 i = DATA_SARA; i <= DATA_MIMIRON_YS; ++i)
-                    if (Creature* creature = ObjectAccessor::GetCreature(*me, instance->GetData64(i)))
+                    if (Creature* creature = ObjectAccessor::GetCreature(*me, instance->GetGuidData(i)))
                         creature->AI()->EnterEvadeMode();
 
                 // not sure, spoken by Sara (sound), regarding to wowwiki Voice whispers it
@@ -459,7 +467,7 @@ class boss_voice_of_yogg_saron : public CreatureScript
                     }
             }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 _Reset();
                 events.SetPhase(PHASE_ONE);
@@ -467,9 +475,7 @@ class boss_voice_of_yogg_saron : public CreatureScript
                 instance->SetData(DATA_DRIVE_ME_CRAZY, uint32(true));
                 instance->DoStopTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_TIMED_START_EVENT);
 
-                _guardiansCount = 0;
-                _guardianTimer = 20000;
-                _illusionShattered = false;
+                Initialize();
 
                 bool clockwise = false;
                 std::list<TempSummon*> clouds;
@@ -482,13 +488,13 @@ class boss_voice_of_yogg_saron : public CreatureScript
                 }
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
-                if (Creature* sara = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_SARA)))
+                if (Creature* sara = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_SARA)))
                     sara->SetInCombatWith(me);
 
                 for (uint8 i = DATA_FREYA_YS; i <= DATA_MIMIRON_YS; ++i)
-                    if (Creature* keeper = ObjectAccessor::GetCreature(*me, instance->GetData64(i)))
+                    if (Creature* keeper = ObjectAccessor::GetCreature(*me, instance->GetGuidData(i)))
                         keeper->SetInCombatWith(me);
 
                 instance->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_TIMED_START_EVENT);
@@ -501,16 +507,16 @@ class boss_voice_of_yogg_saron : public CreatureScript
                 events.ScheduleEvent(EVENT_EXTINGUISH_ALL_LIFE, 900000);    // 15 minutes
             }
 
-            void JustDied(Unit* killer) OVERRIDE
+            void JustDied(Unit* killer) override
             {
                 // don't despawn Yogg-Saron's corpse, remove him from SummonList!
-                if (Creature* yogg = ObjectAccessor::GetCreature(*me, instance->GetData64(BOSS_YOGG_SARON)))
+                if (Creature* yogg = ObjectAccessor::GetCreature(*me, instance->GetGuidData(BOSS_YOGG_SARON)))
                     summons.Despawn(yogg);
 
                 BossAI::JustDied(killer);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -529,7 +535,7 @@ class boss_voice_of_yogg_saron : public CreatureScript
                             instance->SetBossState(BOSS_YOGG_SARON, IN_PROGRESS);
                             break;
                         case EVENT_EXTINGUISH_ALL_LIFE:
-                            if (Creature* yogg = ObjectAccessor::GetCreature(*me, instance->GetData64(BOSS_YOGG_SARON)))
+                            if (Creature* yogg = ObjectAccessor::GetCreature(*me, instance->GetGuidData(BOSS_YOGG_SARON)))
                             {
                                 yogg->AI()->Talk(EMOTE_YOGG_SARON_EXTINGUISH_ALL_LIFE, me);
                                 yogg->CastSpell((Unit*)NULL, SPELL_EXTINGUISH_ALL_LIFE, true);
@@ -557,7 +563,7 @@ class boss_voice_of_yogg_saron : public CreatureScript
                             break;
                         case EVENT_ILLUSION:
                         {
-                            if (Creature* yogg = ObjectAccessor::GetCreature(*me, instance->GetData64(BOSS_YOGG_SARON)))
+                            if (Creature* yogg = ObjectAccessor::GetCreature(*me, instance->GetGuidData(BOSS_YOGG_SARON)))
                             {
                                 yogg->AI()->Talk(EMOTE_YOGG_SARON_MADNESS);
                                 yogg->AI()->Talk(SAY_YOGG_SARON_MADNESS);
@@ -570,7 +576,7 @@ class boss_voice_of_yogg_saron : public CreatureScript
                             uint8 illusion = urand(CHAMBER_ILLUSION, STORMWIND_ILLUSION);
                             instance->SetData(DATA_ILLUSION, illusion);
 
-                            if (Creature* brain = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_BRAIN_OF_YOGG_SARON)))
+                            if (Creature* brain = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_BRAIN_OF_YOGG_SARON)))
                                 brain->AI()->DoAction(ACTION_INDUCE_MADNESS);
                             events.ScheduleEvent(EVENT_ILLUSION, 80000, 0, PHASE_TWO);  // wowwiki says 80 secs, wowhead says something about 90 secs
                             break;
@@ -585,7 +591,7 @@ class boss_voice_of_yogg_saron : public CreatureScript
                 }
             }
 
-            void DoAction(int32 action) OVERRIDE
+            void DoAction(int32 action) override
             {
                 switch (action)
                 {
@@ -596,7 +602,7 @@ class boss_voice_of_yogg_saron : public CreatureScript
                     case ACTION_PHASE_TWO:
                         events.SetPhase(PHASE_TWO);
                         me->SummonCreature(NPC_YOGG_SARON, YoggSaronSpawnPos);
-                        if (Creature* brain = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_BRAIN_OF_YOGG_SARON)))
+                        if (Creature* brain = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_BRAIN_OF_YOGG_SARON)))
                             brain->SetInCombatWithZone();
                         events.ScheduleEvent(EVENT_SUMMON_CORRUPTOR_TENTACLE, 1, EVENT_GROUP_SUMMON_TENTACLES, PHASE_TWO);
                         events.ScheduleEvent(EVENT_SUMMON_CONSTRICTOR_TENTACLE, 1, EVENT_GROUP_SUMMON_TENTACLES, PHASE_TWO);
@@ -615,7 +621,7 @@ class boss_voice_of_yogg_saron : public CreatureScript
                 }
             }
 
-            void JustSummoned(Creature* summon) OVERRIDE
+            void JustSummoned(Creature* summon) override
             {
                 switch (summon->GetEntry())
                 {
@@ -651,7 +657,7 @@ class boss_voice_of_yogg_saron : public CreatureScript
             bool _illusionShattered;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<boss_voice_of_yogg_saronAI>(creature);
         }
@@ -666,34 +672,34 @@ class boss_sara : public CreatureScript
         {
             boss_saraAI(Creature* creature) : ScriptedAI(creature), _instance(creature->GetInstanceScript()) { }
 
-            uint64 GetLinkedPlayerGUID(uint64 guid) const
+            ObjectGuid GetLinkedPlayerGUID(ObjectGuid guid) const
             {
-                std::map<uint64, uint64>::const_iterator itr = _linkData.find(guid);
+                std::map<ObjectGuid, ObjectGuid>::const_iterator itr = _linkData.find(guid);
                 if (itr != _linkData.end())
                     return itr->second;
 
-                return 0;
+                return ObjectGuid::Empty;
             }
 
-            void SetLinkBetween(uint64 player1, uint64 player2)
+            void SetLinkBetween(ObjectGuid player1, ObjectGuid player2)
             {
                 _linkData[player1] = player2;
                 _linkData[player2] = player1;
             }
 
             // called once for each target on aura remove
-            void RemoveLinkFrom(uint64 player1)
+            void RemoveLinkFrom(ObjectGuid player1)
             {
                 _linkData.erase(player1);
             }
 
-            void DamageTaken(Unit* /*attacker*/, uint32& damage) OVERRIDE
+            void DamageTaken(Unit* /*attacker*/, uint32& damage) override
             {
                 if (_events.IsInPhase(PHASE_ONE) && damage >= me->GetHealth())
                 {
                     damage = 0;
 
-                    if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_VOICE_OF_YOGG_SARON)))
+                    if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_VOICE_OF_YOGG_SARON)))
                         voice->AI()->DoAction(ACTION_PHASE_TRANSFORM);
 
                     Talk(SAY_SARA_TRANSFORM_1);
@@ -705,7 +711,7 @@ class boss_sara : public CreatureScript
                 }
             }
 
-            void SpellHitTarget(Unit* /*target*/, SpellInfo const* spell) OVERRIDE
+            void SpellHitTarget(Unit* /*target*/, SpellInfo const* spell) override
             {
                 if (!roll_chance_i(30) || _events.IsInPhase(PHASE_TRANSFORM))
                     return;
@@ -726,13 +732,13 @@ class boss_sara : public CreatureScript
                 }
             }
 
-            void KilledUnit(Unit* victim) OVERRIDE
+            void KilledUnit(Unit* victim) override
             {
                 if (victim->GetTypeId() == TYPEID_PLAYER && !me->IsInEvadeMode())
                     Talk(SAY_SARA_KILL);
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 Talk(SAY_SARA_AGGRO);
                 _events.ScheduleEvent(EVENT_SARAS_FERVOR, 5000, 0, PHASE_ONE);
@@ -740,7 +746,7 @@ class boss_sara : public CreatureScript
                 _events.ScheduleEvent(EVENT_SARAS_ANGER, urand(15000, 25000), 0, PHASE_ONE);
             }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 me->RemoveAllAuras();
                 me->SetReactState(REACT_PASSIVE);
@@ -749,7 +755,7 @@ class boss_sara : public CreatureScript
                 _events.SetPhase(PHASE_ONE);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!me->IsInCombat())
                     return;
@@ -788,14 +794,14 @@ class boss_sara : public CreatureScript
                             Talk(SAY_SARA_TRANSFORM_4);
                             DoCast(me, SPELL_FULL_HEAL);
                             me->setFaction(16);
-                            if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_VOICE_OF_YOGG_SARON)))
+                            if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_VOICE_OF_YOGG_SARON)))
                                 voice->AI()->DoAction(ACTION_PHASE_TWO);
-                            if (Creature* mimiron = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_MIMIRON_YS)))
+                            if (Creature* mimiron = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_MIMIRON_YS)))
                                 mimiron->AI()->DoAction(ACTION_PHASE_TWO);
                             break;
                         case EVENT_TRANSFORM_4:
                             DoCast(me, SPELL_PHASE_2_TRANSFORM);
-                            if (Creature* yogg = ObjectAccessor::GetCreature(*me, _instance->GetData64(BOSS_YOGG_SARON)))
+                            if (Creature* yogg = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(BOSS_YOGG_SARON)))
                                 DoCast(yogg, SPELL_RIDE_YOGG_SARON_VEHICLE);
                             DoCast(me, SPELL_SHADOWY_BARRIER_SARA);
                             _events.SetPhase(PHASE_TWO);
@@ -826,7 +832,7 @@ class boss_sara : public CreatureScript
                 }
             }
 
-            void JustSummoned(Creature* summon) OVERRIDE
+            void JustSummoned(Creature* summon) override
             {
                 summon->SetReactState(REACT_PASSIVE);
 
@@ -839,7 +845,7 @@ class boss_sara : public CreatureScript
                         {
                             Position pos;
                             float radius = frand(25.0f, 50.0f);
-                            float angle = frand(0.0f, 2.0f * M_PI);
+                            float angle = frand(0.0f, 2.0f * float(M_PI));
                             pos.m_positionX = YoggSaronSpawnPos.GetPositionX() + radius * cosf(angle);
                             pos.m_positionY = YoggSaronSpawnPos.GetPositionY() + radius * sinf(angle);
                             pos.m_positionZ = me->GetMap()->GetHeight(me->GetPhaseMask(), pos.GetPositionX(), pos.GetPositionY(), YoggSaronSpawnPos.GetPositionZ() + 5.0f);
@@ -851,11 +857,11 @@ class boss_sara : public CreatureScript
                         break;
                 }
 
-                if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_VOICE_OF_YOGG_SARON)))
+                if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_VOICE_OF_YOGG_SARON)))
                     voice->AI()->JustSummoned(summon);
             }
 
-            void DoAction(int32 action) OVERRIDE
+            void DoAction(int32 action) override
             {
                 switch (action)
                 {
@@ -870,10 +876,10 @@ class boss_sara : public CreatureScript
             private:
                 EventMap _events;
                 InstanceScript* _instance;
-                std::map<uint64, uint64> _linkData;
+                std::map<ObjectGuid, ObjectGuid> _linkData;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<boss_saraAI>(creature);
         }
@@ -888,7 +894,7 @@ class boss_yogg_saron : public CreatureScript
         {
             boss_yogg_saronAI(Creature* creature) : PassiveAI(creature), _instance(creature->GetInstanceScript()) { }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 _events.Reset();
                 _events.SetPhase(PHASE_TWO);
@@ -910,25 +916,25 @@ class boss_yogg_saron : public CreatureScript
                 }
             }
 
-            void SpellHit(Unit* /*caster*/, SpellInfo const* spell) OVERRIDE
+            void SpellHit(Unit* /*caster*/, SpellInfo const* spell) override
             {
                 if (spell->Id == SPELL_IN_THE_MAWS_OF_THE_OLD_GOD)
                     me->AddLootMode(32);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 Talk(SAY_YOGG_SARON_DEATH);
 
-                if (Creature* creature = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_VOICE_OF_YOGG_SARON)))
+                if (Creature* creature = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_VOICE_OF_YOGG_SARON)))
                     me->Kill(creature);
 
                 for (uint8 i = DATA_SARA; i <= DATA_BRAIN_OF_YOGG_SARON; ++i)
-                    if (Creature* creature = ObjectAccessor::GetCreature(*me, _instance->GetData64(i)))
+                    if (Creature* creature = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(i)))
                         creature->DisappearAndDie();
 
                 for (uint8 i = DATA_FREYA_YS; i <= DATA_MIMIRON_YS; ++i)
-                    if (Creature* creature = ObjectAccessor::GetCreature(*me, _instance->GetData64(i)))
+                    if (Creature* creature = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(i)))
                         creature->AI()->EnterEvadeMode();
 
                 Map::PlayerList const& players = me->GetMap()->GetPlayers();
@@ -940,7 +946,7 @@ class boss_yogg_saron : public CreatureScript
                     }
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 _events.Update(diff);
 
@@ -976,7 +982,7 @@ class boss_yogg_saron : public CreatureScript
                 }
             }
 
-            void DoAction(int32 action) OVERRIDE
+            void DoAction(int32 action) override
             {
                 switch (action)
                 {
@@ -1001,7 +1007,7 @@ class boss_yogg_saron : public CreatureScript
             InstanceScript* _instance;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<boss_yogg_saronAI>(creature);
         }
@@ -1014,16 +1020,19 @@ class boss_brain_of_yogg_saron : public CreatureScript
 
         struct boss_brain_of_yogg_saronAI : public PassiveAI
         {
-            boss_brain_of_yogg_saronAI(Creature* creature) : PassiveAI(creature), _instance(creature->GetInstanceScript()), _summons(creature) { }
+            boss_brain_of_yogg_saronAI(Creature* creature) : PassiveAI(creature), _instance(creature->GetInstanceScript()), _summons(creature)
+            {
+                _tentaclesKilled = 0;
+            }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_NOT_SELECTABLE);
                 DoCast(me, SPELL_MATCH_HEALTH);
                 _summons.DespawnAll();
             }
 
-            void DamageTaken(Unit* /*attacker*/, uint32& damage) OVERRIDE
+            void DamageTaken(Unit* /*attacker*/, uint32& damage) override
             {
                 if (me->HealthBelowPctDamaged(30, damage) && !me->HasAura(SPELL_BRAIN_HURT_VISUAL))
                 {
@@ -1034,22 +1043,22 @@ class boss_brain_of_yogg_saron : public CreatureScript
                     DoCast(me, SPELL_BRAIN_HURT_VISUAL, true);
                     me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_NOT_SELECTABLE);
 
-                    if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_VOICE_OF_YOGG_SARON)))
+                    if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_VOICE_OF_YOGG_SARON)))
                         voice->AI()->DoAction(ACTION_PHASE_THREE);
-                    if (Creature* sara = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_SARA)))
+                    if (Creature* sara = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_SARA)))
                         sara->AI()->DoAction(ACTION_PHASE_THREE);
-                    if (Creature* yogg = ObjectAccessor::GetCreature(*me, _instance->GetData64(BOSS_YOGG_SARON)))
+                    if (Creature* yogg = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(BOSS_YOGG_SARON)))
                         yogg->AI()->DoAction(ACTION_PHASE_THREE);
 
                     for (uint8 i = DATA_THORIM_YS; i <= DATA_MIMIRON_YS; ++i)
-                        if (Creature* keeper = ObjectAccessor::GetCreature(*me, _instance->GetData64(i)))
+                        if (Creature* keeper = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(i)))
                             keeper->AI()->DoAction(ACTION_PHASE_THREE);
                 }
             }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE { }
+            void UpdateAI(uint32 /*diff*/) override { }
 
-            void DoAction(int32 action) OVERRIDE
+            void DoAction(int32 action) override
             {
                 switch (action)
                 {
@@ -1061,7 +1070,7 @@ class boss_brain_of_yogg_saron : public CreatureScript
 
                         // make sure doors won't be opened
                         for (uint32 i = GO_BRAIN_ROOM_DOOR_1; i <= GO_BRAIN_ROOM_DOOR_3; ++i)
-                            _instance->HandleGameObject(_instance->GetData64(i), false);
+                            _instance->HandleGameObject(_instance->GetGuidData(i), false);
 
                         DoCastAOE(SPELL_INDUCE_MADNESS);
                         break;
@@ -1074,9 +1083,9 @@ class boss_brain_of_yogg_saron : public CreatureScript
                             sCreatureTextMgr->SendChat(me, EMOTE_BRAIN_ILLUSION_SHATTERED, NULL, CHAT_MSG_ADDON, LANG_ADDON, TEXT_RANGE_AREA);
                             _summons.DespawnAll();
                             DoCastAOE(SPELL_SHATTERED_ILLUSION, true);
-                            _instance->HandleGameObject(_instance->GetData64(GO_BRAIN_ROOM_DOOR_1 + illusion), true);
+                            _instance->HandleGameObject(_instance->GetGuidData(GO_BRAIN_ROOM_DOOR_1 + illusion), true);
 
-                            if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_VOICE_OF_YOGG_SARON)))
+                            if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_VOICE_OF_YOGG_SARON)))
                                 voice->AI()->DoAction(ACTION_TOGGLE_SHATTERED_ILLUSION);
                         }
                         break;
@@ -1086,7 +1095,7 @@ class boss_brain_of_yogg_saron : public CreatureScript
                 }
             }
 
-            void JustSummoned(Creature* summon) OVERRIDE
+            void JustSummoned(Creature* summon) override
             {
                 _summons.Summon(summon);
             }
@@ -1097,7 +1106,7 @@ class boss_brain_of_yogg_saron : public CreatureScript
             uint8 _tentaclesKilled;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<boss_brain_of_yogg_saronAI>(creature);
         }
@@ -1112,14 +1121,14 @@ class npc_ominous_cloud : public CreatureScript
         {
             npc_ominous_cloudAI(Creature* creature) : PassiveAI(creature) { }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 DoCast(me, SPELL_OMINOUS_CLOUD_VISUAL);
             }
 
             void FillCirclePath(Position const& centerPos, float radius, float z, Movement::PointsArray& path, bool clockwise)
             {
-                float step = clockwise ? -M_PI / 8.0f : M_PI / 8.0f;
+                float step = clockwise ? float(-M_PI) / 8.0f : float(M_PI) / 8.0f;
                 float angle = centerPos.GetAngle(me->GetPositionX(), me->GetPositionY());
 
                 for (uint8 i = 0; i < 16; angle += step, ++i)
@@ -1132,19 +1141,19 @@ class npc_ominous_cloud : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE { }
+            void UpdateAI(uint32 /*diff*/) override { }
 
-            void DoAction(int32 action) OVERRIDE
+            void DoAction(int32 action) override
             {
                 Movement::MoveSplineInit init(me);
-                FillCirclePath(YoggSaronSpawnPos, me->GetDistance2d(YoggSaronSpawnPos.GetPositionX(), YoggSaronSpawnPos.GetPositionY()), me->GetPositionZ(), init.Path(), action);
+                FillCirclePath(YoggSaronSpawnPos, me->GetDistance2d(YoggSaronSpawnPos.GetPositionX(), YoggSaronSpawnPos.GetPositionY()), me->GetPositionZ(), init.Path(), action != 0);
                 init.SetWalk(true);
                 init.SetCyclic();
                 init.Launch();
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_ominous_cloudAI>(creature);
         }
@@ -1159,18 +1168,18 @@ class npc_guardian_of_yogg_saron : public CreatureScript
         {
             npc_guardian_of_yogg_saronAI(Creature* creature) : ScriptedAI(creature), _instance(creature->GetInstanceScript()) { }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 DoCastAOE(SPELL_SHADOW_NOVA);
                 DoCastAOE(SPELL_SHADOW_NOVA_2);
             }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 _events.ScheduleEvent(EVENT_DARK_VOLLEY, urand(10000, 15000));
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -1196,13 +1205,13 @@ class npc_guardian_of_yogg_saron : public CreatureScript
                 DoMeleeAttackIfReady();
             }
 
-            void IsSummonedBy(Unit* summoner) OVERRIDE
+            void IsSummonedBy(Unit* summoner) override
             {
                 if (summoner->GetEntry() != NPC_OMINOUS_CLOUD)
                     return;
 
                 // Guardian can be summoned both by Voice of Yogg-Saron and by Ominous Cloud
-                if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_VOICE_OF_YOGG_SARON)))
+                if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_VOICE_OF_YOGG_SARON)))
                     voice->AI()->JustSummoned(me);
             }
 
@@ -1211,7 +1220,7 @@ class npc_guardian_of_yogg_saron : public CreatureScript
             InstanceScript* _instance;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_guardian_of_yogg_saronAI>(creature);
         }
@@ -1229,14 +1238,14 @@ class npc_corruptor_tentacle : public CreatureScript
                 SetCombatMovement(false);
             }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 DoCast(me, SPELL_TENTACLE_VOID_ZONE);
                 DoCastAOE(SPELL_ERUPT);
                 _events.ScheduleEvent(EVENT_CAST_RANDOM_SPELL, 1);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -1268,7 +1277,7 @@ class npc_corruptor_tentacle : public CreatureScript
             EventMap _events;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_corruptor_tentacleAI>(creature);
         }
@@ -1286,26 +1295,26 @@ class npc_constrictor_tentacle : public CreatureScript
                 SetCombatMovement(false);
             }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 DoCast(me, SPELL_TENTACLE_VOID_ZONE_2);
                 DoCastAOE(SPELL_ERUPT);
             }
 
-            void PassengerBoarded(Unit* passenger, int8 /*seatId*/, bool apply) OVERRIDE
+            void PassengerBoarded(Unit* passenger, int8 /*seatId*/, bool apply) override
             {
                 if (!apply)
                     passenger->RemoveAurasDueToSpell(SPELL_SQUEEZE);
             }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE
+            void UpdateAI(uint32 /*diff*/) override
             {
                 UpdateVictim();
             }
 
-            void IsSummonedBy(Unit* /*summoner*/) OVERRIDE
+            void IsSummonedBy(Unit* /*summoner*/) override
             {
-                if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_VOICE_OF_YOGG_SARON)))
+                if (Creature* voice = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_VOICE_OF_YOGG_SARON)))
                     voice->AI()->JustSummoned(me);
             }
 
@@ -1313,7 +1322,7 @@ class npc_constrictor_tentacle : public CreatureScript
             InstanceScript* _instance;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_constrictor_tentacleAI>(creature);
         }
@@ -1331,7 +1340,7 @@ class npc_crusher_tentacle : public CreatureScript
                 SetCombatMovement(false);
             }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 DoCast(me, SPELL_CRUSH);
                 DoCast(me, SPELL_TENTACLE_VOID_ZONE);
@@ -1342,7 +1351,7 @@ class npc_crusher_tentacle : public CreatureScript
                 _events.ScheduleEvent(EVENT_DIMINISH_POWER, urand(6000, 8000));
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -1374,7 +1383,7 @@ class npc_crusher_tentacle : public CreatureScript
             EventMap _events;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_crusher_tentacleAI>(creature);
         }
@@ -1389,24 +1398,24 @@ class npc_influence_tentacle : public CreatureScript
         {
             npc_influence_tentacleAI(Creature* creature) : PassiveAI(creature), _instance(creature->GetInstanceScript()) { }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 DoCast(me, me->GetEntry() == NPC_SUIT_OF_ARMOR ? SPELL_NONDESCRIPT_1 : SPELL_NONDESCRIPT_2);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
-                if (Creature* brain = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_BRAIN_OF_YOGG_SARON)))
+                if (Creature* brain = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_BRAIN_OF_YOGG_SARON)))
                     brain->AI()->DoAction(ACTION_TENTACLE_KILLED);
             }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE { }
+            void UpdateAI(uint32 /*diff*/) override { }
 
         private:
             InstanceScript* _instance;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_influence_tentacleAI>(creature);
         }
@@ -1423,7 +1432,7 @@ class npc_descend_into_madness : public CreatureScript
         {
             npc_descend_into_madnessAI(Creature* creature) : PassiveAI(creature), _instance(creature->GetInstanceScript()) { }
 
-            void OnSpellClick(Unit* clicker, bool& result) OVERRIDE
+            void OnSpellClick(Unit* clicker, bool& result) override
             {
                 if (!result)
                     return;
@@ -1431,13 +1440,13 @@ class npc_descend_into_madness : public CreatureScript
                 me->DespawnOrUnsummon();
             }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE { }
+            void UpdateAI(uint32 /*diff*/) override { }
 
         private:
             InstanceScript* _instance;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_descend_into_madnessAI>(creature);
         }
@@ -1452,20 +1461,20 @@ class npc_immortal_guardian : public CreatureScript
         {
             npc_immortal_guardianAI(Creature* creature) : ScriptedAI(creature) { }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 DoCast(me, SPELL_EMPOWERED);
                 DoCast(me, SPELL_RECENTLY_SPAWNED);
                 _events.ScheduleEvent(EVENT_DRAIN_LIFE, urand(3000, 13000));
             }
 
-            void DamageTaken(Unit* /*attacker*/, uint32& damage) OVERRIDE
+            void DamageTaken(Unit* /*attacker*/, uint32& damage) override
             {
                 if (me->HealthBelowPctDamaged(1, damage))
                     damage = me->GetHealth() - me->CountPctFromMaxHealth(1);   // or set immune to damage? should be done here or in SPELL_WEAKENED spell script?
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -1495,7 +1504,7 @@ class npc_immortal_guardian : public CreatureScript
             EventMap _events;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_immortal_guardianAI>(creature);
         }
@@ -1510,13 +1519,13 @@ class npc_observation_ring_keeper : public CreatureScript
         {
             npc_observation_ring_keeperAI(Creature* creature) : ScriptedAI(creature) { }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 DoCast(SPELL_SIMPLE_TELEPORT_KEEPERS);  // not visible here
                 DoCast(SPELL_KEEPER_ACTIVE);
             }
 
-            void sGossipSelect(Player* player, uint32 sender, uint32 /*action*/) OVERRIDE
+            void sGossipSelect(Player* player, uint32 sender, uint32 /*action*/) override
             {
                 if (sender != 10333)
                     return;
@@ -1544,10 +1553,10 @@ class npc_observation_ring_keeper : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE { }
+            void UpdateAI(uint32 /*diff*/) override { }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_observation_ring_keeperAI>(creature);
         }
@@ -1562,12 +1571,12 @@ class npc_yogg_saron_keeper : public CreatureScript
         {
             npc_yogg_saron_keeperAI(Creature* creature) : ScriptedAI(creature) { }
 
-            void IsSummonedBy(Unit* /*summoner*/) OVERRIDE
+            void IsSummonedBy(Unit* /*summoner*/) override
             {
                 DoCast(SPELL_SIMPLE_TELEPORT_KEEPERS);
             }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 _events.Reset();
                 _events.SetPhase(PHASE_ONE);
@@ -1588,7 +1597,7 @@ class npc_yogg_saron_keeper : public CreatureScript
                 }
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 switch (me->GetEntry())
                 {
@@ -1609,7 +1618,7 @@ class npc_yogg_saron_keeper : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!me->IsInCombat())
                     return;
@@ -1634,7 +1643,7 @@ class npc_yogg_saron_keeper : public CreatureScript
                 }
             }
 
-            void DoAction(int32 action) OVERRIDE
+            void DoAction(int32 action) override
             {
                 switch (action)
                 {
@@ -1670,7 +1679,7 @@ class npc_yogg_saron_keeper : public CreatureScript
             EventMap _events;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_yogg_saron_keeperAI>(creature);
         }
@@ -1685,7 +1694,7 @@ class npc_yogg_saron_illusions : public CreatureScript
         {
             npc_yogg_saron_illusionsAI(Creature* creature) : ScriptedAI(creature), _instance(creature->GetInstanceScript()) { }
 
-            void IsSummonedBy(Unit* /*summoner*/) OVERRIDE
+            void IsSummonedBy(Unit* /*summoner*/) override
             {
                 switch (_instance->GetData(DATA_ILLUSION))
                 {
@@ -1718,7 +1727,7 @@ class npc_yogg_saron_illusions : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 _events.Update(diff);
 
@@ -1791,7 +1800,7 @@ class npc_yogg_saron_illusions : public CreatureScript
             InstanceScript* _instance;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_yogg_saron_illusionsAI>(creature);
         }
@@ -1806,7 +1815,7 @@ class npc_garona : public CreatureScript
         {
             npc_garonaAI(Creature* creature) : ScriptedAI(creature) { }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 _events.Reset();
 
@@ -1819,7 +1828,7 @@ class npc_garona : public CreatureScript
                 _events.ScheduleEvent(EVENT_STORMWIND_ROLEPLAY_6, 52700);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 _events.Update(diff);
 
@@ -1854,7 +1863,7 @@ class npc_garona : public CreatureScript
             EventMap _events;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_garonaAI>(creature);
         }
@@ -1869,12 +1878,12 @@ class npc_turned_champion : public CreatureScript
         {
             npc_turned_championAI(Creature* creature) : ScriptedAI(creature) { }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 DoCast(SPELL_VERTEX_COLOR_BLACK);
             }
 
-            void MovementInform(uint32 type, uint32 pointId) OVERRIDE
+            void MovementInform(uint32 type, uint32 pointId) override
             {
                 if (type != POINT_MOTION_TYPE || pointId != 0)
                     return;
@@ -1882,7 +1891,7 @@ class npc_turned_champion : public CreatureScript
                 me->HandleEmoteCommand(EMOTE_ONESHOT_SALUTE);
             }
 
-            void DoAction(int32 action) OVERRIDE
+            void DoAction(int32 action) override
             {
                 if (action != ACTION_START_ROLEPLAY)
                     return;
@@ -1892,7 +1901,7 @@ class npc_turned_champion : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_turned_championAI>(creature);
         }
@@ -1907,17 +1916,17 @@ class npc_laughing_skull : public CreatureScript
         {
             npc_laughing_skullAI(Creature* creature) : ScriptedAI(creature) { }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 me->SetReactState(REACT_PASSIVE);
                 DoCast(me, SPELL_LUNATIC_GAZE_SKULL);
             }
 
             // don't evade, otherwise the Lunatic Gaze aura is removed
-            void UpdateAI(uint32 /*diff*/) OVERRIDE { }
+            void UpdateAI(uint32 /*diff*/) override { }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetUlduarAI<npc_laughing_skullAI>(creature);
         }
@@ -1938,13 +1947,13 @@ class spell_yogg_saron_target_selectors : public SpellScriptLoader    // 63744, 
                     GetCaster()->CastSpell(target, uint32(GetEffectValue()));
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_target_selectors_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_DUMMY);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_target_selectors_SpellScript();
         }
@@ -1953,7 +1962,7 @@ class spell_yogg_saron_target_selectors : public SpellScriptLoader    // 63744, 
 class SanityReduction : public SpellScript
 {
     public:
-        SanityReduction() : SpellScript() { }
+        SanityReduction() : SpellScript(), _stacks(0) { }
         SanityReduction(uint8 stacks) : SpellScript(), _stacks(stacks) { }
 
     void RemoveSanity(SpellEffIndex /*effIndex*/)
@@ -1990,7 +1999,7 @@ class spell_yogg_saron_psychosis : public SpellScriptLoader      // 63795, 65301
         {
             PrepareSpellScript(spell_yogg_saron_psychosis_SpellScript);
 
-            bool Load() OVERRIDE
+            bool Load() override
             {
                 _stacks = GetSpellInfo()->Id == SPELL_PSYCHOSIS ? 9 : 12;
                 return true;
@@ -2002,7 +2011,7 @@ class spell_yogg_saron_psychosis : public SpellScriptLoader      // 63795, 65301
                 targets.remove_if(Trinity::UnitAuraCheck(true, SPELL_ILLUSION_ROOM));
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_yogg_saron_psychosis_SpellScript::FilterTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ENEMY);
                 OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_yogg_saron_psychosis_SpellScript::FilterTargets, EFFECT_1, TARGET_UNIT_SRC_AREA_ENEMY);
@@ -2010,7 +2019,7 @@ class spell_yogg_saron_psychosis : public SpellScriptLoader      // 63795, 65301
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_psychosis_SpellScript();
         }
@@ -2034,7 +2043,7 @@ class spell_yogg_saron_malady_of_the_mind : public SpellScriptLoader    // 63830
                 targets.remove_if(Trinity::UnitAuraCheck(true, SPELL_ILLUSION_ROOM));
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 if (m_scriptSpellId == SPELL_MALADY_OF_THE_MIND)
                 {
@@ -2051,7 +2060,7 @@ class spell_yogg_saron_malady_of_the_mind : public SpellScriptLoader    // 63830
         {
             PrepareAuraScript(spell_yogg_saron_malady_of_the_mind_AuraScript);
 
-            bool Validate(SpellInfo const* /*spell*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spell*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_MALADY_OF_THE_MIND_JUMP))
                     return false;
@@ -2073,18 +2082,18 @@ class spell_yogg_saron_malady_of_the_mind : public SpellScriptLoader    // 63830
                 GetTarget()->CastSpell(GetTarget(), SPELL_MALADY_OF_THE_MIND_JUMP);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 AfterEffectRemove += AuraEffectRemoveFn(spell_yogg_saron_malady_of_the_mind_AuraScript::OnRemove, EFFECT_1, SPELL_AURA_MOD_FEAR, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_malady_of_the_mind_SpellScript();
         }
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_malady_of_the_mind_AuraScript();
         }
@@ -2113,7 +2122,7 @@ class spell_yogg_saron_brain_link : public SpellScriptLoader    // 63802
                     ai->SetLinkBetween(targets.front()->GetGUID(), targets.back()->GetGUID());
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_yogg_saron_brain_link_SpellScript::FilterTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ENEMY);
             }
@@ -2123,7 +2132,7 @@ class spell_yogg_saron_brain_link : public SpellScriptLoader    // 63802
         {
             PrepareAuraScript(spell_yogg_saron_brain_link_AuraScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_BRAIN_LINK_DAMAGE))
                     return false;
@@ -2170,19 +2179,19 @@ class spell_yogg_saron_brain_link : public SpellScriptLoader    // 63802
                 GetTarget()->CastSpell(linked, (GetTarget()->GetDistance(linked) > (float)aurEff->GetAmount()) ? SPELL_BRAIN_LINK_DAMAGE : SPELL_BRAIN_LINK_NO_DAMAGE, true);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectPeriodic += AuraEffectPeriodicFn(spell_yogg_saron_brain_link_AuraScript::DummyTick, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
                 OnEffectRemove += AuraEffectRemoveFn(spell_yogg_saron_brain_link_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_brain_link_SpellScript();
         }
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_brain_link_AuraScript();
         }
@@ -2200,13 +2209,13 @@ class spell_yogg_saron_brain_link_damage : public SpellScriptLoader      // 6380
 
             PrepareSpellScript(spell_yogg_saron_brain_link_damage_SpellScript);
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_brain_link_damage_SpellScript::RemoveSanity, EFFECT_1, SPELL_EFFECT_SCRIPT_EFFECT);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_brain_link_damage_SpellScript();
         }
@@ -2221,7 +2230,7 @@ class spell_yogg_saron_boil_ominously : public SpellScriptLoader    // 63030
         {
             PrepareSpellScript(spell_yogg_saron_boil_ominously_SpellScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_SUMMON_GUARDIAN_1))
                     return false;
@@ -2240,13 +2249,13 @@ class spell_yogg_saron_boil_ominously : public SpellScriptLoader    // 63030
                     }
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_boil_ominously_SpellScript::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_boil_ominously_SpellScript();
         }
@@ -2273,14 +2282,14 @@ class spell_yogg_saron_shadow_beacon : public SpellScriptLoader     // 64465
                     target->SetEntry(NPC_IMMORTAL_GUARDIAN);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 AfterEffectApply += AuraEffectApplyFn(spell_yogg_saron_shadow_beacon_AuraScript::OnApply, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL, AURA_EFFECT_HANDLE_REAL);
                 AfterEffectRemove += AuraEffectRemoveFn(spell_yogg_saron_shadow_beacon_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_shadow_beacon_AuraScript();
         }
@@ -2301,13 +2310,13 @@ class spell_yogg_saron_empowering_shadows_range_check : public SpellScriptLoader
                     target->CastSpell(GetCaster(), uint32(GetEffectValue()), true);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_empowering_shadows_range_check_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_empowering_shadows_range_check_SpellScript();
         }
@@ -2322,7 +2331,7 @@ class spell_yogg_saron_empowering_shadows_missile : public SpellScriptLoader    
         {
             PrepareSpellScript(spell_yogg_saron_empowering_shadows_missile_SpellScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_EMPOWERING_SHADOWS))
                     return false;
@@ -2335,13 +2344,13 @@ class spell_yogg_saron_empowering_shadows_missile : public SpellScriptLoader    
                     target->CastSpell((Unit*)NULL, SPELL_EMPOWERING_SHADOWS, true);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_empowering_shadows_missile_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_empowering_shadows_missile_SpellScript();
         }
@@ -2357,7 +2366,7 @@ class spell_yogg_saron_constrictor_tentacle : public SpellScriptLoader     // 64
         {
             PrepareAuraScript(spell_yogg_saron_constrictor_tentacle_AuraScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_CONSTRICTOR_TENTACLE_SUMMON))
                     return false;
@@ -2369,13 +2378,13 @@ class spell_yogg_saron_constrictor_tentacle : public SpellScriptLoader     // 64
                 GetTarget()->CastSpell(GetTarget(), SPELL_CONSTRICTOR_TENTACLE_SUMMON);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 AfterEffectApply += AuraEffectApplyFn(spell_yogg_saron_constrictor_tentacle_AuraScript::OnApply, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_constrictor_tentacle_AuraScript();
         }
@@ -2390,7 +2399,7 @@ class spell_yogg_saron_lunge : public SpellScriptLoader    // 64131
         {
             PrepareSpellScript(spell_yogg_saron_lunge_SpellScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_SQUEEZE))
                     return false;
@@ -2406,13 +2415,13 @@ class spell_yogg_saron_lunge : public SpellScriptLoader    // 64131
                 }
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_lunge_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_lunge_SpellScript();
         }
@@ -2434,13 +2443,13 @@ class spell_yogg_saron_squeeze : public SpellScriptLoader     // 64125
                         vehicle->Kill(vehicle); // should tentacle die or just release its target?
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 AfterEffectRemove += AuraEffectRemoveFn(spell_yogg_saron_squeeze_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_PERIODIC_DAMAGE, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_squeeze_AuraScript();
         }
@@ -2463,13 +2472,13 @@ class spell_yogg_saron_diminsh_power : public SpellScriptLoader     // 64148
                         GetTarget()->InterruptSpell(CURRENT_CHANNELED_SPELL);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectProc += AuraEffectProcFn(spell_yogg_saron_diminsh_power_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_diminsh_power_AuraScript();
         }
@@ -2485,7 +2494,7 @@ class spell_yogg_saron_empowered : public SpellScriptLoader     // 64161
         {
             PrepareAuraScript(spell_yogg_saron_empowered_AuraScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_EMPOWERED_BUFF))
                     return false;
@@ -2502,7 +2511,7 @@ class spell_yogg_saron_empowered : public SpellScriptLoader     // 64161
             void OnPeriodic(AuraEffect const* /*aurEff*/)
             {
                 Unit* target = GetTarget();
-                float stack = ceil((target->GetHealthPct() / 10) - 1);
+                float stack = std::ceil((target->GetHealthPct() / 10) - 1);
                 target->RemoveAurasDueToSpell(SPELL_EMPOWERED_BUFF);
 
                 if (stack)
@@ -2514,14 +2523,14 @@ class spell_yogg_saron_empowered : public SpellScriptLoader     // 64161
                     target->CastSpell(target, SPELL_WEAKENED, true);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 AfterEffectApply += AuraEffectApplyFn(spell_yogg_saron_empowered_AuraScript::OnApply, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY, AURA_EFFECT_HANDLE_REAL);
                 OnEffectPeriodic += AuraEffectPeriodicFn(spell_yogg_saron_empowered_AuraScript::OnPeriodic, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_empowered_AuraScript();
         }
@@ -2542,13 +2551,13 @@ class spell_yogg_saron_match_health : public SpellScriptLoader    // 64069
                     target->SetHealth(target->CountPctFromMaxHealth((int32)GetCaster()->GetHealthPct()));
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_match_health_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_match_health_SpellScript();
         }
@@ -2569,13 +2578,13 @@ class spell_yogg_saron_shattered_illusion : public SpellScriptLoader    // 65238
                     target->RemoveAurasDueToSpell(uint32(GetEffectValue()));
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_shattered_illusion_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_shattered_illusion_SpellScript();
         }
@@ -2590,7 +2599,7 @@ class spell_yogg_saron_death_ray_warning_visual : public SpellScriptLoader     /
         {
             PrepareAuraScript(spell_yogg_saron_death_ray_warning_visual_AuraScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_DEATH_RAY_PERIODIC))
                     return false;
@@ -2610,13 +2619,13 @@ class spell_yogg_saron_death_ray_warning_visual : public SpellScriptLoader     /
                 }
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 AfterEffectRemove += AuraEffectRemoveFn(spell_yogg_saron_death_ray_warning_visual_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_death_ray_warning_visual_AuraScript();
         }
@@ -2631,7 +2640,7 @@ class spell_yogg_saron_cancel_illusion_room_aura : public SpellScriptLoader    /
         {
             PrepareSpellScript(spell_yogg_saron_cancel_illusion_room_aura_SpellScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_TELEPORT_BACK_TO_MAIN_ROOM))
                     return false;
@@ -2647,13 +2656,13 @@ class spell_yogg_saron_cancel_illusion_room_aura : public SpellScriptLoader    /
                 }
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_cancel_illusion_room_aura_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_cancel_illusion_room_aura_SpellScript();
         }
@@ -2673,13 +2682,13 @@ class spell_yogg_saron_nondescript : public SpellScriptLoader     // 64010, 6401
                 GetTarget()->CastSpell(GetTarget(), uint32(aurEff->GetAmount()), true);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 AfterEffectRemove += AuraEffectRemoveFn(spell_yogg_saron_nondescript_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_MOD_STUN, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_nondescript_AuraScript();
         }
@@ -2694,7 +2703,7 @@ class spell_yogg_saron_revealed_tentacle : public SpellScriptLoader    // 64012
         {
             PrepareSpellScript(spell_yogg_saron_revealed_tentacle_SpellScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_TENTACLE_VOID_ZONE))
                     return false;
@@ -2709,17 +2718,17 @@ class spell_yogg_saron_revealed_tentacle : public SpellScriptLoader    // 64012
                 {
                     caster->CastSpell(caster, SPELL_TENTACLE_VOID_ZONE, true);
                     caster->CastSpell(caster, SPELL_GRIM_REPRISAL, true);
-                    caster->UpdateEntry(NPC_INFLUENCE_TENTACLE, 0, caster->GetCreatureData());
+                    caster->UpdateEntry(NPC_INFLUENCE_TENTACLE, caster->GetCreatureData());
                 }
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_revealed_tentacle_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_DUMMY);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_revealed_tentacle_SpellScript();
         }
@@ -2734,7 +2743,7 @@ class spell_yogg_saron_grim_reprisal : public SpellScriptLoader     // 63305
         {
             PrepareAuraScript(spell_yogg_saron_grim_reprisal_AuraScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_GRIM_REPRISAL_DAMAGE))
                     return false;
@@ -2747,13 +2756,13 @@ class spell_yogg_saron_grim_reprisal : public SpellScriptLoader     // 63305
                 GetTarget()->CastCustomSpell(SPELL_GRIM_REPRISAL_DAMAGE, SPELLVALUE_BASE_POINT0, damage, eventInfo.GetDamageInfo()->GetAttacker(), true, NULL, aurEff);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectProc += AuraEffectProcFn(spell_yogg_saron_grim_reprisal_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_grim_reprisal_AuraScript();
         }
@@ -2768,7 +2777,7 @@ class spell_yogg_saron_induce_madness : public SpellScriptLoader    // 64059
         {
             PrepareSpellScript(spell_yogg_saron_induce_madness_SpellScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_TELEPORT_BACK_TO_MAIN_ROOM))
                     return false;
@@ -2782,7 +2791,7 @@ class spell_yogg_saron_induce_madness : public SpellScriptLoader    // 64059
                 if (Unit* target = GetHitUnit())
                 {
                     target->CastSpell(target, SPELL_TELEPORT_BACK_TO_MAIN_ROOM);
-                    target->RemoveAurasDueToSpell(SPELL_SANITY, 0, 0, AURA_REMOVE_BY_ENEMY_SPELL);
+                    target->RemoveAurasDueToSpell(SPELL_SANITY, ObjectGuid::Empty, 0, AURA_REMOVE_BY_ENEMY_SPELL);
                     target->RemoveAurasDueToSpell(uint32(GetEffectValue()));
                 }
             }
@@ -2792,18 +2801,18 @@ class spell_yogg_saron_induce_madness : public SpellScriptLoader    // 64059
                 GetCaster()->CastSpell((Unit*)NULL, SPELL_SHATTERED_ILLUSION_REMOVE);
 
                 if (InstanceScript* instance = GetCaster()->GetInstanceScript())
-                    if (Creature* voice = ObjectAccessor::GetCreature(*GetCaster(), instance->GetData64(DATA_VOICE_OF_YOGG_SARON)))
+                    if (Creature* voice = ObjectAccessor::GetCreature(*GetCaster(), instance->GetGuidData(DATA_VOICE_OF_YOGG_SARON)))
                         voice->AI()->DoAction(ACTION_TOGGLE_SHATTERED_ILLUSION);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_induce_madness_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
                 AfterCast += SpellCastFn(spell_yogg_saron_induce_madness_SpellScript::ClearShatteredIllusion);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_induce_madness_SpellScript();
         }
@@ -2825,7 +2834,7 @@ class spell_yogg_saron_sanity : public SpellScriptLoader     // 63050
                 GetSpell()->SetSpellValue(SPELLVALUE_AURA_STACK, 100);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 BeforeCast += SpellCastFn(spell_yogg_saron_sanity_SpellScript::ModSanityStacks);
             }
@@ -2835,7 +2844,7 @@ class spell_yogg_saron_sanity : public SpellScriptLoader     // 63050
         {
             PrepareAuraScript(spell_yogg_saron_sanity_AuraScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_LOW_SANITY_SCREEN_EFFECT))
                     return false;
@@ -2867,19 +2876,19 @@ class spell_yogg_saron_sanity : public SpellScriptLoader     // 63050
                     caster->CastSpell(GetTarget(), SPELL_INSANE, true);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectPeriodic += AuraEffectPeriodicFn(spell_yogg_saron_sanity_AuraScript::DummyTick, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
                 AfterEffectRemove += AuraEffectRemoveFn(spell_yogg_saron_sanity_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_sanity_SpellScript();
         }
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_sanity_AuraScript();
         }
@@ -2894,7 +2903,7 @@ class spell_yogg_saron_insane : public SpellScriptLoader     // 63120
         {
             PrepareAuraScript(spell_yogg_saron_insane_AuraScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_INSANE_VISUAL))
                     return false;
@@ -2916,14 +2925,14 @@ class spell_yogg_saron_insane : public SpellScriptLoader     // 63120
                     GetTarget()->Kill(GetTarget());
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 AfterEffectApply += AuraEffectApplyFn(spell_yogg_saron_insane_AuraScript::OnApply, EFFECT_0, SPELL_AURA_AOE_CHARM, AURA_EFFECT_HANDLE_REAL);
                 AfterEffectRemove += AuraEffectRemoveFn(spell_yogg_saron_insane_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_AOE_CHARM, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_insane_AuraScript();
         }
@@ -2944,13 +2953,13 @@ class spell_yogg_saron_insane_periodic : public SpellScriptLoader    // 64555
                     GetCaster()->CastSpell(target, uint32(GetEffectValue()), true);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_insane_periodic_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_DUMMY);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_insane_periodic_SpellScript();
         }
@@ -2979,7 +2988,7 @@ class spell_yogg_saron_lunatic_gaze : public SpellScriptLoader      // 64164, 64
         {
             PrepareSpellScript(spell_yogg_saron_lunatic_gaze_SpellScript);
 
-            bool Load() OVERRIDE
+            bool Load() override
             {
                 _stacks = GetSpellInfo()->Id == SPELL_LUNATIC_GAZE_DAMAGE ? 4 : 2;
                 return true;
@@ -2990,7 +2999,7 @@ class spell_yogg_saron_lunatic_gaze : public SpellScriptLoader      // 64164, 64
                 targets.remove_if(LunaticGazeTargetSelector(GetCaster()));
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_yogg_saron_lunatic_gaze_SpellScript::FilterTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ENEMY);
                 OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_yogg_saron_lunatic_gaze_SpellScript::FilterTargets, EFFECT_1, TARGET_UNIT_SRC_AREA_ENEMY);
@@ -2998,7 +3007,7 @@ class spell_yogg_saron_lunatic_gaze : public SpellScriptLoader      // 64164, 64
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_lunatic_gaze_SpellScript();
         }
@@ -3020,13 +3029,13 @@ class spell_yogg_saron_keeper_aura : public SpellScriptLoader     // 62650, 6267
                 return true;
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 DoCheckAreaTarget += AuraCheckAreaTargetFn(spell_yogg_saron_keeper_aura_AuraScript::CanApply);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_keeper_aura_AuraScript();
         }
@@ -3048,13 +3057,13 @@ class spell_yogg_saron_hate_to_zero : public SpellScriptLoader    // 63984
                         target->getThreatManager().modifyThreatPercent(GetCaster(), -100);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_hate_to_zero_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_DUMMY);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_hate_to_zero_SpellScript();
         }
@@ -3072,7 +3081,7 @@ class spell_yogg_saron_in_the_maws_of_the_old_god : public SpellScriptLoader    
             SpellCastResult CheckRequirement()
             {
                 if (InstanceScript* instance = GetCaster()->GetInstanceScript())
-                    if (Creature* yogg = ObjectAccessor::GetCreature(*GetCaster(), instance->GetData64(BOSS_YOGG_SARON)))
+                    if (Creature* yogg = ObjectAccessor::GetCreature(*GetCaster(), instance->GetGuidData(BOSS_YOGG_SARON)))
                         if (yogg->FindCurrentSpellBySpellId(SPELL_DEAFENING_ROAR))
                         {
                             if (GetCaster()->GetDistance(yogg) > 20.0f)
@@ -3084,13 +3093,13 @@ class spell_yogg_saron_in_the_maws_of_the_old_god : public SpellScriptLoader    
                 return SPELL_FAILED_CANT_DO_THAT_RIGHT_NOW;
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnCheckCast += SpellCheckCastFn(spell_yogg_saron_in_the_maws_of_the_old_god_SpellScript::CheckRequirement);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_in_the_maws_of_the_old_god_SpellScript();
         }
@@ -3111,13 +3120,13 @@ class spell_yogg_saron_titanic_storm : public SpellScriptLoader    // 64172
                     GetCaster()->Kill(target);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_yogg_saron_titanic_storm_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_DUMMY);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_yogg_saron_titanic_storm_SpellScript();
         }
@@ -3132,7 +3141,7 @@ class spell_yogg_saron_hodirs_protective_gaze : public SpellScriptLoader     // 
         {
             PrepareAuraScript(spell_yogg_saron_hodirs_protective_gaze_AuraScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_FLASH_FREEZE))
                     return false;
@@ -3158,14 +3167,14 @@ class spell_yogg_saron_hodirs_protective_gaze : public SpellScriptLoader     // 
                     PreventDefaultAction();
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 DoCheckAreaTarget += AuraCheckAreaTargetFn(spell_yogg_saron_hodirs_protective_gaze_AuraScript::CanApply);
                 OnEffectAbsorb += AuraEffectAbsorbFn(spell_yogg_saron_hodirs_protective_gaze_AuraScript::OnAbsorb, EFFECT_0);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_yogg_saron_hodirs_protective_gaze_AuraScript();
         }

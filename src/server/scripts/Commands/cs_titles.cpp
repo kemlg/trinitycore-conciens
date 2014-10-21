@@ -33,7 +33,7 @@ class titles_commandscript : public CommandScript
 public:
     titles_commandscript() : CommandScript("titles_commandscript") { }
 
-    ChatCommand* GetCommands() const OVERRIDE
+    ChatCommand* GetCommands() const override
     {
         static ChatCommand titlesSetCommandTable[] =
         {
@@ -80,7 +80,7 @@ public:
         }
 
         // check online security
-        if (handler->HasLowerSecurity(target, 0))
+        if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
             return false;
 
         CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(id);
@@ -125,7 +125,7 @@ public:
         }
 
         // check online security
-        if (handler->HasLowerSecurity(target, 0))
+        if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
             return false;
 
         CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(id);
@@ -171,7 +171,7 @@ public:
         }
 
         // check online security
-        if (handler->HasLowerSecurity(target, 0))
+        if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
             return false;
 
         CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(id);
@@ -219,7 +219,7 @@ public:
         }
 
         // check online security
-        if (handler->HasLowerSecurity(target, 0))
+        if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
             return false;
 
         uint64 titles2 = titles;

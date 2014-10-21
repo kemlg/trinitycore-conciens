@@ -86,10 +86,11 @@ void PetAI::UpdateAI(uint32 diff)
     else
         m_updateAlliesTimer -= diff;
 
-    if (me->GetVictim() && me->GetVictim()->IsAlive())
+    if (me->GetVictim() && me->EnsureVictim()->IsAlive())
     {
         // is only necessary to stop casting, the pet must not exit combat
-        if (me->GetVictim()->HasBreakableByDamageCrowdControlAura(me))
+        if (!me->GetCurrentSpell(CURRENT_CHANNELED_SPELL) && // ignore channeled spells (Pin, Seduction)
+            me->EnsureVictim()->HasBreakableByDamageCrowdControlAura(me))
         {
             me->InterruptNonMeleeSpells(false);
             return;
@@ -163,7 +164,7 @@ void PetAI::UpdateAI(uint32 diff)
                         continue;
                 }
 
-                Spell* spell = new Spell(me, spellInfo, TRIGGERED_NONE, 0);
+                Spell* spell = new Spell(me, spellInfo, TRIGGERED_NONE);
                 bool spellUsed = false;
 
                 // Some spells can target enemy or friendly (DK Ghoul's Leap)
@@ -182,12 +183,16 @@ void PetAI::UpdateAI(uint32 diff)
                 }
 
                 if (spellInfo->HasEffect(SPELL_EFFECT_JUMP_DEST))
+                {
+                    if (!spellUsed)
+                        delete spell;
                     continue; // Pets must only jump to target
+                }
 
                 // No enemy, check friendly
                 if (!spellUsed)
                 {
-                    for (std::set<uint64>::const_iterator tar = m_AllySet.begin(); tar != m_AllySet.end(); ++tar)
+                    for (GuidSet::const_iterator tar = m_AllySet.begin(); tar != m_AllySet.end(); ++tar)
                     {
                         Unit* ally = ObjectAccessor::GetUnit(*me, *tar);
 
@@ -210,7 +215,7 @@ void PetAI::UpdateAI(uint32 diff)
             }
             else if (me->GetVictim() && CanAttack(me->GetVictim()) && spellInfo->CanBeUsedInCombat())
             {
-                Spell* spell = new Spell(me, spellInfo, TRIGGERED_NONE, 0);
+                Spell* spell = new Spell(me, spellInfo, TRIGGERED_NONE);
                 if (spell->CanAutoCast(me->GetVictim()))
                     targetSpellStore.push_back(std::make_pair(me->GetVictim(), spell));
                 else
@@ -231,7 +236,7 @@ void PetAI::UpdateAI(uint32 diff)
             SpellCastTargets targets;
             targets.SetUnitTarget(target);
 
-            if (!me->HasInArc(M_PI, target))
+            if (!me->HasInArc(float(M_PI), target))
             {
                 me->SetInFront(target);
                 if (target && target->GetTypeId() == TYPEID_PLAYER)
@@ -240,8 +245,6 @@ void PetAI::UpdateAI(uint32 diff)
                 if (owner && owner->GetTypeId() == TYPEID_PLAYER)
                     me->SendUpdateToPlayer(owner->ToPlayer());
             }
-
-            me->AddCreatureSpellCooldown(spell->m_spellInfo->Id);
 
             spell->prepare(&targets);
         }
@@ -345,7 +348,7 @@ void PetAI::OwnerAttackedBy(Unit* attacker)
         return;
 
     // Prevent pet from disengaging from current target
-    if (me->GetVictim() && me->GetVictim()->IsAlive())
+    if (me->GetVictim() && me->EnsureVictim()->IsAlive())
         return;
 
     // Continue to evaluate and attack if necessary
@@ -366,7 +369,7 @@ void PetAI::OwnerAttacked(Unit* target)
         return;
 
     // Prevent pet from disengaging from current target
-    if (me->GetVictim() && me->GetVictim()->IsAlive())
+    if (me->GetVictim() && me->EnsureVictim()->IsAlive())
         return;
 
     // Continue to evaluate and attack if necessary
@@ -459,9 +462,6 @@ void PetAI::DoAttack(Unit* target, bool chase)
 
     if (me->Attack(target, true))
     {
-        if (Unit* owner = me->GetOwner())
-            owner->SetInCombatWith(target);
-
         // Play sound to let the player know the pet is attacking something it picked on its own
         if (me->HasReactState(REACT_AGGRESSIVE) && !me->GetCharmInfo()->IsCommandAttack())
             me->SendPetAIReaction(me->GetGUID());
@@ -627,7 +627,7 @@ void PetAI::AttackedBy(Unit* attacker)
         return;
 
     // Prevent pet from disengaging from current target
-    if (me->GetVictim() && me->GetVictim()->IsAlive())
+    if (me->GetVictim() && me->EnsureVictim()->IsAlive())
         return;
 
     // Continue to evaluate and attack if necessary

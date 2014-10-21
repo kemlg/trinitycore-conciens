@@ -63,7 +63,7 @@ class boss_magus_telestra : public CreatureScript
 public:
     boss_magus_telestra() : CreatureScript("boss_magus_telestra") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetInstanceAI<boss_magus_telestraAI>(creature);
     }
@@ -72,14 +72,39 @@ public:
     {
         boss_magus_telestraAI(Creature* creature) : ScriptedAI(creature)
         {
+            Initialize();
             instance = creature->GetInstanceScript();
+            bFireMagusDead = false;
+            bFrostMagusDead = false;
+            bArcaneMagusDead = false;
+            uiIsWaitingToAppearTimer = 0;
+        }
+
+        void Initialize()
+        {
+            Phase = 0;
+            //These times are probably wrong
+            uiIceNovaTimer = 7 * IN_MILLISECONDS;
+            uiFireBombTimer = 0;
+            uiGravityWellTimer = 15 * IN_MILLISECONDS;
+            uiCooldown = 0;
+
+            uiFireMagusGUID.Clear();
+            uiFrostMagusGUID.Clear();
+            uiArcaneMagusGUID.Clear();
+
+            for (uint8 n = 0; n < 3; ++n)
+                time[n] = 0;
+
+            splitPersonality = 0;
+            bIsWaitingToAppear = false;
         }
 
         InstanceScript* instance;
 
-        uint64 uiFireMagusGUID;
-        uint64 uiFrostMagusGUID;
-        uint64 uiArcaneMagusGUID;
+        ObjectGuid uiFireMagusGUID;
+        ObjectGuid uiFrostMagusGUID;
+        ObjectGuid uiArcaneMagusGUID;
 
         bool bFireMagusDead;
         bool bFrostMagusDead;
@@ -96,24 +121,9 @@ public:
         uint8 splitPersonality;
         time_t time[3];
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            Phase = 0;
-            //These times are probably wrong
-            uiIceNovaTimer =  7*IN_MILLISECONDS;
-            uiFireBombTimer =  0;
-            uiGravityWellTimer = 15*IN_MILLISECONDS;
-            uiCooldown = 0;
-
-            uiFireMagusGUID = 0;
-            uiFrostMagusGUID = 0;
-            uiArcaneMagusGUID = 0;
-
-            for (uint8 n = 0; n < 3; ++n)
-                time[n] = 0;
-
-            splitPersonality = 0;
-            bIsWaitingToAppear = false;
+            Initialize();
 
             me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
             me->SetVisible(true);
@@ -121,27 +131,27 @@ public:
             instance->SetData(DATA_MAGUS_TELESTRA_EVENT, NOT_STARTED);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
 
             instance->SetData(DATA_MAGUS_TELESTRA_EVENT, IN_PROGRESS);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             Talk(SAY_DEATH);
 
             instance->SetData(DATA_MAGUS_TELESTRA_EVENT, DONE);
         }
 
-        void KilledUnit(Unit* who) OVERRIDE
+        void KilledUnit(Unit* who) override
         {
             if (who->GetTypeId() == TYPEID_PLAYER)
                 Talk(SAY_KILL);
         }
 
-        void DoAction(int32 action) OVERRIDE
+        void DoAction(int32 action) override
         {
             if (action == ACTION_MAGUS_DEAD)
             {
@@ -155,7 +165,7 @@ public:
             }
         }
 
-        uint32 GetData(uint32 type) const OVERRIDE
+        uint32 GetData(uint32 type) const override
         {
             if (type == DATA_SPLIT_PERSONALITY)
                 return splitPersonality;
@@ -163,7 +173,7 @@ public:
             return 0;
         }
 
-        uint64 SplitPersonality(uint32 entry)
+        ObjectGuid SplitPersonality(uint32 entry)
         {
             if (Creature* Summoned = me->SummonCreature(entry, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), me->GetOrientation(), TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 1*IN_MILLISECONDS))
             {
@@ -189,10 +199,10 @@ public:
                     Summoned->AI()->AttackStart(target);
                 return Summoned->GetGUID();
             }
-            return 0;
+            return ObjectGuid::Empty;
         }
 
-        void SummonedCreatureDespawn(Creature* summon) OVERRIDE
+        void SummonedCreatureDespawn(Creature* summon) override
         {
             if (summon->IsAlive())
                 return;
@@ -214,7 +224,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             //Return since we have no target
             if (!UpdateVictim())
@@ -246,9 +256,9 @@ public:
                         Phase = 2;
                     if (Phase == 3)
                         Phase = 4;
-                    uiFireMagusGUID = 0;
-                    uiFrostMagusGUID = 0;
-                    uiArcaneMagusGUID = 0;
+                    uiFireMagusGUID.Clear();
+                    uiFrostMagusGUID.Clear();
+                    uiArcaneMagusGUID.Clear();
                     bIsWaitingToAppear = true;
                     uiIsWaitingToAppearTimer = 4*IN_MILLISECONDS;
                     Talk(SAY_MERGE);
@@ -345,7 +355,7 @@ class achievement_split_personality : public AchievementCriteriaScript
         {
         }
 
-        bool OnCheck(Player* /*player*/, Unit* target) OVERRIDE
+        bool OnCheck(Player* /*player*/, Unit* target) override
         {
             if (!target)
                 return false;

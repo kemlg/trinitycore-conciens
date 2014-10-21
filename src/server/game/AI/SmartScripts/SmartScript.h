@@ -197,14 +197,14 @@ class SmartScript
                     go = o;
                 }
             }
-            goOrigGUID = 0;
-            meOrigGUID = 0;
+            goOrigGUID.Clear();
+            meOrigGUID.Clear();
         }
 
         //TIMED_ACTIONLIST (script type 9 aka script9)
         void SetScript9(SmartScriptHolder& e, uint32 entry);
         Unit* GetLastInvoker();
-        uint64 mLastInvoker;
+        ObjectGuid mLastInvoker;
 
     private:
         void IncPhase(int32 p = 1)
@@ -216,7 +216,7 @@ class SmartScript
         }
 
         void DecPhase(int32 p = 1) { mEventPhase  -= (mEventPhase < (uint32)p ? (uint32)p - mEventPhase : (uint32)p); }
-        bool IsInPhase(uint32 p) const { return (1 << (mEventPhase - 1)) & p; }
+        bool IsInPhase(uint32 p) const { return ((1 << (mEventPhase - 1)) & p) != 0; }
         void SetPhase(uint32 p = 0) { mEventPhase = p; }
 
         SmartAIEventList mEvents;
@@ -224,14 +224,13 @@ class SmartScript
         SmartAIEventList mTimedActionList;
         bool isProcessingTimedActionList;
         Creature* me;
-        uint64 meOrigGUID;
+        ObjectGuid meOrigGUID;
         GameObject* go;
-        uint64 goOrigGUID;
+        ObjectGuid goOrigGUID;
         AreaTriggerEntry const* trigger;
         SmartScriptType mScriptType;
         uint32 mEventPhase;
 
-        UNORDERED_MAP<int32, int32> mStoredDecimals;
         uint32 mPathId;
         SmartAIEventList mStoredEvents;
         std::list<uint32>mRemIDs;
@@ -257,21 +256,6 @@ class SmartScript
                     }
                 }
             }
-        }
-        SmartScriptHolder FindLinkedEvent(uint32 link)
-        {
-            if (!mEvents.empty())
-            {
-                for (SmartAIEventList::iterator i = mEvents.begin(); i != mEvents.end(); ++i)
-                {
-                    if (i->event_id == link)
-                    {
-                        return (*i);
-                    }
-                }
-            }
-            SmartScriptHolder s;
-            return s;
         }
 };
 

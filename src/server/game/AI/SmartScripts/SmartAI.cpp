@@ -47,7 +47,7 @@ SmartAI::SmartAI(Creature* c) : CreatureAI(c)
     me->SetWalk(false);
     mRun = false;
 
-    me->GetPosition(&mLastOOCPos);
+    mLastOOCPos = me->GetPosition();
 
     mCanAutoAttack = true;
     mCanCombatMove = true;
@@ -61,7 +61,7 @@ SmartAI::SmartAI(Creature* c) : CreatureAI(c)
     mDespawnState = 0;
 
     mEscortInvokerCheckTimer = 1000;
-    mFollowGuid = 0;
+    mFollowGuid.Clear();
     mFollowDist = 0;
     mFollowAngle = 0;
     mFollowCredit = 0;
@@ -132,7 +132,7 @@ void SmartAI::StartPath(bool run, uint32 path, bool repeat, Unit* /*invoker*/)
 
     if (WayPoint* wp = GetNextWayPoint())
     {
-        me->GetPosition(&mLastOOCPos);
+        mLastOOCPos = me->GetPosition();
         me->GetMotionMaster()->MovePoint(wp->id, wp->x, wp->y, wp->z);
         GetScript()->ProcessEventsFor(SMART_EVENT_WAYPOINT_START, NULL, wp->id, GetScript()->GetPathId());
     }
@@ -162,7 +162,7 @@ void SmartAI::PausePath(uint32 delay, bool forced)
         return;
     }
     mForcedPaused = forced;
-    me->GetPosition(&mLastOOCPos);
+    mLastOOCPos = me->GetPosition();
     AddEscortState(SMART_ESCORT_PAUSED);
     mWPPauseTimer = delay;
     if (forced)
@@ -184,7 +184,7 @@ void SmartAI::StopPath(uint32 DespawnTime, uint32 quest, bool fail)
     SetDespawnTime(DespawnTime);
     //mDespawnTime = DespawnTime;
 
-    me->GetPosition(&mLastOOCPos);
+    mLastOOCPos = me->GetPosition();
     me->StopMoving();//force stop
     me->GetMotionMaster()->MoveIdle();
     GetScript()->ProcessEventsFor(SMART_EVENT_WAYPOINT_STOPPED, NULL, mLastWP->id, GetScript()->GetPathId());
@@ -437,8 +437,11 @@ void SmartAI::EnterEvadeMode()
     }
     else if (mFollowGuid)
     {
-        if (Unit* target = me->GetUnit(*me, mFollowGuid))
+        if (Unit* target = ObjectAccessor::GetUnit(*me, mFollowGuid))
             me->GetMotionMaster()->MoveFollow(target, mFollowDist, mFollowAngle);
+
+        // evade is not cleared in MoveFollow, so we can't keep it
+        me->ClearUnitState(UNIT_STATE_EVADE);
     }
     else
         me->GetMotionMaster()->MoveTargetedHome();
@@ -499,7 +502,7 @@ bool SmartAI::AssistPlayerInCombat(Unit* who)
         return false;
 
     //not a player
-    if (!who->GetVictim()->GetCharmerOrOwnerPlayerOrPlayerItself())
+    if (!who->EnsureVictim()->GetCharmerOrOwnerPlayerOrPlayerItself())
         return false;
 
     //never attack friendly
@@ -532,12 +535,12 @@ void SmartAI::JustRespawned()
     mDespawnState = 0;
     mEscortState = SMART_ESCORT_NONE;
     me->SetVisible(true);
-    if (me->getFaction() != me->GetCreatureTemplate()->faction_A)
+    if (me->getFaction() != me->GetCreatureTemplate()->faction)
         me->RestoreFaction();
-    GetScript()->ProcessEventsFor(SMART_EVENT_RESPAWN);
     mJustReset = true;
     JustReachedHome();
-    mFollowGuid = 0;//do not reset follower on Reset(), we need it after combat evade
+    GetScript()->ProcessEventsFor(SMART_EVENT_RESPAWN);
+    mFollowGuid.Clear();//do not reset follower on Reset(), we need it after combat evade
     mFollowDist = 0;
     mFollowAngle = 0;
     mFollowCredit = 0;
@@ -572,7 +575,7 @@ void SmartAI::EnterCombat(Unit* enemy)
 {
     me->InterruptNonMeleeSpells(false); // must be before ProcessEvents
     GetScript()->ProcessEventsFor(SMART_EVENT_AGGRO, enemy);
-    me->GetPosition(&mLastOOCPos);
+    mLastOOCPos = me->GetPosition();
     SetRun(mRun);
     if (me->GetMotionMaster()->GetMotionSlotType(MOTION_SLOT_ACTIVE) == POINT_MOTION_TYPE)
         me->GetMotionMaster()->MovementExpired();
@@ -618,10 +621,7 @@ void SmartAI::DamageTaken(Unit* doneBy, uint32& damage)
 {
     GetScript()->ProcessEventsFor(SMART_EVENT_DAMAGED, doneBy, damage);
     if (mInvincibilityHpLevel && (damage >= me->GetHealth() - mInvincibilityHpLevel))
-    {
-        damage = 0;
-        me->SetHealth(mInvincibilityHpLevel);
-    }
+        damage = me->GetHealth() - mInvincibilityHpLevel; // damage should not be nullified, because of player damage req.
 }
 
 void SmartAI::HealReceived(Unit* doneBy, uint32& addhealth)
@@ -674,8 +674,8 @@ void SmartAI::OnCharmed(bool apply)
 {
     GetScript()->ProcessEventsFor(SMART_EVENT_CHARMED, NULL, 0, 0, apply);
 
-    if (!apply && !me->IsInEvadeMode() && me->GetUInt64Value(UNIT_FIELD_CHARMEDBY))
-        if (Unit* charmer = ObjectAccessor::GetUnit(*me, me->GetUInt64Value(UNIT_FIELD_CHARMEDBY)))
+    if (!apply && !me->IsInEvadeMode() && me->GetCharmerGUID())
+        if (Unit* charmer = ObjectAccessor::GetUnit(*me, me->GetCharmerGUID()))
             AttackStart(charmer);
 }
 
@@ -694,11 +694,11 @@ void SmartAI::SetData(uint32 id, uint32 value)
     GetScript()->ProcessEventsFor(SMART_EVENT_DATA_SET, NULL, id, value);
 }
 
-void SmartAI::SetGUID(uint64 /*guid*/, int32 /*id*/) { }
+void SmartAI::SetGUID(ObjectGuid /*guid*/, int32 /*id*/) { }
 
-uint64 SmartAI::GetGUID(int32 /*id*/) const
+ObjectGuid SmartAI::GetGUID(int32 /*id*/) const
 {
-    return 0;
+    return ObjectGuid::Empty;
 }
 
 void SmartAI::SetRun(bool run)
@@ -800,7 +800,7 @@ void SmartAI::StopFollow()
             player->GroupEventHappens(mFollowCredit, me);
     }
 
-    mFollowGuid = 0;
+    mFollowGuid.Clear();
     mFollowDist = 0;
     mFollowAngle = 0;
     mFollowCredit = 0;
@@ -931,7 +931,7 @@ class SmartTrigger : public AreaTriggerScript
 
         SmartTrigger() : AreaTriggerScript("SmartTrigger") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* trigger)
+        bool OnTrigger(Player* player, AreaTriggerEntry const* trigger) override
         {
             if (!player->IsAlive())
                 return false;
@@ -944,7 +944,7 @@ class SmartTrigger : public AreaTriggerScript
         }
 };
 
-void AddSC_SmartSCripts()
+void AddSC_SmartScripts()
 {
     new SmartTrigger();
 }

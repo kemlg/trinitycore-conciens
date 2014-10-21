@@ -160,7 +160,7 @@ class boss_skadi : public CreatureScript
 public:
     boss_skadi() : CreatureScript("boss_skadi") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetInstanceAI<boss_skadiAI>(creature);
     }
@@ -169,14 +169,28 @@ public:
     {
         boss_skadiAI(Creature* creature) : ScriptedAI(creature), Summons(me)
         {
+            Initialize();
             instance = creature->GetInstanceScript();
-            m_uiGraufGUID = 0;
+            m_uiMovementTimer = 0;
+            m_uiSummonTimer = 0;
+        }
+
+        void Initialize()
+        {
+            m_uiCrushTimer = 8000;
+            m_uiPoisonedSpearTimer = 10000;
+            m_uiWhirlwindTimer = 20000;
+            m_uiMountTimer = 3000;
+            m_uiWaypointId = 0;
+            m_bSaidEmote = false;
+            m_uiSpellHitCount = 0;
+
+            Phase = SKADI;
         }
 
         InstanceScript* instance;
         SummonList Summons;
-        uint64 m_uiGraufGUID;
-        std::vector<uint64> triggersGUID;
+        ObjectGuid m_uiGraufGUID;
 
         uint32 m_uiCrushTimer;
         uint32 m_uiPoisonedSpearTimer;
@@ -190,38 +204,28 @@ public:
 
         CombatPhase Phase;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            triggersGUID.clear();
-
-            m_uiCrushTimer = 8000;
-            m_uiPoisonedSpearTimer = 10000;
-            m_uiWhirlwindTimer = 20000;
-            m_uiMountTimer = 3000;
-            m_uiWaypointId = 0;
-            m_bSaidEmote = false;
-            m_uiSpellHitCount = 0;
-
-            Phase = SKADI;
+            Initialize();
 
             Summons.DespawnAll();
             me->SetSpeed(MOVE_FLIGHT, 3.0f);
-            if ((Unit::GetCreature(*me, m_uiGraufGUID) == NULL) && !me->IsMounted())
+            if ((ObjectAccessor::GetCreature(*me, m_uiGraufGUID) == NULL) && !me->IsMounted())
                  me->SummonCreature(NPC_GRAUF, Location[0].GetPositionX(), Location[0].GetPositionY(), Location[0].GetPositionZ(), 3.0f);
             instance->SetBossState(DATA_SKADI_THE_RUTHLESS, NOT_STARTED);
             instance->DoStopTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_TIMED_START_EVENT);
         }
 
-        void JustReachedHome() OVERRIDE
+        void JustReachedHome() override
         {
             me->SetCanFly(false);
             me->Dismount();
             me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE);
-            if (!Unit::GetCreature(*me, m_uiGraufGUID))
+            if (!ObjectAccessor::GetCreature(*me, m_uiGraufGUID))
                 me->SummonCreature(NPC_GRAUF, Location[0].GetPositionX(), Location[0].GetPositionY(), Location[0].GetPositionZ(), 3.0f);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
 
@@ -240,7 +244,7 @@ public:
             Summons.DespawnEntry(NPC_GRAUF);
         }
 
-        void JustSummoned(Creature* summoned) OVERRIDE
+        void JustSummoned(Creature* summoned) override
         {
             switch (summoned->GetEntry())
             {
@@ -263,14 +267,14 @@ public:
             Summons.Summon(summoned);
         }
 
-        void SummonedCreatureDespawn(Creature* summoned) OVERRIDE
+        void SummonedCreatureDespawn(Creature* summoned) override
         {
             if (summoned->GetEntry() == NPC_GRAUF)
-                m_uiGraufGUID = 0;
+                m_uiGraufGUID.Clear();
             Summons.Despawn(summoned);
         }
 
-        void SpellHit(Unit* /*caster*/, const SpellInfo* spell) OVERRIDE
+        void SpellHit(Unit* /*caster*/, const SpellInfo* spell) override
         {
             if (spell->Id == SPELL_HARPOON_DAMAGE)
             {
@@ -296,7 +300,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             switch (Phase)
             {
@@ -401,14 +405,14 @@ public:
             }
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             Talk(SAY_DEATH);
             Summons.DespawnAll();
             instance->SetBossState(DATA_SKADI_THE_RUTHLESS, DONE);
         }
 
-        void KilledUnit(Unit* who) OVERRIDE
+        void KilledUnit(Unit* who) override
         {
             if (who->GetTypeId() == TYPEID_PLAYER)
                 Talk(SAY_KILL);
@@ -421,15 +425,15 @@ public:
                 switch (urand(0, 2))
                 {
                     case 0:
-                        me->SummonCreature(NPC_YMIRJAR_WARRIOR, SpawnLoc.GetPositionX()+rand()%5, SpawnLoc.GetPositionY()+rand()%5, SpawnLoc.GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000);
+                        me->SummonCreature(NPC_YMIRJAR_WARRIOR, SpawnLoc.GetPositionX() + rand32() % 5, SpawnLoc.GetPositionY() + rand32() % 5, SpawnLoc.GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000);
                         break;
 
                     case 1:
-                        me->SummonCreature(NPC_YMIRJAR_WITCH_DOCTOR, SpawnLoc.GetPositionX()+rand()%5, SpawnLoc.GetPositionY()+rand()%5, SpawnLoc.GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000);
+                        me->SummonCreature(NPC_YMIRJAR_WITCH_DOCTOR, SpawnLoc.GetPositionX() + rand32() % 5, SpawnLoc.GetPositionY() + rand32() % 5, SpawnLoc.GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000);
                         break;
 
                     case 2:
-                        me->SummonCreature(NPC_YMIRJAR_HARPOONER, SpawnLoc.GetPositionX()+rand()%5, SpawnLoc.GetPositionY()+rand()%5, SpawnLoc.GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000);
+                        me->SummonCreature(NPC_YMIRJAR_HARPOONER, SpawnLoc.GetPositionX() + rand32() % 5, SpawnLoc.GetPositionY() + rand32() % 5, SpawnLoc.GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30000);
                         break;
                 }
             }
@@ -463,13 +467,13 @@ class go_harpoon_launcher : public GameObjectScript
 public:
     go_harpoon_launcher() : GameObjectScript("go_harpoon_launcher") { }
 
-    bool OnGossipHello(Player* player, GameObject* go) OVERRIDE
+    bool OnGossipHello(Player* player, GameObject* go) override
     {
         InstanceScript* instance = go->GetInstanceScript();
         if (!instance)
             return false;
 
-        if (Creature* pSkadi = Unit::GetCreature(*go, instance->GetData64(DATA_SKADI_THE_RUTHLESS)))
+        if (Creature* pSkadi = ObjectAccessor::GetCreature(*go, instance->GetGuidData(DATA_SKADI_THE_RUTHLESS)))
             player->CastSpell(pSkadi, SPELL_RAPID_FIRE, true);
 
         return false;

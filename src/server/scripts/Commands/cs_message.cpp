@@ -34,7 +34,7 @@ class message_commandscript : public CommandScript
 public:
     message_commandscript() : CommandScript("message_commandscript") { }
 
-    ChatCommand* GetCommands() const
+    ChatCommand* GetCommands() const override
     {
         static ChatCommand channelSetCommandTable[] =
         {
@@ -211,7 +211,7 @@ public:
             std::string name = strtok(NULL, " ");
             if (normalizePlayerName(name))
             {
-                if (Player* player = sObjectAccessor->FindPlayerByName(name))
+                if (Player* player = ObjectAccessor::FindPlayerByName(name))
                 {
                     handler->GetSession()->GetPlayer()->RemoveFromWhisperWhiteList(player->GetGUID());
                     handler->PSendSysMessage(LANG_COMMAND_WHISPEROFFPLAYER, name.c_str());

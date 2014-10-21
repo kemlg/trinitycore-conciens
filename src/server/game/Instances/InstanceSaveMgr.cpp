@@ -39,8 +39,10 @@ uint16 InstanceSaveManager::ResetTimeDelay[] = {3600, 900, 300, 60};
 
 InstanceSaveManager::~InstanceSaveManager()
 {
-    // it is undefined whether this or objectmgr will be unloaded first
-    // so we must be prepared for both cases
+}
+
+void InstanceSaveManager::Unload()
+{
     lock_instLists = true;
     for (InstanceSaveHashMap::iterator itr = m_instanceSaveById.begin(); itr != m_instanceSaveById.end(); ++itr)
     {
@@ -387,7 +389,7 @@ void InstanceSaveManager::LoadResetTimes()
             if (oldresettime != newresettime)
                 CharacterDatabase.DirectPExecute("UPDATE instance_reset SET resettime = '%u' WHERE mapid = '%u' AND difficulty = '%u'", uint32(newresettime), mapid, difficulty);
 
-            SetResetTimeFor(mapid, difficulty, newresettime);
+            InitializeResetTimeFor(mapid, difficulty, newresettime);
         } while (result->NextRow());
     }
 
@@ -424,7 +426,7 @@ void InstanceSaveManager::LoadResetTimes()
             CharacterDatabase.DirectPExecute("UPDATE instance_reset SET resettime = '" UI64FMTD "' WHERE mapid = '%u' AND difficulty= '%u'", (uint64)t, mapid, difficulty);
         }
 
-        SetResetTimeFor(mapid, difficulty, t);
+        InitializeResetTimeFor(mapid, difficulty, t);
 
         // schedule the global reset/warning
         uint8 type;

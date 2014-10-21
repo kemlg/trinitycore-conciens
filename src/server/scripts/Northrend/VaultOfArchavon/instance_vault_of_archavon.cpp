@@ -35,16 +35,15 @@ class instance_vault_of_archavon : public InstanceMapScript
         {
             instance_vault_of_archavon_InstanceMapScript(Map* map) : InstanceScript(map)
             {
+                SetHeaders(DataHeader);
                 SetBossNumber(EncounterCount);
 
-                EmalonGUID      = 0;
-                ToravonGUID     = 0;
                 ArchavonDeath   = 0;
                 EmalonDeath     = 0;
                 KoralonDeath    = 0;
             }
 
-            void OnCreatureCreate(Creature* creature) OVERRIDE
+            void OnCreatureCreate(Creature* creature) override
             {
                 switch (creature->GetEntry())
                 {
@@ -59,7 +58,7 @@ class instance_vault_of_archavon : public InstanceMapScript
                 }
             }
 
-            uint64 GetData64(uint32 identifier) const OVERRIDE
+            ObjectGuid GetGuidData(uint32 identifier) const override
             {
                 switch (identifier)
                 {
@@ -71,10 +70,10 @@ class instance_vault_of_archavon : public InstanceMapScript
                         break;
                 }
 
-                return 0;
+                return ObjectGuid::Empty;
             }
 
-            bool SetBossState(uint32 type, EncounterState state) OVERRIDE
+            bool SetBossState(uint32 type, EncounterState state) override
             {
                 if (!InstanceScript::SetBossState(type, state))
                     return false;
@@ -103,7 +102,7 @@ class instance_vault_of_archavon : public InstanceMapScript
                 return true;
             }
 
-            bool CheckAchievementCriteriaMeet(uint32 criteria_id, Player const* /*source*/, Unit const* /*target*/, uint32 /*miscvalue1*/) OVERRIDE
+            bool CheckAchievementCriteriaMeet(uint32 criteria_id, Player const* /*source*/, Unit const* /*target*/, uint32 /*miscvalue1*/) override
             {
                 switch (criteria_id)
                 {
@@ -126,14 +125,14 @@ class instance_vault_of_archavon : public InstanceMapScript
             }
 
         private:
-            uint64 EmalonGUID;
-            uint64 ToravonGUID;
+            ObjectGuid EmalonGUID;
+            ObjectGuid ToravonGUID;
             time_t ArchavonDeath;
             time_t EmalonDeath;
             time_t KoralonDeath;
         };
 
-        InstanceScript* GetInstanceScript(InstanceMap* map) const OVERRIDE
+        InstanceScript* GetInstanceScript(InstanceMap* map) const override
         {
             return new instance_vault_of_archavon_InstanceMapScript(map);
         }

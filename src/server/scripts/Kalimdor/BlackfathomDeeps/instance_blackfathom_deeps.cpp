@@ -57,45 +57,36 @@ class instance_blackfathom_deeps : public InstanceMapScript
 public:
     instance_blackfathom_deeps() : InstanceMapScript("instance_blackfathom_deeps", 48) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* map) const OVERRIDE
+    InstanceScript* GetInstanceScript(InstanceMap* map) const override
     {
         return new instance_blackfathom_deeps_InstanceMapScript(map);
     }
 
     struct instance_blackfathom_deeps_InstanceMapScript : public InstanceScript
     {
-        instance_blackfathom_deeps_InstanceMapScript(Map* map) : InstanceScript(map) { }
+        instance_blackfathom_deeps_InstanceMapScript(Map* map) : InstanceScript(map)
+        {
+            SetHeaders(DataHeader);
+            memset(&encounter, 0, sizeof(encounter));
 
-        uint64 twilightLordKelrisGUID;
-        uint64 shrine1GUID;
-        uint64 shrine2GUID;
-        uint64 shrine3GUID;
-        uint64 shrine4GUID;
-        uint64 shrineOfGelihastGUID;
-        uint64 altarOfTheDeepsGUID;
-        uint64 mainDoorGUID;
+            countFires = 0;
+            deathTimes = 0;
+        }
+
+        ObjectGuid twilightLordKelrisGUID;
+        ObjectGuid shrine1GUID;
+        ObjectGuid shrine2GUID;
+        ObjectGuid shrine3GUID;
+        ObjectGuid shrine4GUID;
+        ObjectGuid shrineOfGelihastGUID;
+        ObjectGuid altarOfTheDeepsGUID;
+        ObjectGuid mainDoorGUID;
 
         uint8 encounter[MAX_ENCOUNTER];
         uint8 countFires;
         uint8 deathTimes;
 
-        void Initialize() OVERRIDE
-        {
-            memset(&encounter, 0, sizeof(encounter));
-
-            twilightLordKelrisGUID = 0;
-            shrine1GUID = 0;
-            shrine2GUID = 0;
-            shrine3GUID = 0;
-            shrine4GUID = 0;
-            shrineOfGelihastGUID = 0;
-            altarOfTheDeepsGUID = 0;
-            mainDoorGUID = 0;
-            countFires = 0;
-            deathTimes = 0;
-        }
-
-        void OnCreatureCreate(Creature* creature) OVERRIDE
+        void OnCreatureCreate(Creature* creature) override
         {
             switch (creature->GetEntry())
             {
@@ -108,7 +99,7 @@ public:
             }
         }
 
-        void OnGameObjectCreate(GameObject* go) OVERRIDE
+        void OnGameObjectCreate(GameObject* go) override
         {
             switch (go->GetEntry())
             {
@@ -136,13 +127,13 @@ public:
                     break;
                 case GO_AKU_MAI_DOOR:
                     if (encounter[2] == DONE)
-                        HandleGameObject(0, true, go);
+                        HandleGameObject(ObjectGuid::Empty, true, go);
                     mainDoorGUID = go->GetGUID();
                     break;
             }
         }
 
-        void SetData(uint32 type, uint32 data) OVERRIDE
+        void SetData(uint32 type, uint32 data) override
         {
             switch (type)
             {
@@ -212,7 +203,7 @@ public:
             }
         }
 
-        uint32 GetData(uint32 type) const OVERRIDE
+        uint32 GetData(uint32 type) const override
         {
             switch (type)
             {
@@ -233,7 +224,7 @@ public:
             return 0;
         }
 
-        uint64 GetData64(uint32 data) const OVERRIDE
+        ObjectGuid GetGuidData(uint32 data) const override
         {
             switch (data)
             {
@@ -253,7 +244,7 @@ public:
                     return mainDoorGUID;
             }
 
-            return 0;
+            return ObjectGuid::Empty;
         }
     };
 };

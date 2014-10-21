@@ -77,7 +77,19 @@ public:
     {
         boss_high_king_maulgarAI(Creature* creature) : ScriptedAI(creature)
         {
+            Initialize();
             instance = creature->GetInstanceScript();
+        }
+
+        void Initialize()
+        {
+            ArcingSmash_Timer = 10000;
+            MightyBlow_Timer = 40000;
+            Whirlwind_Timer = 30000;
+            Charging_Timer = 0;
+            Roar_Timer = 0;
+
+            Phase2 = false;
         }
 
         InstanceScript* instance;
@@ -90,27 +102,21 @@ public:
 
         bool Phase2;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            ArcingSmash_Timer = 10000;
-            MightyBlow_Timer = 40000;
-            Whirlwind_Timer = 30000;
-            Charging_Timer = 0;
-            Roar_Timer = 0;
+            Initialize();
 
             DoCast(me, SPELL_DUAL_WIELD, false);
-
-            Phase2 = false;
 
             instance->SetBossState(DATA_MAULGAR, NOT_STARTED);
         }
 
-        void KilledUnit(Unit* /*victim*/) OVERRIDE
+        void KilledUnit(Unit* /*victim*/) override
         {
             Talk(SAY_SLAY);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             Talk(SAY_DEATH);
 
@@ -123,14 +129,14 @@ public:
                 Talk(SAY_OGRE_DEATH);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             DoZoneInCombat();
             instance->SetBossState(DATA_MAULGAR, IN_PROGRESS);
             Talk(SAY_AGGRO);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -153,7 +159,7 @@ public:
             if (MightyBlow_Timer <= diff)
             {
                 DoCastVictim(SPELL_MIGHTY_BLOW);
-                MightyBlow_Timer = 30000+rand()%10000;
+                MightyBlow_Timer = 30000 + rand32() % 10000;
             } else MightyBlow_Timer -= diff;
 
             //Entering Phase 2
@@ -186,7 +192,7 @@ public:
                 if (Roar_Timer <= diff)
                 {
                     DoCast(me, SPELL_ROAR);
-                    Roar_Timer = 40000+(rand()%10000);
+                    Roar_Timer = 40000 + (rand32() % 10000);
                 } else Roar_Timer -= diff;
             }
 
@@ -194,7 +200,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetGruulsLairAI<boss_high_king_maulgarAI>(creature);
     }
@@ -209,25 +215,31 @@ public:
     {
         boss_olm_the_summonerAI(Creature* creature) : ScriptedAI(creature)
         {
+            Initialize();
             instance = creature->GetInstanceScript();
         }
 
-        uint32 DarkDecay_Timer;
-        uint32 Summon_Timer;
-           uint32 DeathCoil_Timer;
-
-        InstanceScript* instance;
-
-        void Reset() OVERRIDE
+        void Initialize()
         {
             DarkDecay_Timer = 10000;
             Summon_Timer = 15000;
             DeathCoil_Timer = 20000;
+        }
+
+        uint32 DarkDecay_Timer;
+        uint32 Summon_Timer;
+        uint32 DeathCoil_Timer;
+
+        InstanceScript* instance;
+
+        void Reset() override
+        {
+            Initialize();
 
             instance->SetBossState(DATA_MAULGAR, NOT_STARTED);
         }
 
-        void AttackStart(Unit* who) OVERRIDE
+        void AttackStart(Unit* who) override
         {
             if (!who)
                 return;
@@ -242,21 +254,21 @@ public:
             }
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             DoZoneInCombat();
             instance->SetBossState(DATA_MAULGAR, IN_PROGRESS);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
-            if (Creature* maulgar = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_MAULGAR)))
+            if (Creature* maulgar = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_MAULGAR)))
                 maulgar->AI()->DoAction(ACTION_ADD_DEATH);
 
             instance->SetBossState(DATA_MAULGAR, DONE);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -289,7 +301,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetGruulsLairAI<boss_olm_the_summonerAI>(creature);
     }
@@ -305,7 +317,16 @@ public:
     {
         boss_kiggler_the_crazedAI(Creature* creature) : ScriptedAI(creature)
         {
+            Initialize();
             instance = creature->GetInstanceScript();
+        }
+
+        void Initialize()
+        {
+            GreaterPolymorph_Timer = 5000;
+            LightningBolt_Timer = 10000;
+            ArcaneShock_Timer = 20000;
+            ArcaneExplosion_Timer = 30000;
         }
 
         uint32 GreaterPolymorph_Timer;
@@ -315,31 +336,28 @@ public:
 
         InstanceScript* instance;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            GreaterPolymorph_Timer = 5000;
-            LightningBolt_Timer = 10000;
-            ArcaneShock_Timer = 20000;
-            ArcaneExplosion_Timer = 30000;
+            Initialize();
 
             instance->SetBossState(DATA_MAULGAR, NOT_STARTED);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             DoZoneInCombat();
             instance->SetBossState(DATA_MAULGAR, IN_PROGRESS);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
-            if (Creature* maulgar = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_MAULGAR)))
+            if (Creature* maulgar = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_MAULGAR)))
                 maulgar->AI()->DoAction(ACTION_ADD_DEATH);
 
             instance->SetBossState(DATA_MAULGAR, DONE);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -378,7 +396,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetGruulsLairAI<boss_kiggler_the_crazedAI>(creature);
     }
@@ -393,7 +411,15 @@ public:
     {
         boss_blindeye_the_seerAI(Creature* creature) : ScriptedAI(creature)
         {
+            Initialize();
             instance = creature->GetInstanceScript();
+        }
+
+        void Initialize()
+        {
+            GreaterPowerWordShield_Timer = 5000;
+            Heal_Timer = urand(25000, 40000);
+            PrayerofHealing_Timer = urand(45000, 55000);
         }
 
         uint32 GreaterPowerWordShield_Timer;
@@ -402,30 +428,28 @@ public:
 
         InstanceScript* instance;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            GreaterPowerWordShield_Timer = 5000;
-            Heal_Timer = urand(25000, 40000);
-            PrayerofHealing_Timer = urand(45000, 55000);
+            Initialize();
 
             instance->SetBossState(DATA_MAULGAR, NOT_STARTED);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             DoZoneInCombat();
             instance->SetBossState(DATA_MAULGAR, IN_PROGRESS);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
-            if (Creature* maulgar = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_MAULGAR)))
+            if (Creature* maulgar = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_MAULGAR)))
                 maulgar->AI()->DoAction(ACTION_ADD_DEATH);
 
             instance->SetBossState(DATA_MAULGAR, DONE);
         }
 
-         void UpdateAI(uint32 diff) OVERRIDE
+         void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -455,7 +479,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetGruulsLairAI<boss_blindeye_the_seerAI>(creature);
     }
@@ -470,7 +494,15 @@ public:
     {
         boss_krosh_firehandAI(Creature* creature) : ScriptedAI(creature)
         {
+            Initialize();
             instance = creature->GetInstanceScript();
+        }
+
+        void Initialize()
+        {
+            GreaterFireball_Timer = 1000;
+            SpellShield_Timer = 5000;
+            BlastWave_Timer = 20000;
         }
 
         uint32 GreaterFireball_Timer;
@@ -479,30 +511,28 @@ public:
 
         InstanceScript* instance;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            GreaterFireball_Timer = 1000;
-            SpellShield_Timer = 5000;
-            BlastWave_Timer = 20000;
+            Initialize();
 
             instance->SetBossState(DATA_MAULGAR, NOT_STARTED);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             DoZoneInCombat();
             instance->SetBossState(DATA_MAULGAR, IN_PROGRESS);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
-            if (Creature* maulgar = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_MAULGAR)))
+            if (Creature* maulgar = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_MAULGAR)))
                 maulgar->AI()->DoAction(ACTION_ADD_DEATH);
 
             instance->SetBossState(DATA_MAULGAR, DONE);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -530,14 +560,14 @@ public:
                 std::vector<Unit*> target_list;
                 for (std::list<HostileReference*>::const_iterator itr = t_list.begin(); itr!= t_list.end(); ++itr)
                 {
-                    target = Unit::GetUnit(*me, (*itr)->getUnitGuid());
+                    target = ObjectAccessor::GetUnit(*me, (*itr)->getUnitGuid());
                                                                 //15 yard radius minimum
                     if (target && target->IsWithinDist(me, 15, false))
                         target_list.push_back(target);
                     target = NULL;
                 }
                 if (!target_list.empty())
-                    target = *(target_list.begin()+rand()%target_list.size());
+                    target = *(target_list.begin() + rand32() % target_list.size());
 
                 me->InterruptNonMeleeSpells(false);
                 DoCast(target, SPELL_BLAST_WAVE);
@@ -546,7 +576,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetGruulsLairAI<boss_krosh_firehandAI>(creature);
     }

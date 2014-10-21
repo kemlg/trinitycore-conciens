@@ -61,7 +61,7 @@ class boss_xevozz : public CreatureScript
 public:
     boss_xevozz() : CreatureScript("boss_xevozz") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetInstanceAI<boss_xevozzAI>(creature);
     }
@@ -70,7 +70,15 @@ public:
     {
         boss_xevozzAI(Creature* creature) : ScriptedAI(creature)
         {
+            Initialize();
             instance  = creature->GetInstanceScript();
+        }
+
+        void Initialize()
+        {
+            uiSummonEtherealSphere_Timer = urand(10000, 12000);
+            uiArcaneBarrageVolley_Timer = urand(20000, 22000);
+            uiArcaneBuffet_Timer = uiSummonEtherealSphere_Timer + urand(5000, 6000);
         }
 
         InstanceScript* instance;
@@ -79,16 +87,14 @@ public:
         uint32 uiArcaneBarrageVolley_Timer;
         uint32 uiArcaneBuffet_Timer;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             if (instance->GetData(DATA_WAVE_COUNT) == 6)
                 instance->SetData(DATA_1ST_BOSS_EVENT, NOT_STARTED);
             else if (instance->GetData(DATA_WAVE_COUNT) == 12)
                 instance->SetData(DATA_2ND_BOSS_EVENT, NOT_STARTED);
 
-            uiSummonEtherealSphere_Timer = urand(10000, 12000);
-            uiArcaneBarrageVolley_Timer = urand(20000, 22000);
-            uiArcaneBuffet_Timer = uiSummonEtherealSphere_Timer + urand(5000, 6000);
+            Initialize();
             DespawnSphere();
         }
 
@@ -107,7 +113,7 @@ public:
             }
         }
 
-        void JustSummoned(Creature* summoned) OVERRIDE
+        void JustSummoned(Creature* summoned) override
         {
             summoned->SetSpeed(MOVE_RUN, 0.5f);
             if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
@@ -117,7 +123,7 @@ public:
             }
         }
 
-        void AttackStart(Unit* who) OVERRIDE
+        void AttackStart(Unit* who) override
         {
             if (me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC) || me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE))
                 return;
@@ -131,10 +137,10 @@ public:
             }
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
-            if (GameObject* pDoor = instance->instance->GetGameObject(instance->GetData64(DATA_XEVOZZ_CELL)))
+            if (GameObject* pDoor = instance->instance->GetGameObject(instance->GetGuidData(DATA_XEVOZZ_CELL)))
                 if (pDoor->GetGoState() == GO_STATE_READY)
                 {
                     EnterEvadeMode();
@@ -146,10 +152,10 @@ public:
                 instance->SetData(DATA_2ND_BOSS_EVENT, IN_PROGRESS);
         }
 
-        void MoveInLineOfSight(Unit* /*who*/) OVERRIDE { }
+        void MoveInLineOfSight(Unit* /*who*/) override { }
 
 
-        void UpdateAI(uint32 uiDiff) OVERRIDE
+        void UpdateAI(uint32 uiDiff) override
         {
             //Return since we have no target
             if (!UpdateVictim())
@@ -177,7 +183,7 @@ public:
                 Talk(SAY_SPAWN);
                 DoCast(me, SPELL_SUMMON_ETHEREAL_SPHERE_1);
                 if (IsHeroic()) // extra one for heroic
-                    me->SummonCreature(NPC_ETHEREAL_SPHERE, me->GetPositionX()-5+rand()%10, me->GetPositionY()-5+rand()%10, me->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN, 40000);
+                    me->SummonCreature(NPC_ETHEREAL_SPHERE, me->GetPositionX() - 5 + rand32() % 10, me->GetPositionY() - 5 + rand32() % 10, me->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN, 40000);
 
                 uiSummonEtherealSphere_Timer = urand(45000, 47000);
                 uiArcaneBuffet_Timer = urand(5000, 6000);
@@ -187,7 +193,7 @@ public:
             DoMeleeAttackIfReady();
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             Talk(SAY_DEATH);
 
@@ -204,7 +210,7 @@ public:
                 instance->SetData(DATA_WAVE_COUNT, 13);
             }
         }
-        void KilledUnit(Unit* victim) OVERRIDE
+        void KilledUnit(Unit* victim) override
         {
             if (victim->GetTypeId() != TYPEID_PLAYER)
                 return;
@@ -220,7 +226,7 @@ class npc_ethereal_sphere : public CreatureScript
 public:
     npc_ethereal_sphere() : CreatureScript("npc_ethereal_sphere") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetInstanceAI<npc_ethereal_sphereAI>(creature);
     }
@@ -229,7 +235,14 @@ public:
     {
         npc_ethereal_sphereAI(Creature* creature) : ScriptedAI(creature)
         {
+            Initialize();
             instance   = creature->GetInstanceScript();
+        }
+
+        void Initialize()
+        {
+            uiSummonPlayers_Timer = urand(33000, 35000);
+            uiRangeCheck_Timer = 1000;
         }
 
         InstanceScript* instance;
@@ -237,13 +250,12 @@ public:
         uint32 uiSummonPlayers_Timer;
         uint32 uiRangeCheck_Timer;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            uiSummonPlayers_Timer = urand(33000, 35000);
-            uiRangeCheck_Timer = 1000;
+            Initialize();
         }
 
-        void UpdateAI(uint32 uiDiff) OVERRIDE
+        void UpdateAI(uint32 uiDiff) override
         {
             //Return since we have no target
             if (!UpdateVictim())
@@ -254,7 +266,7 @@ public:
 
             if (uiRangeCheck_Timer < uiDiff)
             {
-                if (Creature* pXevozz = Unit::GetCreature(*me, instance->GetData64(DATA_XEVOZZ)))
+                if (Creature* pXevozz = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_XEVOZZ)))
                 {
                     float fDistance = me->GetDistance2d(pXevozz);
                     if (fDistance <= 3)

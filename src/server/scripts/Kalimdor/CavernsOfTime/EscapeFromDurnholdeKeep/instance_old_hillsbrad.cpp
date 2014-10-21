@@ -45,33 +45,29 @@ class instance_old_hillsbrad : public InstanceMapScript
 public:
     instance_old_hillsbrad() : InstanceMapScript("instance_old_hillsbrad", 560) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* map) const OVERRIDE
+    InstanceScript* GetInstanceScript(InstanceMap* map) const override
     {
         return new instance_old_hillsbrad_InstanceMapScript(map);
     }
 
     struct instance_old_hillsbrad_InstanceMapScript : public InstanceScript
     {
-        instance_old_hillsbrad_InstanceMapScript(Map* map) : InstanceScript(map) { }
+        instance_old_hillsbrad_InstanceMapScript(Map* map) : InstanceScript(map)
+        {
+            SetHeaders(DataHeader);
+            memset(&m_auiEncounter, 0, sizeof(m_auiEncounter));
+
+            mBarrelCount = 0;
+            mThrallEventCount = 0;
+        }
 
         uint32 m_auiEncounter[MAX_ENCOUNTER];
         uint32 mBarrelCount;
         uint32 mThrallEventCount;
 
-        uint64 ThrallGUID;
-        uint64 TarethaGUID;
-        uint64 EpochGUID;
-
-        void Initialize() OVERRIDE
-        {
-            memset(&m_auiEncounter, 0, sizeof(m_auiEncounter));
-
-            mBarrelCount        = 0;
-            mThrallEventCount   = 0;
-            ThrallGUID          = 0;
-            TarethaGUID         = 0;
-            EpochGUID        = 0;
-        }
+        ObjectGuid ThrallGUID;
+        ObjectGuid TarethaGUID;
+        ObjectGuid EpochGUID;
 
         Player* GetPlayerInMap()
         {
@@ -99,12 +95,12 @@ public:
                 for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
                 {
                     if (Player* player = itr->GetSource())
-                        player->KilledMonsterCredit(LODGE_QUEST_TRIGGER, 0);
+                        player->KilledMonsterCredit(LODGE_QUEST_TRIGGER);
                 }
             }
         }
 
-        void OnCreatureCreate(Creature* creature) OVERRIDE
+        void OnCreatureCreate(Creature* creature) override
         {
             switch (creature->GetEntry())
             {
@@ -114,13 +110,13 @@ public:
                 case TARETHA_ENTRY:
                     TarethaGUID = creature->GetGUID();
                     break;
-            case EPOCH_ENTRY:
-            EpochGUID = creature->GetGUID();
-            break;
+                case EPOCH_ENTRY:
+                    EpochGUID = creature->GetGUID();
+                    break;
             }
         }
 
-        void SetData(uint32 type, uint32 data) OVERRIDE
+        void SetData(uint32 type, uint32 data) override
         {
             Player* player = GetPlayerInMap();
 
@@ -203,7 +199,7 @@ public:
             }
         }
 
-        uint32 GetData(uint32 data) const OVERRIDE
+        uint32 GetData(uint32 data) const override
         {
             switch (data)
             {
@@ -223,7 +219,7 @@ public:
             return 0;
         }
 
-        uint64 GetData64(uint32 data) const OVERRIDE
+        ObjectGuid GetGuidData(uint32 data) const override
         {
             switch (data)
             {
@@ -231,10 +227,10 @@ public:
                     return ThrallGUID;
                 case DATA_TARETHA:
                     return TarethaGUID;
-            case DATA_EPOCH:
-            return EpochGUID;
+                case DATA_EPOCH:
+                    return EpochGUID;
             }
-            return 0;
+            return ObjectGuid::Empty;
         }
     };
 

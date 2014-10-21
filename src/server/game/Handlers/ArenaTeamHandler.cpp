@@ -33,19 +33,27 @@ void WorldSession::HandleInspectArenaTeamsOpcode(WorldPacket& recvData)
 {
     TC_LOG_DEBUG("network", "MSG_INSPECT_ARENA_TEAMS");
 
-    uint64 guid;
+    ObjectGuid guid;
     recvData >> guid;
-    TC_LOG_DEBUG("network", "Inspect Arena stats (GUID: %u TypeId: %u)", GUID_LOPART(guid), GuidHigh2TypeId(GUID_HIPART(guid)));
+    TC_LOG_DEBUG("network", "Inspect Arena stats %s", guid.ToString().c_str());
 
-    if (Player* player = ObjectAccessor::FindPlayer(guid))
+    Player* player = ObjectAccessor::FindPlayer(guid);
+
+    if (!player)
+        return;
+
+    if (!GetPlayer()->IsWithinDistInMap(player, INSPECT_DISTANCE, false))
+        return;
+
+    if (GetPlayer()->IsValidAttackTarget(player))
+        return;
+
+    for (uint8 i = 0; i < MAX_ARENA_SLOT; ++i)
     {
-        for (uint8 i = 0; i < MAX_ARENA_SLOT; ++i)
+        if (uint32 a_id = player->GetArenaTeamId(i))
         {
-            if (uint32 a_id = player->GetArenaTeamId(i))
-            {
-                if (ArenaTeam* arenaTeam = sArenaTeamMgr->GetArenaTeamById(a_id))
-                    arenaTeam->Inspect(this, player->GetGUID());
-            }
+            if (ArenaTeam* arenaTeam = sArenaTeamMgr->GetArenaTeamById(a_id))
+                arenaTeam->Inspect(this, player->GetGUID());
         }
     }
 }
@@ -91,7 +99,7 @@ void WorldSession::HandleArenaTeamInviteOpcode(WorldPacket& recvData)
         if (!normalizePlayerName(invitedName))
             return;
 
-        player = sObjectAccessor->FindPlayerByName(invitedName);
+        player = ObjectAccessor::FindPlayerByName(invitedName);
     }
 
     if (!player)
@@ -110,6 +118,12 @@ void WorldSession::HandleArenaTeamInviteOpcode(WorldPacket& recvData)
     if (!arenaTeam)
     {
         SendArenaTeamCommandResult(ERR_ARENA_TEAM_CREATE_S, "", "", ERR_ARENA_TEAM_PLAYER_NOT_IN_TEAM);
+        return;
+    }
+
+    if (GetPlayer()->GetArenaTeamId(arenaTeam->GetSlot()) != arenaTeamId)
+    {
+        SendArenaTeamCommandResult(ERR_ARENA_TEAM_CREATE_S, "", "", ERR_ARENA_TEAM_PERMISSIONS);
         return;
     }
 
@@ -298,10 +312,14 @@ void WorldSession::HandleArenaTeamRemoveOpcode(WorldPacket& recvData)
         return;
     }
 
+    // Player cannot be removed during fights
+    if (arenaTeam->IsFighting())
+        return;
+
     arenaTeam->DelMember(member->Guid, true);
 
     // Broadcast event
-    arenaTeam->BroadcastEvent(ERR_ARENA_TEAM_REMOVE_SSS, 0, 3, name, arenaTeam->GetName(), _player->GetName());
+    arenaTeam->BroadcastEvent(ERR_ARENA_TEAM_REMOVE_SSS, ObjectGuid::Empty, 3, name, arenaTeam->GetName(), _player->GetName());
 }
 
 void WorldSession::HandleArenaTeamLeaderOpcode(WorldPacket& recvData)
@@ -344,7 +362,7 @@ void WorldSession::HandleArenaTeamLeaderOpcode(WorldPacket& recvData)
     arenaTeam->SetCaptain(member->Guid);
 
     // Broadcast event
-    arenaTeam->BroadcastEvent(ERR_ARENA_TEAM_LEADER_CHANGED_SSS, 0, 3, _player->GetName(), name, arenaTeam->GetName());
+    arenaTeam->BroadcastEvent(ERR_ARENA_TEAM_LEADER_CHANGED_SSS, ObjectGuid::Empty, 3, _player->GetName(), name, arenaTeam->GetName());
 }
 
 void WorldSession::SendArenaTeamCommandResult(uint32 teamAction, const std::string& team, const std::string& player, uint32 errorId)

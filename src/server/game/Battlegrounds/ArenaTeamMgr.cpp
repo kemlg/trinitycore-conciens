@@ -59,7 +59,7 @@ ArenaTeam* ArenaTeamMgr::GetArenaTeamByName(const std::string& arenaTeamName) co
     return NULL;
 }
 
-ArenaTeam* ArenaTeamMgr::GetArenaTeamByCaptain(uint64 guid) const
+ArenaTeam* ArenaTeamMgr::GetArenaTeamByCaptain(ObjectGuid guid) const
 {
     for (ArenaTeamContainer::const_iterator itr = ArenaTeamStore.begin(); itr != ArenaTeamStore.end(); ++itr)
         if (itr->second->GetCaptain() == guid)
@@ -158,8 +158,8 @@ void ArenaTeamMgr::DistributeArenaPoints()
     for (std::map<uint32, uint32>::iterator playerItr = PlayerPoints.begin(); playerItr != PlayerPoints.end(); ++playerItr)
     {
         // Add points to player if online
-        if (Player* player = HashMapHolder<Player>::Find(playerItr->first))
-            player->ModifyArenaPoints(playerItr->second, &trans);
+        if (Player* player = ObjectAccessor::FindConnectedPlayer(ObjectGuid(HIGHGUID_PLAYER, playerItr->first)))
+            player->ModifyArenaPoints(playerItr->second, trans);
         else    // Update database
         {
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_ADD_CHAR_ARENA_POINTS);

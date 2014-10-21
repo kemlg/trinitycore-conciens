@@ -77,42 +77,47 @@ class boss_anomalus : public CreatureScript
         {
             boss_anomalusAI(Creature* creature) : ScriptedAI(creature)
             {
+                Initialize();
                 instance = me->GetInstanceScript();
+            }
+
+            void Initialize()
+            {
+                Phase = 0;
+                uiSparkTimer = 5000;
+                uiChaoticRiftGUID.Clear();
+                chaosTheory = true;
             }
 
             InstanceScript* instance;
 
             uint8 Phase;
             uint32 uiSparkTimer;
-            uint32 uiCreateRiftTimer;
-            uint64 uiChaoticRiftGUID;
+            ObjectGuid uiChaoticRiftGUID;
             bool chaosTheory;
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
-                Phase = 0;
-                uiSparkTimer = 5000;
-                uiChaoticRiftGUID = 0;
-                chaosTheory = true;
+                Initialize();
 
                 instance->SetData(DATA_ANOMALUS_EVENT, NOT_STARTED);
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
 
                 instance->SetData(DATA_ANOMALUS_EVENT, IN_PROGRESS);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 Talk(SAY_DEATH);
 
                 instance->SetData(DATA_ANOMALUS_EVENT, DONE);
             }
 
-            uint32 GetData(uint32 type) const OVERRIDE
+            uint32 GetData(uint32 type) const override
             {
                 if (type == DATA_CHAOS_THEORY)
                     return chaosTheory ? 1 : 0;
@@ -120,13 +125,13 @@ class boss_anomalus : public CreatureScript
                 return 0;
             }
 
-            void SummonedCreatureDies(Creature* summoned, Unit* /*who*/) OVERRIDE
+            void SummonedCreatureDies(Creature* summoned, Unit* /*who*/) override
             {
                 if (summoned->GetEntry() == NPC_CHAOTIC_RIFT)
                     chaosTheory = false;
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -146,13 +151,13 @@ class boss_anomalus : public CreatureScript
                         if (Rift && Rift->isDead())
                         {
                             me->RemoveAurasDueToSpell(SPELL_RIFT_SHIELD);
-                            uiChaoticRiftGUID = 0;
+                            uiChaoticRiftGUID.Clear();
                         }
                         return;
                     }
                 }
                 else
-                    uiChaoticRiftGUID = 0;
+                    uiChaoticRiftGUID.Clear();
 
                 if ((Phase == 0) && HealthBelowPct(50))
                 {
@@ -182,7 +187,7 @@ class boss_anomalus : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetInstanceAI<boss_anomalusAI>(creature);
         }
@@ -197,8 +202,15 @@ class npc_chaotic_rift : public CreatureScript
         {
             npc_chaotic_riftAI(Creature* creature) : ScriptedAI(creature)
             {
+                Initialize();
                 instance = me->GetInstanceScript();
                 SetCombatMovement(false);
+            }
+
+            void Initialize()
+            {
+                uiChaoticEnergyBurstTimer = 1000;
+                uiSummonCrazedManaWraithTimer = 5000;
             }
 
             InstanceScript* instance;
@@ -206,22 +218,21 @@ class npc_chaotic_rift : public CreatureScript
             uint32 uiChaoticEnergyBurstTimer;
             uint32 uiSummonCrazedManaWraithTimer;
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
-                uiChaoticEnergyBurstTimer = 1000;
-                uiSummonCrazedManaWraithTimer = 5000;
+                Initialize();
                 me->SetDisplayId(me->GetCreatureTemplate()->Modelid2);
                 DoCast(me, SPELL_ARCANEFORM, false);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
 
                 if (uiChaoticEnergyBurstTimer <= diff)
                 {
-                    Creature* Anomalus = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_ANOMALUS));
+                    Creature* Anomalus = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_ANOMALUS));
                     if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                     {
                         if (Anomalus && Anomalus->HasAura(SPELL_RIFT_SHIELD))
@@ -239,7 +250,7 @@ class npc_chaotic_rift : public CreatureScript
                     if (Creature* Wraith = me->SummonCreature(NPC_CRAZED_MANA_WRAITH, me->GetPositionX() + 1, me->GetPositionY() + 1, me->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 1000))
                         if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                             Wraith->AI()->AttackStart(target);
-                    Creature* Anomalus = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_ANOMALUS));
+                    Creature* Anomalus = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_ANOMALUS));
                     if (Anomalus && Anomalus->HasAura(SPELL_RIFT_SHIELD))
                         uiSummonCrazedManaWraithTimer = 5000;
                     else
@@ -250,7 +261,7 @@ class npc_chaotic_rift : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetInstanceAI<npc_chaotic_riftAI>(creature);
         }
@@ -263,7 +274,7 @@ class achievement_chaos_theory : public AchievementCriteriaScript
         {
         }
 
-        bool OnCheck(Player* /*player*/, Unit* target) OVERRIDE
+        bool OnCheck(Player* /*player*/, Unit* target) override
         {
             if (!target)
                 return false;

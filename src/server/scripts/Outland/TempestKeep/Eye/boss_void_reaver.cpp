@@ -56,7 +56,18 @@ class boss_void_reaver : public CreatureScript
         {
             boss_void_reaverAI(Creature* creature) : ScriptedAI(creature)
             {
+                Initialize();
                 instance = creature->GetInstanceScript();
+            }
+
+            void Initialize()
+            {
+                Pounding_Timer = 15000;
+                ArcaneOrb_Timer = 3000;
+                KnockAway_Timer = 30000;
+                Berserk_Timer = 600000;
+
+                Enraged = false;
             }
 
             InstanceScript* instance;
@@ -68,25 +79,20 @@ class boss_void_reaver : public CreatureScript
 
             bool Enraged;
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
-                Pounding_Timer = 15000;
-                ArcaneOrb_Timer = 3000;
-                KnockAway_Timer = 30000;
-                Berserk_Timer = 600000;
-
-                Enraged = false;
+                Initialize();
 
                 if (me->IsAlive())
                     instance->SetData(DATA_VOIDREAVEREVENT, NOT_STARTED);
             }
 
-            void KilledUnit(Unit* /*victim*/) OVERRIDE
+            void KilledUnit(Unit* /*victim*/) override
             {
                 Talk(SAY_SLAY);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 Talk(SAY_DEATH);
                 DoZoneInCombat();
@@ -94,14 +100,14 @@ class boss_void_reaver : public CreatureScript
                 instance->SetData(DATA_VOIDREAVEREVENT, DONE);
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
 
                 instance->SetData(DATA_VOIDREAVEREVENT, IN_PROGRESS);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -122,7 +128,7 @@ class boss_void_reaver : public CreatureScript
                     std::vector<Unit*> target_list;
                     for (std::list<HostileReference*>::const_iterator itr = t_list.begin(); itr!= t_list.end(); ++itr)
                     {
-                        target = Unit::GetUnit(*me, (*itr)->getUnitGuid());
+                        target = ObjectAccessor::GetUnit(*me, (*itr)->getUnitGuid());
                         if (!target)
                             continue;
                         // exclude pets & totems, 18 yard radius minimum
@@ -132,12 +138,12 @@ class boss_void_reaver : public CreatureScript
                     }
 
                     if (!target_list.empty())
-                        target = *(target_list.begin()+rand()%target_list.size());
+                        target = *(target_list.begin() + rand32() % target_list.size());
                     else
                         target = me->GetVictim();
 
                     if (target)
-                        me->CastSpell(target, SPELL_ARCANE_ORB, false, NULL, NULL, 0);
+                        me->CastSpell(target, SPELL_ARCANE_ORB, false, NULL, NULL);
                     ArcaneOrb_Timer = 3000;
                 }
                 else
@@ -168,7 +174,7 @@ class boss_void_reaver : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetInstanceAI<boss_void_reaverAI>(creature);
         }

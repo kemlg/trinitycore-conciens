@@ -32,12 +32,7 @@
 #include "CreatureAIImpl.h"
 #include "Player.h"
 #include "WorldPacket.h"
-
-namespace
-{
-    typedef std::set<ScriptObject*> ExampleScriptContainer;
-    ExampleScriptContainer ExampleScripts;
-}
+#include "WorldSession.h"
 
 // This is the global static registry of scripts.
 template<class TScript>
@@ -107,12 +102,13 @@ class ScriptRegistry
                 else
                 {
                     // The script uses a script name from database, but isn't assigned to anything.
-                    if (script->GetName().find("example") == std::string::npos && script->GetName().find("Smart") == std::string::npos)
-                        TC_LOG_ERROR("sql.sql", "Script named '%s' does not have a script name assigned in database.",
-                            script->GetName().c_str());
+                    TC_LOG_ERROR("sql.sql", "Script named '%s' does not have a script name assigned in database.", script->GetName().c_str());
 
-                    // These scripts don't get stored anywhere so throw them into this to avoid leaking memory
-                    ExampleScripts.insert(script);
+                    // Avoid calling "delete script;" because we are currently in the script constructor
+                    // In a valid scenario this will not happen because every script has a name assigned in the database
+                    // If that happens, it's acceptable to just leak a few bytes
+
+                    return;
                 }
             }
             else
@@ -175,8 +171,10 @@ struct TSpellSummary
     uint8 Effects;                                          // set of enum SelectEffect
 } *SpellSummary;
 
-ScriptMgr::ScriptMgr()
-    : _scriptCount(0), _scheduledScripts(0) { }
+ScriptMgr::ScriptMgr() : _scriptCount(0)
+{
+    _scheduledScripts = 0;
+}
 
 ScriptMgr::~ScriptMgr() { }
 
@@ -227,15 +225,12 @@ void ScriptMgr::Unload()
     SCR_CLEAR(TransportScript);
     SCR_CLEAR(AchievementCriteriaScript);
     SCR_CLEAR(PlayerScript);
+    SCR_CLEAR(AccountScript);
     SCR_CLEAR(GuildScript);
     SCR_CLEAR(GroupScript);
     SCR_CLEAR(UnitScript);
 
     #undef SCR_CLEAR
-
-    for (ExampleScriptContainer::iterator itr = ExampleScripts.begin(); itr != ExampleScripts.end(); ++itr)
-        delete *itr;
-    ExampleScripts.clear();
 
     delete[] SpellSummary;
     delete[] UnitAI::AISpellInfo;
@@ -400,39 +395,49 @@ void ScriptMgr::OnNetworkStop()
     FOREACH_SCRIPT(ServerScript)->OnNetworkStop();
 }
 
-void ScriptMgr::OnSocketOpen(WorldSocket* socket)
+void ScriptMgr::OnSocketOpen(std::shared_ptr<WorldSocket> socket)
 {
     ASSERT(socket);
 
     FOREACH_SCRIPT(ServerScript)->OnSocketOpen(socket);
 }
 
-void ScriptMgr::OnSocketClose(WorldSocket* socket, bool wasNew)
+void ScriptMgr::OnSocketClose(std::shared_ptr<WorldSocket> socket)
 {
     ASSERT(socket);
 
-    FOREACH_SCRIPT(ServerScript)->OnSocketClose(socket, wasNew);
+    FOREACH_SCRIPT(ServerScript)->OnSocketClose(socket);
 }
 
-void ScriptMgr::OnPacketReceive(WorldSocket* socket, WorldPacket packet)
+void ScriptMgr::OnPacketReceive(WorldSession* session, WorldPacket const& packet)
 {
-    ASSERT(socket);
+    if (SCR_REG_LST(ServerScript).empty())
+        return;
 
-    FOREACH_SCRIPT(ServerScript)->OnPacketReceive(socket, packet);
+    WorldPacket copy(packet);
+    FOREACH_SCRIPT(ServerScript)->OnPacketReceive(session, copy);
 }
 
-void ScriptMgr::OnPacketSend(WorldSocket* socket, WorldPacket packet)
+void ScriptMgr::OnPacketSend(WorldSession* session, WorldPacket const& packet)
 {
-    ASSERT(socket);
+    ASSERT(session);
 
-    FOREACH_SCRIPT(ServerScript)->OnPacketSend(socket, packet);
+    if (SCR_REG_LST(ServerScript).empty())
+        return;
+
+    WorldPacket copy(packet);
+    FOREACH_SCRIPT(ServerScript)->OnPacketSend(session, copy);
 }
 
-void ScriptMgr::OnUnknownPacketReceive(WorldSocket* socket, WorldPacket packet)
+void ScriptMgr::OnUnknownPacketReceive(WorldSession* session, WorldPacket const& packet)
 {
-    ASSERT(socket);
+    ASSERT(session);
 
-    FOREACH_SCRIPT(ServerScript)->OnUnknownPacketReceive(socket, packet);
+    if (SCR_REG_LST(ServerScript).empty())
+        return;
+
+    WorldPacket copy(packet);
+    FOREACH_SCRIPT(ServerScript)->OnUnknownPacketReceive(session, copy);
 }
 
 void ScriptMgr::OnOpenStateChange(bool open)
@@ -784,6 +789,8 @@ bool ScriptMgr::OnQuestComplete(Player* player, Creature* creature, Quest const*
     return tmpscript->OnQuestComplete(player, creature, quest);
 }
 
+=======
+>>>>>>> 361d285ba3d42f0b5ec60bbb646d500ef6940488
 bool ScriptMgr::OnQuestReward(Player* player, Creature* creature, Quest const* quest, uint32 opt)
 {
     ASSERT(player);
@@ -965,7 +972,7 @@ bool ScriptMgr::OnAreaTrigger(Player* player, AreaTriggerEntry const* trigger)
 
 Battleground* ScriptMgr::CreateBattleground(BattlegroundTypeId /*typeId*/)
 {
-    // TODO: Implement script-side battlegrounds.
+    /// @todo Implement script-side battlegrounds.
     ASSERT(false);
     return NULL;
 }
@@ -1216,6 +1223,11 @@ void ScriptMgr::OnPlayerMoneyChanged(Player* player, int32& amount)
     FOREACH_SCRIPT(PlayerScript)->OnMoneyChanged(player, amount);
 }
 
+void ScriptMgr::OnPlayerMoneyLimit(Player* player, int32 amount)
+{
+    FOREACH_SCRIPT(PlayerScript)->OnMoneyLimit(player, amount);
+}
+
 void ScriptMgr::OnGivePlayerXP(Player* player, uint32& amount, Unit* victim)
 {
     FOREACH_SCRIPT(PlayerScript)->OnGiveXP(player, amount, victim);
@@ -1277,7 +1289,7 @@ void ScriptMgr::OnPlayerEmote(Player* player, uint32 emote)
     FOREACH_SCRIPT(PlayerScript)->OnEmote(player, emote);
 }
 
-void ScriptMgr::OnPlayerTextEmote(Player* player, uint32 textEmote, uint32 emoteNum, uint64 guid)
+void ScriptMgr::OnPlayerTextEmote(Player* player, uint32 textEmote, uint32 emoteNum, ObjectGuid guid)
 {
     eb->sendEvent(EVENT_TYPE_EMOTE, player, NULL, emoteNum); // TODO: complete fields
     FOREACH_SCRIPT(PlayerScript)->OnTextEmote(player, textEmote, emoteNum, guid);
@@ -1289,10 +1301,10 @@ void ScriptMgr::OnPlayerSpellCast(Player* player, Spell* spell, bool skipCheck)
    FOREACH_SCRIPT(PlayerScript)->OnSpellCast(player, spell, skipCheck);
 }
 
-void ScriptMgr::OnPlayerLogin(Player* player)
+void ScriptMgr::OnPlayerLogin(Player* player, bool firstLogin)
 {
-    eb->sendEvent(EVENT_TYPE_PLAYER_LOGIN, player);
-    FOREACH_SCRIPT(PlayerScript)->OnLogin(player);
+    eb->sendEvent(EVENT_TYPE_PLAYER_LOGIN, player); // TODO: complete fields
+    FOREACH_SCRIPT(PlayerScript)->OnLogin(player, firstLogin);
 }
 
 void ScriptMgr::OnPlayerLogout(Player* player)
@@ -1307,13 +1319,19 @@ void ScriptMgr::OnPlayerCreate(Player* player)
     FOREACH_SCRIPT(PlayerScript)->OnCreate(player);
 }
 
-void ScriptMgr::OnPlayerDelete(uint64 guid)
+void ScriptMgr::OnPlayerDelete(ObjectGuid guid, uint32 accountId)
 {
     std::ostringstream sin;
     sin << guid;
     std::string intAsString(sin.str());
+    // TODO: complete fields
     eb->sendEvent(EVENT_TYPE_PLAYER_DELETE, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, intAsString.c_str());
-    FOREACH_SCRIPT(PlayerScript)->OnDelete(guid);
+    FOREACH_SCRIPT(PlayerScript)->OnDelete(guid, accountId);
+}
+
+void ScriptMgr::OnPlayerFailedDelete(ObjectGuid guid, uint32 accountId)
+{
+    FOREACH_SCRIPT(PlayerScript)->OnFailedDelete(guid, accountId);
 }
 
 void ScriptMgr::OnPlayerSave(Player* player)
@@ -1337,6 +1355,43 @@ void ScriptMgr::OnPlayerUpdateZone(Player* player, uint32 newZone, uint32 newAre
 void ScriptMgr::OnPlayerUpdatePosition(Player* player)
 {
     eb->sendEvent(EVENT_TYPE_PLAYER_UPDATE, player);
+}
+
+void ScriptMgr::OnQuestStatusChange(Player* player, uint32 questId, QuestStatus status)
+{
+    // TODO: create event
+    FOREACH_SCRIPT(PlayerScript)->OnQuestStatusChange(player, questId, status);
+}
+
+// Account
+void ScriptMgr::OnAccountLogin(uint32 accountId)
+{
+    FOREACH_SCRIPT(AccountScript)->OnAccountLogin(accountId);
+}
+
+void ScriptMgr::OnFailedAccountLogin(uint32 accountId)
+{
+    FOREACH_SCRIPT(AccountScript)->OnFailedAccountLogin(accountId);
+}
+
+void ScriptMgr::OnEmailChange(uint32 accountId)
+{
+    FOREACH_SCRIPT(AccountScript)->OnEmailChange(accountId);
+}
+
+void ScriptMgr::OnFailedEmailChange(uint32 accountId)
+{
+    FOREACH_SCRIPT(AccountScript)->OnFailedEmailChange(accountId);
+}
+
+void ScriptMgr::OnPasswordChange(uint32 accountId)
+{
+    FOREACH_SCRIPT(AccountScript)->OnPasswordChange(accountId);
+}
+
+void ScriptMgr::OnFailedPasswordChange(uint32 accountId)
+{
+    FOREACH_SCRIPT(AccountScript)->OnFailedPasswordChange(accountId);
 }
 
 // Guild
@@ -1397,25 +1452,25 @@ void ScriptMgr::OnGuildBankEvent(Guild* guild, uint8 eventType, uint8 tabId, uin
 }
 
 // Group
-void ScriptMgr::OnGroupAddMember(Group* group, uint64 guid)
+void ScriptMgr::OnGroupAddMember(Group* group, ObjectGuid guid)
 {
     ASSERT(group);
     FOREACH_SCRIPT(GroupScript)->OnAddMember(group, guid);
 }
 
-void ScriptMgr::OnGroupInviteMember(Group* group, uint64 guid)
+void ScriptMgr::OnGroupInviteMember(Group* group, ObjectGuid guid)
 {
     ASSERT(group);
     FOREACH_SCRIPT(GroupScript)->OnInviteMember(group, guid);
 }
 
-void ScriptMgr::OnGroupRemoveMember(Group* group, uint64 guid, RemoveMethod method, uint64 kicker, const char* reason)
+void ScriptMgr::OnGroupRemoveMember(Group* group, ObjectGuid guid, RemoveMethod method, ObjectGuid kicker, const char* reason)
 {
     ASSERT(group);
     FOREACH_SCRIPT(GroupScript)->OnRemoveMember(group, guid, method, kicker, reason);
 }
 
-void ScriptMgr::OnGroupChangeLeader(Group* group, uint64 newLeaderGuid, uint64 oldLeaderGuid)
+void ScriptMgr::OnGroupChangeLeader(Group* group, ObjectGuid newLeaderGuid, ObjectGuid oldLeaderGuid)
 {
     ASSERT(group);
     FOREACH_SCRIPT(GroupScript)->OnChangeLeader(group, newLeaderGuid, oldLeaderGuid);
@@ -1603,6 +1658,12 @@ PlayerScript::PlayerScript(const char* name)
     ScriptRegistry<PlayerScript>::AddScript(this);
 }
 
+AccountScript::AccountScript(const char* name)
+    : ScriptObject(name)
+{
+    ScriptRegistry<AccountScript>::AddScript(this);
+}
+
 GuildScript::GuildScript(const char* name)
     : ScriptObject(name)
 {
@@ -1645,6 +1706,7 @@ template class ScriptRegistry<PlayerScript>;
 template class ScriptRegistry<GuildScript>;
 template class ScriptRegistry<GroupScript>;
 template class ScriptRegistry<UnitScript>;
+template class ScriptRegistry<AccountScript>;
 
 // Undefine utility macros.
 #undef GET_SCRIPT_RET

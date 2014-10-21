@@ -67,7 +67,21 @@ class boss_harbinger_skyriss : public CreatureScript
         {
             boss_harbinger_skyrissAI(Creature* creature) : BossAI(creature, DATA_HARBINGER_SKYRISS)
             {
+                Initialize();
                 Intro = false;
+            }
+
+            void Initialize()
+            {
+                IsImage33 = false;
+                IsImage66 = false;
+
+                Intro_Phase = 1;
+                Intro_Timer = 5000;
+                MindRend_Timer = 3000;
+                Fear_Timer = 15000;
+                Domination_Timer = 30000;
+                ManaBurn_Timer = 25000;
             }
 
             bool Intro;
@@ -81,23 +95,15 @@ class boss_harbinger_skyriss : public CreatureScript
             uint32 Domination_Timer;
             uint32 ManaBurn_Timer;
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 if (!Intro)
                     me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
 
-                IsImage33 = false;
-                IsImage66 = false;
-
-                Intro_Phase = 1;
-                Intro_Timer = 5000;
-                MindRend_Timer = 3000;
-                Fear_Timer = 15000;
-                Domination_Timer = 30000;
-                ManaBurn_Timer = 25000;
+                Initialize();
             }
 
-            void MoveInLineOfSight(Unit* who) OVERRIDE
+            void MoveInLineOfSight(Unit* who) override
             {
                 if (!Intro)
                     return;
@@ -105,15 +111,15 @@ class boss_harbinger_skyriss : public CreatureScript
                 ScriptedAI::MoveInLineOfSight(who);
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE { }
+            void EnterCombat(Unit* /*who*/) override { }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 Talk(SAY_DEATH);
                 _JustDied();
             }
 
-            void JustSummoned(Creature* summon) OVERRIDE
+            void JustSummoned(Creature* summon) override
             {
                 if (!summon)
                     return;
@@ -126,7 +132,7 @@ class boss_harbinger_skyriss : public CreatureScript
                         summon->AI()->AttackStart(target);
             }
 
-            void KilledUnit(Unit* victim) OVERRIDE
+            void KilledUnit(Unit* victim) override
             {
                 //won't yell killing pet/other unit
                 if (victim->GetEntry() == NPC_ALPHA_POD_TARGET)
@@ -148,7 +154,7 @@ class boss_harbinger_skyriss : public CreatureScript
                     DoCast(me, SPELL_33_ILLUSION);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!Intro)
                 {
@@ -158,18 +164,18 @@ class boss_harbinger_skyriss : public CreatureScript
                         {
                         case 1:
                             Talk(SAY_INTRO);
-                            instance->HandleGameObject(instance->GetData64(DATA_WARDENS_SHIELD), true);
+                            instance->HandleGameObject(instance->GetGuidData(DATA_WARDENS_SHIELD), true);
                             ++Intro_Phase;
                             Intro_Timer = 25000;
                             break;
                         case 2:
                             Talk(SAY_AGGRO);
-                            if (Unit* mellic = ObjectAccessor::GetUnit(*me, instance->GetData64(DATA_MELLICHAR)))
+                            if (Unit* mellic = ObjectAccessor::GetUnit(*me, instance->GetGuidData(DATA_MELLICHAR)))
                             {
                                 //should have a better way to do this. possibly spell exist.
                                 mellic->setDeathState(JUST_DIED);
                                 mellic->SetHealth(0);
-                                instance->HandleGameObject(instance->GetData64(DATA_WARDENS_SHIELD), false);
+                                instance->HandleGameObject(instance->GetGuidData(DATA_WARDENS_SHIELD), false);
                             }
                             ++Intro_Phase;
                             Intro_Timer = 3000;
@@ -238,7 +244,7 @@ class boss_harbinger_skyriss : public CreatureScript
                     else
                         DoCastVictim(SPELL_DOMINATION);
 
-                    Domination_Timer = 16000+rand()%16000;
+                    Domination_Timer = 16000 + rand32() % 16000;
                 }
                 else
                     Domination_Timer -=diff;
@@ -253,7 +259,7 @@ class boss_harbinger_skyriss : public CreatureScript
                         if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1))
                             DoCast(target, H_SPELL_MANA_BURN);
 
-                        ManaBurn_Timer = 16000+rand()%16000;
+                        ManaBurn_Timer = 16000 + rand32() % 16000;
                     }
                     else
                         ManaBurn_Timer -=diff;
@@ -262,7 +268,7 @@ class boss_harbinger_skyriss : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetArcatrazAI<boss_harbinger_skyrissAI>(creature);
         }
@@ -277,12 +283,12 @@ class boss_harbinger_skyriss_illusion : public CreatureScript
         {
             boss_harbinger_skyriss_illusionAI(Creature* creature) : ScriptedAI(creature) { }
 
-            void Reset() OVERRIDE { }
+            void Reset() override { }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE { }
+            void EnterCombat(Unit* /*who*/) override { }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new boss_harbinger_skyriss_illusionAI(creature);
         }

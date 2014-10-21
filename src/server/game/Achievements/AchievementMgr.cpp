@@ -21,7 +21,7 @@
 #include "ArenaTeamMgr.h"
 #include "Battleground.h"
 #include "CellImpl.h"
-#include "Chat.h"
+#include "ChatTextBuilder.h"
 #include "Common.h"
 #include "DatabaseEnv.h"
 #include "DBCEnums.h"
@@ -41,28 +41,6 @@
 #include "SpellMgr.h"
 #include "World.h"
 #include "WorldPacket.h"
-
-namespace Trinity
-{
-    class AchievementChatBuilder
-    {
-        public:
-            AchievementChatBuilder(Player const& player, ChatMsg msgtype, int32 textId, uint32 ach_id)
-                : i_player(player), i_msgtype(msgtype), i_textId(textId), i_achievementId(ach_id) { }
-
-            void operator()(WorldPacket& data, LocaleConstant loc_idx)
-            {
-                std::string text = sObjectMgr->GetTrinityString(i_textId, loc_idx);
-                ChatHandler::BuildChatPacket(data, i_msgtype, LANG_UNIVERSAL, &i_player, &i_player, text, i_achievementId);
-            }
-
-        private:
-            Player const& i_player;
-            ChatMsg i_msgtype;
-            int32 i_textId;
-            uint32 i_achievementId;
-    };
-}                                                           // namespace Trinity
 
 bool AchievementCriteriaData::IsValid(AchievementCriteriaEntry const* criteria)
 {
@@ -424,7 +402,7 @@ bool AchievementCriteriaData::Meets(uint32 criteria_id, Player const* source, Un
         {
             time_t birthday_start = time_t(sWorld->getIntConfig(CONFIG_BIRTHDAY_TIME));
             tm birthday_tm;
-            ACE_OS::localtime_r(&birthday_start, &birthday_tm);
+            localtime_r(&birthday_start, &birthday_tm);
 
             // exactly N birthday
             birthday_tm.tm_year += birthday_login.nth_birthday;
@@ -479,7 +457,7 @@ void AchievementMgr::Reset()
 
     m_completedAchievements.clear();
     m_criteriaProgress.clear();
-    DeleteFromDB(m_player->GetGUIDLow());
+    DeleteFromDB(m_player->GetGUID());
 
     // re-fill data
     CheckAllAchievementCriteria();
@@ -517,16 +495,16 @@ void AchievementMgr::ResetAchievementCriteria(AchievementCriteriaTypes type, uin
     }
 }
 
-void AchievementMgr::DeleteFromDB(uint32 lowguid)
+void AchievementMgr::DeleteFromDB(ObjectGuid guid)
 {
     SQLTransaction trans = CharacterDatabase.BeginTransaction();
 
     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_ACHIEVEMENT);
-    stmt->setUInt32(0, lowguid);
+    stmt->setUInt32(0, guid.GetCounter());
     trans->Append(stmt);
 
     stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_ACHIEVEMENT_PROGRESS);
-    stmt->setUInt32(0, lowguid);
+    stmt->setUInt32(0, guid.GetCounter());
     trans->Append(stmt);
 
     CharacterDatabase.CommitTransaction(trans);
@@ -543,11 +521,11 @@ void AchievementMgr::SaveToDB(SQLTransaction& trans)
 
             PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_ACHIEVEMENT_BY_ACHIEVEMENT);
             stmt->setUInt16(0, iter->first);
-            stmt->setUInt32(1, GetPlayer()->GetGUID());
+            stmt->setUInt32(1, GetPlayer()->GetGUIDLow());
             trans->Append(stmt);
 
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_CHAR_ACHIEVEMENT);
-            stmt->setUInt32(0, GetPlayer()->GetGUID());
+            stmt->setUInt32(0, GetPlayer()->GetGUIDLow());
             stmt->setUInt16(1, iter->first);
             stmt->setUInt32(2, uint32(iter->second.date));
             trans->Append(stmt);
@@ -564,14 +542,14 @@ void AchievementMgr::SaveToDB(SQLTransaction& trans)
                 continue;
 
             PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_ACHIEVEMENT_PROGRESS_BY_CRITERIA);
-            stmt->setUInt32(0, GetPlayer()->GetGUID());
+            stmt->setUInt32(0, GetPlayer()->GetGUIDLow());
             stmt->setUInt16(1, iter->first);
             trans->Append(stmt);
 
             if (iter->second.counter)
             {
                 stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_CHAR_ACHIEVEMENT_PROGRESS);
-                stmt->setUInt32(0, GetPlayer()->GetGUID());
+                stmt->setUInt32(0, GetPlayer()->GetGUIDLow());
                 stmt->setUInt16(1, iter->first);
                 stmt->setUInt32(2, iter->second.counter);
                 stmt->setUInt32(3, uint32(iter->second.date));
@@ -660,9 +638,9 @@ void AchievementMgr::SendAchievementEarned(AchievementEntry const* achievement) 
 
     if (Guild* guild = sGuildMgr->GetGuildById(GetPlayer()->GetGuildId()))
     {
-        Trinity::AchievementChatBuilder say_builder(*GetPlayer(), CHAT_MSG_GUILD_ACHIEVEMENT, LANG_ACHIEVEMENT_EARNED, achievement->ID);
-        Trinity::LocalizedPacketDo<Trinity::AchievementChatBuilder> say_do(say_builder);
-        guild->BroadcastWorker(say_do, GetPlayer());
+        Trinity::BroadcastTextBuilder _builder(GetPlayer(), CHAT_MSG_GUILD_ACHIEVEMENT, BROADCAST_TEXT_ACHIEVEMENT_EARNED, GetPlayer(), achievement->ID);
+        Trinity::LocalizedPacketDo<Trinity::BroadcastTextBuilder> _localizer(_builder);
+        guild->BroadcastWorker(_localizer, GetPlayer());
     }
 
     if (achievement->flags & (ACHIEVEMENT_FLAG_REALM_FIRST_KILL | ACHIEVEMENT_FLAG_REALM_FIRST_REACH))
@@ -678,20 +656,14 @@ void AchievementMgr::SendAchievementEarned(AchievementEntry const* achievement) 
     // if player is in world he can tell his friends about new achievement
     else if (GetPlayer()->IsInWorld())
     {
-        CellCoord p = Trinity::ComputeCellCoord(GetPlayer()->GetPositionX(), GetPlayer()->GetPositionY());
-
-        Cell cell(p);
-        cell.SetNoCreate();
-
-        Trinity::AchievementChatBuilder say_builder(*GetPlayer(), CHAT_MSG_ACHIEVEMENT, LANG_ACHIEVEMENT_EARNED, achievement->ID);
-        Trinity::LocalizedPacketDo<Trinity::AchievementChatBuilder> say_do(say_builder);
-        Trinity::PlayerDistWorker<Trinity::LocalizedPacketDo<Trinity::AchievementChatBuilder> > say_worker(GetPlayer(), sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_SAY), say_do);
-        TypeContainerVisitor<Trinity::PlayerDistWorker<Trinity::LocalizedPacketDo<Trinity::AchievementChatBuilder> >, WorldTypeMapContainer > message(say_worker);
-        cell.Visit(p, message, *GetPlayer()->GetMap(), *GetPlayer(), sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_SAY));
+        Trinity::BroadcastTextBuilder _builder(GetPlayer(), CHAT_MSG_ACHIEVEMENT, BROADCAST_TEXT_ACHIEVEMENT_EARNED, GetPlayer(), achievement->ID);
+        Trinity::LocalizedPacketDo<Trinity::BroadcastTextBuilder> _localizer(_builder);
+        Trinity::PlayerDistWorker<Trinity::LocalizedPacketDo<Trinity::BroadcastTextBuilder> > _worker(GetPlayer(), sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_SAY), _localizer);
+        GetPlayer()->VisitNearbyWorldObject(sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_SAY), _worker);
     }
 
     WorldPacket data(SMSG_ACHIEVEMENT_EARNED, 8+4+8);
-    data.append(GetPlayer()->GetPackGUID());
+    data << GetPlayer()->GetPackGUID();
     data << uint32(achievement->ID);
     data.AppendPackedTime(time(NULL));
     data << uint32(0);
@@ -706,11 +678,11 @@ void AchievementMgr::SendCriteriaUpdate(AchievementCriteriaEntry const* entry, C
     // the counter is packed like a packed Guid
     data.appendPackGUID(progress->counter);
 
-    data.append(GetPlayer()->GetPackGUID());
+    data << GetPlayer()->GetPackGUID();
     if (!entry->timeLimit)
         data << uint32(0);
     else
-        data << uint32(timedCompleted ? 0 : 1); // this are some flags, 1 is for keeping the counter at 0 in client
+        data << uint32(timedCompleted ? 1 : 0); // this are some flags, 1 is for keeping the counter at 0 in client
     data.AppendPackedTime(progress->date);
     data << uint32(timeElapsed);    // time elapsed in seconds
     data << uint32(0);              // unk
@@ -1031,7 +1003,7 @@ void AchievementMgr::UpdateAchievementCriteria(AchievementCriteriaTypes type, ui
                     continue;
 
                 //FIXME: work only for instances where max == min for players
-                if (((InstanceMap*)map)->GetMaxPlayers() != achievementCriteria->death_in_dungeon.manLimit)
+                if (map->ToInstanceMap()->GetMaxPlayers() != achievementCriteria->death_in_dungeon.manLimit)
                     continue;
                 SetCriteriaProgress(achievementCriteria, 1, PROGRESS_ACCUMULATE);
                 break;
@@ -1284,7 +1256,7 @@ void AchievementMgr::UpdateAchievementCriteria(AchievementCriteriaTypes type, ui
 
                 // check item level and quality via achievement_criteria_data
                 AchievementCriteriaDataSet const* data = sAchievementMgr->GetCriteriaDataSet(achievementCriteria);
-                if (!data || !data->Meets(GetPlayer(), 0, miscValue1))
+                if (!data || !data->Meets(GetPlayer(), nullptr, miscValue1))
                     continue;
 
                 SetCriteriaProgress(achievementCriteria, 1);
@@ -1306,7 +1278,7 @@ void AchievementMgr::UpdateAchievementCriteria(AchievementCriteriaTypes type, ui
 
                 // check item level via achievement_criteria_data
                 AchievementCriteriaDataSet const* data = sAchievementMgr->GetCriteriaDataSet(achievementCriteria);
-                if (!data || !data->Meets(GetPlayer(), 0, pProto->ItemLevel))
+                if (!data || !data->Meets(GetPlayer(), nullptr, pProto->ItemLevel))
                     continue;
 
                 SetCriteriaProgress(achievementCriteria, 1, PROGRESS_ACCUMULATE);
@@ -1648,7 +1620,7 @@ bool AchievementMgr::IsCompletedCriteria(AchievementCriteriaEntry const* achieve
     if (achievement->flags & (ACHIEVEMENT_FLAG_REALM_FIRST_REACH | ACHIEVEMENT_FLAG_REALM_FIRST_KILL))
     {
         // someone on this realm has already completed that achievement
-        if (sAchievementMgr->IsRealmCompleted(achievement))
+        if (sAchievementMgr->IsRealmCompleted(achievement, GetPlayer()->GetInstanceId()))
             return false;
     }
 
@@ -2055,10 +2027,7 @@ void AchievementMgr::CompletedAchievement(AchievementEntry const* achievement)
     ca.date = time(NULL);
     ca.changed = true;
 
-    // don't insert for ACHIEVEMENT_FLAG_REALM_FIRST_KILL since otherwise only the first group member would reach that achievement
-    /// @todo where do set this instead?
-    if (!(achievement->flags & ACHIEVEMENT_FLAG_REALM_FIRST_KILL))
-        sAchievementMgr->SetRealmCompleted(achievement);
+    sAchievementMgr->SetRealmCompleted(achievement, GetPlayer()->GetInstanceId());
 
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_ACHIEVEMENT);
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EARN_ACHIEVEMENT_POINTS, achievement->points);
@@ -2130,7 +2099,7 @@ void AchievementMgr::SendAllAchievementData() const
 void AchievementMgr::SendRespondInspectAchievements(Player* player) const
 {
     WorldPacket data(SMSG_RESPOND_INSPECT_ACHIEVEMENTS, 9+m_completedAchievements.size()*8+4+m_criteriaProgress.size()*38+4);
-    data.append(GetPlayer()->GetPackGUID());
+    data << GetPlayer()->GetPackGUID();
     BuildAllDataPacket(&data);
     player->GetSession()->SendPacket(&data);
 }
@@ -2156,7 +2125,7 @@ void AchievementMgr::BuildAllDataPacket(WorldPacket* data) const
     {
         *data << uint32(iter->first);
         data->appendPackGUID(iter->second.counter);
-        data->append(GetPlayer()->GetPackGUID());
+        *data << GetPlayer()->GetPackGUID();
         *data << uint32(0);
         data->AppendPackedTime(iter->second.date);
         *data << uint32(0);
@@ -2433,7 +2402,7 @@ void AchievementGlobalMgr::LoadCompletedAchievements()
             continue;
         }
         else if (achievement->flags & (ACHIEVEMENT_FLAG_REALM_FIRST_REACH | ACHIEVEMENT_FLAG_REALM_FIRST_KILL))
-            m_allCompletedAchievements.insert(achievementId);
+            m_allCompletedAchievements[achievementId] = uint32(0xFFFFFFFF);
     }
     while (result->NextRow());
 
@@ -2589,7 +2558,7 @@ void AchievementGlobalMgr::LoadRewardLocales()
 
         AchievementRewardLocale& data = m_achievementRewardLocales[entry];
 
-        for (int i = 1; i < TOTAL_LOCALES; ++i)
+        for (uint8 i = TOTAL_LOCALES - 1; i > 0; --i)
         {
             LocaleConstant locale = (LocaleConstant) i;
             ObjectMgr::AddLocaleString(fields[1 + 2 * (i - 1)].GetString(), locale, data.subject);
@@ -2598,7 +2567,7 @@ void AchievementGlobalMgr::LoadRewardLocales()
     }
     while (result->NextRow());
 
-    TC_LOG_INFO("server.loading", ">> Loaded %lu achievement reward locale strings in %u ms", (unsigned long)m_achievementRewardLocales.size(), GetMSTimeDiffToNow(oldMSTime));
+    TC_LOG_INFO("server.loading", ">> Loaded %u achievement reward locale strings in %u ms", uint32(m_achievementRewardLocales.size()), GetMSTimeDiffToNow(oldMSTime));
 }
 
 AchievementEntry const* AchievementGlobalMgr::GetAchievement(uint32 achievementId) const
@@ -2609,4 +2578,11 @@ AchievementEntry const* AchievementGlobalMgr::GetAchievement(uint32 achievementI
 AchievementCriteriaEntry const* AchievementGlobalMgr::GetAchievementCriteria(uint32 criteriaId) const
 {
     return sAchievementCriteriaStore.LookupEntry(criteriaId);
+}
+
+void AchievementGlobalMgr::OnInstanceDestroyed(uint32 instanceId)
+{
+    for (auto& realmCompletion : m_allCompletedAchievements)
+        if (realmCompletion.second == instanceId)
+            realmCompletion.second = uint32(0xFFFFFFFF);
 }

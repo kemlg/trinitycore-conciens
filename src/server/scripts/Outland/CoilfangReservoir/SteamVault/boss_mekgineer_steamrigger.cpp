@@ -55,7 +55,7 @@ class boss_mekgineer_steamrigger : public CreatureScript
 public:
     boss_mekgineer_steamrigger() : CreatureScript("boss_mekgineer_steamrigger") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetInstanceAI<boss_mekgineer_steamriggerAI>(creature);
     }
@@ -64,7 +64,19 @@ public:
     {
         boss_mekgineer_steamriggerAI(Creature* creature) : ScriptedAI(creature)
         {
+            Initialize();
             instance = creature->GetInstanceScript();
+        }
+
+        void Initialize()
+        {
+            Shrink_Timer = 20000;
+            Saw_Blade_Timer = 15000;
+            Electrified_Net_Timer = 10000;
+
+            Summon75 = false;
+            Summon50 = false;
+            Summon25 = false;
         }
 
         InstanceScript* instance;
@@ -76,32 +88,26 @@ public:
         bool Summon50;
         bool Summon25;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            Shrink_Timer = 20000;
-            Saw_Blade_Timer = 15000;
-            Electrified_Net_Timer = 10000;
-
-            Summon75 = false;
-            Summon50 = false;
-            Summon25 = false;
+            Initialize();
 
             instance->SetBossState(DATA_MEKGINEER_STEAMRIGGER, NOT_STARTED);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             Talk(SAY_DEATH);
 
             instance->SetBossState(DATA_MEKGINEER_STEAMRIGGER, DONE);
         }
 
-        void KilledUnit(Unit* /*victim*/) OVERRIDE
+        void KilledUnit(Unit* /*victim*/) override
         {
             Talk(SAY_SLAY);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
 
@@ -117,13 +123,13 @@ public:
             DoSpawnCreature(NPC_STREAMRIGGER_MECHANIC, -5, 5, 0, 0, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 240000);
             DoSpawnCreature(NPC_STREAMRIGGER_MECHANIC, -5, -5, 0, 0, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 240000);
 
-            if (rand()%2)
+            if (rand32() % 2)
                 DoSpawnCreature(NPC_STREAMRIGGER_MECHANIC, 5, -7, 0, 0, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 240000);
-            if (rand()%2)
+            if (rand32() % 2)
                 DoSpawnCreature(NPC_STREAMRIGGER_MECHANIC, 7, -5, 0, 0, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 240000);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -192,7 +198,7 @@ class npc_steamrigger_mechanic : public CreatureScript
 public:
     npc_steamrigger_mechanic() : CreatureScript("npc_steamrigger_mechanic") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetInstanceAI<npc_steamrigger_mechanicAI>(creature);
     }
@@ -201,32 +207,38 @@ public:
     {
         npc_steamrigger_mechanicAI(Creature* creature) : ScriptedAI(creature)
         {
+            Initialize();
             instance = creature->GetInstanceScript();
+        }
+
+        void Initialize()
+        {
+            Repair_Timer = 2000;
         }
 
         InstanceScript* instance;
 
         uint32 Repair_Timer;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            Repair_Timer = 2000;
+            Initialize();
         }
 
-        void MoveInLineOfSight(Unit* /*who*/) OVERRIDE
+        void MoveInLineOfSight(Unit* /*who*/) override
         {
             //react only if attacked
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE { }
+        void EnterCombat(Unit* /*who*/) override { }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (Repair_Timer <= diff)
             {
                 if (instance->GetBossState(DATA_MEKGINEER_STEAMRIGGER) == IN_PROGRESS)
                 {
-                    if (Creature* mekgineer = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_MEKGINEER_STEAMRIGGER)))
+                    if (Creature* mekgineer = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_MEKGINEER_STEAMRIGGER)))
                     {
                         if (me->IsWithinDistInMap(mekgineer, MAX_REPAIR_RANGE))
                         {

@@ -41,7 +41,7 @@ class boss_hungarfen : public CreatureScript
 public:
     boss_hungarfen() : CreatureScript("boss_hungarfen") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new boss_hungarfenAI(creature);
     }
@@ -50,24 +50,30 @@ public:
     {
         boss_hungarfenAI(Creature* creature) : ScriptedAI(creature)
         {
+            Initialize();
         }
 
-        bool Root;
-        uint32 Mushroom_Timer;
-        uint32 AcidGeyser_Timer;
-
-        void Reset() OVERRIDE
+        void Initialize()
         {
             Root = false;
             Mushroom_Timer = 5000;                              // 1 mushroom after 5s, then one per 10s. This should be different in heroic mode
             AcidGeyser_Timer = 10000;
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        bool Root;
+        uint32 Mushroom_Timer;
+        uint32 AcidGeyser_Timer;
+
+        void Reset() override
+        {
+            Initialize();
+        }
+
+        void EnterCombat(Unit* /*who*/) override
         {
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -84,9 +90,9 @@ public:
             if (Mushroom_Timer <= diff)
             {
                 if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
-                    me->SummonCreature(17990, target->GetPositionX()+(rand()%8), target->GetPositionY()+(rand()%8), target->GetPositionZ(), float(rand()%5), TEMPSUMMON_TIMED_DESPAWN, 22000);
+                    me->SummonCreature(17990, target->GetPositionX() + (rand32() % 8), target->GetPositionY() + (rand32() % 8), target->GetPositionZ(), float(rand32() % 5), TEMPSUMMON_TIMED_DESPAWN, 22000);
                 else
-                    me->SummonCreature(17990, me->GetPositionX()+(rand()%8), me->GetPositionY()+(rand()%8), me->GetPositionZ(), float(rand()%5), TEMPSUMMON_TIMED_DESPAWN, 22000);
+                    me->SummonCreature(17990, me->GetPositionX() + (rand32() % 8), me->GetPositionY() + (rand32() % 8), me->GetPositionZ(), float(rand32() % 5), TEMPSUMMON_TIMED_DESPAWN, 22000);
 
                 Mushroom_Timer = 10000;
             } else Mushroom_Timer -= diff;
@@ -95,7 +101,7 @@ public:
             {
                 if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                     DoCast(target, SPELL_ACID_GEYSER);
-                AcidGeyser_Timer = 10000+rand()%7500;
+                AcidGeyser_Timer = 10000 + rand32() % 7500;
             } else AcidGeyser_Timer -= diff;
 
             DoMeleeAttackIfReady();
@@ -109,37 +115,45 @@ class npc_underbog_mushroom : public CreatureScript
 public:
     npc_underbog_mushroom() : CreatureScript("npc_underbog_mushroom") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_underbog_mushroomAI(creature);
     }
 
     struct npc_underbog_mushroomAI : public ScriptedAI
     {
-        npc_underbog_mushroomAI(Creature* creature) : ScriptedAI(creature) { }
+        npc_underbog_mushroomAI(Creature* creature) : ScriptedAI(creature)
+        {
+            Initialize();
+        }
+
+        void Initialize()
+        {
+            Stop = false;
+            Grow_Timer = 0;
+            Shrink_Timer = 20000;
+        }
 
         bool Stop;
         uint32 Grow_Timer;
         uint32 Shrink_Timer;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            Stop = false;
-            Grow_Timer = 0;
-            Shrink_Timer = 20000;
+            Initialize();
 
             DoCast(me, SPELL_PUTRID_MUSHROOM, true);
             DoCast(me, SPELL_SPORE_CLOUD, true);
         }
 
-        void MoveInLineOfSight(Unit* /*who*/) OVERRIDE { }
+        void MoveInLineOfSight(Unit* /*who*/) override { }
 
 
-        void AttackStart(Unit* /*who*/) OVERRIDE { }
+        void AttackStart(Unit* /*who*/) override { }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE { }
+        void EnterCombat(Unit* /*who*/) override { }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (Stop)
                 return;

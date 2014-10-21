@@ -79,7 +79,7 @@ class boss_the_lurker_below : public CreatureScript
 public:
     boss_the_lurker_below() : CreatureScript("boss_the_lurker_below") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetInstanceAI<boss_the_lurker_belowAI>(creature);
     }
@@ -88,8 +88,28 @@ public:
     {
         boss_the_lurker_belowAI(Creature* creature) : ScriptedAI(creature), Summons(me)
         {
+            Initialize();
             SetCombatMovement(false);
             instance = creature->GetInstanceScript();
+        }
+
+        void Initialize()
+        {
+            SpoutAnimTimer = 1000;
+            RotTimer = 0;
+            WaterboltTimer = 15000; // give time to get in range when fight starts
+            SpoutTimer = 45000;
+            WhirlTimer = 18000; // after avery spout
+            PhaseTimer = 120000;
+            GeyserTimer = rand32() % 5000 + 15000;
+            CheckTimer = 15000; // give time to get in range when fight starts
+            WaitTimer = 60000; // never reached
+            WaitTimer2 = 60000; // never reached
+
+            Submerged = true; // will be false at combat start
+            Spawned = false;
+            InRange = false;
+            CanStartEvent = false;
         }
 
         InstanceScript* instance;
@@ -117,25 +137,11 @@ public:
             return true;
         }
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             me->SetSwim(true);
             me->SetDisableGravity(true);
-            SpoutAnimTimer = 1000;
-            RotTimer = 0;
-            WaterboltTimer = 15000; // give time to get in range when fight starts
-            SpoutTimer = 45000;
-            WhirlTimer = 18000; // after avery spout
-            PhaseTimer = 120000;
-            GeyserTimer = rand()%5000 + 15000;
-            CheckTimer = 15000; // give time to get in range when fight starts
-            WaitTimer = 60000; // never reached
-            WaitTimer2 = 60000; // never reached
-
-            Submerged = true; // will be false at combat start
-            Spawned = false;
-            InRange = false;
-            CanStartEvent = false;
+            Initialize();
 
             Summons.DespawnAll();
 
@@ -147,7 +153,7 @@ public:
             me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             instance->SetData(DATA_THELURKERBELOWEVENT, DONE);
             instance->SetData(DATA_STRANGE_POOL, IN_PROGRESS);
@@ -155,12 +161,12 @@ public:
             Summons.DespawnAll();
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             instance->SetData(DATA_THELURKERBELOWEVENT, IN_PROGRESS);
         }
 
-        void MoveInLineOfSight(Unit* who) OVERRIDE
+        void MoveInLineOfSight(Unit* who) override
 
         {
             if (!CanStartEvent) // boss is invisible, don't attack
@@ -173,13 +179,13 @@ public:
             }
         }
 
-        void MovementInform(uint32 type, uint32 /*id*/) OVERRIDE
+        void MovementInform(uint32 type, uint32 /*id*/) override
         {
             if (type == ROTATE_MOTION_TYPE)
                 me->SetReactState(REACT_AGGRESSIVE);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!CanStartEvent) // boss is invisible, don't attack
             {
@@ -234,7 +240,7 @@ public:
 
                 if (SpoutTimer <= diff)
                 {
-                    me->MonsterTextEmote(EMOTE_SPOUT, NULL, true);
+                    me->TextEmote(EMOTE_SPOUT, nullptr, true);
                     me->SetReactState(REACT_PASSIVE);
                     me->GetMotionMaster()->MoveRotate(20000, urand(0, 1) ? ROTATE_DIRECTION_LEFT : ROTATE_DIRECTION_RIGHT);
                     SpoutTimer = 45000;
@@ -299,7 +305,7 @@ public:
                         target = me->GetVictim();
                     if (target)
                         DoCast(target, SPELL_GEYSER, true);
-                    GeyserTimer = rand()%5000 + 15000;
+                    GeyserTimer = rand32() % 5000 + 15000;
                 } else GeyserTimer -= diff;
 
                 if (!InRange) // if on players in melee range cast Waterbolt
@@ -365,7 +371,7 @@ class npc_coilfang_ambusher : public CreatureScript
 public:
     npc_coilfang_ambusher() : CreatureScript("npc_coilfang_ambusher") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_coilfang_ambusherAI(creature);
     }
@@ -374,19 +380,25 @@ public:
     {
         npc_coilfang_ambusherAI(Creature* creature) : ScriptedAI(creature)
         {
+            Initialize();
             SetCombatMovement(false);
         }
 
-        uint32 MultiShotTimer;
-        uint32 ShootBowTimer;
-
-        void Reset() OVERRIDE
+        void Initialize()
         {
             MultiShotTimer = 10000;
             ShootBowTimer = 4000;
         }
 
-        void MoveInLineOfSight(Unit* who) OVERRIDE
+        uint32 MultiShotTimer;
+        uint32 ShootBowTimer;
+
+        void Reset() override
+        {
+            Initialize();
+        }
+
+        void MoveInLineOfSight(Unit* who) override
 
         {
             if (!who || me->GetVictim())
@@ -396,14 +408,14 @@ public:
                 AttackStart(who);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (MultiShotTimer <= diff)
             {
                 if (me->GetVictim())
                     DoCastVictim(SPELL_SPREAD_SHOT, true);
 
-                MultiShotTimer = 10000+rand()%10000;
+                MultiShotTimer = 10000 + rand32() % 10000;
                 ShootBowTimer += 1500; // add global cooldown
             } else MultiShotTimer -= diff;
 
@@ -412,7 +424,7 @@ public:
                 int bp0 = 1100;
                 if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                     me->CastCustomSpell(target, SPELL_SHOOT, &bp0, NULL, NULL, true);
-                ShootBowTimer = 4000+rand()%5000;
+                ShootBowTimer = 4000 + rand32() % 5000;
                 MultiShotTimer += 1500; // add global cooldown
             } else ShootBowTimer -= diff;
         }
@@ -425,7 +437,7 @@ class go_strange_pool : public GameObjectScript
     public:
         go_strange_pool() : GameObjectScript("go_strange_pool") { }
 
-        bool OnGossipHello(Player* player, GameObject* go) OVERRIDE
+        bool OnGossipHello(Player* player, GameObject* go) override
         {
             // 25%
             if (InstanceScript* instanceScript = go->GetInstanceScript())

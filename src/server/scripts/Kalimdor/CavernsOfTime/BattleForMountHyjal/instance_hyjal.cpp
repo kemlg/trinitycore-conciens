@@ -29,7 +29,6 @@ EndScriptData */
 #include "hyjal_trash.h"
 #include "Player.h"
 #include "WorldPacket.h"
-#include "Opcodes.h"
 #include "Chat.h"
 
 /* Battle of Mount Hyjal encounters:
@@ -48,40 +47,27 @@ class instance_hyjal : public InstanceMapScript
 public:
     instance_hyjal() : InstanceMapScript("instance_hyjal", 534) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* map) const OVERRIDE
+    InstanceScript* GetInstanceScript(InstanceMap* map) const override
     {
         return new instance_mount_hyjal_InstanceMapScript(map);
     }
 
     struct instance_mount_hyjal_InstanceMapScript : public InstanceScript
     {
-        instance_mount_hyjal_InstanceMapScript(Map* map) : InstanceScript(map) { }
-
-        void Initialize() OVERRIDE
+        instance_mount_hyjal_InstanceMapScript(Map* map) : InstanceScript(map)
         {
+            SetHeaders(DataHeader);
             memset(&m_auiEncounter, 0, sizeof(m_auiEncounter));
 
-            m_uiAncientGemGUID.clear();
+            RaidDamage = 0;
+            Trash = 0;
+            hordeRetreat = 0;
+            allianceRetreat = 0;
 
-            RageWinterchill    = 0;
-            Anetheron          = 0;
-            Kazrogal           = 0;
-            Azgalor            = 0;
-            Archimonde         = 0;
-            JainaProudmoore    = 0;
-            Thrall             = 0;
-            TyrandeWhisperwind = 0;
-            HordeGate          = 0;
-            ElfGate            = 0;
-            RaidDamage         = 0;
-            Trash              = 0;
-            hordeRetreat       = 0;
-            allianceRetreat    = 0;
-
-            ArchiYell          = false;
+            ArchiYell = false;
         }
 
-        bool IsEncounterInProgress() const OVERRIDE
+        bool IsEncounterInProgress() const override
         {
             for (uint8 i = 0; i < EncounterCount; ++i)
                 if (m_auiEncounter[i] == IN_PROGRESS)
@@ -90,23 +76,23 @@ public:
             return false;
         }
 
-        void OnGameObjectCreate(GameObject* go) OVERRIDE
+        void OnGameObjectCreate(GameObject* go) override
         {
             switch (go->GetEntry())
             {
                 case GO_HORDE_ENCAMPMENT_PORTAL:
                     HordeGate = go->GetGUID();
                     if (allianceRetreat)
-                        HandleGameObject(0, true, go);
+                        HandleGameObject(ObjectGuid::Empty, true, go);
                     else
-                        HandleGameObject(0, false, go);
+                        HandleGameObject(ObjectGuid::Empty, false, go);
                     break;
                 case GO_NIGHT_ELF_VILLAGE_PORTAL:
                     ElfGate = go->GetGUID();
                     if (hordeRetreat)
-                        HandleGameObject(0, true, go);
+                        HandleGameObject(ObjectGuid::Empty, true, go);
                     else
-                        HandleGameObject(0, false, go);
+                        HandleGameObject(ObjectGuid::Empty, false, go);
                     break;
                 case GO_ANCIENT_GEM:
                     m_uiAncientGemGUID.push_back(go->GetGUID());
@@ -114,7 +100,7 @@ public:
             }
         }
 
-        void OnCreatureCreate(Creature* creature) OVERRIDE
+        void OnCreatureCreate(Creature* creature) override
         {
             switch (creature->GetEntry())
             {
@@ -129,7 +115,7 @@ public:
             }
         }
 
-        uint64 GetData64(uint32 identifier) const OVERRIDE
+        ObjectGuid GetGuidData(uint32 identifier) const override
         {
             switch (identifier)
             {
@@ -143,10 +129,10 @@ public:
                 case DATA_TYRANDEWHISPERWIND: return TyrandeWhisperwind;
             }
 
-            return 0;
+            return ObjectGuid::Empty;
         }
 
-        void SetData(uint32 type, uint32 data) OVERRIDE
+        void SetData(uint32 type, uint32 data) override
         {
             switch (type)
             {
@@ -184,15 +170,12 @@ public:
 
                                     for (Map::PlayerList::const_iterator i = PlayerList.begin(); i != PlayerList.end(); ++i)
                                     {
-                                         if (i->GetSource())
+                                         if (Player* player = i->GetSource())
                                          {
                                             WorldPacket packet;
-                                            ChatHandler::BuildChatPacket(packet, CHAT_MSG_MONSTER_YELL, LANG_UNIVERSAL, unit, i->GetSource(), YELL_EFFORTS);
-                                            i->GetSource()->GetSession()->SendPacket(&packet);
-
-                                            WorldPacket data2(SMSG_PLAY_SOUND, 4);
-                                            data2 << 10986;
-                                            i->GetSource()->GetSession()->SendPacket(&data2);
+                                            ChatHandler::BuildChatPacket(packet, CHAT_MSG_MONSTER_YELL, LANG_UNIVERSAL, unit, player, YELL_EFFORTS);
+                                            player->SendDirectMessage(&packet);
+                                            player->PlayDirectSound(10986, player);
                                          }
                                     }
                                 }
@@ -218,7 +201,7 @@ public:
                     {
                         if (!m_uiAncientGemGUID.empty())
                         {
-                            for (std::list<uint64>::const_iterator itr = m_uiAncientGemGUID.begin(); itr != m_uiAncientGemGUID.end(); ++itr)
+                            for (GuidList::const_iterator itr = m_uiAncientGemGUID.begin(); itr != m_uiAncientGemGUID.end(); ++itr)
                             {
                                 //don't know how long it expected
                                 DoRespawnGameObject(*itr, DAY);
@@ -266,7 +249,7 @@ public:
 
         }
 
-        uint32 GetData(uint32 type) const OVERRIDE
+        uint32 GetData(uint32 type) const override
         {
             switch (type)
             {
@@ -283,12 +266,12 @@ public:
             return 0;
         }
 
-        std::string GetSaveData() OVERRIDE
+        std::string GetSaveData() override
         {
             return str_data;
         }
 
-        void Load(const char* in) OVERRIDE
+        void Load(const char* in) override
         {
             if (!in)
             {
@@ -308,17 +291,17 @@ public:
         protected:
             uint32 m_auiEncounter[EncounterCount];
             std::string str_data;
-            std::list<uint64> m_uiAncientGemGUID;
-            uint64 RageWinterchill;
-            uint64 Anetheron;
-            uint64 Kazrogal;
-            uint64 Azgalor;
-            uint64 Archimonde;
-            uint64 JainaProudmoore;
-            uint64 Thrall;
-            uint64 TyrandeWhisperwind;
-            uint64 HordeGate;
-            uint64 ElfGate;
+            GuidList m_uiAncientGemGUID;
+            ObjectGuid RageWinterchill;
+            ObjectGuid Anetheron;
+            ObjectGuid Kazrogal;
+            ObjectGuid Azgalor;
+            ObjectGuid Archimonde;
+            ObjectGuid JainaProudmoore;
+            ObjectGuid Thrall;
+            ObjectGuid TyrandeWhisperwind;
+            ObjectGuid HordeGate;
+            ObjectGuid ElfGate;
             uint32 Trash;
             uint32 hordeRetreat;
             uint32 allianceRetreat;

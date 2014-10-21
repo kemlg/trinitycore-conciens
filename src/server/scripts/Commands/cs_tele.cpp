@@ -35,7 +35,7 @@ class tele_commandscript : public CommandScript
 public:
     tele_commandscript() : CommandScript("tele_commandscript") { }
 
-    ChatCommand* GetCommands() const OVERRIDE
+    ChatCommand* GetCommands() const override
     {
         static ChatCommand teleCommandTable[] =
         {
@@ -123,7 +123,7 @@ public:
             return false;
 
         Player* target;
-        uint64 target_guid;
+        ObjectGuid target_guid;
         std::string target_name;
         if (!handler->extractPlayerTarget(nameStr, &target, &target_guid, &target_name))
             return false;
@@ -135,19 +135,17 @@ public:
             else
             {
                 PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_CHAR_HOMEBIND);
-                stmt->setUInt32(0, target_guid);
+                stmt->setUInt32(0, target_guid.GetCounter());
                 PreparedQueryResult resultDB = CharacterDatabase.Query(stmt);
 
                 if (resultDB)
                 {
                     Field* fieldsDB = resultDB->Fetch();
-                    uint32 mapId = fieldsDB[0].GetUInt16();
+                    WorldLocation loc(fieldsDB[0].GetUInt16(), fieldsDB[2].GetFloat(), fieldsDB[3].GetFloat(), fieldsDB[4].GetFloat(), 0.0f);
                     uint32 zoneId = fieldsDB[1].GetUInt16();
-                    float posX = fieldsDB[2].GetFloat();
-                    float posY = fieldsDB[3].GetFloat();
-                    float posZ = fieldsDB[4].GetFloat();
 
-                    Player::SavePositionInDB(mapId, posX, posY, posZ, 0, zoneId, target_guid);
+                    SQLTransaction dummy;
+                    Player::SavePositionInDB(loc, zoneId, target_guid, dummy);
                 }
             }
 
@@ -166,7 +164,7 @@ public:
         if (target)
         {
             // check online security
-            if (handler->HasLowerSecurity(target, 0))
+            if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
                 return false;
 
             std::string chrNameLink = handler->playerLink(target_name);
@@ -203,8 +201,10 @@ public:
             std::string nameLink = handler->playerLink(target_name);
 
             handler->PSendSysMessage(LANG_TELEPORTING_TO, nameLink.c_str(), handler->GetTrinityString(LANG_OFFLINE), tele->name.c_str());
-            Player::SavePositionInDB(tele->mapId, tele->position_x, tele->position_y, tele->position_z, tele->orientation,
-                sMapMgr->GetZoneId(tele->mapId, tele->position_x, tele->position_y, tele->position_z), target_guid);
+
+            SQLTransaction dummy;
+            Player::SavePositionInDB(WorldLocation(tele->mapId, tele->position_x, tele->position_y, tele->position_z, tele->orientation),
+                sMapMgr->GetZoneId(tele->mapId, tele->position_x, tele->position_y, tele->position_z), target_guid, dummy);
         }
 
         return true;
@@ -225,7 +225,7 @@ public:
         }
 
         // check online security
-        if (handler->HasLowerSecurity(target, 0))
+        if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
             return false;
 
         // id, or string, or [name] Shift-click form |color|Htele:id|h[name]|h|r
@@ -263,7 +263,7 @@ public:
                 continue;
 
             // check online security
-            if (handler->HasLowerSecurity(player, 0))
+            if (handler->HasLowerSecurity(player, ObjectGuid::Empty))
                 return false;
 
             std::string plNameLink = handler->GetNameLink(player);

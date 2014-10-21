@@ -40,26 +40,14 @@ class instance_oculus : public InstanceMapScript
         {
             instance_oculus_InstanceMapScript(Map* map) : InstanceScript(map)
             {
+                SetHeaders(DataHeader);
                 SetBossNumber(EncounterCount);
                 LoadDoorData(doorData);
 
-                DrakosGUID          = 0;
-                VarosGUID           = 0;
-                UromGUID            = 0;
-                EregosGUID          = 0;
-
                 CentrifugueConstructCounter = 0;
-
-                EregosCacheGUID     = 0;
-
-                GreaterWhelpList.clear();
-
-                BelgaristraszGUID   = 0;
-                EternosGUID         = 0;
-                VerdisaGUID         = 0;
             }
 
-            void OnCreatureCreate(Creature* creature) OVERRIDE
+            void OnCreatureCreate(Creature* creature) override
             {
                 switch (creature->GetEntry())
                 {
@@ -121,7 +109,7 @@ class instance_oculus : public InstanceMapScript
                 }
             }
 
-            void OnGameObjectCreate(GameObject* go) OVERRIDE
+            void OnGameObjectCreate(GameObject* go) override
             {
                 switch (go->GetEntry())
                 {
@@ -137,7 +125,7 @@ class instance_oculus : public InstanceMapScript
                 }
             }
 
-            void OnGameObjectRemove(GameObject* go) OVERRIDE
+            void OnGameObjectRemove(GameObject* go) override
             {
                 switch (go->GetEntry())
                 {
@@ -149,7 +137,7 @@ class instance_oculus : public InstanceMapScript
                 }
             }
 
-            void OnUnitDeath(Unit* unit) OVERRIDE
+            void OnUnitDeath(Unit* unit) override
             {
                 Creature* creature = unit->ToCreature();
                 if (!creature)
@@ -165,7 +153,7 @@ class instance_oculus : public InstanceMapScript
                 }
             }
 
-            void FillInitialWorldStates(WorldPacket& data) OVERRIDE
+            void FillInitialWorldStates(WorldPacket& data) override
             {
                 if (GetBossState(DATA_DRAKOS) == DONE && GetBossState(DATA_VAROS) != DONE)
                 {
@@ -179,7 +167,7 @@ class instance_oculus : public InstanceMapScript
                 }
             }
 
-            void ProcessEvent(WorldObject* /*unit*/, uint32 eventId) OVERRIDE
+            void ProcessEvent(WorldObject* /*unit*/, uint32 eventId) override
             {
                 if (eventId != EVENT_CALL_DRAGON)
                     return;
@@ -189,7 +177,7 @@ class instance_oculus : public InstanceMapScript
                         drake->AI()->DoAction(ACTION_CALL_DRAGON_EVENT);
             }
 
-            bool SetBossState(uint32 type, EncounterState state) OVERRIDE
+            bool SetBossState(uint32 type, EncounterState state) override
             {
                 if (!InstanceScript::SetBossState(type, state))
                     return false;
@@ -239,7 +227,7 @@ class instance_oculus : public InstanceMapScript
                 return true;
             }
 
-            uint64 GetData64(uint32 type) const OVERRIDE
+            ObjectGuid GetGuidData(uint32 type) const override
             {
                 switch (type)
                 {
@@ -255,7 +243,7 @@ class instance_oculus : public InstanceMapScript
                         break;
                 }
 
-                return 0;
+                return ObjectGuid::Empty;
             }
 
             void FreeDragons()
@@ -281,72 +269,29 @@ class instance_oculus : public InstanceMapScript
 
             void GreaterWhelps()
             {
-                for (std::list<uint64>::const_iterator itr = GreaterWhelpList.begin(); itr != GreaterWhelpList.end(); ++itr)
-                    if (Creature* gwhelp = instance->GetCreature(*itr))
+                for (ObjectGuid guid : GreaterWhelpList)
+                    if (Creature* gwhelp = instance->GetCreature(guid))
                         gwhelp->SetPhaseMask(1, true);
             }
 
-            std::string GetSaveData() OVERRIDE
-            {
-                OUT_SAVE_INST_DATA;
-
-                std::ostringstream saveStream;
-                saveStream << "T O " << GetBossSaveData();
-
-                OUT_SAVE_INST_DATA_COMPLETE;
-                return saveStream.str();
-            }
-
-            void Load(char const* str) OVERRIDE
-            {
-                if (!str)
-                {
-                    OUT_LOAD_INST_DATA_FAIL;
-                    return;
-                }
-
-                OUT_LOAD_INST_DATA(str);
-
-                char dataHead1, dataHead2;
-
-                std::istringstream loadStream(str);
-                loadStream >> dataHead1 >> dataHead2;
-
-                if (dataHead1 == 'T' && dataHead2 == 'O')
-                {
-                    for (uint32 i = 0; i < EncounterCount; ++i)
-                    {
-                        uint32 tmpState;
-                        loadStream >> tmpState;
-                        if (tmpState == IN_PROGRESS || tmpState > SPECIAL)
-                            tmpState = NOT_STARTED;
-                        SetBossState(i, EncounterState(tmpState));
-                    }
-                }
-                else
-                    OUT_LOAD_INST_DATA_FAIL;
-
-                OUT_LOAD_INST_DATA_COMPLETE;
-            }
-
         protected:
-            uint64 DrakosGUID;
-            uint64 VarosGUID;
-            uint64 UromGUID;
-            uint64 EregosGUID;
+            ObjectGuid DrakosGUID;
+            ObjectGuid VarosGUID;
+            ObjectGuid UromGUID;
+            ObjectGuid EregosGUID;
 
-            uint64 BelgaristraszGUID;
-            uint64 EternosGUID;
-            uint64 VerdisaGUID;
+            ObjectGuid BelgaristraszGUID;
+            ObjectGuid EternosGUID;
+            ObjectGuid VerdisaGUID;
 
             uint8 CentrifugueConstructCounter;
 
-            uint64 EregosCacheGUID;
+            ObjectGuid EregosCacheGUID;
 
-            std::list<uint64> GreaterWhelpList;
+            GuidList GreaterWhelpList;
         };
 
-        InstanceScript* GetInstanceScript(InstanceMap* map) const OVERRIDE
+        InstanceScript* GetInstanceScript(InstanceMap* map) const override
         {
             return new instance_oculus_InstanceMapScript(map);
         }

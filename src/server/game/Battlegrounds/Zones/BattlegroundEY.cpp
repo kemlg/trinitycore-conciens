@@ -23,7 +23,6 @@
 #include "BattlegroundMgr.h"
 #include "Creature.h"
 #include "Language.h"
-#include "Object.h"
 #include "Player.h"
 #include "Util.h"
 
@@ -47,8 +46,8 @@ BattlegroundEY::BattlegroundEY()
     m_HonorScoreTics[TEAM_HORDE] = 0;
     m_TeamPointsCount[TEAM_ALLIANCE] = 0;
     m_TeamPointsCount[TEAM_HORDE] = 0;
-    m_FlagKeeper = 0;
-    m_DroppedFlagGUID = 0;
+    m_FlagKeeper.Clear();
+    m_DroppedFlagGUID.Clear();
     m_FlagCapturedBgObjectType = 0;
     m_FlagState = BG_EY_FLAG_STATE_ON_BASE;
     m_FlagsTimer = 0;
@@ -172,7 +171,7 @@ void BattlegroundEY::CheckSomeoneJoinedPoint()
                 Player* player = ObjectAccessor::FindPlayer(m_PlayersNearPoint[EY_POINTS_MAX][j]);
                 if (!player)
                 {
-                    TC_LOG_ERROR("bg.battleground", "BattlegroundEY:CheckSomeoneJoinedPoint: Player (GUID: %u) not found!", GUID_LOPART(m_PlayersNearPoint[EY_POINTS_MAX][j]));
+                    TC_LOG_ERROR("bg.battleground", "BattlegroundEY:CheckSomeoneJoinedPoint: Player (%s) not found!", m_PlayersNearPoint[EY_POINTS_MAX][j].ToString().c_str());
                     ++j;
                     continue;
                 }
@@ -212,7 +211,7 @@ void BattlegroundEY::CheckSomeoneLeftPoint()
                 Player* player = ObjectAccessor::FindPlayer(m_PlayersNearPoint[i][j]);
                 if (!player)
                 {
-                    TC_LOG_ERROR("bg.battleground", "BattlegroundEY:CheckSomeoneLeftPoint Player (GUID: %u) not found!", GUID_LOPART(m_PlayersNearPoint[i][j]));
+                    TC_LOG_ERROR("bg.battleground", "BattlegroundEY:CheckSomeoneLeftPoint Player (%s) not found!", m_PlayersNearPoint[i][j].ToString().c_str());
                     //move not existed player to "free space" - this will cause many error showing in log, but it is a very important bug
                     m_PlayersNearPoint[EY_POINTS_MAX].push_back(m_PlayersNearPoint[i][j]);
                     m_PlayersNearPoint[i].erase(m_PlayersNearPoint[i].begin() + j);
@@ -364,15 +363,12 @@ void BattlegroundEY::UpdatePointsIcons(uint32 Team, uint32 Point)
 void BattlegroundEY::AddPlayer(Player* player)
 {
     Battleground::AddPlayer(player);
-    //create score and add it to map
-    BattlegroundEYScore* sc = new BattlegroundEYScore;
+    PlayerScores[player->GetGUIDLow()] = new BattlegroundEYScore(player->GetGUID());
 
     m_PlayersNearPoint[EY_POINTS_MAX].push_back(player->GetGUID());
-
-    PlayerScores[player->GetGUID()] = sc;
 }
 
-void BattlegroundEY::RemovePlayer(Player* player, uint64 guid, uint32 /*team*/)
+void BattlegroundEY::RemovePlayer(Player* player, ObjectGuid guid, uint32 /*team*/)
 {
     // sometimes flag aura not removed :(
     for (int j = EY_POINTS_MAX; j >= 0; --j)
@@ -389,7 +385,7 @@ void BattlegroundEY::RemovePlayer(Player* player, uint64 guid, uint32 /*team*/)
                 EventPlayerDroppedFlag(player);
             else
             {
-                SetFlagPicker(0);
+                SetFlagPicker(ObjectGuid::Empty);
                 RespawnFlag(true);
             }
         }
@@ -523,14 +519,14 @@ bool BattlegroundEY::SetupBattleground()
 
     WorldSafeLocsEntry const* sg = NULL;
     sg = sWorldSafeLocsStore.LookupEntry(EY_GRAVEYARD_MAIN_ALLIANCE);
-    if (!sg || !AddSpiritGuide(EY_SPIRIT_MAIN_ALLIANCE, sg->x, sg->y, sg->z, 3.124139f, ALLIANCE))
+    if (!sg || !AddSpiritGuide(EY_SPIRIT_MAIN_ALLIANCE, sg->x, sg->y, sg->z, 3.124139f, TEAM_ALLIANCE))
     {
         TC_LOG_ERROR("sql.sql", "BatteGroundEY: Failed to spawn spirit guide! Battleground not created!");
         return false;
     }
 
     sg = sWorldSafeLocsStore.LookupEntry(EY_GRAVEYARD_MAIN_HORDE);
-    if (!sg || !AddSpiritGuide(EY_SPIRIT_MAIN_HORDE, sg->x, sg->y, sg->z, 3.193953f, HORDE))
+    if (!sg || !AddSpiritGuide(EY_SPIRIT_MAIN_HORDE, sg->x, sg->y, sg->z, 3.193953f, TEAM_HORDE))
     {
         TC_LOG_ERROR("sql.sql", "BatteGroundEY: Failed to spawn spirit guide! Battleground not created!");
         return false;
@@ -552,8 +548,8 @@ void BattlegroundEY::Reset()
     m_HonorScoreTics[TEAM_HORDE] = 0;
     m_FlagState = BG_EY_FLAG_STATE_ON_BASE;
     m_FlagCapturedBgObjectType = 0;
-    m_FlagKeeper = 0;
-    m_DroppedFlagGUID = 0;
+    m_FlagKeeper.Clear();
+    m_DroppedFlagGUID.Clear();
     m_PointAddingTimer = 0;
     m_TowerCapCheckTimer = 0;
     bool isBGWeekend = sBattlegroundMgr->IsBGWeekend(GetTypeID());
@@ -597,9 +593,9 @@ void BattlegroundEY::RespawnFlagAfterDrop()
     if (obj)
         obj->Delete();
     else
-        TC_LOG_ERROR("bg.battleground", "BattlegroundEY: Unknown dropped flag guid: %u", GUID_LOPART(GetDroppedFlagGUID()));
+        TC_LOG_ERROR("bg.battleground", "BattlegroundEY: Unknown dropped flag (%s)", GetDroppedFlagGUID().ToString().c_str());
 
-    SetDroppedFlagGUID(0);
+    SetDroppedFlagGUID(ObjectGuid::Empty);
 }
 
 void BattlegroundEY::HandleKillPlayer(Player* player, Player* killer)
@@ -619,7 +615,7 @@ void BattlegroundEY::EventPlayerDroppedFlag(Player* player)
         // just take off the aura
         if (IsFlagPickedup() && GetFlagPickerGUID() == player->GetGUID())
         {
-            SetFlagPicker(0);
+            SetFlagPicker(ObjectGuid::Empty);
             player->RemoveAurasDueToSpell(BG_EY_NETHERSTORM_FLAG_SPELL);
         }
         return;
@@ -631,7 +627,7 @@ void BattlegroundEY::EventPlayerDroppedFlag(Player* player)
     if (GetFlagPickerGUID() != player->GetGUID())
         return;
 
-    SetFlagPicker(0);
+    SetFlagPicker(ObjectGuid::Empty);
     player->RemoveAurasDueToSpell(BG_EY_NETHERSTORM_FLAG_SPELL);
     m_FlagState = BG_EY_FLAG_STATE_ON_GROUND;
     m_FlagsTimer = BG_EY_FLAG_RESPAWN_TIME;
@@ -768,7 +764,7 @@ void BattlegroundEY::EventTeamCapturedPoint(Player* player, uint32 Point)
 
     WorldSafeLocsEntry const* sg = NULL;
     sg = sWorldSafeLocsStore.LookupEntry(m_CapturingPointTypes[Point].GraveYardId);
-    if (!sg || !AddSpiritGuide(Point, sg->x, sg->y, sg->z, 3.124139f, Team))
+    if (!sg || !AddSpiritGuide(Point, sg->x, sg->y, sg->z, 3.124139f, GetTeamIndexByTeamId(Team)))
         TC_LOG_ERROR("bg.battleground", "BatteGroundEY: Failed to spawn spirit guide! point: %u, team: %u, graveyard_id: %u",
             Point, Team, m_CapturingPointTypes[Point].GraveYardId);
 
@@ -782,7 +778,7 @@ void BattlegroundEY::EventTeamCapturedPoint(Player* player, uint32 Point)
 
     Creature* trigger = GetBGCreature(Point + 6, false);//0-5 spirit guides
     if (!trigger)
-       trigger = AddCreature(WORLD_TRIGGER, Point+6, Team, BG_EY_TriggerPositions[Point][0], BG_EY_TriggerPositions[Point][1], BG_EY_TriggerPositions[Point][2], BG_EY_TriggerPositions[Point][3]);
+        trigger = AddCreature(WORLD_TRIGGER, Point+6, BG_EY_TriggerPositions[Point], GetTeamIndexByTeamId(Team));
 
     //add bonus honor aura trigger creature when node is accupied
     //cast bonus aura (+50% honor in 25yards)
@@ -799,7 +795,7 @@ void BattlegroundEY::EventPlayerCapturedFlag(Player* player, uint32 BgObjectType
     if (GetStatus() != STATUS_IN_PROGRESS || GetFlagPickerGUID() != player->GetGUID())
         return;
 
-    SetFlagPicker(0);
+    SetFlagPicker(ObjectGuid::Empty);
     m_FlagState = BG_EY_FLAG_STATE_WAIT_RESPAWN;
     player->RemoveAurasDueToSpell(BG_EY_NETHERSTORM_FLAG_SPELL);
 
@@ -833,22 +829,20 @@ void BattlegroundEY::EventPlayerCapturedFlag(Player* player, uint32 BgObjectType
     UpdatePlayerScore(player, SCORE_FLAG_CAPTURES, 1);
 }
 
-void BattlegroundEY::UpdatePlayerScore(Player* player, uint32 type, uint32 value, bool doAddHonor)
+bool BattlegroundEY::UpdatePlayerScore(Player* player, uint32 type, uint32 value, bool doAddHonor)
 {
-    BattlegroundScoreMap::iterator itr = PlayerScores.find(player->GetGUID());
-    if (itr == PlayerScores.end())                         // player not found
-        return;
+    if (!Battleground::UpdatePlayerScore(player, type, value, doAddHonor))
+        return false;
 
     switch (type)
     {
-        case SCORE_FLAG_CAPTURES:                           // flags captured
-            ((BattlegroundEYScore*)itr->second)->FlagCaptures += value;
+        case SCORE_FLAG_CAPTURES:
             player->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_BG_OBJECTIVE_CAPTURE, EY_OBJECTIVE_CAPTURE_FLAG);
             break;
         default:
-            Battleground::UpdatePlayerScore(player, type, value, doAddHonor);
             break;
     }
+    return true;
 }
 
 void BattlegroundEY::FillInitialWorldStates(WorldPacket& data)

@@ -67,7 +67,7 @@ class boss_nethermancer_sepethrea : public CreatureScript
         {
             boss_nethermancer_sepethreaAI(Creature* creature) : BossAI(creature, DATA_NETHERMANCER_SEPRETHREA) { }
 
-            void EnterCombat(Unit* who) OVERRIDE
+            void EnterCombat(Unit* who) override
             {
                 _EnterCombat();
                 events.ScheduleEvent(EVENT_FROST_ATTACK, urand(7000, 10000));
@@ -80,18 +80,18 @@ class boss_nethermancer_sepethrea : public CreatureScript
                 Talk(SAY_SUMMON);
             }
 
-            void KilledUnit(Unit* /*victim*/) OVERRIDE
+            void KilledUnit(Unit* /*victim*/) override
             {
                 Talk(SAY_SLAY);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 _JustDied();
                 Talk(SAY_DEATH);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -136,7 +136,7 @@ class boss_nethermancer_sepethrea : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new boss_nethermancer_sepethreaAI(creature);
         }
@@ -151,7 +151,16 @@ class npc_ragin_flames : public CreatureScript
             {
                 npc_ragin_flamesAI(Creature* creature) : ScriptedAI(creature)
                 {
+                    Initialize();
                     instance = creature->GetInstanceScript();
+                }
+
+                void Initialize()
+                {
+                    inferno_Timer = 10000;
+                    flame_timer = 500;
+                    Check_Timer = 2000;
+                    onlyonce = false;
                 }
 
                 InstanceScript* instance;
@@ -162,22 +171,19 @@ class npc_ragin_flames : public CreatureScript
 
                 bool onlyonce;
 
-                void Reset() OVERRIDE
+                void Reset() override
                 {
-                    inferno_Timer = 10000;
-                    flame_timer = 500;
-                    Check_Timer = 2000;
-                    onlyonce = false;
+                    Initialize();
                     me->ApplySpellImmune(0, IMMUNITY_DAMAGE, SPELL_SCHOOL_MASK_MAGIC, true);
                     me->ApplySpellImmune(0, IMMUNITY_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, true);
                     me->SetSpeed(MOVE_RUN, DUNGEON_MODE(0.5f, 0.7f));
                 }
 
-                void EnterCombat(Unit* /*who*/) OVERRIDE
+                void EnterCombat(Unit* /*who*/) override
                 {
                 }
 
-                void UpdateAI(uint32 diff) OVERRIDE
+                void UpdateAI(uint32 diff) override
                 {
                     //Check_Timer
                     if (Check_Timer <= diff)
@@ -218,7 +224,7 @@ class npc_ragin_flames : public CreatureScript
                 }
 
             };
-            CreatureAI* GetAI(Creature* creature) const OVERRIDE
+            CreatureAI* GetAI(Creature* creature) const override
             {
                 return GetInstanceAI<npc_ragin_flamesAI>(creature);
             }

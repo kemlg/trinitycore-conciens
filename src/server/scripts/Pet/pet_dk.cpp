@@ -43,15 +43,23 @@ class npc_pet_dk_ebon_gargoyle : public CreatureScript
 
         struct npc_pet_dk_ebon_gargoyleAI : CasterAI
         {
-            npc_pet_dk_ebon_gargoyleAI(Creature* creature) : CasterAI(creature) { }
+            npc_pet_dk_ebon_gargoyleAI(Creature* creature) : CasterAI(creature)
+            {
+                Initialize();
+            }
 
-            void InitializeAI() OVERRIDE
+            void Initialize()
             {
                 // Not needed to be despawned now
                 _despawnTimer = 0;
+            }
+
+            void InitializeAI() override
+            {
+                Initialize();
 
                 CasterAI::InitializeAI();
-                uint64 ownerGuid = me->GetOwnerGUID();
+                ObjectGuid ownerGuid = me->GetOwnerGUID();
                 if (!ownerGuid)
                     return;
 
@@ -61,14 +69,14 @@ class npc_pet_dk_ebon_gargoyle : public CreatureScript
                 Trinity::UnitListSearcher<Trinity::AnyUnfriendlyUnitInObjectRangeCheck> searcher(me, targets, u_check);
                 me->VisitNearbyObject(30.0f, searcher);
                 for (std::list<Unit*>::const_iterator iter = targets.begin(); iter != targets.end(); ++iter)
-                    if ((*iter)->GetAura(SPELL_DK_SUMMON_GARGOYLE_1, ownerGuid))
+                    if ((*iter)->HasAura(SPELL_DK_SUMMON_GARGOYLE_1, ownerGuid))
                     {
                         me->Attack((*iter), false);
                         break;
                     }
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 // Stop Feeding Gargoyle when it dies
                 if (Unit* owner = me->GetOwner())
@@ -76,7 +84,7 @@ class npc_pet_dk_ebon_gargoyle : public CreatureScript
             }
 
             // Fly away when dismissed
-            void SpellHit(Unit* source, SpellInfo const* spell) OVERRIDE
+            void SpellHit(Unit* source, SpellInfo const* spell) override
             {
                 if (spell->Id != SPELL_DK_DISMISS_GARGOYLE || !me->IsAlive())
                     return;
@@ -107,7 +115,7 @@ class npc_pet_dk_ebon_gargoyle : public CreatureScript
                 _despawnTimer = 4 * IN_MILLISECONDS;
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (_despawnTimer > 0)
                 {
@@ -125,7 +133,7 @@ class npc_pet_dk_ebon_gargoyle : public CreatureScript
            uint32 _despawnTimer;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_pet_dk_ebon_gargoyleAI(creature);
         }

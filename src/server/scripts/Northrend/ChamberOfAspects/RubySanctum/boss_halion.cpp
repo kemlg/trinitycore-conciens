@@ -221,7 +221,7 @@ struct generic_halionAI : public BossAI
 {
     generic_halionAI(Creature* creature, uint32 bossId) : BossAI(creature, bossId), _canEvade(false) { }
 
-    void EnterCombat(Unit* /*who*/) OVERRIDE
+    void EnterCombat(Unit* /*who*/) override
     {
         _EnterCombat();
         me->AddAura(SPELL_TWILIGHT_PRECISION, me);
@@ -231,19 +231,19 @@ struct generic_halionAI : public BossAI
         events.ScheduleEvent(EVENT_BREATH, urand(10000, 15000));
     }
 
-    void Reset() OVERRIDE
+    void Reset() override
     {
         _canEvade = false;
         _Reset();
     }
 
-    void JustReachedHome() OVERRIDE
+    void JustReachedHome() override
     {
         instance->SendEncounterUnit(ENCOUNTER_FRAME_DISENGAGE, me);
         _JustReachedHome();
     }
 
-    void ExecuteEvent(uint32 eventId) OVERRIDE
+    void ExecuteEvent(uint32 eventId) override
     {
         switch (eventId)
         {
@@ -262,9 +262,21 @@ struct generic_halionAI : public BossAI
         }
     }
 
-    void UpdateAI(uint32 diff) OVERRIDE
+    bool CheckInRoom() override
     {
-        if (!UpdateVictim() || me->HasUnitState(UNIT_STATE_CASTING))
+        // Rough radius, it is not an exactly perfect circle
+        if (me->GetDistance2d(HalionControllerSpawnPos.GetPositionX(), HalionControllerSpawnPos.GetPositionY()) > 48.5f)
+        {
+            if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HALION_CONTROLLER)))
+                controller->AI()->EnterEvadeMode();
+            return false;
+        }
+        return true;
+    }
+
+    void UpdateAI(uint32 diff) override
+    {
+        if (!UpdateVictim() || !CheckInRoom() || me->HasUnitState(UNIT_STATE_CASTING))
             return;
 
         events.Update(diff);
@@ -275,7 +287,7 @@ struct generic_halionAI : public BossAI
         DoMeleeAttackIfReady();
     }
 
-    void SetData(uint32 index, uint32 dataValue) OVERRIDE
+    void SetData(uint32 index, uint32 dataValue) override
     {
         switch (index)
         {
@@ -287,7 +299,7 @@ struct generic_halionAI : public BossAI
         }
     }
 
-    void SpellHit(Unit* /*who*/, SpellInfo const* spellInfo) OVERRIDE
+    void SpellHit(Unit* /*who*/, SpellInfo const* spellInfo) override
     {
         if (spellInfo->Id == SPELL_TWILIGHT_MENDING)
             Talk(SAY_REGENERATE);
@@ -309,7 +321,7 @@ class boss_halion : public CreatureScript
                 me->SetHomePosition(HalionSpawnPos);
             }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 generic_halionAI::Reset();
                 me->SetReactState(REACT_DEFENSIVE);
@@ -317,14 +329,14 @@ class boss_halion : public CreatureScript
                 me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
             }
 
-            void EnterEvadeMode() OVERRIDE
+            void EnterEvadeMode() override
             {
                 // Phase 1: We always can evade. Phase 2 & 3: We can evade if and only if the controller tells us to.
                 if (events.IsInPhase(PHASE_ONE) || _canEvade)
                     generic_halionAI::EnterEvadeMode();
             }
 
-            void EnterCombat(Unit* who) OVERRIDE
+            void EnterCombat(Unit* who) override
             {
                 Talk(SAY_AGGRO);
 
@@ -340,29 +352,29 @@ class boss_halion : public CreatureScript
                 events.ScheduleEvent(EVENT_METEOR_STRIKE, urand(20000, 25000));
                 events.ScheduleEvent(EVENT_FIERY_COMBUSTION, urand(15000, 18000));
 
-                if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_HALION_CONTROLLER)))
+                if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HALION_CONTROLLER)))
                     controller->AI()->SetData(DATA_FIGHT_PHASE, PHASE_ONE);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 _JustDied();
 
                 Talk(SAY_DEATH);
                 instance->SendEncounterUnit(ENCOUNTER_FRAME_DISENGAGE, me);
 
-                if (Creature* twilightHalion = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_TWILIGHT_HALION)))
+                if (Creature* twilightHalion = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_TWILIGHT_HALION)))
                     if (twilightHalion->IsAlive())
                         twilightHalion->Kill(twilightHalion);
 
-                if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_HALION_CONTROLLER)))
+                if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HALION_CONTROLLER)))
                     if (controller->IsAlive())
                         controller->Kill(controller);
             }
 
             Position const* GetMeteorStrikePosition() const { return &_meteorStrikePos; }
 
-            void DamageTaken(Unit* attacker, uint32& damage) OVERRIDE
+            void DamageTaken(Unit* attacker, uint32& damage) override
             {
                 if (me->HealthBelowPctDamaged(75, damage) && events.IsInPhase(PHASE_ONE))
                 {
@@ -373,7 +385,7 @@ class boss_halion : public CreatureScript
                     me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                     DoCast(me, SPELL_TWILIGHT_PHASING);
 
-                    if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_HALION_CONTROLLER)))
+                    if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HALION_CONTROLLER)))
                         controller->AI()->SetData(DATA_FIGHT_PHASE, PHASE_TWO);
                     return;
                 }
@@ -384,41 +396,34 @@ class boss_halion : public CreatureScript
                     if (!me->InSamePhase(attacker))
                         return;
 
-                    if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_HALION_CONTROLLER)))
+                    if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HALION_CONTROLLER)))
                         controller->AI()->SetData(DATA_MATERIAL_DAMAGE_TAKEN, damage);
                 }
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (events.IsInPhase(PHASE_TWO))
                     return;
 
-                // Rough radius, it is not an exactly perfect circle
-                if (me->GetDistance2d(HalionControllerSpawnPos.GetPositionX(), HalionControllerSpawnPos.GetPositionY()) > 48.5f)
-                {
-                    EnterEvadeMode();
-                    return;
-                }
-
                 generic_halionAI::UpdateAI(diff);
             }
 
-            void ExecuteEvent(uint32 eventId) OVERRIDE
+            void ExecuteEvent(uint32 eventId) override
             {
                 switch (eventId)
                 {
                     case EVENT_ACTIVATE_FIREWALL:
                         // Flame ring is activated 5 seconds after starting encounter, DOOR_TYPE_ROOM is only instant.
                         for (uint8 i = DATA_FLAME_RING; i <= DATA_TWILIGHT_FLAME_RING; ++i)
-                            if (GameObject* flameRing = ObjectAccessor::GetGameObject(*me, instance->GetData64(i)))
-                                instance->HandleGameObject(instance->GetData64(DATA_FLAME_RING), false, flameRing);
+                            if (GameObject* flameRing = ObjectAccessor::GetGameObject(*me, instance->GetGuidData(i)))
+                                instance->HandleGameObject(instance->GetGuidData(DATA_FLAME_RING), false, flameRing);
                         break;
                     case EVENT_METEOR_STRIKE:
                     {
                         if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 0.0f, true, -SPELL_TWILIGHT_REALM))
                         {
-                            target->GetPosition(&_meteorStrikePos);
+                            _meteorStrikePos = target->GetPosition();
                             me->CastSpell(_meteorStrikePos.GetPositionX(), _meteorStrikePos.GetPositionY(), _meteorStrikePos.GetPositionZ(), SPELL_METEOR_STRIKE, true, NULL, NULL, me->GetGUID());
                             Talk(SAY_METEOR_STRIKE);
                         }
@@ -438,7 +443,7 @@ class boss_halion : public CreatureScript
                 }
             }
 
-            void SetData(uint32 index, uint32 value) OVERRIDE
+            void SetData(uint32 index, uint32 value) override
             {
                 switch (index)
                 {
@@ -454,7 +459,7 @@ class boss_halion : public CreatureScript
             Position _meteorStrikePos;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetRubySanctumAI<boss_halionAI>(creature);
         }
@@ -471,7 +476,7 @@ class boss_twilight_halion : public CreatureScript
         {
             boss_twilight_halionAI(Creature* creature) : generic_halionAI(creature, DATA_TWILIGHT_HALION)
             {
-                Creature* halion = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_HALION));
+                Creature* halion = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HALION));
                 if (!halion)
                     return;
 
@@ -485,7 +490,7 @@ class boss_twilight_halion : public CreatureScript
                 me->SetReactState(REACT_AGGRESSIVE);
             }
 
-            void EnterCombat(Unit* who) OVERRIDE
+            void EnterCombat(Unit* who) override
             {
                 events.Reset();
                 events.SetPhase(PHASE_TWO);
@@ -498,9 +503,9 @@ class boss_twilight_halion : public CreatureScript
             }
 
             // Never evade
-            void EnterEvadeMode() OVERRIDE { }
+            void EnterEvadeMode() override { }
 
-            void KilledUnit(Unit* victim) OVERRIDE
+            void KilledUnit(Unit* victim) override
             {
                 if (victim->GetTypeId() == TYPEID_PLAYER)
                     Talk(SAY_KILL);
@@ -509,9 +514,9 @@ class boss_twilight_halion : public CreatureScript
                 me->CastSpell(victim, SPELL_LEAVE_TWILIGHT_REALM, true);
             }
 
-            void JustDied(Unit* killer) OVERRIDE
+            void JustDied(Unit* killer) override
             {
-                if (Creature* halion = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_HALION)))
+                if (Creature* halion = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HALION)))
                 {
                     // Ensure looting
                     if (me->IsDamageEnoughForLootingAndReward())
@@ -521,14 +526,14 @@ class boss_twilight_halion : public CreatureScript
                         killer->Kill(halion);
                 }
 
-                if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_HALION_CONTROLLER)))
+                if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HALION_CONTROLLER)))
                     if (controller->IsAlive())
                         controller->Kill(controller);
 
                 instance->SendEncounterUnit(ENCOUNTER_FRAME_DISENGAGE, me);
             }
 
-            void DamageTaken(Unit* attacker, uint32& damage) OVERRIDE
+            void DamageTaken(Unit* attacker, uint32& damage) override
             {
                 if (me->HealthBelowPctDamaged(50, damage) && events.IsInPhase(PHASE_TWO))
                 {
@@ -545,17 +550,17 @@ class boss_twilight_halion : public CreatureScript
                     if (!me->InSamePhase(attacker))
                         return;
 
-                    if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_HALION_CONTROLLER)))
+                    if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HALION_CONTROLLER)))
                         controller->AI()->SetData(DATA_TWILIGHT_DAMAGE_TAKEN, damage);
                 }
             }
 
-            void SpellHit(Unit* who, SpellInfo const* spell) OVERRIDE
+            void SpellHit(Unit* who, SpellInfo const* spell) override
             {
                 switch (spell->Id)
                 {
                     case SPELL_TWILIGHT_DIVISION:
-                        if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_HALION_CONTROLLER)))
+                        if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HALION_CONTROLLER)))
                             controller->AI()->DoAction(ACTION_MONITOR_CORPOREALITY);
                         break;
                     default:
@@ -564,7 +569,7 @@ class boss_twilight_halion : public CreatureScript
                 }
             }
 
-            void ExecuteEvent(uint32 eventId) OVERRIDE
+            void ExecuteEvent(uint32 eventId) override
             {
                 switch (eventId)
                 {
@@ -578,12 +583,9 @@ class boss_twilight_halion : public CreatureScript
                         break;
                 }
             }
-
-        private:
-            EventMap events;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetRubySanctumAI<boss_twilight_halionAI>(creature);
         }
@@ -599,26 +601,32 @@ class npc_halion_controller : public CreatureScript
             npc_halion_controllerAI(Creature* creature) : ScriptedAI(creature),
                 _instance(creature->GetInstanceScript()), _summons(me)
             {
+                Initialize();
                 me->SetPhaseMask(me->GetPhaseMask() | 0x20, true);
             }
 
-            void Reset() OVERRIDE
+            void Initialize()
             {
-                _summons.DespawnAll();
-                _events.Reset();
                 _materialCorporealityValue = 5;
                 _materialDamageTaken = 0;
                 _twilightDamageTaken = 0;
+            }
+
+            void Reset() override
+            {
+                _summons.DespawnAll();
+                _events.Reset();
+                Initialize();
 
                 DoCast(me, SPELL_CLEAR_DEBUFFS);
             }
 
-            void JustSummoned(Creature* who) OVERRIDE
+            void JustSummoned(Creature* who) override
             {
                 _summons.Summon(who);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 _events.Reset();
                 _summons.DespawnAll();
@@ -626,7 +634,7 @@ class npc_halion_controller : public CreatureScript
                 DoCast(me, SPELL_CLEAR_DEBUFFS);
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 _twilightDamageTaken = 0;
                 _materialDamageTaken = 0;
@@ -634,12 +642,12 @@ class npc_halion_controller : public CreatureScript
                 _events.ScheduleEvent(EVENT_TRIGGER_BERSERK, 8 * MINUTE * IN_MILLISECONDS);
             }
 
-            void JustReachedHome() OVERRIDE
+            void JustReachedHome() override
             {
-                if (Creature* twilightHalion = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_TWILIGHT_HALION)))
+                if (Creature* twilightHalion = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_TWILIGHT_HALION)))
                     twilightHalion->DespawnOrUnsummon();
 
-                if (Creature* halion = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_HALION)))
+                if (Creature* halion = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_HALION)))
                 {
                     halion->AI()->SetData(DATA_EVADE_METHOD, 1);
                     halion->AI()->EnterEvadeMode();
@@ -648,7 +656,7 @@ class npc_halion_controller : public CreatureScript
                 _instance->SetBossState(DATA_HALION, FAIL);
             }
 
-            void DoAction(int32 action) OVERRIDE
+            void DoAction(int32 action) override
             {
                 switch (action)
                 {
@@ -661,7 +669,7 @@ class npc_halion_controller : public CreatureScript
                     {
                         for (uint8 itr = DATA_HALION; itr <= DATA_TWILIGHT_HALION; itr++)
                         {
-                            Creature* halion = ObjectAccessor::GetCreature(*me, _instance->GetData64(itr));
+                            Creature* halion = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(itr));
                             if (!halion)
                                 continue;
 
@@ -690,7 +698,7 @@ class npc_halion_controller : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 // The IsInCombat() check is needed because that check should be false when Halion is
                 // not engaged, while it would return true without as UpdateVictim() checks for
@@ -713,14 +721,14 @@ class npc_halion_controller : public CreatureScript
                             break;
                         case EVENT_INTRO_PROGRESS_1:
                             for (uint8 i = DATA_BURNING_TREE_3; i <= DATA_BURNING_TREE_4; ++i)
-                                if (GameObject* tree = ObjectAccessor::GetGameObject(*me, _instance->GetData64(i)))
-                                    _instance->HandleGameObject(_instance->GetData64(i), true, tree);
+                                if (GameObject* tree = ObjectAccessor::GetGameObject(*me, _instance->GetGuidData(i)))
+                                    _instance->HandleGameObject(_instance->GetGuidData(i), true, tree);
                             _events.ScheduleEvent(EVENT_INTRO_PROGRESS_2, 4000);
                             break;
                         case EVENT_INTRO_PROGRESS_2:
                             for (uint8 i = DATA_BURNING_TREE_1; i <= DATA_BURNING_TREE_2; ++i)
-                                if (GameObject* tree = ObjectAccessor::GetGameObject(*me, _instance->GetData64(i)))
-                                    _instance->HandleGameObject(_instance->GetData64(i), true, tree);
+                                if (GameObject* tree = ObjectAccessor::GetGameObject(*me, _instance->GetGuidData(i)))
+                                    _instance->HandleGameObject(_instance->GetGuidData(i), true, tree);
                             _events.ScheduleEvent(EVENT_INTRO_PROGRESS_3, 4000);
                             break;
                         case EVENT_INTRO_PROGRESS_3:
@@ -729,20 +737,20 @@ class npc_halion_controller : public CreatureScript
                                 halion->AI()->Talk(SAY_INTRO);
                             break;
                         case EVENT_TWILIGHT_MENDING:
-                            if (ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_HALION))) // Just check if physical Halion is spawned
-                                if (Creature* twilightHalion = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_TWILIGHT_HALION)))
+                            if (ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_HALION))) // Just check if physical Halion is spawned
+                                if (Creature* twilightHalion = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_TWILIGHT_HALION)))
                                     twilightHalion->CastSpell((Unit*)NULL, SPELL_TWILIGHT_MENDING, true);
                             break;
                         case EVENT_TRIGGER_BERSERK:
                             for (uint8 i = DATA_HALION; i <= DATA_TWILIGHT_HALION; i++)
-                                if (Creature* halion = ObjectAccessor::GetCreature(*me, _instance->GetData64(i)))
+                                if (Creature* halion = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(i)))
                                     halion->CastSpell(halion, SPELL_BERSERK, true);
                             break;
                         case EVENT_SHADOW_PULSARS_SHOOT:
-                            if (Creature* twilightHalion = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_TWILIGHT_HALION)))
+                            if (Creature* twilightHalion = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_TWILIGHT_HALION)))
                                 twilightHalion->AI()->Talk(SAY_SPHERE_PULSE);
 
-                            if (Creature* orbCarrier = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_ORB_CARRIER)))
+                            if (Creature* orbCarrier = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_ORB_CARRIER)))
                                 orbCarrier->AI()->DoAction(ACTION_SHOOT);
 
                             _events.ScheduleEvent(EVENT_SHADOW_PULSARS_SHOOT, 29000);
@@ -757,7 +765,7 @@ class npc_halion_controller : public CreatureScript
                 }
             }
 
-            void SetData(uint32 id, uint32 value) OVERRIDE
+            void SetData(uint32 id, uint32 value) override
             {
                 switch (id)
                 {
@@ -853,28 +861,14 @@ class npc_halion_controller : public CreatureScript
 
                 for (uint8 itr = DATA_HALION; itr <= DATA_TWILIGHT_HALION; itr++)
                 {
-                    if (Creature* halion = ObjectAccessor::GetCreature(*me, _instance->GetData64(itr)))
+                    if (Creature* halion = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(itr)))
                     {
-                        RemoveCorporeality(halion, itr == DATA_TWILIGHT_HALION);
                         halion->CastSpell(halion, GetSpell(_materialCorporealityValue, itr == DATA_TWILIGHT_HALION), true);
 
                         if (itr == DATA_TWILIGHT_HALION)
                             halion->AI()->Talk(oldValue < _materialCorporealityValue ? EMOTE_CORPOREALITY_TOT : EMOTE_CORPOREALITY_TIT, halion);
                         else // if (itr == DATA_HALION)
                             halion->AI()->Talk(oldValue > _materialCorporealityValue ? EMOTE_CORPOREALITY_POT : EMOTE_CORPOREALITY_PIP, halion);
-                    }
-                }
-            }
-
-            void RemoveCorporeality(Creature* who, bool isTwilight = false)
-            {
-                for (uint8 i = 0; i < MAX_CORPOREALITY_STATE; i++)
-                {
-                    uint32 spellID = (isTwilight ? _corporealityReference[i].twilightRealmSpell : _corporealityReference[i].materialRealmSpell);
-                    if (who->HasAura(spellID))
-                    {
-                        who->RemoveAurasDueToSpell(spellID);
-                        break;
                     }
                 }
             }
@@ -894,7 +888,7 @@ class npc_halion_controller : public CreatureScript
             uint8 _materialCorporealityValue;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetRubySanctumAI<npc_halion_controllerAI>(creature);
         }
@@ -915,7 +909,7 @@ class npc_orb_carrier : public CreatureScript
                 ASSERT(creature->GetVehicleKit());
             }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE
+            void UpdateAI(uint32 /*diff*/) override
             {
                 /// According to sniffs this spell is cast every 1 or 2 seconds.
                 /// However, refreshing it looks bad, so just cast the spell if
@@ -927,11 +921,11 @@ class npc_orb_carrier : public CreatureScript
                 /// we are having two creatures involded here. This attribute is handled clientside, meaning the client
                 /// sends orientation update itself. Here, no packet is sent, and the creature does not rotate. By
                 /// forcing the carrier to always be facing the rotation focus, we ensure everything works as it should.
-                if (Creature* rotationFocus = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_ORB_ROTATION_FOCUS)))
+                if (Creature* rotationFocus = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_ORB_ROTATION_FOCUS)))
                     me->SetFacingToObject(rotationFocus); // setInFront
             }
 
-            void DoAction(int32 action) OVERRIDE
+            void DoAction(int32 action) override
             {
                 if (action == ACTION_SHOOT)
                 {
@@ -965,7 +959,7 @@ class npc_orb_carrier : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetRubySanctumAI<npc_orb_carrierAI>(creature);
         }
@@ -984,7 +978,7 @@ class npc_meteor_strike_initial : public CreatureScript
                 SetCombatMovement(false);
             }
 
-            void DoAction(int32 action) OVERRIDE
+            void DoAction(int32 action) override
             {
                 switch (action)
                 {
@@ -997,14 +991,14 @@ class npc_meteor_strike_initial : public CreatureScript
                 }
             }
 
-            void IsSummonedBy(Unit* summoner) OVERRIDE
+            void IsSummonedBy(Unit* summoner) override
             {
                 Creature* owner = summoner->ToCreature();
                 if (!owner)
                     return;
 
                 // Let Halion Controller count as summoner
-                if (Creature* controller = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_HALION_CONTROLLER)))
+                if (Creature* controller = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_HALION_CONTROLLER)))
                     controller->AI()->JustSummoned(me);
 
                 DoCast(me, SPELL_METEOR_STRIKE_COUNTDOWN);
@@ -1013,7 +1007,6 @@ class npc_meteor_strike_initial : public CreatureScript
                 if (HalionAI* halionAI = CAST_AI(HalionAI, owner->AI()))
                 {
                     Position const* ownerPos = halionAI->GetMeteorStrikePosition();
-                    Position newPos;
                     float angle[4];
                     angle[0] = me->GetAngle(ownerPos);
                     angle[1] = me->GetAngle(ownerPos) - static_cast<float>(M_PI/2);
@@ -1025,21 +1018,21 @@ class npc_meteor_strike_initial : public CreatureScript
                     {
                         angle[i] = Position::NormalizeOrientation(angle[i]);
                         me->SetOrientation(angle[i]);
-                        me->GetNearPosition(newPos, 10.0f, 0.0f); // Exact distance
+                        Position newPos = me->GetNearPosition(10.0f, 0.0f); // Exact distance
                         if (Creature* meteor = me->SummonCreature(NPC_METEOR_STRIKE_NORTH + i, newPos, TEMPSUMMON_TIMED_DESPAWN, 30000))
                             _meteorList.push_back(meteor);
                     }
                 }
             }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE { }
-            void EnterEvadeMode() OVERRIDE { }
+            void UpdateAI(uint32 /*diff*/) override { }
+            void EnterEvadeMode() override { }
         private:
             InstanceScript* _instance;
             std::list<Creature*> _meteorList;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetRubySanctumAI<npc_meteor_strike_initialAI>(creature);
         }
@@ -1061,7 +1054,7 @@ class npc_meteor_strike : public CreatureScript
                 SetCombatMovement(false);
             }
 
-            void DoAction(int32 action) OVERRIDE
+            void DoAction(int32 action) override
             {
                 if (action == ACTION_METEOR_STRIKE_BURN)
                 {
@@ -1071,14 +1064,14 @@ class npc_meteor_strike : public CreatureScript
                 }
             }
 
-            void IsSummonedBy(Unit* /*summoner*/) OVERRIDE
+            void IsSummonedBy(Unit* /*summoner*/) override
             {
                 // Let Halion Controller count as summoner.
-                if (Creature* controller = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_HALION_CONTROLLER)))
+                if (Creature* controller = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_HALION_CONTROLLER)))
                     controller->AI()->JustSummoned(me);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (_spawnCount > 5)
                     return;
@@ -1087,12 +1080,11 @@ class npc_meteor_strike : public CreatureScript
 
                 if (_events.ExecuteEvent() == EVENT_SPAWN_METEOR_FLAME)
                 {
-                    Position pos;
-                    me->GetNearPosition(pos, _range, 0.0f);
+                    Position pos = me->GetNearPosition( _range, 0.0f);
 
                     if (Creature* flame = me->SummonCreature(NPC_METEOR_STRIKE_FLAME, pos, TEMPSUMMON_TIMED_DESPAWN, 25000))
                     {
-                        if (Creature* controller = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_HALION_CONTROLLER)))
+                        if (Creature* controller = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_HALION_CONTROLLER)))
                             controller->AI()->JustSummoned(flame);
 
                         flame->CastSpell(flame, SPELL_METEOR_STRIKE_FIRE_AURA_2, true);
@@ -1110,7 +1102,7 @@ class npc_meteor_strike : public CreatureScript
             uint8 _spawnCount;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetRubySanctumAI<npc_meteor_strikeAI>(creature);
         }
@@ -1124,7 +1116,7 @@ class npc_combustion_consumption : public CreatureScript
         struct npc_combustion_consumptionAI : public ScriptedAI
         {
             npc_combustion_consumptionAI(Creature* creature) : ScriptedAI(creature),
-                   _instance(creature->GetInstanceScript()), _summonerGuid(0)
+                   _instance(creature->GetInstanceScript())
             {
                 SetCombatMovement(false);
 
@@ -1150,16 +1142,16 @@ class npc_combustion_consumption : public CreatureScript
                     me->SetPhaseMask(0x01 | 0x20, true);
             }
 
-            void IsSummonedBy(Unit* summoner) OVERRIDE
+            void IsSummonedBy(Unit* summoner) override
             {
                 // Let Halion Controller count as summoner
-                if (Creature* controller = ObjectAccessor::GetCreature(*me, _instance->GetData64(DATA_HALION_CONTROLLER)))
+                if (Creature* controller = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_HALION_CONTROLLER)))
                     controller->AI()->JustSummoned(me);
 
                 _summonerGuid = summoner->GetGUID();
             }
 
-            void SetData(uint32 type, uint32 stackAmount) OVERRIDE
+            void SetData(uint32 type, uint32 stackAmount) override
             {
                 Unit* summoner = ObjectAccessor::GetUnit(*me, _summonerGuid);
 
@@ -1173,16 +1165,16 @@ class npc_combustion_consumption : public CreatureScript
                 summoner->CastCustomSpell(_explosionSpell, SPELLVALUE_BASE_POINT0, damage, summoner);
             }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE { }
+            void UpdateAI(uint32 /*diff*/) override { }
 
         private:
             InstanceScript* _instance;
             uint32 _explosionSpell;
             uint32 _damageSpell;
-            uint64 _summonerGuid;
+            ObjectGuid _summonerGuid;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetRubySanctumAI<npc_combustion_consumptionAI>(creature);
         }
@@ -1197,23 +1189,23 @@ class npc_living_inferno : public CreatureScript
         {
             npc_living_infernoAI(Creature* creature) : ScriptedAI(creature) { }
 
-            void IsSummonedBy(Unit* /*summoner*/) OVERRIDE
+            void IsSummonedBy(Unit* /*summoner*/) override
             {
                 me->SetInCombatWithZone();
                 me->CastSpell(me, SPELL_BLAZING_AURA, true);
 
                 if (InstanceScript* instance = me->GetInstanceScript())
-                    if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_HALION_CONTROLLER)))
+                    if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HALION_CONTROLLER)))
                         controller->AI()->JustSummoned(me);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 me->DespawnOrUnsummon(1);
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetRubySanctumAI<npc_living_infernoAI>(creature);
         }
@@ -1227,32 +1219,41 @@ class npc_living_ember : public CreatureScript
 
         struct npc_living_emberAI : public ScriptedAI
         {
-            npc_living_emberAI(Creature* creature) : ScriptedAI(creature) { }
+            npc_living_emberAI(Creature* creature) : ScriptedAI(creature)
+            {
+                Initialize();
+                _enrageTimer = 0;
+            }
 
-            void Reset() OVERRIDE
+            void Initialize()
             {
                 _hasEnraged = false;
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void Reset() override
+            {
+                Initialize();
+            }
+
+            void EnterCombat(Unit* /*who*/) override
             {
                 _enrageTimer = 20000;
                 _hasEnraged = false;
             }
 
-            void IsSummonedBy(Unit* /*summoner*/) OVERRIDE
+            void IsSummonedBy(Unit* /*summoner*/) override
             {
                 if (InstanceScript* instance = me->GetInstanceScript())
-                    if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_HALION_CONTROLLER)))
+                    if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HALION_CONTROLLER)))
                         controller->AI()->JustSummoned(me);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 me->DespawnOrUnsummon(1);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim() || me->HasUnitState(UNIT_STATE_CASTING))
                     return;
@@ -1272,7 +1273,7 @@ class npc_living_ember : public CreatureScript
             bool _hasEnraged;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetRubySanctumAI<npc_living_emberAI>(creature);
         }
@@ -1306,14 +1307,14 @@ class go_twilight_portal : public GameObjectScript
                 }
             }
 
-            bool GossipHello(Player* player) OVERRIDE
+            bool GossipHello(Player* player) override
             {
                 if (_spellId != 0)
                     player->CastSpell(player, _spellId, true);
                 return true;
             }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE
+            void UpdateAI(uint32 /*diff*/) override
             {
                 if (_instance->GetBossState(DATA_HALION) == IN_PROGRESS)
                     return;
@@ -1331,7 +1332,7 @@ class go_twilight_portal : public GameObjectScript
             bool _deleted;
         };
 
-        GameObjectAI* GetAI(GameObject* gameobject) const OVERRIDE
+        GameObjectAI* GetAI(GameObject* gameobject) const override
         {
             return GetRubySanctumAI<go_twilight_portalAI>(gameobject);
         }
@@ -1356,13 +1357,13 @@ class spell_halion_meteor_strike_marker : public SpellScriptLoader
                         creCaster->AI()->DoAction(ACTION_METEOR_STRIKE_AOE);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 AfterEffectRemove += AuraEffectRemoveFn(spell_halion_meteor_strike_marker_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_halion_meteor_strike_marker_AuraScript();
         }
@@ -1380,7 +1381,7 @@ class spell_halion_combustion_consumption : public SpellScriptLoader
         public:
             spell_halion_combustion_consumption_AuraScript(uint32 spellID) : AuraScript(), _markSpell(spellID) { }
 
-            bool Validate(SpellInfo const* /*spell*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spell*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(_markSpell))
                     return false;
@@ -1393,7 +1394,7 @@ class spell_halion_combustion_consumption : public SpellScriptLoader
                     return;
 
                 if (GetTarget()->HasAura(_markSpell))
-                    GetTarget()->RemoveAurasDueToSpell(_markSpell, 0, 0, AURA_REMOVE_BY_EXPIRE);
+                    GetTarget()->RemoveAurasDueToSpell(_markSpell, ObjectGuid::Empty, 0, AURA_REMOVE_BY_EXPIRE);
             }
 
             void OnApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
@@ -1406,7 +1407,7 @@ class spell_halion_combustion_consumption : public SpellScriptLoader
                 GetTarget()->CastSpell(GetTarget(), _markSpell, true);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectPeriodic += AuraEffectPeriodicFn(spell_halion_combustion_consumption_AuraScript::AddMarkStack, EFFECT_0, SPELL_AURA_PERIODIC_DAMAGE);
                 AfterEffectApply += AuraEffectApplyFn(spell_halion_combustion_consumption_AuraScript::OnApply, EFFECT_0, SPELL_AURA_PERIODIC_DAMAGE, AURA_EFFECT_HANDLE_REAL);
@@ -1416,7 +1417,7 @@ class spell_halion_combustion_consumption : public SpellScriptLoader
             uint32 _markSpell;
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_halion_combustion_consumption_AuraScript(_spellID);
         }
@@ -1439,7 +1440,7 @@ class spell_halion_marks : public SpellScriptLoader
             spell_halion_marks_AuraScript(uint32 summonSpell, uint32 removeSpell) : AuraScript(),
                 _summonSpellId(summonSpell), _removeSpellId(removeSpell) { }
 
-            bool Validate(SpellInfo const* /*spell*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spell*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(_summonSpellId))
                     return false;
@@ -1454,7 +1455,7 @@ class spell_halion_marks : public SpellScriptLoader
 
                 if (Unit* dispelledUnit = GetUnitOwner())
                     if (dispelledUnit->HasAura(_removeSpellId))
-                        dispelledUnit->RemoveAurasDueToSpell(_removeSpellId, 0, 0, AURA_REMOVE_BY_EXPIRE);
+                        dispelledUnit->RemoveAurasDueToSpell(_removeSpellId, ObjectGuid::Empty, 0, AURA_REMOVE_BY_EXPIRE);
             }
 
             void OnRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
@@ -1466,7 +1467,7 @@ class spell_halion_marks : public SpellScriptLoader
                 GetTarget()->CastCustomSpell(_summonSpellId, SPELLVALUE_BASE_POINT1, aurEff->GetBase()->GetStackAmount(), GetTarget(), TRIGGERED_FULL_MASK, NULL, NULL, GetCasterGUID());
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnDispel += AuraDispelFn(spell_halion_marks_AuraScript::BeforeDispel);
                 AfterEffectRemove += AuraEffectRemoveFn(spell_halion_marks_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
@@ -1476,7 +1477,7 @@ class spell_halion_marks : public SpellScriptLoader
             uint32 _removeSpellId;
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_halion_marks_AuraScript(_summonSpell, _removeSpell);
         }
@@ -1503,20 +1504,19 @@ class spell_halion_damage_aoe_summon : public SpellScriptLoader
                 SummonPropertiesEntry const* properties = sSummonPropertiesStore.LookupEntry(uint32(GetSpellInfo()->Effects[effIndex].MiscValueB));
                 uint32 duration = uint32(GetSpellInfo()->GetDuration());
 
-                Position pos;
-                caster->GetPosition(&pos);
+                Position pos = caster->GetPosition();
                 if (Creature* summon = caster->GetMap()->SummonCreature(entry, pos, properties, duration, caster, GetSpellInfo()->Id))
                     if (summon->IsAIEnabled)
                         summon->AI()->SetData(DATA_STACKS_DISPELLED, GetSpellValue()->EffectBasePoints[EFFECT_1]);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHit += SpellEffectFn(spell_halion_damage_aoe_summon_SpellScript::HandleSummon, EFFECT_0, SPELL_EFFECT_SUMMON);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_halion_damage_aoe_summon_SpellScript();
         }
@@ -1538,7 +1538,7 @@ class spell_halion_twilight_realm_handlers : public SpellScriptLoader
                 _isApply(isApplyHandler), _beforeHitSpellId(beforeHitSpell)
             { }
 
-            bool Validate(SpellInfo const* /*spell*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spell*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(_beforeHitSpellId))
                     return false;
@@ -1558,12 +1558,12 @@ class spell_halion_twilight_realm_handlers : public SpellScriptLoader
                 if (!target)
                     return;
 
-                target->RemoveAurasDueToSpell(_beforeHitSpellId, 0, 0, AURA_REMOVE_BY_ENEMY_SPELL);
+                target->RemoveAurasDueToSpell(_beforeHitSpellId, ObjectGuid::Empty, 0, AURA_REMOVE_BY_ENEMY_SPELL);
                 if (InstanceScript* instance = target->GetInstanceScript())
                     instance->SendEncounterUnit(ENCOUNTER_FRAME_UNK7);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 if (!_isApply)
                 {
@@ -1578,7 +1578,7 @@ class spell_halion_twilight_realm_handlers : public SpellScriptLoader
             uint32 _beforeHitSpellId;
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_halion_twilight_realm_handlers_AuraScript(_beforeHitSpell, _isApplyHandler);
         }
@@ -1597,7 +1597,7 @@ class spell_halion_clear_debuffs : public SpellScriptLoader
         {
             PrepareSpellScript(spell_halion_clear_debuffs_SpellScript);
 
-            bool Validate(SpellInfo const* /*spell*/) OVERRIDE
+            bool Validate(SpellInfo const* /*spell*/) override
             {
                 if (!sSpellMgr->GetSpellInfo(SPELL_CLEAR_DEBUFFS))
                     return false;
@@ -1612,13 +1612,13 @@ class spell_halion_clear_debuffs : public SpellScriptLoader
                     GetHitUnit()->RemoveAurasDueToSpell(GetSpellInfo()->Effects[effIndex].CalcValue());
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_halion_clear_debuffs_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_halion_clear_debuffs_SpellScript();
         }
@@ -1654,7 +1654,7 @@ class spell_halion_twilight_cutter : public SpellScriptLoader
                     return;
 
                 Unit* caster = GetCaster();
-                if (Unit* channelTarget = ObjectAccessor::GetUnit(*caster, caster->GetUInt64Value(UNIT_FIELD_CHANNEL_OBJECT)))
+                if (Unit* channelTarget = ObjectAccessor::GetUnit(*caster, caster->GetChannelObjectGuid()))
                 {
                     unitList.remove_if(TwilightCutterSelector(caster, channelTarget));
                     return;
@@ -1664,13 +1664,13 @@ class spell_halion_twilight_cutter : public SpellScriptLoader
                 unitList.clear();
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_halion_twilight_cutter_SpellScript::RemoveNotBetween, EFFECT_0, TARGET_UNIT_SRC_AREA_ENEMY);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_halion_twilight_cutter_SpellScript();
         }
@@ -1692,13 +1692,13 @@ class spell_halion_twilight_phasing : public SpellScriptLoader
                 caster->GetMap()->SummonCreature(NPC_TWILIGHT_HALION, HalionSpawnPos);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnHit += SpellHitFn(spell_halion_twilight_phasing_SpellScript::Phase);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_halion_twilight_phasing_SpellScript();
         }
@@ -1726,14 +1726,14 @@ class spell_halion_summon_exit_portals : public SpellScriptLoader
                 dest.RelocateOffset(offset);
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnDestinationTargetSelect += SpellDestinationTargetSelectFn(spell_halion_summon_exit_portals_SpellScript::SetDest0, EFFECT_0, TARGET_DEST_CASTER);
                 OnDestinationTargetSelect += SpellDestinationTargetSelectFn(spell_halion_summon_exit_portals_SpellScript::SetDest1, EFFECT_1, TARGET_DEST_CASTER);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_halion_summon_exit_portals_SpellScript();
         }

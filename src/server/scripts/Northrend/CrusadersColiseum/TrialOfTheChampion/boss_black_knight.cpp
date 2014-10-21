@@ -81,39 +81,14 @@ public:
 
     struct boss_black_knightAI : public ScriptedAI
     {
-        boss_black_knightAI(Creature* creature) : ScriptedAI(creature)
+        boss_black_knightAI(Creature* creature) : ScriptedAI(creature), summons(creature)
         {
+            Initialize();
             instance = creature->GetInstanceScript();
         }
 
-        InstanceScript* instance;
-
-        std::list<uint64> SummonList;
-
-        bool bEventInProgress;
-        bool bEvent;
-        bool bSummonArmy;
-        bool bDeathArmyDone;
-
-        uint8 uiPhase;
-
-        uint32 uiPlagueStrikeTimer;
-        uint32 uiIcyTouchTimer;
-        uint32 uiDeathRespiteTimer;
-        uint32 uiObliterateTimer;
-        uint32 uiDesecration;
-        uint32 uiResurrectTimer;
-        uint32 uiDeathArmyCheckTimer;
-        uint32 uiGhoulExplodeTimer;
-        uint32 uiDeathBiteTimer;
-        uint32 uiMarkedDeathTimer;
-
-        void Reset() OVERRIDE
+        void Initialize()
         {
-            RemoveSummons();
-            me->SetDisplayId(me->GetNativeDisplayId());
-            me->ClearUnitState(UNIT_STATE_ROOT | UNIT_STATE_STUNNED);
-
             bEventInProgress = false;
             bEvent = false;
             bSummonArmy = false;
@@ -133,27 +108,49 @@ public:
             uiMarkedDeathTimer = urand(5000, 7000);
         }
 
-        void RemoveSummons()
-        {
-            if (SummonList.empty())
-                return;
+        InstanceScript* instance;
 
-            for (std::list<uint64>::const_iterator itr = SummonList.begin(); itr != SummonList.end(); ++itr)
-            {
-                if (Creature* temp = Unit::GetCreature(*me, *itr))
-                    if (temp)
-                        temp->DisappearAndDie();
-            }
-            SummonList.clear();
+        SummonList summons;
+
+        bool bEventInProgress;
+        bool bEvent;
+        bool bSummonArmy;
+        bool bDeathArmyDone;
+
+        uint8 uiPhase;
+
+        uint32 uiPlagueStrikeTimer;
+        uint32 uiIcyTouchTimer;
+        uint32 uiDeathRespiteTimer;
+        uint32 uiObliterateTimer;
+        uint32 uiDesecration;
+        uint32 uiResurrectTimer;
+        uint32 uiDeathArmyCheckTimer;
+        uint32 uiGhoulExplodeTimer;
+        uint32 uiDeathBiteTimer;
+        uint32 uiMarkedDeathTimer;
+
+        void Reset() override
+        {
+            summons.DespawnAll();
+            me->SetDisplayId(me->GetNativeDisplayId());
+            me->ClearUnitState(UNIT_STATE_ROOT | UNIT_STATE_STUNNED);
+
+            Initialize();
         }
 
-        void JustSummoned(Creature* summon) OVERRIDE
+        void JustSummoned(Creature* summon) override
         {
-            SummonList.push_back(summon->GetGUID());
+            summons.Summon(summon);
             summon->AI()->AttackStart(me->GetVictim());
         }
 
-        void UpdateAI(uint32 uiDiff) OVERRIDE
+        void SummonedCreatureDespawn(Creature* summon) override
+        {
+            summons.Despawn(summon);
+        }
+
+        void UpdateAI(uint32 uiDiff) override
         {
             //Return since we have no target
             if (!UpdateVictim())
@@ -268,14 +265,14 @@ public:
                 DoMeleeAttackIfReady();
         }
 
-        void DamageTaken(Unit* /*pDoneBy*/, uint32& uiDamage) OVERRIDE
+        void DamageTaken(Unit* /*pDoneBy*/, uint32& uiDamage) override
         {
             if (uiDamage > me->GetHealth() && uiPhase <= PHASE_SKELETON)
             {
                 uiDamage = 0;
                 me->SetHealth(0);
                 me->AddUnitState(UNIT_STATE_ROOT | UNIT_STATE_STUNNED);
-                RemoveSummons();
+                summons.DespawnAll();
                 switch (uiPhase)
                 {
                     case PHASE_UNDEAD:
@@ -289,7 +286,7 @@ public:
             }
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             DoCast(me, SPELL_KILL_CREDIT);
 
@@ -297,7 +294,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return GetInstanceAI<boss_black_knightAI>(creature);
     }
@@ -310,16 +307,24 @@ public:
 
     struct npc_risen_ghoulAI : public ScriptedAI
     {
-        npc_risen_ghoulAI(Creature* creature) : ScriptedAI(creature) { }
+        npc_risen_ghoulAI(Creature* creature) : ScriptedAI(creature)
+        {
+            Initialize();
+        }
 
-        uint32 uiAttackTimer;
-
-        void Reset() OVERRIDE
+        void Initialize()
         {
             uiAttackTimer = 3500;
         }
 
-        void UpdateAI(uint32 uiDiff) OVERRIDE
+        uint32 uiAttackTimer;
+
+        void Reset() override
+        {
+            Initialize();
+        }
+
+        void UpdateAI(uint32 uiDiff) override
         {
             if (!UpdateVictim())
                 return;
@@ -338,7 +343,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_risen_ghoulAI(creature);
     }
@@ -353,25 +358,21 @@ public:
     {
         npc_black_knight_skeletal_gryphonAI(Creature* creature) : npc_escortAI(creature)
         {
-            Start(false, true, 0, NULL);
+            Start(false, true);
         }
 
-        void WaypointReached(uint32 /*waypointId*/) OVERRIDE
-        {
+        void WaypointReached(uint32 /*waypointId*/) override { }
 
-        }
-
-        void UpdateAI(uint32 uiDiff) OVERRIDE
+        void UpdateAI(uint32 uiDiff) override
         {
             npc_escortAI::UpdateAI(uiDiff);
 
-            if (!UpdateVictim())
-                return;
+            UpdateVictim();
         }
 
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_black_knight_skeletal_gryphonAI(creature);
     }

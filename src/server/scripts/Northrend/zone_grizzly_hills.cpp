@@ -64,7 +64,7 @@ public:
     {
         npc_emilyAI(Creature* creature) : npc_escortAI(creature) { }
 
-        void JustSummoned(Creature* summoned) OVERRIDE
+        void JustSummoned(Creature* summoned) override
         {
             if (Creature* Mrfloppy = GetClosestCreatureWithEntry(me, NPC_MRFLOPPY, 50.0f))
                 summoned->AI()->AttackStart(Mrfloppy);
@@ -72,7 +72,7 @@ public:
                 summoned->AI()->AttackStart(me->GetVictim());
         }
 
-        void WaypointReached(uint32 waypointId) OVERRIDE
+        void WaypointReached(uint32 waypointId) override
         {
             Player* player = GetPlayerForEscort();
             if (!player)
@@ -85,18 +85,18 @@ public:
                         _mrfloppyGUID = Mrfloppy->GetGUID();
                     break;
                 case 10:
-                    if (Unit::GetCreature(*me, _mrfloppyGUID))
+                    if (ObjectAccessor::GetCreature(*me, _mrfloppyGUID))
                     {
                         Talk(SAY_WORGHAGGRO1);
                         me->SummonCreature(NPC_HUNGRY_WORG, me->GetPositionX()+5, me->GetPositionY()+2, me->GetPositionZ()+1, 3.229f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 120000);
                     }
                     break;
                 case 11:
-                    if (Creature* Mrfloppy = Unit::GetCreature(*me, _mrfloppyGUID))
+                    if (Creature* Mrfloppy = ObjectAccessor::GetCreature(*me, _mrfloppyGUID))
                         Mrfloppy->GetMotionMaster()->MoveFollow(me, PET_FOLLOW_DIST, PET_FOLLOW_ANGLE);
                     break;
                 case 17:
-                    if (Creature* Mrfloppy = Unit::GetCreature(*me, _mrfloppyGUID))
+                    if (Creature* Mrfloppy = ObjectAccessor::GetCreature(*me, _mrfloppyGUID))
                         Mrfloppy->GetMotionMaster()->MovePoint(0, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ());
                     Talk(SAY_WORGRAGGRO3);
                     if (Creature* RWORG = me->SummonCreature(NPC_RAVENOUS_WORG, me->GetPositionX()+10, me->GetPositionY()+8, me->GetPositionZ()+2, 3.229f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 120000))
@@ -106,31 +106,31 @@ public:
                     }
                     break;
                 case 18:
-                    if (Creature* Mrfloppy = Unit::GetCreature(*me, _mrfloppyGUID))
+                    if (Creature* Mrfloppy = ObjectAccessor::GetCreature(*me, _mrfloppyGUID))
                     {
-                        if (Creature* RWORG = Unit::GetCreature(*me, _RavenousworgGUID))
+                        if (Creature* RWORG = ObjectAccessor::GetCreature(*me, _RavenousworgGUID))
                             RWORG->GetMotionMaster()->MovePoint(0, Mrfloppy->GetPositionX(), Mrfloppy->GetPositionY(), Mrfloppy->GetPositionZ());
                         DoCast(Mrfloppy, SPELL_MRFLOPPY);
                     }
                     break;
                 case 19:
-                    if (Creature* Mrfloppy = Unit::GetCreature(*me, _mrfloppyGUID))
+                    if (Creature* Mrfloppy = ObjectAccessor::GetCreature(*me, _mrfloppyGUID))
                     {
-                        if (Mrfloppy->HasAura(SPELL_MRFLOPPY, 0))
+                        if (Mrfloppy->HasAura(SPELL_MRFLOPPY))
                         {
-                            if (Creature* RWORG = Unit::GetCreature(*me, _RavenousworgGUID))
+                            if (Creature* RWORG = ObjectAccessor::GetCreature(*me, _RavenousworgGUID))
                                 Mrfloppy->EnterVehicle(RWORG);
                         }
                     }
                     break;
                 case 20:
-                    if (Creature* RWORG = Unit::GetCreature(*me, _RavenousworgGUID))
+                    if (Creature* RWORG = ObjectAccessor::GetCreature(*me, _RavenousworgGUID))
                         RWORG->HandleEmoteCommand(34);
                     break;
                 case 21:
-                    if (Creature* Mrfloppy = Unit::GetCreature(*me, _mrfloppyGUID))
+                    if (Creature* Mrfloppy = ObjectAccessor::GetCreature(*me, _mrfloppyGUID))
                     {
-                        if (Creature* RWORG = Unit::GetCreature(*me, _RavenousworgGUID))
+                        if (Creature* RWORG = ObjectAccessor::GetCreature(*me, _RavenousworgGUID))
                         {
                             RWORG->Kill(Mrfloppy);
                             Mrfloppy->ExitVehicle();
@@ -141,11 +141,11 @@ public:
                     }
                     break;
                 case 22:
-                    if (Creature* Mrfloppy = Unit::GetCreature(*me, _mrfloppyGUID))
+                    if (Creature* Mrfloppy = ObjectAccessor::GetCreature(*me, _mrfloppyGUID))
                     {
                         if (Mrfloppy->isDead())
                         {
-                            if (Creature* RWORG = Unit::GetCreature(*me, _RavenousworgGUID))
+                            if (Creature* RWORG = ObjectAccessor::GetCreature(*me, _RavenousworgGUID))
                                 RWORG->DisappearAndDie();
                             me->GetMotionMaster()->MovePoint(0, Mrfloppy->GetPositionX(), Mrfloppy->GetPositionY(), Mrfloppy->GetPositionZ());
                             Mrfloppy->setDeathState(ALIVE);
@@ -167,29 +167,29 @@ public:
                     break;
                 case 27:
                     me->DisappearAndDie();
-                    if (Creature* Mrfloppy = Unit::GetCreature(*me, _mrfloppyGUID))
+                    if (Creature* Mrfloppy = ObjectAccessor::GetCreature(*me, _mrfloppyGUID))
                         Mrfloppy->DisappearAndDie();
                     break;
             }
         }
 
-        void EnterCombat(Unit* /*Who*/) OVERRIDE
+        void EnterCombat(Unit* /*Who*/) override
         {
             Talk(SAY_RANDOMAGGRO);
         }
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            _mrfloppyGUID     = 0;
-            _RavenousworgGUID = 0;
+            _mrfloppyGUID.Clear();
+            _RavenousworgGUID.Clear();
         }
 
         private:
-            uint64   _RavenousworgGUID;
-            uint64   _mrfloppyGUID;
+            ObjectGuid   _RavenousworgGUID;
+            ObjectGuid   _mrfloppyGUID;
     };
 
-    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) OVERRIDE
+    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) override
     {
         if (quest->GetQuestId() == QUEST_PERILOUS_ADVENTURE)
         {
@@ -203,7 +203,7 @@ public:
         return true;
     }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_emilyAI(creature);
     }
@@ -219,9 +219,9 @@ public:
     {
         npc_mrfloppyAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Reset() OVERRIDE { }
+        void Reset() override { }
 
-        void EnterCombat(Unit* Who) OVERRIDE
+        void EnterCombat(Unit* Who) override
         {
             if (Creature* Emily = GetClosestCreatureWithEntry(me, NPC_EMILY, 50.0f))
             {
@@ -239,19 +239,19 @@ public:
             }
         }
 
-        void EnterEvadeMode() OVERRIDE { }
+        void EnterEvadeMode() override { }
 
-        void MoveInLineOfSight(Unit* /*who*/) OVERRIDE { }
+        void MoveInLineOfSight(Unit* /*who*/) override { }
 
 
-        void UpdateAI(uint32 /*diff*/) OVERRIDE
+        void UpdateAI(uint32 /*diff*/) override
         {
             if (!UpdateVictim())
                 return;
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_mrfloppyAI(creature);
     }
@@ -279,21 +279,29 @@ public:
 
     struct npc_outhouse_bunnyAI : public ScriptedAI
     {
-        npc_outhouse_bunnyAI(Creature* creature) : ScriptedAI(creature) { }
-
-        void Reset() OVERRIDE
+        npc_outhouse_bunnyAI(Creature* creature) : ScriptedAI(creature)
         {
-            _counter = 0;
-            _gender  = 0;
+            Initialize();
         }
 
-        void SetData(uint32 Type, uint32 Data) OVERRIDE
+        void Initialize()
+        {
+            _counter = 0;
+            _gender = 0;
+        }
+
+        void Reset() override
+        {
+            Initialize();
+        }
+
+        void SetData(uint32 Type, uint32 Data) override
         {
             if (Type == 1)
                 _gender = Data;
         }
 
-        void SpellHit(Unit* Caster, const SpellInfo* Spell) OVERRIDE
+        void SpellHit(Unit* Caster, const SpellInfo* Spell) override
         {
              if (Spell->Id == SPELL_OUTHOUSE_GROANS)
              {
@@ -320,7 +328,7 @@ public:
             uint8 _gender;
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_outhouse_bunnyAI(creature);
     }
@@ -341,14 +349,22 @@ public:
 
     struct npc_tallhorn_stagAI : public ScriptedAI
     {
-        npc_tallhorn_stagAI(Creature* creature) : ScriptedAI(creature) { }
+        npc_tallhorn_stagAI(Creature* creature) : ScriptedAI(creature)
+        {
+            Initialize();
+        }
 
-        void Reset() OVERRIDE
+        void Initialize()
         {
             _phase = 1;
         }
 
-        void UpdateAI(uint32 /*diff*/) OVERRIDE
+        void Reset() override
+        {
+            Initialize();
+        }
+
+        void UpdateAI(uint32 /*diff*/) override
         {
             if (_phase == 1)
             {
@@ -366,7 +382,7 @@ public:
             uint8 _phase;
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_tallhorn_stagAI(creature);
     }
@@ -395,7 +411,7 @@ public:
     {
         npc_amberpine_woodsmanAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             if (me->FindNearestCreature(NPC_TALLHORN_STAG, 0.2f))
             {
@@ -405,7 +421,7 @@ public:
                 _events.ScheduleEvent(EVENT_WOODSMAN_1, 0);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             _events.Update(diff);
 
@@ -431,7 +447,7 @@ public:
             EventMap _events;
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_amberpine_woodsmanAI(creature);
     }
@@ -459,21 +475,28 @@ public:
 
     struct npc_wounded_skirmisherAI : public ScriptedAI
     {
-        npc_wounded_skirmisherAI(Creature* creature) : ScriptedAI(creature) { }
-
-        void Reset() OVERRIDE
+        npc_wounded_skirmisherAI(Creature* creature) : ScriptedAI(creature)
         {
-            _despawnTimer = 5000;
-            _playerGUID = 0;
+            Initialize();
         }
 
-        void MovementInform(uint32, uint32 id) OVERRIDE
+        void Initialize()
+        {
+            _despawnTimer = 5000;
+        }
+
+        void Reset() override
+        {
+            Initialize();
+        }
+
+        void MovementInform(uint32, uint32 id) override
         {
             if (id == 1)
                 me->DespawnOrUnsummon(_despawnTimer);
         }
 
-        void SpellHit(Unit* caster, const SpellInfo* spell) OVERRIDE
+        void SpellHit(Unit* caster, const SpellInfo* spell) override
         {
             if (spell->Id == SPELL_RENEW_SKIRMISHER && caster->GetTypeId() == TYPEID_PLAYER
                 && caster->ToPlayer()->GetQuestStatus(QUEST_OVERWHELMED) == QUEST_STATUS_INCOMPLETE)
@@ -490,7 +513,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 /*diff*/) OVERRIDE
+        void UpdateAI(uint32 /*diff*/) override
         {
             if (!UpdateVictim())
                 return;
@@ -498,11 +521,10 @@ public:
             DoMeleeAttackIfReady();
         }
         private:
-            uint64 _playerGUID;
             uint32 _despawnTimer;
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_wounded_skirmisherAI(creature);
     }
@@ -540,15 +562,15 @@ public:
     {
         npc_venture_co_stragglerAI(Creature* creature) : ScriptedAI(creature) { }
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            _playerGUID   = 0;
+            _playerGUID.Clear();
 
             me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_IMMUNE_TO_PC);
             me->SetReactState(REACT_AGGRESSIVE);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             _events.Update(diff);
 
@@ -590,7 +612,7 @@ public:
             DoMeleeAttackIfReady();
         }
 
-        void SpellHit(Unit* caster, SpellInfo const* spell) OVERRIDE
+        void SpellHit(Unit* caster, SpellInfo const* spell) override
         {
             if (spell->Id == SPELL_SMOKE_BOMB && caster->GetTypeId() == TYPEID_PLAYER)
             {
@@ -604,10 +626,10 @@ public:
 
         private:
             EventMap _events;
-            uint64 _playerGUID;
+            ObjectGuid _playerGUID;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_venture_co_stragglerAI(creature);
         }
@@ -653,17 +675,25 @@ public:
 
         struct npc_lake_frogAI : public ScriptedAI
         {
-            npc_lake_frogAI(Creature* creature) : ScriptedAI(creature) { }
+            npc_lake_frogAI(Creature* creature) : ScriptedAI(creature)
+            {
+                Initialize();
+            }
 
-            void Reset() OVERRIDE
+            void Initialize()
             {
                 _following = false;
                 _runningScript = false;
+            }
+
+            void Reset() override
+            {
+                Initialize();
                 if (me->GetEntry() == NPC_LAKE_FROG_QUEST)
                     me->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (_following)
                     if (!me->HasAura(SPELL_FROG_LOVE))
@@ -702,7 +732,7 @@ public:
                 }
             }
 
-            void ReceiveEmote(Player* player, uint32 emote) OVERRIDE
+            void ReceiveEmote(Player* player, uint32 emote) override
             {
                 if (_following || _runningScript)
                     return;
@@ -718,7 +748,7 @@ public:
                         if (me->GetEntry() == NPC_LAKE_FROG)
                         {
                             me->AddAura(SPELL_FROG_LOVE, me);
-                            me->GetMotionMaster()->MoveFollow(player, 0.3f, frand(M_PI/2, M_PI + (M_PI/2)));
+                            me->GetMotionMaster()->MoveFollow(player, 0.3f, frand(float(M_PI) / 2, float(M_PI) + (float(M_PI) / 2)));
                             _following = true;
                         }
                         else if (me->GetEntry() == NPC_LAKE_FROG_QUEST)
@@ -732,7 +762,7 @@ public:
                 }
             }
 
-            void sGossipSelect(Player* player, uint32 /*sender*/, uint32 /*action*/) OVERRIDE
+            void sGossipSelect(Player* player, uint32 /*sender*/, uint32 /*action*/) override
             {
                 DoCast(player, SPELL_SUMMON_ASHWOOD_BRAND);
             }
@@ -743,7 +773,7 @@ public:
             bool   _runningScript;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_lake_frogAI(creature);
         }
@@ -763,7 +793,7 @@ class spell_shredder_delivery : public SpellScriptLoader
         {
             PrepareSpellScript(spell_shredder_delivery_SpellScript);
 
-            bool Load() OVERRIDE
+            bool Load() override
             {
                 return GetCaster()->GetTypeId() == TYPEID_UNIT;
             }
@@ -774,13 +804,13 @@ class spell_shredder_delivery : public SpellScriptLoader
                     GetCaster()->ToCreature()->DespawnOrUnsummon();
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectHitTarget += SpellEffectFn(spell_shredder_delivery_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_shredder_delivery_SpellScript();
         }

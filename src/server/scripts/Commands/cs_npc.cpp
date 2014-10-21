@@ -43,6 +43,7 @@ struct EnumName
 #define CREATE_NAMED_ENUM(VALUE) { VALUE, STRINGIZE(VALUE) }
 
 #define NPCFLAG_COUNT   24
+#define FLAGS_EXTRA_COUNT 16
 
 EnumName<NPCFlags, int32> const npcFlagTexts[NPCFLAG_COUNT] =
 {
@@ -144,12 +145,32 @@ EnumName<UnitFlags> const unitFlags[MAX_UNIT_FLAGS] =
     CREATE_NAMED_ENUM(UNIT_FLAG_UNK_31)
 };
 
+EnumName<CreatureFlagsExtra> const flagsExtra[FLAGS_EXTRA_COUNT] =
+{
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_INSTANCE_BIND),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_CIVILIAN),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_NO_PARRY),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_NO_PARRY_HASTEN),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_NO_BLOCK),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_NO_CRUSH),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_NO_XP_AT_KILL),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_TRIGGER),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_NO_TAUNT),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_WORLDEVENT),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_GUARD),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_NO_CRIT),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_NO_SKILLGAIN),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_TAUNT_DIMINISH),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_ALL_DIMINISH),
+    CREATE_NAMED_ENUM(CREATURE_FLAG_EXTRA_DUNGEON_BOSS)
+};
+
 class npc_commandscript : public CommandScript
 {
 public:
     npc_commandscript() : CommandScript("npc_commandscript") { }
 
-    ChatCommand* GetCommands() const OVERRIDE
+    ChatCommand* GetCommands() const override
     {
         static ChatCommand npcAddCommandTable[] =
         {
@@ -226,14 +247,6 @@ public:
         if (!charID)
             return false;
 
-        char* team = strtok(NULL, " ");
-        int32 teamval = 0;
-        if (team)
-            teamval = atoi(team);
-
-        if (teamval < 0)
-            teamval = 0;
-
         uint32 id  = atoi(charID);
         if (!sObjectMgr->GetCreatureTemplate(id))
             return false;
@@ -265,7 +278,7 @@ public:
         }
 
         Creature* creature = new Creature();
-        if (!creature->Create(sObjectMgr->GenerateLowGuid(HIGHGUID_UNIT), map, chr->GetPhaseMaskForSpawn(), id, 0, (uint32)teamval, x, y, z, o))
+        if (!creature->Create(sObjectMgr->GenerateLowGuid(HIGHGUID_UNIT), map, chr->GetPhaseMaskForSpawn(), id, x, y, z, o))
         {
             delete creature;
             return false;
@@ -508,7 +521,7 @@ public:
                 return false;
 
             if (CreatureData const* cr_data = sObjectMgr->GetCreatureData(lowguid))
-                unit = handler->GetSession()->GetPlayer()->GetMap()->GetCreature(MAKE_NEW_GUID(lowguid, cr_data->id, HIGHGUID_UNIT));
+                unit = handler->GetSession()->GetPlayer()->GetMap()->GetCreature(ObjectGuid(HIGHGUID_UNIT, cr_data->id, lowguid));
         }
         else
             unit = handler->getSelectedCreature();
@@ -596,17 +609,13 @@ public:
 
         // Update in memory..
         if (CreatureTemplate const* cinfo = creature->GetCreatureTemplate())
-        {
-            const_cast<CreatureTemplate*>(cinfo)->faction_A = factionId;
-            const_cast<CreatureTemplate*>(cinfo)->faction_H = factionId;
-        }
+            const_cast<CreatureTemplate*>(cinfo)->faction = factionId;
 
         // ..and DB
         PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_UPD_CREATURE_FACTION);
 
         stmt->setUInt16(0, uint16(factionId));
-        stmt->setUInt16(1, uint16(factionId));
-        stmt->setUInt32(2, creature->GetEntry());
+        stmt->setUInt32(1, creature->GetEntry());
 
         WorldDatabase.Execute(stmt);
 
@@ -672,8 +681,8 @@ public:
         }
 
         creature->AI()->SetData(data_1, data_2);
-        std::string AIorScript = creature->GetAIName() != "" ? "AI type: " + creature->GetAIName() : (creature->GetScriptName() != "" ? "Script Name: " + creature->GetScriptName() : "No AI or Script Name Set");
-        handler->PSendSysMessage(LANG_NPC_SETDATA, creature->GetGUID(), creature->GetEntry(), creature->GetName().c_str(), data_1, data_2, AIorScript.c_str());
+        std::string AIorScript = !creature->GetAIName().empty() ? "AI type: " + creature->GetAIName() : (!creature->GetScriptName().empty() ? "Script Name: " + creature->GetScriptName() : "No AI or Script Name Set");
+        handler->PSendSysMessage(LANG_NPC_SETDATA, creature->GetGUID().GetCounter(), creature->GetEntry(), creature->GetName().c_str(), data_1, data_2, AIorScript.c_str());
         return true;
     }
 
@@ -727,6 +736,7 @@ public:
         handler->PSendSysMessage(LANG_NPCINFO_LEVEL, target->getLevel());
         handler->PSendSysMessage(LANG_NPCINFO_EQUIPMENT, target->GetCurrentEquipmentId(), target->GetOriginalEquipmentId());
         handler->PSendSysMessage(LANG_NPCINFO_HEALTH, target->GetCreateHealth(), target->GetMaxHealth(), target->GetHealth());
+        handler->PSendSysMessage(LANG_NPCINFO_INHABIT_TYPE, cInfo->InhabitType);
 
         handler->PSendSysMessage(LANG_NPCINFO_UNIT_FIELD_FLAGS, target->GetUInt32Value(UNIT_FIELD_FLAGS));
         for (uint8 i = 0; i < MAX_UNIT_FLAGS; ++i)
@@ -741,14 +751,18 @@ public:
         handler->PSendSysMessage(LANG_NPCINFO_ARMOR, target->GetArmor());
         handler->PSendSysMessage(LANG_NPCINFO_POSITION, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ());
         handler->PSendSysMessage(LANG_NPCINFO_AIINFO, target->GetAIName().c_str(), target->GetScriptName().c_str());
+        handler->PSendSysMessage(LANG_NPCINFO_FLAGS_EXTRA, cInfo->flags_extra);
+        for (uint8 i = 0; i < FLAGS_EXTRA_COUNT; ++i)
+            if (cInfo->flags_extra & flagsExtra[i].Value)
+                handler->PSendSysMessage("%s (0x%X)", flagsExtra[i].Name, flagsExtra[i].Value);
 
         for (uint8 i = 0; i < NPCFLAG_COUNT; i++)
             if (npcflags & npcFlagTexts[i].Value)
                 handler->PSendSysMessage(npcFlagTexts[i].Name, npcFlagTexts[i].Value);
 
         handler->PSendSysMessage(LANG_NPCINFO_MECHANIC_IMMUNE, mechanicImmuneMask);
-        for (uint8 i = 0; i < MAX_MECHANIC; ++i)
-            if ((mechanicImmuneMask << 1) & mechanicImmunes[i].Value)
+        for (uint8 i = 1; i < MAX_MECHANIC; ++i)
+            if (mechanicImmuneMask & (1 << (mechanicImmunes[i].Value - 1)))
                 handler->PSendSysMessage("%s (0x%X)", mechanicImmunes[i].Name, mechanicImmunes[i].Value);
 
         return true;
@@ -1208,7 +1222,7 @@ public:
             return false;
         }
 
-        creature->MonsterSay(args, LANG_UNIVERSAL, NULL);
+        creature->Say(args, LANG_UNIVERSAL);
 
         // make some emotes
         char lastchar = args[strlen(args) - 1];
@@ -1237,7 +1251,7 @@ public:
             return false;
         }
 
-        creature->MonsterTextEmote(args, 0);
+        creature->TextEmote(args);
 
         return true;
     }
@@ -1283,30 +1297,21 @@ public:
     static bool HandleNpcWhisperCommand(ChatHandler* handler, char const* args)
     {
         if (!*args)
+        {
+            handler->SendSysMessage(LANG_CMD_SYNTAX);
+            handler->SetSentErrorMessage(true);
             return false;
+        }
 
         char* receiver_str = strtok((char*)args, " ");
         char* text = strtok(NULL, "");
 
-        Creature* creature = handler->getSelectedCreature();
-        if (!creature || !receiver_str || !text)
+        if (!receiver_str || !text)
+        {
+            handler->SendSysMessage(LANG_CMD_SYNTAX);
+            handler->SetSentErrorMessage(true);
             return false;
-
-        uint64 receiver_guid = atol(receiver_str);
-
-        // check online security
-        Player* receiver = ObjectAccessor::FindPlayer(receiver_guid);
-        if (handler->HasLowerSecurity(receiver, 0))
-            return false;
-
-        creature->MonsterWhisper(text, receiver);
-        return true;
-    }
-
-    static bool HandleNpcYellCommand(ChatHandler* handler, char const* args)
-    {
-        if (!*args)
-            return false;
+        }
 
         Creature* creature = handler->getSelectedCreature();
         if (!creature)
@@ -1316,7 +1321,35 @@ public:
             return false;
         }
 
-        creature->MonsterYell(args, LANG_UNIVERSAL, NULL);
+        ObjectGuid receiver_guid(HIGHGUID_PLAYER, uint32(atol(receiver_str)));
+
+        // check online security
+        Player* receiver = ObjectAccessor::FindPlayer(receiver_guid);
+        if (handler->HasLowerSecurity(receiver, ObjectGuid::Empty))
+            return false;
+
+        creature->Whisper(text, LANG_UNIVERSAL, receiver);
+        return true;
+    }
+
+    static bool HandleNpcYellCommand(ChatHandler* handler, char const* args)
+    {
+        if (!*args)
+        {
+            handler->SendSysMessage(LANG_CMD_SYNTAX);
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
+
+        Creature* creature = handler->getSelectedCreature();
+        if (!creature)
+        {
+            handler->SendSysMessage(LANG_SELECT_CREATURE);
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
+
+        creature->Yell(args, LANG_UNIVERSAL);
 
         // make an emote
         creature->HandleEmoteCommand(EMOTE_ONESHOT_SHOUT);
@@ -1389,7 +1422,7 @@ public:
         // place pet before player
         float x, y, z;
         player->GetClosePoint (x, y, z, creatureTarget->GetObjectSize(), CONTACT_DISTANCE);
-        pet->Relocate(x, y, z, M_PI-player->GetOrientation());
+        pet->Relocate(x, y, z, float(M_PI) - player->GetOrientation());
 
         // set pet to defensive mode by default (some classes can't control controlled pets in fact).
         pet->SetReactState(REACT_DEFENSIVE);
@@ -1444,8 +1477,8 @@ public:
         FormationInfo* group_member;
 
         group_member                 = new FormationInfo;
-        group_member->follow_angle   = (creature->GetAngle(chr) - chr->GetOrientation()) * 180 / M_PI;
-        group_member->follow_dist    = sqrtf(pow(chr->GetPositionX() - creature->GetPositionX(), int(2))+pow(chr->GetPositionY() - creature->GetPositionY(), int(2)));
+        group_member->follow_angle   = (creature->GetAngle(chr) - chr->GetOrientation()) * 180 / float(M_PI);
+        group_member->follow_dist    = std::sqrt(std::pow(chr->GetPositionX() - creature->GetPositionX(), 2.f) + std::pow(chr->GetPositionY() - creature->GetPositionY(), 2.f));
         group_member->leaderGUID     = leaderGUID;
         group_member->groupAI        = 0;
 

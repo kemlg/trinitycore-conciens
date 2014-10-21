@@ -70,22 +70,27 @@ public:
     {
         boss_vaelAI(Creature* creature) : BossAI(creature, BOSS_VAELASTRAZ)
         {
+            Initialize();
             creature->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
             creature->setFaction(35);
             creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
         }
 
-        void Reset() OVERRIDE
+        void Initialize()
+        {
+            PlayerGUID.Clear();
+            HasYelled = false;
+        }
+
+        void Reset() override
         {
             _Reset();
 
             me->SetStandState(UNIT_STAND_STATE_DEAD);
-            PlayerGUID = 0;
-
-            HasYelled = false;
+            Initialize();
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             _EnterCombat();
 
@@ -109,15 +114,15 @@ public:
             events.ScheduleEvent(EVENT_SPEECH_1, 1000);
         }
 
-        void KilledUnit(Unit* victim) OVERRIDE
+        void KilledUnit(Unit* victim) override
         {
-            if (rand()%5)
+            if (rand32() % 5)
                 return;
 
             Talk(SAY_KILLTARGET, victim);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             events.Update(diff);
 
@@ -146,8 +151,8 @@ public:
                             break;
                         case EVENT_SPEECH_4:
                             me->setFaction(103);
-                            if (PlayerGUID && Unit::GetUnit(*me, PlayerGUID))
-                                AttackStart(Unit::GetUnit(*me, PlayerGUID));;
+                            if (PlayerGUID && ObjectAccessor::GetUnit(*me, PlayerGUID))
+                                AttackStart(ObjectAccessor::GetUnit(*me, PlayerGUID));;
                             break;
                     }
                 }
@@ -200,7 +205,7 @@ public:
                         break;
                     case EVENT_BURNINGADRENALINE_TANK:
                         // have the victim cast the spell on himself otherwise the third effect aura will be applied to Vael instead of the player
-                        me->GetVictim()->CastSpell(me->GetVictim(), SPELL_BURNINGADRENALINE, true);
+                        me->EnsureVictim()->CastSpell(me->GetVictim(), SPELL_BURNINGADRENALINE, true);
                         events.ScheduleEvent(EVENT_BURNINGADRENALINE_TANK, 45000);
                         break;
                 }
@@ -216,7 +221,7 @@ public:
             DoMeleeAttackIfReady();
         }
 
-        void sGossipSelect(Player* player, uint32 sender, uint32 action) OVERRIDE
+        void sGossipSelect(Player* player, uint32 sender, uint32 action) override
         {
             if (sender == GOSSIP_ID && action == 0)
             {
@@ -226,11 +231,11 @@ public:
         }
 
         private:
-            uint64 PlayerGUID;
+            ObjectGuid PlayerGUID;
             bool HasYelled;
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new boss_vaelAI(creature);
     }

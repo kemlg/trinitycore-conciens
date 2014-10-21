@@ -32,6 +32,8 @@
 #define CONTACT_DISTANCE            0.5f
 #define INTERACTION_DISTANCE        5.0f
 #define ATTACK_DISTANCE             5.0f
+#define INSPECT_DISTANCE            28.0f
+#define TRADE_DISTANCE              11.11f
 #define MAX_VISIBILITY_DISTANCE     SIZE_OF_GRIDS           // max distance for visible objects
 #define SIGHT_RANGE_UNIT            50.0f
 #define DEFAULT_VISIBILITY_DISTANCE 90.0f                   // default visible distance, 90 yards on continents
@@ -43,35 +45,6 @@
 #define MIN_MELEE_REACH             2.0f
 #define NOMINAL_MELEE_RANGE         5.0f
 #define MELEE_RANGE                 (NOMINAL_MELEE_RANGE - MIN_MELEE_REACH * 2) //center to center for players
-
-enum TypeMask
-{
-    TYPEMASK_OBJECT         = 0x0001,
-    TYPEMASK_ITEM           = 0x0002,
-    TYPEMASK_CONTAINER      = 0x0006,                       // TYPEMASK_ITEM | 0x0004
-    TYPEMASK_UNIT           = 0x0008,                       // creature
-    TYPEMASK_PLAYER         = 0x0010,
-    TYPEMASK_GAMEOBJECT     = 0x0020,
-    TYPEMASK_DYNAMICOBJECT  = 0x0040,
-    TYPEMASK_CORPSE         = 0x0080,
-    TYPEMASK_SEER           = TYPEMASK_PLAYER | TYPEMASK_UNIT | TYPEMASK_DYNAMICOBJECT
-};
-
-enum TypeID
-{
-    TYPEID_OBJECT        = 0,
-    TYPEID_ITEM          = 1,
-    TYPEID_CONTAINER     = 2,
-    TYPEID_UNIT          = 3,
-    TYPEID_PLAYER        = 4,
-    TYPEID_GAMEOBJECT    = 5,
-    TYPEID_DYNAMICOBJECT = 6,
-    TYPEID_CORPSE        = 7
-};
-
-#define NUM_CLIENT_OBJECT_TYPES             8
-
-uint32 GuidHigh2TypeId(uint32 guid_hi);
 
 enum TempSummonType
 {
@@ -114,7 +87,7 @@ class WorldObject;
 class WorldPacket;
 class ZoneScript;
 
-typedef UNORDERED_MAP<Player*, UpdateData> UpdateDataMapType;
+typedef std::unordered_map<Player*, UpdateData> UpdateDataMapType;
 
 class Object
 {
@@ -126,11 +99,11 @@ class Object
         virtual void AddToWorld();
         virtual void RemoveFromWorld();
 
-        uint64 GetGUID() const { return GetUInt64Value(0); }
-        uint32 GetGUIDLow() const { return GUID_LOPART(GetUInt64Value(0)); }
-        uint32 GetGUIDMid() const { return GUID_ENPART(GetUInt64Value(0)); }
-        uint32 GetGUIDHigh() const { return GUID_HIPART(GetUInt64Value(0)); }
-        const ByteBuffer& GetPackGUID() const { return m_PackGUID; }
+        ObjectGuid GetGUID() const { return GetGuidValue(OBJECT_FIELD_GUID); }
+        uint32 GetGUIDLow() const { return GetGuidValue(OBJECT_FIELD_GUID).GetCounter(); }
+        uint32 GetGUIDMid() const { return GetGuidValue(OBJECT_FIELD_GUID).GetEntry(); }
+        uint32 GetGUIDHigh() const { return GetGuidValue(OBJECT_FIELD_GUID).GetHigh(); }
+        PackedGuid const& GetPackGUID() const { return m_PackGUID; }
         uint32 GetEntry() const { return GetUInt32Value(OBJECT_FIELD_ENTRY); }
         void SetEntry(uint32 entry) { SetUInt32Value(OBJECT_FIELD_ENTRY, entry); }
 
@@ -138,7 +111,7 @@ class Object
         virtual void SetObjectScale(float scale) { SetFloatValue(OBJECT_FIELD_SCALE_X, scale); }
 
         TypeID GetTypeId() const { return m_objectTypeId; }
-        bool isType(uint16 mask) const { return (mask & m_objectType); }
+        bool isType(uint16 mask) const { return (mask & m_objectType) != 0; }
 
         virtual void BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) const;
         void SendUpdateToPlayer(Player* player);
@@ -155,6 +128,7 @@ class Object
         float GetFloatValue(uint16 index) const;
         uint8 GetByteValue(uint16 index, uint8 offset) const;
         uint16 GetUInt16Value(uint16 index, uint8 offset) const;
+        ObjectGuid GetGuidValue(uint16 index) const;
 
         void SetInt32Value(uint16 index, int32 value);
         void SetUInt32Value(uint16 index, uint32 value);
@@ -164,11 +138,12 @@ class Object
         void SetByteValue(uint16 index, uint8 offset, uint8 value);
         void SetUInt16Value(uint16 index, uint8 offset, uint16 value);
         void SetInt16Value(uint16 index, uint8 offset, int16 value) { SetUInt16Value(index, offset, (uint16)value); }
+        void SetGuidValue(uint16 index, ObjectGuid value);
         void SetStatFloatValue(uint16 index, float value);
         void SetStatInt32Value(uint16 index, int32 value);
 
-        bool AddUInt64Value(uint16 index, uint64 value);
-        bool RemoveUInt64Value(uint16 index, uint64 value);
+        bool AddGuidValue(uint16 index, ObjectGuid value);
+        bool RemoveGuidValue(uint16 index, ObjectGuid value);
 
         void ApplyModUInt32Value(uint16 index, int32 val, bool apply);
         void ApplyModInt32Value(uint16 index, int32 val, bool apply);
@@ -204,7 +179,7 @@ class Object
         void BuildFieldsUpdate(Player*, UpdateDataMapType &) const;
 
         void SetFieldNotifyFlag(uint16 flag) { _fieldNotifyFlags |= flag; }
-        void RemoveFieldNotifyFlag(uint16 flag) { _fieldNotifyFlags &= ~flag; }
+        void RemoveFieldNotifyFlag(uint16 flag) { _fieldNotifyFlags &= uint16(~flag); }
 
         // FG: some hacky helpers
         void ForceValuesUpdateAtIndex(uint32);
@@ -263,12 +238,12 @@ class Object
     private:
         bool m_inWorld;
 
-        ByteBuffer m_PackGUID;
+        PackedGuid m_PackGUID;
 
         // for output helpfull error messages from asserts
         bool PrintIndexError(uint32 index, bool set) const;
-        Object(const Object&);                              // prevent generation copy constructor
-        Object& operator=(Object const&);                   // prevent generation assigment operator
+        Object(Object const& right) = delete;
+        Object& operator=(Object const& right) = delete;
 };
 
 struct Position
@@ -330,10 +305,10 @@ struct Position
         { x = m_positionX; y = m_positionY; z = m_positionZ; }
     void GetPosition(float &x, float &y, float &z, float &o) const
         { x = m_positionX; y = m_positionY; z = m_positionZ; o = m_orientation; }
-    void GetPosition(Position* pos) const
+
+    Position GetPosition() const
     {
-        if (pos)
-            pos->Relocate(m_positionX, m_positionY, m_positionZ, m_orientation);
+        return *this;
     }
 
     Position::PositionXYZStreamer PositionXYZStream()
@@ -350,19 +325,19 @@ struct Position
     float GetExactDist2dSq(float x, float y) const
         { float dx = m_positionX - x; float dy = m_positionY - y; return dx*dx + dy*dy; }
     float GetExactDist2d(const float x, const float y) const
-        { return sqrt(GetExactDist2dSq(x, y)); }
+        { return std::sqrt(GetExactDist2dSq(x, y)); }
     float GetExactDist2dSq(Position const* pos) const
         { float dx = m_positionX - pos->m_positionX; float dy = m_positionY - pos->m_positionY; return dx*dx + dy*dy; }
     float GetExactDist2d(Position const* pos) const
-        { return sqrt(GetExactDist2dSq(pos)); }
+        { return std::sqrt(GetExactDist2dSq(pos)); }
     float GetExactDistSq(float x, float y, float z) const
         { float dz = m_positionZ - z; return GetExactDist2dSq(x, y) + dz*dz; }
     float GetExactDist(float x, float y, float z) const
-        { return sqrt(GetExactDistSq(x, y, z)); }
+        { return std::sqrt(GetExactDistSq(x, y, z)); }
     float GetExactDistSq(Position const* pos) const
         { float dx = m_positionX - pos->m_positionX; float dy = m_positionY - pos->m_positionY; float dz = m_positionZ - pos->m_positionZ; return dx*dx + dy*dy + dz*dz; }
     float GetExactDist(Position const* pos) const
-        { return sqrt(GetExactDistSq(pos)); }
+        { return std::sqrt(GetExactDistSq(pos)); }
 
     void GetPositionOffsetTo(Position const & endPos, Position & retOffset) const;
 
@@ -393,11 +368,11 @@ struct Position
         if (o < 0)
         {
             float mod = o *-1;
-            mod = fmod(mod, 2.0f * static_cast<float>(M_PI));
+            mod = std::fmod(mod, 2.0f * static_cast<float>(M_PI));
             mod = -mod + 2.0f * static_cast<float>(M_PI);
             return mod;
         }
-        return fmod(o, 2.0f * static_cast<float>(M_PI));
+        return std::fmod(o, 2.0f * static_cast<float>(M_PI));
     }
 };
 ByteBuffer& operator>>(ByteBuffer& buf, Position::PositionXYZOStreamer const& streamer);
@@ -408,7 +383,7 @@ ByteBuffer& operator<<(ByteBuffer& buf, Position::PositionXYZOStreamer const& st
 struct MovementInfo
 {
     // common
-    uint64 guid;
+    ObjectGuid guid;
     uint32 flags;
     uint16 flags2;
     Position pos;
@@ -419,14 +394,14 @@ struct MovementInfo
     {
         void Reset()
         {
-            guid = 0;
+            guid.Clear();
             pos.Relocate(0.0f, 0.0f, 0.0f, 0.0f);
             seat = -1;
             time = 0;
             time2 = 0;
         }
 
-        uint64 guid;
+        ObjectGuid guid;
         Position pos;
         int8 seat;
         uint32 time;
@@ -455,7 +430,7 @@ struct MovementInfo
     float splineElevation;
 
     MovementInfo() :
-        guid(0), flags(0), flags2(0), time(0), pitch(0.0f), fallTime(0), splineElevation(0.0f)
+        guid(), flags(0), flags2(0), time(0), pitch(0.0f), fallTime(0), splineElevation(0.0f)
     {
         pos.Relocate(0.0f, 0.0f, 0.0f, 0.0f);
         transport.Reset();
@@ -466,11 +441,11 @@ struct MovementInfo
     void SetMovementFlags(uint32 flag) { flags = flag; }
     void AddMovementFlag(uint32 flag) { flags |= flag; }
     void RemoveMovementFlag(uint32 flag) { flags &= ~flag; }
-    bool HasMovementFlag(uint32 flag) const { return flags & flag; }
+    bool HasMovementFlag(uint32 flag) const { return (flags & flag) != 0; }
 
     uint16 GetExtraMovementFlags() const { return flags2; }
     void AddExtraMovementFlag(uint16 flag) { flags2 |= flag; }
-    bool HasExtraMovementFlag(uint16 flag) const { return flags2 & flag; }
+    bool HasExtraMovementFlag(uint16 flag) const { return (flags2 & flag) != 0; }
 
     void SetFallTime(uint32 time) { fallTime = time; }
 
@@ -482,12 +457,29 @@ struct MovementInfo
 class WorldLocation : public Position
 {
     public:
-        explicit WorldLocation(uint32 _mapid = MAPID_INVALID, float _x = 0, float _y = 0, float _z = 0, float _o = 0)
-            : m_mapId(_mapid) { Relocate(_x, _y, _z, _o); }
-        WorldLocation(const WorldLocation &loc) : Position(loc) { WorldRelocate(loc); }
+        explicit WorldLocation(uint32 _mapId = MAPID_INVALID, float _x = 0.f, float _y = 0.f, float _z = 0.f, float _o = 0.f)
+            : Position(_x, _y, _z, _o), m_mapId(_mapId) { }
 
-        void WorldRelocate(const WorldLocation &loc)
-            { m_mapId = loc.GetMapId(); Relocate(loc); }
+        WorldLocation(WorldLocation const& loc)
+            : Position(loc), m_mapId(loc.GetMapId()) { }
+
+        void WorldRelocate(WorldLocation const& loc)
+        {
+            m_mapId = loc.GetMapId();
+            Relocate(loc);
+        }
+
+        void WorldRelocate(uint32 _mapId = MAPID_INVALID, float _x = 0.f, float _y = 0.f, float _z = 0.f, float _o = 0.f)
+        {
+            m_mapId = _mapId;
+            Relocate(_x, _y, _z, _o);
+        }
+
+        WorldLocation GetWorldLocation() const
+        {
+            return *this;
+        }
+
         uint32 GetMapId() const { return m_mapId; }
 
         uint32 m_mapId;
@@ -497,6 +489,8 @@ template<class T>
 class GridObject
 {
     public:
+        virtual ~GridObject() { }
+
         bool IsInGrid() const { return _gridRef.isValid(); }
         void AddToGrid(GridRefManager<T>& m) { ASSERT(!IsInGrid()); _gridRef.link(&m, (T*)this); }
         void RemoveFromGrid() { ASSERT(IsInGrid()); _gridRef.unlink(); }
@@ -570,16 +564,16 @@ class WorldObject : public Object, public WorldLocation
         virtual void Update (uint32 /*time_diff*/) { }
 
         void _Create(uint32 guidlow, HighGuid guidhigh, uint32 phaseMask);
-        virtual void RemoveFromWorld();
+        virtual void RemoveFromWorld() override;
 
         void GetNearPoint2D(float &x, float &y, float distance, float absAngle) const;
         void GetNearPoint(WorldObject const* searcher, float &x, float &y, float &z, float searcher_size, float distance2d, float absAngle) const;
         void GetClosePoint(float &x, float &y, float &z, float size, float distance2d = 0, float angle = 0) const;
         void MovePosition(Position &pos, float dist, float angle);
-        void GetNearPosition(Position &pos, float dist, float angle);
+        Position GetNearPosition(float dist, float angle);
         void MovePositionToFirstCollision(Position &pos, float dist, float angle);
-        void GetFirstCollisionPosition(Position &pos, float dist, float angle);
-        void GetRandomNearPosition(Position &pos, float radius);
+        Position GetFirstCollisionPosition(float dist, float angle);
+        Position GetRandomNearPosition(float radius);
         void GetContactPoint(WorldObject const* obj, float &x, float &y, float &z, float distance2d = CONTACT_DISTANCE) const;
 
         float GetObjectSize() const;
@@ -587,14 +581,14 @@ class WorldObject : public Object, public WorldLocation
         void UpdateAllowedPositionZ(float x, float y, float &z) const;
 
         void GetRandomPoint(Position const &srcPos, float distance, float &rand_x, float &rand_y, float &rand_z) const;
-        void GetRandomPoint(Position const &srcPos, float distance, Position &pos) const;
+        Position GetRandomPoint(Position const &srcPos, float distance) const;
 
         uint32 GetInstanceId() const { return m_InstanceId; }
 
         virtual void SetPhaseMask(uint32 newPhaseMask, bool update);
         uint32 GetPhaseMask() const { return m_phaseMask; }
         bool InSamePhase(WorldObject const* obj) const;
-        bool InSamePhase(uint32 phasemask) const { return (GetPhaseMask() & phasemask); }
+        bool InSamePhase(uint32 phasemask) const { return (GetPhaseMask() & phasemask) != 0; }
 
         uint32 GetZoneId() const;
         uint32 GetAreaId() const;
@@ -629,8 +623,8 @@ class WorldObject : public Object, public WorldLocation
         bool IsInRange(WorldObject const* obj, float minRange, float maxRange, bool is3D = true) const;
         bool IsInRange2d(float x, float y, float minRange, float maxRange) const;
         bool IsInRange3d(float x, float y, float z, float minRange, float maxRange) const;
-        bool isInFront(WorldObject const* target, float arc = M_PI) const;
-        bool isInBack(WorldObject const* target, float arc = M_PI) const;
+        bool isInFront(WorldObject const* target, float arc = float(M_PI)) const;
+        bool isInBack(WorldObject const* target, float arc = float(M_PI)) const;
 
         bool IsInBetween(WorldObject const* obj1, WorldObject const* obj2, float size = 0) const;
 
@@ -642,19 +636,10 @@ class WorldObject : public Object, public WorldLocation
 
         virtual uint8 getLevelForTarget(WorldObject const* /*target*/) const { return 1; }
 
-        void MonsterSay(const char* text, uint32 language, WorldObject const* target);
-        void MonsterYell(const char* text, uint32 language, WorldObject const* target);
-        void MonsterTextEmote(const char* text, WorldObject const* target, bool IsBossEmote = false);
-        void MonsterWhisper(const char* text, Player const* target, bool IsBossWhisper = false);
-        void MonsterSay(int32 textId, uint32 language, WorldObject const* target);
-        void MonsterYell(int32 textId, uint32 language, WorldObject const* target);
-        void MonsterTextEmote(int32 textId, WorldObject const* target, bool IsBossEmote = false);
-        void MonsterWhisper(int32 textId, Player const* target, bool IsBossWhisper = false);
-
         void PlayDistanceSound(uint32 sound_id, Player* target = NULL);
         void PlayDirectSound(uint32 sound_id, Player* target = NULL);
 
-        void SendObjectDeSpawnAnim(uint64 guid);
+        void SendObjectDeSpawnAnim(ObjectGuid guid);
 
         virtual void SaveRespawnTime() { }
         void AddObjectToRemoveList();
@@ -673,9 +658,6 @@ class WorldObject : public Object, public WorldLocation
         FlaggedValuesArray32<int32, uint32, ServerSideVisibilityType, TOTAL_SERVERSIDE_VISIBILITY_TYPES> m_serverSideVisibility;
         FlaggedValuesArray32<int32, uint32, ServerSideVisibilityType, TOTAL_SERVERSIDE_VISIBILITY_TYPES> m_serverSideVisibilityDetect;
 
-        // Low Level Packets
-        void SendPlaySound(uint32 Sound, bool OnlySelf);
-
         virtual void SetMap(Map* map);
         virtual void ResetMap();
         Map* GetMap() const { ASSERT(m_currMap); return m_currMap; }
@@ -690,7 +672,7 @@ class WorldObject : public Object, public WorldLocation
 
         TempSummon* SummonCreature(uint32 id, Position const &pos, TempSummonType spwtype = TEMPSUMMON_MANUAL_DESPAWN, uint32 despwtime = 0, uint32 vehId = 0) const;
         TempSummon* SummonCreature(uint32 id, float x, float y, float z, float ang = 0, TempSummonType spwtype = TEMPSUMMON_MANUAL_DESPAWN, uint32 despwtime = 0) const;
-        GameObject* SummonGameObject(uint32 entry, float x, float y, float z, float ang, float rotation0, float rotation1, float rotation2, float rotation3, uint32 respawnTime);
+        GameObject* SummonGameObject(uint32 entry, float x, float y, float z, float ang, float rotation0, float rotation1, float rotation2, float rotation3, uint32 respawnTime /* s */);
         Creature*   SummonTrigger(float x, float y, float z, float ang, uint32 dur, CreatureAI* (*GetAI)(Creature*) = NULL);
         void SummonCreatureGroup(uint8 group, std::list<TempSummon*>* list = NULL);
 
@@ -703,13 +685,13 @@ class WorldObject : public Object, public WorldLocation
 
         void DestroyForNearbyPlayers();
         virtual void UpdateObjectVisibility(bool forced = true);
-        void BuildUpdate(UpdateDataMapType&);
+        void BuildUpdate(UpdateDataMapType&) override;
 
         //relocation and visibility system functions
         void AddToNotify(uint16 f) { m_notifyflags |= f;}
-        bool isNeedNotify(uint16 f) const { return m_notifyflags & f;}
+        bool isNeedNotify(uint16 f) const { return (m_notifyflags & f) != 0; }
         uint16 GetNotifyFlags() const { return m_notifyflags; }
-        bool NotifyExecuted(uint16 f) const { return m_executed_notifies & f;}
+        bool NotifyExecuted(uint16 f) const { return (m_executed_notifies & f) != 0; }
         void SetNotified(uint16 f) { m_executed_notifies |= f;}
         void ResetAllNotifies() { m_notifyflags = 0; m_executed_notifies = 0; }
 
@@ -741,7 +723,7 @@ class WorldObject : public Object, public WorldLocation
         float GetTransOffsetO() const { return m_movementInfo.transport.pos.GetOrientation(); }
         uint32 GetTransTime()   const { return m_movementInfo.transport.time; }
         int8 GetTransSeat()     const { return m_movementInfo.transport.seat; }
-        virtual uint64 GetTransGUID()   const;
+        virtual ObjectGuid GetTransGUID() const;
         void SetTransport(Transport* t) { m_transport = t; }
 
         MovementInfo m_movementInfo;
@@ -795,14 +777,16 @@ namespace Trinity
     class ObjectDistanceOrderPred
     {
         public:
-            ObjectDistanceOrderPred(WorldObject const* pRefObj, bool ascending = true) : m_refObj(pRefObj), m_ascending(ascending) { }
-            bool operator()(WorldObject const* pLeft, WorldObject const* pRight) const
+            ObjectDistanceOrderPred(WorldObject const* refObj, bool ascending = true) : _refObj(refObj), _ascending(ascending) { }
+
+            bool operator()(WorldObject const* left, WorldObject const* right) const
             {
-                return m_ascending ? m_refObj->GetDistanceOrder(pLeft, pRight) : !m_refObj->GetDistanceOrder(pLeft, pRight);
+                return _refObj->GetDistanceOrder(left, right) == _ascending;
             }
+
         private:
-            WorldObject const* m_refObj;
-            const bool m_ascending;
+            WorldObject const* _refObj;
+            bool _ascending;
     };
 }
 

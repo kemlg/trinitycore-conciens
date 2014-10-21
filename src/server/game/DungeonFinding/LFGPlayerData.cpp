@@ -21,7 +21,7 @@ namespace lfg
 {
 
 LfgPlayerData::LfgPlayerData(): m_State(LFG_STATE_NONE), m_OldState(LFG_STATE_NONE),
-    m_Team(0), m_Group(0), m_Roles(0), m_Comment("")
+    m_Team(0), m_Group(), m_Roles(0), m_Comment("")
 { }
 
 LfgPlayerData::~LfgPlayerData() { }
@@ -34,7 +34,7 @@ void LfgPlayerData::SetState(LfgState state)
         case LFG_STATE_FINISHED_DUNGEON:
             m_Roles = 0;
             m_SelectedDungeons.clear();
-            m_Comment = "";
+            m_Comment.clear();
             // No break on purpose
         case LFG_STATE_DUNGEON:
             m_OldState = state;
@@ -54,17 +54,12 @@ void LfgPlayerData::RestoreState()
     m_State = m_OldState;
 }
 
-void LfgPlayerData::SetLockedDungeons(LfgLockMap const& lockStatus)
-{
-    m_LockedDungeons = lockStatus;
-}
-
 void LfgPlayerData::SetTeam(uint8 team)
 {
     m_Team = team;
 }
 
-void LfgPlayerData::SetGroup(uint64 group)
+void LfgPlayerData::SetGroup(ObjectGuid group)
 {
     m_Group = group;
 }
@@ -94,17 +89,12 @@ LfgState LfgPlayerData::GetOldState() const
     return m_OldState;
 }
 
-const LfgLockMap& LfgPlayerData::GetLockedDungeons() const
-{
-    return m_LockedDungeons;
-}
-
 uint8 LfgPlayerData::GetTeam() const
 {
     return m_Team;
 }
 
-uint64 LfgPlayerData::GetGroup() const
+ObjectGuid LfgPlayerData::GetGroup() const
 {
     return m_Group;
 }

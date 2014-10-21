@@ -26,10 +26,10 @@ class CharacterDatabaseConnection : public MySQLConnection
     public:
         //- Constructors for sync and async connections
         CharacterDatabaseConnection(MySQLConnectionInfo& connInfo) : MySQLConnection(connInfo) { }
-        CharacterDatabaseConnection(ACE_Activation_Queue* q, MySQLConnectionInfo& connInfo) : MySQLConnection(q, connInfo) { }
+        CharacterDatabaseConnection(ProducerConsumerQueue<SQLOperation*>* q, MySQLConnectionInfo& connInfo) : MySQLConnection(q, connInfo) { }
 
         //- Loads database type specific prepared statements
-        void DoPrepareStatements();
+        void DoPrepareStatements() override;
 };
 
 typedef DatabaseWorkerPool<CharacterDatabaseConnection> CharacterDatabaseWorkerPool;
@@ -304,8 +304,6 @@ enum CharacterDatabaseStatements
     CHAR_INS_GM_SUBSURVEY,
     CHAR_INS_LAG_REPORT,
 
-    CHAR_SEL_EXPIRED_AUCTIONS,
-
     CHAR_INS_CHARACTER,
     CHAR_UPD_CHARACTER,
 
@@ -533,6 +531,15 @@ enum CharacterDatabaseStatements
     CHAR_SEL_ITEMCONTAINER_MONEY,
     CHAR_DEL_ITEMCONTAINER_MONEY,
     CHAR_INS_ITEMCONTAINER_MONEY,
+
+    CHAR_SEL_PVPSTATS_MAXID,
+    CHAR_INS_PVPSTATS_BATTLEGROUND,
+    CHAR_INS_PVPSTATS_PLAYER,
+
+    CHAR_INS_QUEST_TRACK,
+    CHAR_UPD_QUEST_TRACK_GM_COMPLETE,
+    CHAR_UPD_QUEST_TRACK_COMPLETE_TIME,
+    CHAR_UPD_QUEST_TRACK_ABANDON_TIME,
 
     MAX_CHARACTERDATABASE_STATEMENTS
 };

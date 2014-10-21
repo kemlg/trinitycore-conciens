@@ -1,5 +1,9 @@
 # ![logo](http://www.trinitycore.org/f/public/style_images/1_trinitycore.png) TrinityCore
 
+[![Coverity Scan Build Status](https://scan.coverity.com/projects/435/badge.svg)](https://scan.coverity.com/projects/435) 
+[![Bountysource](https://www.bountysource.com/badge/tracker?tracker_id=1310)](https://www.bountysource.com/trackers/1310-trinity-core?utm_source=1310&utm_medium=shield&utm_campaign=TRACKER_BADGE)  
+`3.3.5`: [![3.3.5 Build Status](https://travis-ci.org/TrinityCore/TrinityCore.svg?branch=master)](https://travis-ci.org/TrinityCore/TrinityCore)
+`4.3.4`: [![4.3.4 Build Status](https://travis-ci.org/TrinityCore/TrinityCore.svg?branch=4.3.4)](https://travis-ci.org/TrinityCore/TrinityCore)
 
 ## Introduction
 
@@ -18,13 +22,12 @@ make pull requests to our [Github repository](https://github.com/TrinityCore/Tri
 For further information on the TrinityCore project, please visit our project
 website at [TrinityCore.org](http://www.trinitycore.org).
 
-
 ## Requirements
 
 + Platform: Linux, Windows or Mac
 + Processor with SSE2 support
-+ ACE ≥ 5.8.3 (included for Windows)
-+ MySQL ≥ 5.1.0 (included for Windows)
++ Boost ≥ 1.49
++ MySQL ≥ 5.1.0
 + CMake ≥ 2.8.11.2 / 2.8.9 (Windows / Linux)
 + OpenSSL ≥ 1.0.0
 + GCC ≥ 4.7.2 (Linux only)
@@ -34,9 +37,9 @@ website at [TrinityCore.org](http://www.trinitycore.org).
 ## Install
 
 Detailed installation guides are available in the wiki for
-[Windows](http://collab.kpsn.org/display/tc/How-to_Win),
-[Linux](http://collab.kpsn.org/display/tc/How-to_Linux) and
-[Mac OSX](http://collab.kpsn.org/display/tc/How-to_Mac).
+[Windows](http://collab.kpsn.org/display/tc/Win),
+[Linux](http://collab.kpsn.org/display/tc/Linux) and
+[Mac OSX](http://collab.kpsn.org/display/tc/Mac).
 
 ## Install: cOncienS flavor
 

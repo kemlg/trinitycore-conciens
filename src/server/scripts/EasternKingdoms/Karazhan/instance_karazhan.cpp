@@ -49,14 +49,22 @@ class instance_karazhan : public InstanceMapScript
 public:
     instance_karazhan() : InstanceMapScript("instance_karazhan", 532) { }
 
-    InstanceScript* GetInstanceScript(InstanceMap* map) const OVERRIDE
+    InstanceScript* GetInstanceScript(InstanceMap* map) const override
     {
         return new instance_karazhan_InstanceMapScript(map);
     }
 
     struct instance_karazhan_InstanceMapScript : public InstanceScript
     {
-        instance_karazhan_InstanceMapScript(Map* map) : InstanceScript(map) { }
+        instance_karazhan_InstanceMapScript(Map* map) : InstanceScript(map)
+        {
+            SetHeaders(DataHeader);
+            memset(&m_auiEncounter, 0, sizeof(m_auiEncounter));
+
+            // 1 - OZ, 2 - HOOD, 3 - RAJ, this never gets altered.
+            m_uiOperaEvent = urand(1, 3);
+            m_uiOzDeathCount = 0;
+        }
 
         uint32 m_auiEncounter[MAX_ENCOUNTER];
         std::string strSaveData;
@@ -64,51 +72,23 @@ public:
         uint32 m_uiOperaEvent;
         uint32 m_uiOzDeathCount;
 
-        uint64 m_uiCurtainGUID;
-        uint64 m_uiStageDoorLeftGUID;
-        uint64 m_uiStageDoorRightGUID;
-        uint64 m_uiKilrekGUID;
-        uint64 m_uiTerestianGUID;
-        uint64 m_uiMoroesGUID;
-        uint64 m_uiLibraryDoor;                                     // Door at Shade of Aran
-        uint64 m_uiMassiveDoor;                                     // Door at Netherspite
-        uint64 m_uiSideEntranceDoor;                                // Side Entrance
-        uint64 m_uiGamesmansDoor;                                   // Door before Chess
-        uint64 m_uiGamesmansExitDoor;                               // Door after Chess
-        uint64 m_uiNetherspaceDoor;                                // Door at Malchezaar
-        uint64 MastersTerraceDoor[2];
-        uint64 ImageGUID;
-        uint64 DustCoveredChest;
+        ObjectGuid m_uiCurtainGUID;
+        ObjectGuid m_uiStageDoorLeftGUID;
+        ObjectGuid m_uiStageDoorRightGUID;
+        ObjectGuid m_uiKilrekGUID;
+        ObjectGuid m_uiTerestianGUID;
+        ObjectGuid m_uiMoroesGUID;
+        ObjectGuid m_uiLibraryDoor;                                     // Door at Shade of Aran
+        ObjectGuid m_uiMassiveDoor;                                     // Door at Netherspite
+        ObjectGuid m_uiSideEntranceDoor;                                // Side Entrance
+        ObjectGuid m_uiGamesmansDoor;                                   // Door before Chess
+        ObjectGuid m_uiGamesmansExitDoor;                               // Door after Chess
+        ObjectGuid m_uiNetherspaceDoor;                                // Door at Malchezaar
+        ObjectGuid MastersTerraceDoor[2];
+        ObjectGuid ImageGUID;
+        ObjectGuid DustCoveredChest;
 
-        void Initialize() OVERRIDE
-        {
-            memset(&m_auiEncounter, 0, sizeof(m_auiEncounter));
-
-            // 1 - OZ, 2 - HOOD, 3 - RAJ, this never gets altered.
-            m_uiOperaEvent      = urand(1, 3);
-            m_uiOzDeathCount    = 0;
-
-            m_uiCurtainGUID         = 0;
-            m_uiStageDoorLeftGUID   = 0;
-            m_uiStageDoorRightGUID  = 0;
-
-            m_uiKilrekGUID      = 0;
-            m_uiTerestianGUID   = 0;
-            m_uiMoroesGUID      = 0;
-
-            m_uiLibraryDoor         = 0;
-            m_uiMassiveDoor         = 0;
-            m_uiSideEntranceDoor    = 0;
-            m_uiGamesmansDoor       = 0;
-            m_uiGamesmansExitDoor   = 0;
-            m_uiNetherspaceDoor     = 0;
-            MastersTerraceDoor[0]= 0;
-            MastersTerraceDoor[1]= 0;
-            ImageGUID = 0;
-            DustCoveredChest    = 0;
-        }
-
-        bool IsEncounterInProgress() const OVERRIDE
+        bool IsEncounterInProgress() const override
         {
             for (uint8 i = 0; i < MAX_ENCOUNTER; ++i)
                 if (m_auiEncounter[i] == IN_PROGRESS)
@@ -117,7 +97,7 @@ public:
             return false;
         }
 
-        void OnCreatureCreate(Creature* creature) OVERRIDE
+        void OnCreatureCreate(Creature* creature) override
         {
             switch (creature->GetEntry())
             {
@@ -127,7 +107,7 @@ public:
             }
         }
 
-        void SetData(uint32 type, uint32 uiData) OVERRIDE
+        void SetData(uint32 type, uint32 uiData) override
         {
             switch (type)
             {
@@ -182,7 +162,7 @@ public:
             }
         }
 
-         void SetData64(uint32 identifier, uint64 data) OVERRIDE
+         void SetGuidData(uint32 identifier, ObjectGuid data) override
          {
              switch (identifier)
              {
@@ -190,7 +170,7 @@ public:
              }
          }
 
-        void OnGameObjectCreate(GameObject* go) OVERRIDE
+        void OnGameObjectCreate(GameObject* go) override
         {
             switch (go->GetEntry())
             {
@@ -236,12 +216,12 @@ public:
             }
         }
 
-        std::string GetSaveData() OVERRIDE
+        std::string GetSaveData() override
         {
             return strSaveData;
         }
 
-        uint32 GetData(uint32 uiData) const OVERRIDE
+        uint32 GetData(uint32 uiData) const override
         {
             switch (uiData)
             {
@@ -264,7 +244,7 @@ public:
             return 0;
         }
 
-        uint64 GetData64(uint32 uiData) const OVERRIDE
+        ObjectGuid GetGuidData(uint32 uiData) const override
         {
             switch (uiData)
             {
@@ -285,7 +265,7 @@ public:
                 case DATA_IMAGE_OF_MEDIVH:          return ImageGUID;
             }
 
-            return 0;
+            return ObjectGuid::Empty;
         }
 
         void Load(char const* chrIn)

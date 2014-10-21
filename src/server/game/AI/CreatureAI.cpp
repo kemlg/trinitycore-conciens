@@ -38,7 +38,7 @@ void CreatureAI::OnCharmed(bool /*apply*/)
 AISpellInfoType* UnitAI::AISpellInfo;
 AISpellInfoType* GetAISpellInfo(uint32 i) { return &CreatureAI::AISpellInfo[i]; }
 
-void CreatureAI::Talk(uint8 id, WorldObject const* whisperTarget /*= NULL*/)
+void CreatureAI::Talk(uint8 id, WorldObject const* whisperTarget /*= nullptr*/)
 {
     sCreatureTextMgr->SendChat(me, id, whisperTarget);
 }
@@ -199,7 +199,8 @@ bool CreatureAI::UpdateVictimWithGaze()
 
     if (Unit* victim = me->SelectVictim())
         AttackStart(victim);
-    return me->GetVictim();
+
+    return me->GetVictim() != nullptr;
 }
 
 bool CreatureAI::UpdateVictim()
@@ -211,7 +212,8 @@ bool CreatureAI::UpdateVictim()
     {
         if (Unit* victim = me->SelectVictim())
             AttackStart(victim);
-        return me->GetVictim();
+
+        return me->GetVictim() != nullptr;
     }
     else if (me->getThreatManager().isThreatListEmpty())
     {
@@ -252,15 +254,13 @@ Creature* CreatureAI::DoSummon(uint32 entry, const Position& pos, uint32 despawn
 
 Creature* CreatureAI::DoSummon(uint32 entry, WorldObject* obj, float radius, uint32 despawnTime, TempSummonType summonType)
 {
-    Position pos;
-    obj->GetRandomNearPosition(pos, radius);
+    Position pos = obj->GetRandomNearPosition(radius);
     return me->SummonCreature(entry, pos, summonType, despawnTime);
 }
 
 Creature* CreatureAI::DoSummonFlyer(uint32 entry, WorldObject* obj, float flightZ, float radius, uint32 despawnTime, TempSummonType summonType)
 {
-    Position pos;
-    obj->GetRandomNearPosition(pos, radius);
+    Position pos = obj->GetRandomNearPosition(radius);
     pos.m_positionZ += flightZ;
     return me->SummonCreature(entry, pos, summonType, despawnTime);
 }

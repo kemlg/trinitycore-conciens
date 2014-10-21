@@ -25,6 +25,7 @@
 
 #include "ScriptMgr.h"
 #include "Chat.h"
+#include "DisableMgr.h"
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "PointMovementGenerator.h"
@@ -41,7 +42,7 @@ class mmaps_commandscript : public CommandScript
 public:
     mmaps_commandscript() : CommandScript("mmaps_commandscript") { }
 
-    ChatCommand* GetCommands() const OVERRIDE
+    ChatCommand* GetCommands() const override
     {
         static ChatCommand mmapCommandTable[] =
         {
@@ -98,7 +99,7 @@ public:
         Movement::PointsArray const& pointPath = path.GetPath();
         handler->PSendSysMessage("%s's path to %s:", target->GetName().c_str(), player->GetName().c_str());
         handler->PSendSysMessage("Building: %s", useStraightPath ? "StraightPath" : "SmoothPath");
-        handler->PSendSysMessage("Result: %s - Length: " SIZEFMTD " - Type: %u", (result ? "true" : "false"), pointPath.size(), path.GetPathType());
+        handler->PSendSysMessage("Result: %s - Length: %zu - Type: %u", (result ? "true" : "false"), pointPath.size(), path.GetPathType());
 
         G3D::Vector3 const &start = path.GetStartPosition();
         G3D::Vector3 const &end = path.GetEndPosition();
@@ -209,7 +210,7 @@ public:
     {
         uint32 mapId = handler->GetSession()->GetPlayer()->GetMapId();
         handler->PSendSysMessage("mmap stats:");
-        handler->PSendSysMessage("  global mmap pathfinding is %sabled", MMAP::MMapFactory::IsPathfindingEnabled(mapId) ? "en" : "dis");
+        handler->PSendSysMessage("  global mmap pathfinding is %sabled", DisableMgr::IsPathfindingEnabled(mapId) ? "en" : "dis");
 
         MMAP::MMapManager* manager = MMAP::MMapFactory::createOrGetMMapManager();
         handler->PSendSysMessage(" %u maps loaded with %u tiles overall", manager->getLoadedMapsCount(), manager->getLoadedTilesCount());
@@ -273,7 +274,7 @@ public:
 
         if (!creatureList.empty())
         {
-            handler->PSendSysMessage("Found " SIZEFMTD " Creatures.", creatureList.size());
+            handler->PSendSysMessage("Found %zu Creatures.", creatureList.size());
 
             uint32 paths = 0;
             uint32 uStartTime = getMSTime();

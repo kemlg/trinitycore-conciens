@@ -26,10 +26,10 @@ class WorldDatabaseConnection : public MySQLConnection
     public:
         //- Constructors for sync and async connections
         WorldDatabaseConnection(MySQLConnectionInfo& connInfo) : MySQLConnection(connInfo) { }
-        WorldDatabaseConnection(ACE_Activation_Queue* q, MySQLConnectionInfo& connInfo) : MySQLConnection(q, connInfo) { }
+        WorldDatabaseConnection(ProducerConsumerQueue<SQLOperation*>* q, MySQLConnectionInfo& connInfo) : MySQLConnection(q, connInfo) { }
 
         //- Loads database type specific prepared statements
-        void DoPrepareStatements();
+        void DoPrepareStatements() override;
 };
 
 typedef DatabaseWorkerPool<WorldDatabaseConnection> WorldDatabaseWorkerPool;
@@ -118,7 +118,8 @@ enum WorldDatabaseStatements
     WORLD_SEL_DISABLES,
     WORLD_INS_DISABLES,
     WORLD_DEL_DISABLES,
-    WORLD_SEL_REQ_XP,
+    WORLD_UPD_CREATURE_ZONE_AREA_DATA,
+    WORLD_UPD_GAMEOBJECT_ZONE_AREA_DATA,
 
     MAX_WORLDDATABASE_STATEMENTS
 };

@@ -65,24 +65,24 @@ class boss_dalliah_the_doomsayer : public CreatureScript
                 soccothratesDeath = false;
             }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 _Reset();
                 soccothratesTaunt = false;
                 soccothratesDeath = false;
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 _JustDied();
                 Talk(SAY_DEATH);
 
-                if (Creature* soccothrates = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_SOCCOTHRATES)))
+                if (Creature* soccothrates = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_SOCCOTHRATES)))
                     if (soccothrates->IsAlive() && !soccothrates->IsInCombat())
                         soccothrates->AI()->SetData(1, 1);
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 _EnterCombat();
                 events.ScheduleEvent(EVENT_GIFT_OF_THE_DOOMSAYER, urand(1000, 4000));
@@ -93,12 +93,12 @@ class boss_dalliah_the_doomsayer : public CreatureScript
                 Talk(SAY_AGGRO);
             }
 
-            void KilledUnit(Unit* /*victim*/) OVERRIDE
+            void KilledUnit(Unit* /*victim*/) override
             {
                 Talk(SAY_SLAY);
             }
 
-            void SetData(uint32 /*type*/, uint32 data) OVERRIDE
+            void SetData(uint32 /*type*/, uint32 data) override
             {
                 switch (data)
                 {
@@ -111,7 +111,7 @@ class boss_dalliah_the_doomsayer : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                 {
@@ -163,7 +163,7 @@ class boss_dalliah_the_doomsayer : public CreatureScript
                             events.ScheduleEvent(EVENT_SHADOW_WAVE, urand(11000, 16000));
                             break;
                         case EVENT_ME_FIRST:
-                            if (Creature* soccothrates = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_SOCCOTHRATES)))
+                            if (Creature* soccothrates = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_SOCCOTHRATES)))
                                 if (soccothrates->IsAlive() && !soccothrates->IsInCombat())
                                     soccothrates->AI()->Talk(SAY_AGGRO_DALLIAH_FIRST);
                             break;
@@ -174,7 +174,7 @@ class boss_dalliah_the_doomsayer : public CreatureScript
 
                 if (HealthBelowPct(25) && !soccothratesTaunt)
                 {
-                    if (Creature* soccothrates = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_SOCCOTHRATES)))
+                    if (Creature* soccothrates = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_SOCCOTHRATES)))
                         soccothrates->AI()->Talk(SAY_DALLIAH_25_PERCENT);
                     soccothratesTaunt = true;
                 }
@@ -187,7 +187,7 @@ class boss_dalliah_the_doomsayer : public CreatureScript
             bool soccothratesDeath;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return GetArcatrazAI<boss_dalliah_the_doomsayerAI>(creature);
         }
