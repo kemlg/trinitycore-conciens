@@ -1545,7 +1545,7 @@ bool ScriptMgr::OnItemUse(Player* player, Item* item, SpellCastTargets const& ta
     ASSERT(player);
     ASSERT(item);
 
-    eb->sendEvent(EVENT_TYPE_ITEM_USE, player, NULL, NULL, item, NULL, &targets);
+    eb->sendEvent(EVENT_TYPE_ITEM_USE, player, NULL, 0, item, NULL, &targets);
     GET_SCRIPT_RET(ItemScript, item->GetScriptId(), tmpscript, false);
     return tmpscript->OnUse(player, item, targets);
 }
@@ -1555,7 +1555,7 @@ bool ScriptMgr::OnItemExpire(Player* player, ItemTemplate const* proto)
     ASSERT(player);
     ASSERT(proto);
 
-    eb->sendEvent(EVENT_TYPE_ITEM_EXPIRE, player, NULL, NULL, NULL, NULL, NULL, proto);
+    eb->sendEvent(EVENT_TYPE_ITEM_EXPIRE, player, NULL, 0, NULL, NULL, NULL, proto);
     GET_SCRIPT_RET(ItemScript, proto->ScriptId, tmpscript, false);
     return tmpscript->OnExpire(player, proto);
 }
@@ -1565,7 +1565,7 @@ bool ScriptMgr::OnItemRemove(Player* player, Item* item)
     ASSERT(player);
     ASSERT(item);
 
-    eb->sendEvent(EVENT_TYPE_ITEM_REMOVE, player, NULL, NULL, item);
+    eb->sendEvent(EVENT_TYPE_ITEM_REMOVE, player, NULL, 0, item);
     GET_SCRIPT_RET(ItemScript, item->GetScriptId(), tmpscript, false);
     return tmpscript->OnRemove(player, item);
 }
@@ -1643,7 +1643,7 @@ void ScriptMgr::OnWeatherChange(Weather* weather, WeatherState state, float grad
 {
     ASSERT(weather);
 
-    eb->sendEvent(EVENT_TYPE_WEATHER_CHANGE, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, weather, state, grade);
+    eb->sendEvent(EVENT_TYPE_WEATHER_CHANGE, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, weather, state, grade);
     GET_SCRIPT(WeatherScript, weather->GetScriptId(), tmpscript);
     tmpscript->OnChange(weather, state, grade);
 }
@@ -1652,7 +1652,7 @@ void ScriptMgr::OnWeatherUpdate(Weather* weather, uint32 diff)
 {
     ASSERT(weather);
     
-    eb->sendEvent(EVENT_TYPE_WEATHER_UPDATE, NULL, NULL, diff, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, weather);
+    eb->sendEvent(EVENT_TYPE_WEATHER_UPDATE, NULL, NULL, diff, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, weather);
     GET_SCRIPT(WeatherScript, weather->GetScriptId(), tmpscript);
     tmpscript->OnUpdate(weather, diff);
 }
@@ -1662,7 +1662,7 @@ void ScriptMgr::OnAuctionAdd(AuctionHouseObject* ah, AuctionEntry* entry)
     ASSERT(ah);
     ASSERT(entry);
 
-    eb->sendEvent(EVENT_TYPE_AUCTION_ADD, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ah, entry);
+    eb->sendEvent(EVENT_TYPE_AUCTION_ADD, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, NULL, ah, entry);
     FOREACH_SCRIPT(AuctionHouseScript)->OnAuctionAdd(ah, entry);
 }
 
@@ -1671,7 +1671,7 @@ void ScriptMgr::OnAuctionRemove(AuctionHouseObject* ah, AuctionEntry* entry)
     ASSERT(ah);
     ASSERT(entry);
 
-    eb->sendEvent(EVENT_TYPE_AUCTION_REMOVE, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ah, entry);
+    eb->sendEvent(EVENT_TYPE_AUCTION_REMOVE, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, NULL, ah, entry);
     FOREACH_SCRIPT(AuctionHouseScript)->OnAuctionRemove(ah, entry);
 }
 
@@ -1680,7 +1680,7 @@ void ScriptMgr::OnAuctionSuccessful(AuctionHouseObject* ah, AuctionEntry* entry)
     ASSERT(ah);
     ASSERT(entry);
 
-    eb->sendEvent(EVENT_TYPE_AUCTION_SUCCESSFUL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ah, entry);
+    eb->sendEvent(EVENT_TYPE_AUCTION_SUCCESSFUL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, NULL, ah, entry);
     FOREACH_SCRIPT(AuctionHouseScript)->OnAuctionSuccessful(ah, entry);
 }
 
@@ -1689,7 +1689,7 @@ void ScriptMgr::OnAuctionExpire(AuctionHouseObject* ah, AuctionEntry* entry)
     ASSERT(ah);
     ASSERT(entry);
 
-    eb->sendEvent(EVENT_TYPE_AUCTION_EXPIRE, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ah, entry);
+    eb->sendEvent(EVENT_TYPE_AUCTION_EXPIRE, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, NULL, ah, entry);
     FOREACH_SCRIPT(AuctionHouseScript)->OnAuctionExpire(ah, entry);
 }
 
@@ -1829,7 +1829,7 @@ bool ScriptMgr::OnCriteriaCheck(uint32 scriptId, Player* source, Unit* target)
 // Player
 void ScriptMgr::OnPVPKill(Player* killer, Player* killed)
 {
-    eb->sendEvent(EVENT_TYPE_PVP_KILL, killer, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, killed);
+    eb->sendEvent(EVENT_TYPE_PVP_KILL, killer, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, killed);
     FOREACH_SCRIPT(PlayerScript)->OnPVPKill(killer, killed);
 }
 
@@ -1906,25 +1906,25 @@ void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::stri
 
 void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::string& msg, Player* receiver)
 {
-    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str(), NULL, NULL, NULL, NULL, NULL, receiver);
+    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str(), NULL, NULL, NULL, 0, 0, receiver);
     FOREACH_SCRIPT(PlayerScript)->OnChat(player, type, lang, msg, receiver);
 }
 
 void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::string& msg, Group* group)
 {
-    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str(), NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, group);
+    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str(), NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, group);
     FOREACH_SCRIPT(PlayerScript)->OnChat(player, type, lang, msg, group);
 }
 
 void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::string& msg, Guild* guild)
 {
-    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str(), NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, guild);
+    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str(), NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, guild);
     FOREACH_SCRIPT(PlayerScript)->OnChat(player, type, lang, msg, guild);
 }
 
 void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::string& msg, Channel* channel)
 {
-    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str(), NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, channel);
+    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str(), NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, channel);
     FOREACH_SCRIPT(PlayerScript)->OnChat(player, type, lang, msg, channel);
 }
 
@@ -1942,7 +1942,7 @@ void ScriptMgr::OnPlayerTextEmote(Player* player, uint32 textEmote, uint32 emote
 
 void ScriptMgr::OnPlayerSpellCast(Player* player, Spell* spell, bool skipCheck)
 {
-   eb->sendEvent(EVENT_TYPE_PLAYER_SPELL_CAST, player, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, spell);
+   eb->sendEvent(EVENT_TYPE_PLAYER_SPELL_CAST, player, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, spell);
    FOREACH_SCRIPT(PlayerScript)->OnSpellCast(player, spell, skipCheck);
 }
 
@@ -1966,6 +1966,11 @@ void ScriptMgr::OnPlayerCreate(Player* player)
 
 void ScriptMgr::OnPlayerDelete(ObjectGuid guid, uint32 accountId)
 {
+    std::ostringstream sin;
+    sin << guid;
+    std::string intAsString(sin.str());
+    // TODO: complete fields
+    eb->sendEvent(EVENT_TYPE_PLAYER_DELETE, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, intAsString.c_str());
     FOREACH_SCRIPT(PlayerScript)->OnDelete(guid, accountId);
 }
 

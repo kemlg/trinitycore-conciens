@@ -120,7 +120,7 @@ private:
 const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT_TYPE_ITEM_EXPIRE",
   "EVENT_TYPE_GOSSIP_HELLO", "EVENT_TYPE_GOSSIP_SELECT", "EVENT_TYPE_GOSSIP_SELECT_CODE",
   "EVENT_TYPE_GOSSIP_HELLO_OBJECT", "EVENT_TYPE_GOSSIP_SELECT_OBJECT", "EVENT_TYPE_GOSSIP_SELECT_CODE_OBJECT",
-  "EVENT_TYPE_QUEST_ACCEPT", "EVENT_TYPE_QUEST_SELECT", "EVENT_TYPE_QUEST_COMPLETE", "EVENT_TYPE_QUEST_REWARD",
+  "EVENT_TYPE_QUEST_ACCEPT", "EVENT_TYPE_QUEST_SELECT", "EVENT_TYPE_QUEST_STATUS_CHANGE", "EVENT_TYPE_QUEST_REWARD",
   "EVENT_TYPE_GET_DIALOG_STATUS", "EVENT_TYPE_QUEST_ACCEPT_OBJECT", "EVENT_TYPE_QUEST_SELECT_OBJECT",
   "EVENT_TYPE_QUEST_COMPLETE_OBJECT", "EVENT_TYPE_QUEST_REWARD_OBJECT", "EVENT_TYPE_GET_DIALOG_STATUS_OBJECT",
   "EVENT_TYPE_OBJECT_CHANGED", "EVENT_TYPE_OBJECT_UPDATE", "EVENT_TYPE_AREA_TRIGGER", "EVENT_TYPE_WEATHER_CHANGE",
@@ -233,7 +233,7 @@ static bool updateCreature(uint64 guid)
 	WorldSession* ws = itr->second;
 	if(ws->GetPlayer())
 	{
-	    Creature *obj = sObjectAccessor->GetCreatureOrPetOrVehicle(*ws->GetPlayer(), guid);
+	    Creature *obj = sObjectAccessor->GetCreatureOrPetOrVehicle(*ws->GetPlayer(), ObjectGuid(guid));
 	    int phaseMask = obj->GetPhaseMask();
 	    int tmpPhaseMask = phaseMask == 2 ? 3 : 2;
 	    obj->SendUpdateToPlayer(ws->GetPlayer());
@@ -306,33 +306,34 @@ static bool createGameObject(int objectId, int mapId, double x, double y, double
 
 void processActions(rapidjson::Document& d)
 {
-    for(rapidjson::Value::ConstValueIterator itr = d["actions"].Begin(); itr != d["actions"].End(); ++itr)
+  for(rapidjson::Value::ConstValueIterator itr = d["actions"].Begin(); itr != d["actions"].End(); ++itr)
+  {
+    const rapidjson::Value& action = *itr;
+    const char* actionId = action["action-id"].GetString();
+    const ObjectGuid guid(HIGHGUID_UNIT, (uint32)295, (uint32)80346);
+
+    if(!strcmp(actionId, "create"))
     {
-	const rapidjson::Value& action = *itr;
-	const char* actionId = action["action-id"].GetString();
-	
-	if(!strcmp(actionId, "create"))
-	{
-	    createGameObject(action["object-id"].GetInt(), action["map-id"].GetInt(), action["x"].GetDouble(),
-			     action["y"].GetDouble(), action["z"].GetDouble(), action["o"].GetDouble());
-	}
-	else if(!strcmp(actionId, "reload-quests"))
-	{
-	    reloadAllQuests();
-	}
-	else if(!strcmp(actionId, "add-quest"))
-	{
-	    addQuestToDB();
-	    reloadAllQuests();
-	    updateCreature(MAKE_NEW_GUID(80346, 295, HIGHGUID_UNIT));
-	}
-	else if(!strcmp(actionId, "remove-quest"))
-	{
-	    removeQuestFromDB();
-	    reloadAllQuests();
-	    updateCreature(MAKE_NEW_GUID(80346, 295, HIGHGUID_UNIT));
-	}
+      createGameObject(action["object-id"].GetInt(), action["map-id"].GetInt(), action["x"].GetDouble(),
+          action["y"].GetDouble(), action["z"].GetDouble(), action["o"].GetDouble());
     }
+    else if(!strcmp(actionId, "reload-quests"))
+    {
+      reloadAllQuests();
+    }
+    else if(!strcmp(actionId, "add-quest"))
+    {
+      addQuestToDB();
+      reloadAllQuests();
+      updateCreature(guid);
+    }
+    else if(!strcmp(actionId, "remove-quest"))
+    {
+      removeQuestFromDB();
+      reloadAllQuests();
+      updateCreature(guid);
+    }
+  }
 }
 
 bool checkPortTCP(short int dwPort, const char *ipAddressStr)

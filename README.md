@@ -42,7 +42,7 @@ Windows, Linux and OS X.
 ## Install: cOncienS flavor
 
 ```bash
-sudo apt-get install libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev
+sudo apt-get install libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev
 git clone https://github.com/mrtazz/restclient-cpp
 cd restclient-cpp/
 ./autogen.sh
@@ -61,12 +61,17 @@ cmake ../ -DPREFIX=/home/trinity/server -DCONF_DIR=/home/trinity/server/conf -DL
 make
 make install
 scp sergio@192.168.1.42:WoW.zip .
+export LANGUAGE=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+sudo locale-gen en_US.UTF-8
+sudo dpkg-reconfigure locales
 cd WoW/
 cd Data/
 cp ../../gameobject335/patch-g.mpq .
+cd ..
 ~/server/bin/mapextractor
 cp ~/gameobject335/GameObjectDisplayInfo.dbc dbc/
-ls dbc/
 rm -fR Buildings/
 ~/server/bin/vmap4extractor
 mkdir ~/server/data
@@ -80,19 +85,18 @@ cd server/
 cd conf/
 cp worldserver.conf.dist worldserver.conf
 cp authserver.conf.dist authserver.conf
-vi authserver.conf
+# Configure DB
 vi worldserver.conf
-wget http://www.trinitycore.org/f/files/getdownload/969-tdb-full-updates/
-mv index.html   TDB_full_335.53_2014_03_29.7z
-7z x TDB_full_335.53_2014_03_29.7z
+vi authserver.conf
+cd
+wget http://www.trinitycore.org/f/files/getdownload/1266-legacy-tdb-335-full/
+mv index.html TDB_full_335.57_2014_10_19.7z
+7z x TDB_full_335.57_2014_10_19.7z
 mysql -u root -p < trinitycore-conciens/sql/create/create_mysql.sql
-mysql -u root -p < trinitycore-conciens/sql/base/*
-mysql -u root -p < trinitycore-conciens/sql/base/auth_database.sql 
 mysql -u root -p auth < trinitycore-conciens/sql/base/auth_database.sql 
 mysql -u root -p characters < trinitycore-conciens/sql/base/characters_database.sql 
-mysql -u root -p characters < trinitycore-conciens/sql/updates/characters/2014_03_29_00_characters_groups.sql 
-mysql -u root -p world < TDB_full_335.53_2014_03_29.sql 
-mysql -u root -p characters < trinitycore-conciens/sql/updates/world/2014_0*.sql
+mysql -u root -p world < TDB_full_335.57_2014_10_19.sql
+mysql -u root -p world < trinitycore-conciens/sql/updates/world/2014_10*.sql
 cd
 ```
 
