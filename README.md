@@ -85,9 +85,13 @@ cd server/
 cd conf/
 cp worldserver.conf.dist worldserver.conf
 cp authserver.conf.dist authserver.conf
-# Configure DB
+# Configure DB and BindIP
 vi worldserver.conf
 vi authserver.conf
+# Configure realm, e.g. insert into
+realmlist(id,name,address,localAddress,localSubnetMask,port,icon,flag,timezone,allowedSecurityLevel,population,gamebuild)
+values(1,"Trinity","130.211.62.241","10.240.183.175","255.255.0.0",8085,0,2,1,0,0,12340);
+mysql -u root -p auth
 cd
 wget http://www.trinitycore.org/f/files/getdownload/1266-legacy-tdb-335-full/
 mv index.html TDB_full_335.57_2014_10_19.7z
