@@ -556,10 +556,9 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	  d->AddMember("quest", jsonQuest, a);
 	}
 
-	if(targets != NULL) {
-	  jsonTarget.AddMember("guid", targets->GetUnitTarget()->GetGUIDLow(), a);
-	  jsonTarget.AddMember("name", rapidjson::StringRef(targets->GetUnitTarget()->GetName().c_str()), a);
-	  jsonTarget.AddMember("level", targets->GetUnitTarget()->getLevel(), a);
+	if(targets != NULL && targets->GetObjectTarget() != NULL) {
+	  jsonTarget.AddMember("guid", targets->GetObjectTarget()->GetGUIDLow(), a);
+	  jsonTarget.AddMember("name", rapidjson::StringRef(targets->GetObjectTarget()->GetName().c_str()), a);
 	  d->AddMember("target", jsonTarget, a);
 	}
 
