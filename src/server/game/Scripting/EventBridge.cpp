@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <stdio.h>
+#include <ctime>
 
 #include "EventBridge.h"
 #include "Config.h"
@@ -441,6 +442,9 @@ EventBridge::~EventBridge()
 	// TODO Auto-generated destructor stub
 }
 
+std::tm epoch_strt = {0, 0, 0, 1, 0, 70, 0, 0, -1, 0, 0};
+std::time_t basetime = std::mktime(&epoch_strt);
+
 void EventBridge::sendEvent(const int event_type, const Player* player, const Creature* creature, const uint32 num,
 			    const Item* item, const Quest* quest, const SpellCastTargets* targets,
 			    const ItemTemplate* proto, const uint32 num2, const char* st, const GameObject* go,
@@ -472,7 +476,10 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	rapidjson::Document::AllocatorType& a = d->GetAllocator();
 	d->SetObject();
 	
-    d->AddMember(rapidjson::StringRef("timestamp"), sWorld->GetGameTime());
+  std::time_t curtime = sWorld->GetGameTime();
+  uint32 nsecs = std::difftime(curtime, basetime);
+
+  d->AddMember(rapidjson::StringRef("timestamp"), nsecs, a);
 	d->AddMember(rapidjson::StringRef("event-type"), rapidjson::StringRef(idToEventType[event_type]), a);
 	
 	jsonNums.PushBack(num, a).PushBack(num2, a);
