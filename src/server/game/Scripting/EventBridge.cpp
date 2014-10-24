@@ -472,6 +472,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	rapidjson::Document::AllocatorType& a = d->GetAllocator();
 	d->SetObject();
 	
+    d->AddMember(rapidjson::StringRef("timestamp"), sWorld->GetGameTime());
 	d->AddMember(rapidjson::StringRef("event-type"), rapidjson::StringRef(idToEventType[event_type]), a);
 	
 	jsonNums.PushBack(num, a).PushBack(num2, a);
