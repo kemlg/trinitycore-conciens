@@ -40,6 +40,7 @@
 #include "MapManager.h"
 #include "DatabaseEnv.h"
 #include "World.h"
+#include "geohash.cpp"
 
 #include <queue>
 #include <boost/thread.hpp>  
@@ -444,6 +445,7 @@ EventBridge::~EventBridge()
 
 std::tm epoch_strt = {0, 0, 0, 1, 0, 70, 0, 0, -1, 0, 0};
 std::time_t basetime = std::mktime(&epoch_strt);
+float shiftCoordinate = 32.0 * 1600.0 / 3.0;
 
 void EventBridge::sendEvent(const int event_type, const Player* player, const Creature* creature, const uint32 num,
 			    const Item* item, const Quest* quest, const SpellCastTargets* targets,
@@ -453,8 +455,10 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 			    const AuctionEntry* entry, const Group* group, const Guild* guild,
 			    const Channel* channel, const Spell* spell, const Unit* actor)
 {
-	float	x, y, z, o;
-	x = y = z = o = 0.0;
+	float	x, y, z, o, lat, lng;
+  int mapId = 0;
+  x = y = z = o = lat = lng = 0.0;
+  char *geohash, *gharea, *ghsector;
 
 	rapidjson::Document* d = new rapidjson::Document();
 	rapidjson::Value jsonNums(rapidjson::kArrayType);
@@ -473,6 +477,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	rapidjson::Value jsonGuild (rapidjson::kObjectType);
 	rapidjson::Value jsonChannel (rapidjson::kObjectType);
 	rapidjson::Value jsonSpell (rapidjson::kObjectType);
+  rapidjson::Value jsonGeometry (rapidjson::kObjectType);
 	rapidjson::Document::AllocatorType& a = d->GetAllocator();
 	d->SetObject();
 	
@@ -480,7 +485,9 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
   uint32 nsecs = std::difftime(curtime, basetime);
 
   d->AddMember(rapidjson::StringRef("timestamp"), nsecs, a);
+  d->AddMember(rapidjson::StringRef("interval"), ((int)(nsecs/900)) * 900, a);
 	d->AddMember(rapidjson::StringRef("event-type"), rapidjson::StringRef(idToEventType[event_type]), a);
+	d->AddMember(rapidjson::StringRef("app"), rapidjson::StringRef(idToEventType[event_type]), a);
 	
 	jsonNums.PushBack(num, a).PushBack(num2, a);
 	d->AddMember("num-values", jsonNums, a);
@@ -498,6 +505,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	
 	if(player != NULL) {
 	  player->GetPosition(x, y, z, o);
+    mapId = player->GetMapId();
 	  jsonPlayer.AddMember("guid", player->GetGUIDLow(), a);
 	  jsonPlayer.AddMember("name", rapidjson::StringRef(player->GetName().c_str()), a);
 	  jsonPlayer.AddMember("level", player->getLevel(), a);
@@ -509,12 +517,13 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	  jsonPlayer.AddMember("y", y, a);
 	  jsonPlayer.AddMember("z", z, a);
 	  jsonPlayer.AddMember("o", o, a);
-	  jsonPlayer.AddMember("map", player->GetMapId(), a);
+	  jsonPlayer.AddMember("map", mapId, a);
 	  d->AddMember("player", jsonPlayer, a);
 	}
 	
 	if(actor != NULL) {
 	  actor->GetPosition(x, y, z, o);
+    mapId = actor->GetMapId();
 	  jsonActor.AddMember("guid", actor->GetGUIDLow(), a);
 	  jsonActor.AddMember("name", rapidjson::StringRef(actor->GetName().c_str()), a);
 	  jsonActor.AddMember("level", actor->getLevel(), a);
@@ -526,10 +535,13 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	  jsonActor.AddMember("y", y, a);
 	  jsonActor.AddMember("z", z, a);
 	  jsonActor.AddMember("o", o, a);
+	  jsonActor.AddMember("map", mapId, a);
 	  d->AddMember("actor", jsonActor, a);
 	}
 	
 	if(target != NULL) {
+	  target->GetPosition(x, y, z, o);
+    mapId = target->GetMapId();
 	  jsonTarget.AddMember("guid", target->GetGUIDLow(), a);
 	  jsonTarget.AddMember("name", rapidjson::StringRef(target->GetName().c_str()), a);
 	  jsonTarget.AddMember("level", target->getLevel(), a);
@@ -537,10 +549,13 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	  jsonTarget.AddMember("y", y, a);
 	  jsonTarget.AddMember("z", z, a);
 	  jsonTarget.AddMember("o", o, a);
+	  jsonTarget.AddMember("map", mapId, a);
 	  d->AddMember("target", jsonTarget, a);
 	}
 	
 	if(creature != NULL) {
+	  creature->GetPosition(x, y, z, o);
+    mapId = creature->GetMapId();
 	  jsonCreature.AddMember("guid", creature->GetGUIDLow(), a);
 	  jsonCreature.AddMember("name", rapidjson::StringRef(creature->GetName().c_str()), a);
 	  jsonCreature.AddMember("level", creature->getLevel(), a);
@@ -548,6 +563,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	  jsonCreature.AddMember("y", y, a);
 	  jsonCreature.AddMember("z", z, a);
 	  jsonCreature.AddMember("o", o, a);
+	  jsonCreature.AddMember("map", mapId, a);
 	  d->AddMember("creature", jsonCreature, a);
 	}
 	
@@ -565,8 +581,15 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	}
 
 	if(targets != NULL && targets->GetObjectTarget() != NULL) {
+	  targets->GetObjectTarget()->GetPosition(x, y, z, o);
+    mapId = targets->GetObjectTarget()->GetMapId();
 	  jsonTarget.AddMember("guid", targets->GetObjectTarget()->GetGUIDLow(), a);
 	  jsonTarget.AddMember("name", rapidjson::StringRef(targets->GetObjectTarget()->GetName().c_str()), a);
+	  jsonTarget.AddMember("x", x, a);
+	  jsonTarget.AddMember("y", y, a);
+	  jsonTarget.AddMember("z", z, a);
+	  jsonTarget.AddMember("o", o, a);
+	  jsonTarget.AddMember("map", mapId, a);
 	  d->AddMember("target", jsonTarget, a);
 	}
 
@@ -577,8 +600,15 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	}
 
 	if(go != NULL) {
+	  go->GetPosition(x, y, z, o);
+    mapId = go->GetMapId();
 	  jsonGameObject.AddMember("guid", go->GetGUIDLow(), a);
 	  jsonGameObject.AddMember("name", rapidjson::StringRef(go->GetName().c_str()), a);
+	  jsonGameObject.AddMember("x", x, a);
+	  jsonGameObject.AddMember("y", y, a);
+	  jsonGameObject.AddMember("z", z, a);
+	  jsonGameObject.AddMember("o", o, a);
+	  jsonGameObject.AddMember("map", mapId, a);
 	  d->AddMember("game-object", jsonGameObject, a);
 	}
 	 
@@ -637,6 +667,30 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	  jsonSpell.AddMember("family", spell->GetSpellInfo()->SpellFamilyName, a);
 	  d->AddMember("spell", jsonSpell, a);
 	}
-	
+
+  if(x != 0 && y != 0 && z != 0) {
+    rapidjson::Value jsonGeohash, jsonArea, jsonSector;
+
+    lat = ((mapId * 100000.0) + y + shiftCoordinate) / 1000000.0;
+    lng = ((mapId * 100000.0) + x + shiftCoordinate) / 1000000.0;
+    jsonGeometry.AddMember("lat", lat, a);
+    jsonGeometry.AddMember("lng", lng, a);
+    d->AddMember("geometry", jsonGeometry, a);
+    d->AddMember("lat", lat, a);
+    d->AddMember("lng", lng, a);
+    geohash = geohash_encode(lat, lng, 12);
+    gharea = geohash_encode(lat, lng, 6);
+    ghsector = geohash_encode(lat, lng, 7);
+    jsonGeohash.SetString(geohash, 12, a);
+    jsonArea.SetString(gharea, 6, a);
+    jsonSector.SetString(ghsector, 7, a);
+    d->AddMember("geohash", jsonGeohash, a);
+    d->AddMember("area", jsonArea, a);
+    d->AddMember("sector", jsonSector, a);
+    free(geohash);
+    free(gharea);
+    free(ghsector);
+  }
+
 	queue.Enqueue(d);
 }
