@@ -10,8 +10,8 @@
 
 add_subdirectory(genrev)
 add_subdirectory(server)
+add_subdirectory(plugins)
 
 if(TOOLS)
   add_subdirectory(tools)
 endif(TOOLS)
-

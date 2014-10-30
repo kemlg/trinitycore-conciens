@@ -27,6 +27,7 @@
 #include "World.h"
 #include "GroupMgr.h"
 
+#include "../Entities/Player/Player.h"
 namespace lfg
 {
 
@@ -486,6 +487,20 @@ LfgCompatibility LFGQueue::CheckCompatibility(GuidList check)
         return LFG_COMPATIBLES_WITH_LESS_PLAYERS;
     }
 
+    // playerbot mod
+    bool nonBotFound = false;
+    for (GuidList::const_iterator it = check.begin(); it != check.end(); ++it)
+    {
+        Player *player = sObjectMgr->GetPlayerByLowGUID(*it);
+        if (player && !player->GetPlayerbotAI())
+        {
+            nonBotFound = true;
+            break;
+        }
+    }
+    if (!nonBotFound)
+        return LFG_INCOMPATIBLES_HAS_IGNORES;
+    // end of playerbot mod
     ObjectGuid gguid = *check.begin();
     proposal.queues = check;
     proposal.isNew = numLfgGroups != 1 || sLFGMgr->GetOldState(gguid) != LFG_STATE_DUNGEON;

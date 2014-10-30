@@ -211,7 +211,7 @@ add_library(game STATIC
   ${game_STAT_PCH_SRC}
 )
 
-add_dependencies(game revision.h)
+add_dependencies(game plugins revision.h)
 
 # Generate precompiled header
 if (USE_COREPCH)

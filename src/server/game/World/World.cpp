@@ -65,6 +65,10 @@
 #include "WeatherMgr.h"
 #include "WorldSession.h"
 
+// playerbot mod
+#include "../../plugins/ahbot/AhBot.h"
+#include "../../plugins/playerbot/PlayerbotAIConfig.h"
+#include "../../plugins/playerbot/RandomPlayerbotMgr.h"
 
 std::atomic<bool> World::m_stopEvent(false);
 uint8 World::m_ExitCode = SHUTDOWN_EXIT_CODE;
@@ -1841,6 +1845,11 @@ void World::SetInitialWorldSettings()
 
     if (uint32 realmId = sConfigMgr->GetIntDefault("RealmID", 0)) // 0 reserved for auth
         sLog->SetRealmId(realmId);
+
+    TC_LOG_INFO("server.loading", "Initializing AuctionHouseBot...");
+    auctionbot.Init();
+
+    sPlayerbotAIConfig.Initialize();
 }
 
 void World::DetectDBCLang()
@@ -2014,14 +2023,22 @@ void World::Update(uint32 diff)
 
         ///- Handle expired auctions
         sAuctionMgr->Update();
+
+        // ahbot mod
+        auctionbot.Update();
     }
 
+    // playerbot mod
+    sRandomPlayerbotMgr.UpdateAI(diff);
+    sRandomPlayerbotMgr.UpdateSessions(diff);
+
     /// <li> Handle AHBot operations
-    if (m_timers[WUPDATE_AHBOT].Passed())
-    {
-        sAuctionBot->Update();
-        m_timers[WUPDATE_AHBOT].Reset();
-    }
+    // if (m_timers[WUPDATE_AHBOT].Passed())
+    //{
+    //    sAuctionBot->Update();
+    //    m_timers[WUPDATE_AHBOT].Reset();
+    //}
+    // end of playerbot mod
 
     /// <li> Handle session updates when the timer has passed
     RecordTimeDiff(NULL);
@@ -2582,6 +2599,10 @@ void World::ShutdownServ(uint32 time, uint32 options, uint8 exitcode, const std:
         m_ShutdownTimer = time;
         ShutdownMsg(true, nullptr, reason);
     }
+
+    // playerbot mod
+    sRandomPlayerbotMgr.LogoutAllBots();
+    // end of playerbot mod
 
     sScriptMgr->OnShutdownInitiate(ShutdownExitCode(exitcode), ShutdownMask(options));
 }

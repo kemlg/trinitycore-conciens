@@ -63,12 +63,12 @@ class WorldPacket;
 class WorldSocket;
 class WorldObject;
 class WorldSession;
+class AuctionEntry;
+class ItemTemplate;
 
 struct AchievementCriteriaData;
-struct AuctionEntry;
 struct ConditionSourceInfo;
 struct Condition;
-struct ItemTemplate;
 struct OutdoorPvPData;
 
 #define VISIBLE_RANGE       166.0f                          //MAX visible range (size of grid)
