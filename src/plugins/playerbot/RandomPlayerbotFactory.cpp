@@ -100,7 +100,7 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls)
     }
 
     Player *player = new Player(session);
-    WorldPacket data;
+    uint8 data;
     CharacterCreateInfo cci(name, race, cls, gender, skin, face, hairStyle,hairColor, facialHair, outfitId, data);
     if (!player->Create(sObjectMgr->GenerateLowGuid(HIGHGUID_PLAYER), &cci))
     {
