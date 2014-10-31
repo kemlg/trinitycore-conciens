@@ -27,19 +27,19 @@ void LoadList(string value, T &list)
 
 bool PlayerbotAIConfig::Initialize()
 {
-    TC_LOG_INFO("playerbot", "Initializing AI Playerbot by ike3, based on the original Playerbot by blueboy");
+    TC_LOG_INFO("server.loading", "Initializing AI Playerbot by ike3, based on the original Playerbot by blueboy");
 
     string error;
     if (!sConfigMgr->LoadInitial("aiplayerbot.conf", error))
     {
-        TC_LOG_INFO("playerbot", "AI Playerbot is Disabled. Unable to open configuration file aiplayerbot.conf");
+        TC_LOG_INFO("server.loading", "AI Playerbot is Disabled. Unable to open configuration file aiplayerbot.conf");
         return false;
     }
 
     enabled = sConfigMgr->GetBoolDefault("AiPlayerbot.Enabled", true);
     if (!enabled)
     {
-        TC_LOG_INFO("playerbot", "AI Playerbot is Disabled in aiplayerbot.conf");
+        TC_LOG_INFO("server.loading", "AI Playerbot is Disabled in aiplayerbot.conf");
         return false;
     }
 
@@ -120,7 +120,7 @@ bool PlayerbotAIConfig::Initialize()
     }
 
     CreateRandomBots();
-    TC_LOG_INFO("playerbot", "AI Playerbot configuration loaded");
+    TC_LOG_INFO("server.loading", "AI Playerbot configuration loaded");
 
     return true;
 }
@@ -220,7 +220,7 @@ void PlayerbotAIConfig::CreateRandomBots()
 
     if (sConfigMgr->GetBoolDefault("AiPlayerbot.DeleteRandomBotAccounts", false))
     {
-        TC_LOG_INFO("playerbot", "Deleting random bot accounts...");
+        TC_LOG_INFO("server.loading", "Deleting random bot accounts...");
         QueryResult results = LoginDatabase.PQuery("SELECT id FROM account where username like '%s%%'", randomBotAccountPrefix.c_str());
         if (results)
         {
@@ -232,7 +232,7 @@ void PlayerbotAIConfig::CreateRandomBots()
         }
 
         CharacterDatabase.Execute("DELETE FROM ai_playerbot_random_bots");
-        TC_LOG_INFO("playerbot", "Random bot accounts deleted");
+        TC_LOG_INFO("server.loading", "Random bot accounts deleted");
     }
 
     for (int accountNumber = 0; accountNumber < randomBotAccountCount; ++accountNumber)
@@ -250,9 +250,9 @@ void PlayerbotAIConfig::CreateRandomBots()
         {
             password += (char)urand('!', 'z');
         }
-        sAccountMgr->CreateAccount(accountName, password, "playerbot");
+        sAccountMgr->CreateAccount(accountName, password, "server.loading");
 
-        TC_LOG_INFO("playerbot", "Account %s created for random bots", accountName.c_str());
+        TC_LOG_INFO("server.loading", "Account %s created for random bots", accountName.c_str());
     }
 
     LoginDatabase.PExecute("UPDATE account SET expansion = '%u' where username like '%s%%'", 2, randomBotAccountPrefix.c_str());
@@ -289,5 +289,5 @@ void PlayerbotAIConfig::CreateRandomBots()
         totalRandomBotChars += sAccountMgr->GetCharactersCount(accountId);
     }
 
-    TC_LOG_INFO("playerbot", "%d random bot accounts with %d characters available", randomBotAccounts.size(), totalRandomBotChars);
+    TC_LOG_INFO("server.loading", "%d random bot accounts with %d characters available", randomBotAccounts.size(), totalRandomBotChars);
 }
