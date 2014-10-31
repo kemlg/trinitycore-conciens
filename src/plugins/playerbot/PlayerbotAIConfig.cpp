@@ -30,11 +30,6 @@ bool PlayerbotAIConfig::Initialize()
     TC_LOG_INFO("server.loading", "Initializing AI Playerbot by ike3, based on the original Playerbot by blueboy");
 
     string error;
-    if (!sConfigMgr->LoadInitial("aiplayerbot.conf", error))
-    {
-        TC_LOG_INFO("server.loading", "AI Playerbot is Disabled. Unable to open configuration file aiplayerbot.conf");
-        return false;
-    }
 
     enabled = sConfigMgr->GetBoolDefault("AiPlayerbot.Enabled", true);
     if (!enabled)
