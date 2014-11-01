@@ -480,7 +480,7 @@ void Engine::LogAction(const char* format, ...)
         if (sPlayerbotAIConfig.logInGroupOnly && !bot->GetGroup())
             return;
 
-        sLog->outMessage("playerbot", LOG_LEVEL_DEBUG, "%s %s", bot->GetName().c_str(), buf);
+        TC_LOG_INFO("server.loading", "%s %s", bot->GetName().c_str(), buf);
     }
 }
 
@@ -518,5 +518,5 @@ void Engine::LogValues()
         return;
 
     string text = ai->GetAiObjectContext()->FormatValues();
-    sLog->outMessage("playerbot", LOG_LEVEL_DEBUG, "Values for %s: %s", bot->GetName().c_str(), text.c_str());
+    TC_LOG_INFO("server.loading", "Values for %s: %s", bot->GetName().c_str(), text.c_str());
 }

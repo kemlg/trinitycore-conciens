@@ -75,7 +75,7 @@ RandomPlayerbotFactory::RandomPlayerbotFactory(uint32 accountId) : accountId(acc
 
 bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls)
 {
-    sLog->outMessage("playerbot", LOG_LEVEL_DEBUG, "Creating new random bot for class %d", cls);
+    TC_LOG_INFO("server.loading", "Creating new random bot for class %d", cls);
 
     uint8 gender = rand() % 2 ? GENDER_MALE : GENDER_FEMALE;
 
@@ -94,7 +94,7 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls)
     WorldSession* session = new WorldSession(accountId, NULL, SEC_PLAYER, 2, 0, LOCALE_enUS, 0, false);
     if (!session)
     {
-        sLog->outMessage("playerbot", LOG_LEVEL_ERROR, "Couldn't create session for random bot account %d", accountId);
+        TC_LOG_INFO("server.loading", "Couldn't create session for random bot account %d", accountId);
         delete session;
         return false;
     }
@@ -118,7 +118,7 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls)
         player->DeleteFromDB(player->GetGUID(), accountId, true, true);
         delete session;
         delete player;
-        sLog->outMessage("playerbot", LOG_LEVEL_ERROR, "Unable to create random bot for account %d - name: \"%s\"; race: %u; class: %u; gender: %u; skin: %u; face: %u; hairStyle: %u; hairColor: %u; facialHair: %u; outfitId: %u",
+        TC_LOG_INFO("server.loading", "Unable to create random bot for account %d - name: \"%s\"; race: %u; class: %u; gender: %u; skin: %u; face: %u; hairStyle: %u; hairColor: %u; facialHair: %u; outfitId: %u",
                 accountId, name.c_str(), race, cls, gender, skin, face, hairStyle, hairColor, facialHair, outfitId);
         return false;
     }
@@ -127,7 +127,7 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls)
     player->SetAtLoginFlag(AT_LOGIN_NONE);
     player->SaveToDB(true);
 
-    sLog->outMessage("playerbot", LOG_LEVEL_DEBUG, "Random bot created for account %d - name: \"%s\"; race: %u; class: %u; gender: %u; skin: %u; face: %u; hairStyle: %u; hairColor: %u; facialHair: %u; outfitId: %u",
+    TC_LOG_INFO("server.loading", "Random bot created for account %d - name: \"%s\"; race: %u; class: %u; gender: %u; skin: %u; face: %u; hairStyle: %u; hairColor: %u; facialHair: %u; outfitId: %u",
             accountId, name.c_str(), race, cls, gender, skin, face, hairStyle, hairColor, facialHair, outfitId);
 
     return true;
@@ -148,7 +148,7 @@ string RandomPlayerbotFactory::CreateRandomBotName()
             "WHERE e.guid IS NULL AND n.name_id >= '%u' LIMIT 1", id);
     if (!result)
     {
-        sLog->outMessage("playerbot", LOG_LEVEL_ERROR, "No more names left for random bots");
+        TC_LOG_INFO("server.loading", "No more names left for random bots");
         return "";
     }
 

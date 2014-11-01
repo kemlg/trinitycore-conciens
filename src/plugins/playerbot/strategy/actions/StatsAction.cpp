@@ -121,7 +121,7 @@ uint32 StatsAction::EstRepair(uint16 pos)
         DurabilityCostsEntry const *dcost = sDurabilityCostsStore.LookupEntry(ditemProto->ItemLevel);
         if(!dcost)
         {
-            sLog->outMessage("playerbot", LOG_LEVEL_ERROR, "RepairDurability: Wrong item lvl %u", ditemProto->ItemLevel);
+            TC_LOG_INFO("server.loading", "RepairDurability: Wrong item lvl %u", ditemProto->ItemLevel);
             return TotalCost;
         }
 
@@ -129,7 +129,7 @@ uint32 StatsAction::EstRepair(uint16 pos)
         DurabilityQualityEntry const *dQualitymodEntry = sDurabilityQualityStore.LookupEntry(dQualitymodEntryId);
         if(!dQualitymodEntry)
         {
-            sLog->outMessage("playerbot", LOG_LEVEL_ERROR, "RepairDurability: Wrong dQualityModEntry %u", dQualitymodEntryId);
+            TC_LOG_INFO("server.loading", "RepairDurability: Wrong dQualityModEntry %u", dQualitymodEntryId);
             return TotalCost;
         }
 

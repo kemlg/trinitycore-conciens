@@ -88,7 +88,7 @@ uint32 RandomPlayerbotMgr::AddRandomBot(bool alliance)
     SetEventValue(bot, "add", 1, urand(sPlayerbotAIConfig.minRandomBotInWorldTime, sPlayerbotAIConfig.maxRandomBotInWorldTime));
     uint32 randomTime = 30 + urand(sPlayerbotAIConfig.randomBotUpdateInterval, sPlayerbotAIConfig.randomBotUpdateInterval * 3);
     ScheduleRandomize(bot, randomTime);
-    sLog->outMessage("playerbot", LOG_LEVEL_DEBUG, "Random bot %d added", bot);
+    TC_LOG_INFO("server.loading", "Random bot %d added", bot);
     return bot;
 }
 
@@ -203,7 +203,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, vector<WorldLocation> &locs
 
     if (locs.empty())
     {
-        sLog->outMessage("playerbot", LOG_LEVEL_ERROR, "Cannot teleport bot %s - no locations available", bot->GetName().c_str());
+        TC_LOG_INFO("server.loading", "Cannot teleport bot %s - no locations available", bot->GetName().c_str());
         return;
     }
 
@@ -243,7 +243,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, vector<WorldLocation> &locs
         return;
     }
 
-    sLog->outMessage("playerbot", LOG_LEVEL_ERROR, "Cannot teleport bot %s - no locations available", bot->GetName().c_str());
+    TC_LOG_INFO("server.loading", "Cannot teleport bot %s - no locations available", bot->GetName().c_str());
 }
 
 void RandomPlayerbotMgr::RandomTeleportForLevel(Player* bot)
@@ -536,13 +536,13 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
 {
     if (!sPlayerbotAIConfig.enabled)
     {
-        sLog->outMessage("playerbot", LOG_LEVEL_ERROR, "Playerbot system is currently disabled!");
+        TC_LOG_INFO("server.loading", "Playerbot system is currently disabled!");
         return false;
     }
 
     if (!args || !*args)
     {
-        sLog->outMessage("playerbot", LOG_LEVEL_ERROR, "Usage: rndbot stats/update/reset/init/refresh/add/remove");
+        TC_LOG_INFO("server.loading", "Usage: rndbot stats/update/reset/init/refresh/add/remove");
         return false;
     }
 
