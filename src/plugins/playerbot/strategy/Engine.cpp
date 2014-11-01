@@ -316,10 +316,10 @@ void Engine::addStrategies(string first, ...)
 	do
 	{
 		cur = va_arg(vl, const char*);
-		if (cur)
+		if (cur != NULL)
 			addStrategy(cur);
 	}
-	while (cur);
+	while (cur != NULL);
 
 	va_end(vl);
 }
