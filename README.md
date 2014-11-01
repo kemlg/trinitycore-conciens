@@ -103,6 +103,9 @@ mysql -u root -p auth < trinitycore-conciens/sql/base/auth_database.sql
 mysql -u root -p characters < trinitycore-conciens/sql/base/characters_database.sql 
 mysql -u root -p world < TDB_full_335.57_2014_10_19.sql
 mysql -u root -p world < trinitycore-conciens/sql/updates/world/2014_10*.sql
+mysql -u root -p characters < trinitycore-conciens/sql/characters_ai_playerbot.sql
+mysql -u root -p characters < trinitycore-conciens/sql/characters_auctionhousebot.sql
+mysql -u root -p characters < trinitycore-conciens/sql/characters_ai_playerbot_names.sql
 cd
 ```
 
