@@ -79,7 +79,7 @@ void ItemBag::Init(bool silent)
         return;
     }
 
-    sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Loading/Scanning %s...", GetName().c_str());
+    TC_LOG_INFO("server.loading", "Loading/Scanning %s...", GetName().c_str());
 
     Load();
 
@@ -87,7 +87,7 @@ void ItemBag::Init(bool silent)
     {
         Category* category = CategoryList::instance[i];
         Shuffle(content[category]);
-        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "loaded %d %s items", content[category].size(), category->GetDisplayName().c_str());
+        TC_LOG_INFO("server.loading", "loaded %d %s items", content[category].size(), category->GetDisplayName().c_str());
     }
 }
 

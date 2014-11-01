@@ -22,7 +22,7 @@ void RandomPlayerbotMgr::UpdateAIInternal(uint32 elapsed)
     if (!sPlayerbotAIConfig.randomBotAutologin || !sPlayerbotAIConfig.enabled)
         return;
 
-    sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Processing random bots...");
+    TC_LOG_INFO("server.loading", "Processing random bots...");
 
     int maxAllowedBotCount = GetEventValue(0, "bot_count");
     if (!maxAllowedBotCount)
@@ -70,7 +70,7 @@ void RandomPlayerbotMgr::UpdateAIInternal(uint32 elapsed)
             break;
     }
 
-    sLog->outMessage("playerbot", LOG_LEVEL_INFO, "%d bots processed. %d alliance and %d horde bots added. %d bots online. Next check in %d seconds",
+    TC_LOG_INFO("server.loading", "%d bots processed. %d alliance and %d horde bots added. %d bots online. Next check in %d seconds",
             botProcessed, allianceNewBots, hordeNewBots, playerBots.size(), sPlayerbotAIConfig.randomBotUpdateInterval);
 
     if (processTicks++ == 1)
@@ -111,7 +111,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
 		Player* player = GetPlayerBot(bot);
 		if (!player || !player->GetGroup())
 		{
-			sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Bot %d expired", bot);
+			TC_LOG_INFO("server.loading", "Bot %d expired", bot);
 			SetEventValue(bot, "add", 0, 0);
 		}
         return true;
@@ -119,7 +119,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
 
     if (!GetPlayerBot(bot))
     {
-        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Bot %d logged in", bot);
+        TC_LOG_INFO("server.loading", "Bot %d logged in", bot);
         AddPlayerBot(bot, 0);
         if (!GetEventValue(bot, "online"))
         {
@@ -138,7 +138,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
 
     if (player->GetGroup())
     {
-        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Skipping bot %d as it is in group", bot);
+        TC_LOG_INFO("server.loading", "Skipping bot %d as it is in group", bot);
         return false;
     }
 
@@ -146,7 +146,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
     {
         if (!GetEventValue(bot, "dead"))
         {
-            sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Setting dead flag for bot %d", bot);
+            TC_LOG_INFO("server.loading", "Setting dead flag for bot %d", bot);
             uint32 randomTime = urand(sPlayerbotAIConfig.minRandomBotReviveTime, sPlayerbotAIConfig.maxRandomBotReviveTime);
             SetEventValue(bot, "dead", 1, randomTime);
             SetEventValue(bot, "revive", 1, randomTime - 60);
@@ -155,7 +155,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
 
         if (!GetEventValue(bot, "revive"))
         {
-            sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Reviving dead bot %d", bot);
+            TC_LOG_INFO("server.loading", "Reviving dead bot %d", bot);
             SetEventValue(bot, "dead", 0, 0);
             SetEventValue(bot, "revive", 0, 0);
             RandomTeleport(player, player->GetMapId(), player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
@@ -168,7 +168,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
     uint32 randomize = GetEventValue(bot, "randomize");
     if (!randomize)
     {
-        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Randomizing bot %d", bot);
+        TC_LOG_INFO("server.loading", "Randomizing bot %d", bot);
         Randomize(player);
         uint32 randomTime = urand(sPlayerbotAIConfig.minRandomBotRandomizeTime, sPlayerbotAIConfig.maxRandomBotRandomizeTime);
         ScheduleRandomize(bot, randomTime);
@@ -178,7 +178,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
     uint32 logout = GetEventValue(bot, "logout");
     if (!logout)
     {
-        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Logging out bot %d", bot);
+        TC_LOG_INFO("server.loading", "Logging out bot %d", bot);
         LogoutPlayerBot(bot);
         SetEventValue(bot, "logout", 1, sPlayerbotAIConfig.maxRandomBotInWorldTime);
         return true;
@@ -187,7 +187,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
     uint32 teleport = GetEventValue(bot, "teleport");
     if (!teleport)
     {
-        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Random teleporting bot %d", bot);
+        TC_LOG_INFO("server.loading", "Random teleporting bot %d", bot);
         RandomTeleportForLevel(ai->GetBot());
         SetEventValue(bot, "teleport", 1, sPlayerbotAIConfig.maxRandomBotInWorldTime);
         return true;
@@ -231,7 +231,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, vector<WorldLocation> &locs
         if (!area)
             continue;
 
-        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Random teleporting bot %s to %s %f,%f,%f", bot->GetName().c_str(), area->area_name[0], x, y, z);
+        TC_LOG_INFO("server.loading", "Random teleporting bot %s to %s %f,%f,%f", bot->GetName().c_str(), area->area_name[0], x, y, z);
         float height = map->GetWaterOrGroundLevel(x, y, 0.05f + z);
         if (height == INVALID_HEIGHT)
             continue;
@@ -551,7 +551,7 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
     if (cmd == "reset")
     {
         CharacterDatabase.PExecute("delete from ai_playerbot_random_bots");
-        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Random bots were reset for all players");
+        TC_LOG_INFO("server.loading", "Random bots were reset for all players");
         return true;
     }
     else if (cmd == "stats")
@@ -566,7 +566,7 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
     }
     else if (cmd == "init" || cmd == "refresh" || cmd == "teleport")
     {
-		sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Randomizing bots for %d accounts", sPlayerbotAIConfig.randomBotAccounts.size());
+		TC_LOG_INFO("server.loading", "Randomizing bots for %d accounts", sPlayerbotAIConfig.randomBotAccounts.size());
         for (list<uint32>::iterator i = sPlayerbotAIConfig.randomBotAccounts.begin(); i != sPlayerbotAIConfig.randomBotAccounts.end(); ++i)
         {
             uint32 account = *i;
@@ -582,17 +582,17 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
 
                     if (cmd == "init")
                     {
-                        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Randomizing bot %s for account %u", bot->GetName().c_str(), account);
+                        TC_LOG_INFO("server.loading", "Randomizing bot %s for account %u", bot->GetName().c_str(), account);
                         sRandomPlayerbotMgr.RandomizeFirst(bot);
                     }
                     else if (cmd == "teleport")
                     {
-                        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Random teleporting bot %s for account %u", bot->GetName().c_str(), account);
+                        TC_LOG_INFO("server.loading", "Random teleporting bot %s for account %u", bot->GetName().c_str(), account);
                         sRandomPlayerbotMgr.RandomTeleportForLevel(bot);
                     }
                     else
                     {
-                        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Refreshing bot %s for account %u", bot->GetName().c_str(), account);
+                        TC_LOG_INFO("server.loading", "Refreshing bot %s for account %u", bot->GetName().c_str(), account);
                         bot->SetLevel(bot->getLevel() - 1);
                         sRandomPlayerbotMgr.IncreaseLevel(bot);
                     }
@@ -611,7 +611,7 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
         list<string> messages = sRandomPlayerbotMgr.HandlePlayerbotCommand(args, NULL);
         for (list<string>::iterator i = messages.begin(); i != messages.end(); ++i)
         {
-            sLog->outMessage("playerbot", LOG_LEVEL_INFO, i->c_str());
+            TC_LOG_INFO("server.loading", i->c_str());
         }
         return true;
     }
@@ -690,7 +690,7 @@ Player* RandomPlayerbotMgr::GetRandomPlayer()
 
 void RandomPlayerbotMgr::PrintStats()
 {
-    sLog->outMessage("playerbot", LOG_LEVEL_INFO, "%d Random Bots online", playerBots.size());
+    TC_LOG_INFO("server.loading", "%d Random Bots online", playerBots.size());
 
     map<uint32, int> alliance, horde;
     for (uint32 i = 0; i < 10; ++i)
@@ -762,7 +762,7 @@ void RandomPlayerbotMgr::PrintStats()
         }
     }
 
-    sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Per level:");
+    TC_LOG_INFO("server.loading", "Per level:");
     uint32 maxLevel = sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL);
     for (uint32 i = 0; i < 10; ++i)
     {
@@ -772,24 +772,24 @@ void RandomPlayerbotMgr::PrintStats()
         uint32 from = i*10;
         uint32 to = min(from + 9, maxLevel);
         if (!from) from = 1;
-        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "    %d..%d: %d alliance, %d horde", from, to, alliance[i], horde[i]);
+        TC_LOG_INFO("server.loading", "    %d..%d: %d alliance, %d horde", from, to, alliance[i], horde[i]);
     }
-    sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Per race:");
+    TC_LOG_INFO("server.loading", "Per race:");
     for (uint8 race = RACE_HUMAN; race < MAX_RACES; ++race)
     {
         if (perRace[race])
-            sLog->outMessage("playerbot", LOG_LEVEL_INFO, "    %s: %d", ChatHelper::formatRace(race).c_str(), perRace[race]);
+            TC_LOG_INFO("server.loading", "    %s: %d", ChatHelper::formatRace(race).c_str(), perRace[race]);
     }
-    sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Per class:");
+    TC_LOG_INFO("server.loading", "Per class:");
     for (uint8 cls = CLASS_WARRIOR; cls < MAX_CLASSES; ++cls)
     {
         if (perClass[cls])
-            sLog->outMessage("playerbot", LOG_LEVEL_INFO, "    %s: %d", ChatHelper::formatClass(cls).c_str(), perClass[cls]);
+            TC_LOG_INFO("server.loading", "    %s: %d", ChatHelper::formatClass(cls).c_str(), perClass[cls]);
     }
-    sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Per role:");
-    sLog->outMessage("playerbot", LOG_LEVEL_INFO, "    tank: %d", tank);
-    sLog->outMessage("playerbot", LOG_LEVEL_INFO, "    heal: %d", heal);
-    sLog->outMessage("playerbot", LOG_LEVEL_INFO, "    dps: %d", dps);
+    TC_LOG_INFO("server.loading", "Per role:");
+    TC_LOG_INFO("server.loading", "    tank: %d", tank);
+    TC_LOG_INFO("server.loading", "    heal: %d", heal);
+    TC_LOG_INFO("server.loading", "    dps: %d", dps);
 }
 
 double RandomPlayerbotMgr::GetBuyMultiplier(Player* bot)
