@@ -56,28 +56,28 @@ typedef struct IntervalStruct {
 
 
 /* Normal 32 characer map used for geohashing */
-static char char_map[32] =  "0123456789bcdefghjkmnpqrstuvwxyz";
+static char char_map[33] =  "0123456789bcdefghjkmnpqrstuvwxyz";
 
 /*
  *  The follow character maps were created by Dave Troy and used in his Javascript Geohashing
  *  library. http://github.com/davetroy/geohash-js
  */
-static char *even_neighbors[] = {"p0r21436x8zb9dcf5h7kjnmqesgutwvy",
+static const char *even_neighbors[] = {"p0r21436x8zb9dcf5h7kjnmqesgutwvy",
                                 "bc01fg45238967deuvhjyznpkmstqrwx", 
                                 "14365h7k9dcfesgujnmqp0r2twvyx8zb",
                                 "238967debc01fg45kmstqrwxuvhjyznp"
                                 };
 
-static char *odd_neighbors[] = {"bc01fg45238967deuvhjyznpkmstqrwx", 
+static const char *odd_neighbors[] = {"bc01fg45238967deuvhjyznpkmstqrwx", 
                                "p0r21436x8zb9dcf5h7kjnmqesgutwvy",
                                 "238967debc01fg45kmstqrwxuvhjyznp",
                                "14365h7k9dcfesgujnmqp0r2twvyx8zb"    
                                 };
 
-static char *even_borders[] = {"prxz", "bcfguvyz", "028b", "0145hjnp"};
-static char *odd_borders[] = {"bcfguvyz", "prxz", "0145hjnp", "028b"};
+static const char *even_borders[] = {"prxz", "bcfguvyz", "028b", "0145hjnp"};
+static const char *odd_borders[] = {"bcfguvyz", "prxz", "0145hjnp", "028b"};
 
-unsigned int index_for_char(char c, char *string) {
+int index_for_char(char c, const char *string) {
     
     int index = -1;
     int string_amount = strlen(string);
@@ -102,10 +102,10 @@ char* get_neighbor(char *hash, int direction) {
 	char last_char = hash[hash_length - 1];
     
     int is_odd = hash_length % 2;
-    char **border = is_odd ? odd_borders : even_borders;
-    char **neighbor = is_odd ? odd_neighbors : even_neighbors; 
+    const char **border = is_odd ? odd_borders : even_borders;
+    const char **neighbor = is_odd ? odd_neighbors : even_neighbors; 
     
-    char *base = malloc(sizeof(char) * 1);
+    char *base = (char *)malloc(sizeof(char) * 1);
     base[0] = '\0';
     strncat(base, hash, hash_length - 1);
     
@@ -115,7 +115,7 @@ char* get_neighbor(char *hash, int direction) {
     int neighbor_index = index_for_char(last_char, neighbor[direction]);
     last_char = char_map[neighbor_index];
         
-    char *last_hash = malloc(sizeof(char) * 2);
+    char *last_hash = (char *)malloc(sizeof(char) * 2);
     last_hash[0] = last_char;
     last_hash[1] = '\0';
     strcat(base, last_hash);
@@ -188,7 +188,7 @@ char* geohash_encode(double lat, double lng, int precision) {
 
 GeoCoord geohash_decode(char *hash) {
     
-    GeoCoord coordinate = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    GeoCoord coordinate = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, {0.0, 0.0}};
     
     if(hash) {
         
@@ -196,7 +196,7 @@ GeoCoord geohash_decode(char *hash) {
         
         if(char_amount) {
             
-            unsigned int char_mapIndex;
+            int char_mapIndex;
             Interval lat_interval = {MAX_LAT, MIN_LAT};
             Interval lng_interval = {MAX_LONG, MIN_LONG};
             Interval *interval;

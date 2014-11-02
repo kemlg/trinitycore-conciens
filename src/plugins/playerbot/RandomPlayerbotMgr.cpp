@@ -108,18 +108,18 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
     uint32 isValid = GetEventValue(bot, "add");
     if (!isValid)
     {
-		Player* player = GetPlayerBot(bot);
-		if (!player || !player->GetGroup())
-		{
-			TC_LOG_INFO("server.loading", "Bot %d expired", bot);
-			SetEventValue(bot, "add", 0, 0);
-		}
-        return true;
+      Player* player = GetPlayerBot(bot);
+      if (!player || !player->GetGroup())
+      {
+        TC_LOG_DEBUG("server.loading", "Bot %d expired", bot);
+        SetEventValue(bot, "add", 0, 0);
+      }
+      return true;
     }
 
     if (!GetPlayerBot(bot))
     {
-        TC_LOG_INFO("server.loading", "Bot %d logged in", bot);
+        TC_LOG_DEBUG("server.loading", "Bot %d logged in", bot);
         AddPlayerBot(bot, 0);
         if (!GetEventValue(bot, "online"))
         {
@@ -178,7 +178,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
     uint32 logout = GetEventValue(bot, "logout");
     if (!logout)
     {
-        TC_LOG_INFO("server.loading", "Logging out bot %d", bot);
+        TC_LOG_DEBUG("server.loading", "Logging out bot %d", bot);
         LogoutPlayerBot(bot);
         SetEventValue(bot, "logout", 1, sPlayerbotAIConfig.maxRandomBotInWorldTime);
         return true;
@@ -187,7 +187,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
     uint32 teleport = GetEventValue(bot, "teleport");
     if (!teleport)
     {
-        TC_LOG_INFO("server.loading", "Random teleporting bot %d", bot);
+        TC_LOG_DEBUG("server.loading", "Random teleporting bot %d", bot);
         RandomTeleportForLevel(ai->GetBot());
         SetEventValue(bot, "teleport", 1, sPlayerbotAIConfig.maxRandomBotInWorldTime);
         return true;
@@ -231,7 +231,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, vector<WorldLocation> &locs
         if (!area)
             continue;
 
-        TC_LOG_INFO("server.loading", "Random teleporting bot %s to %s %f,%f,%f", bot->GetName().c_str(), area->area_name[0], x, y, z);
+        TC_LOG_DEBUG("server.loading", "Random teleporting bot %s to %s %f,%f,%f", bot->GetName().c_str(), area->area_name[0], x, y, z);
         float height = map->GetWaterOrGroundLevel(x, y, 0.05f + z);
         if (height == INVALID_HEIGHT)
             continue;
@@ -582,17 +582,17 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
 
                     if (cmd == "init")
                     {
-                        TC_LOG_INFO("server.loading", "Randomizing bot %s for account %u", bot->GetName().c_str(), account);
+                        TC_LOG_DEBUG("server.loading", "Randomizing bot %s for account %u", bot->GetName().c_str(), account);
                         sRandomPlayerbotMgr.RandomizeFirst(bot);
                     }
                     else if (cmd == "teleport")
                     {
-                        TC_LOG_INFO("server.loading", "Random teleporting bot %s for account %u", bot->GetName().c_str(), account);
+                        TC_LOG_DEBUG("server.loading", "Random teleporting bot %s for account %u", bot->GetName().c_str(), account);
                         sRandomPlayerbotMgr.RandomTeleportForLevel(bot);
                     }
                     else
                     {
-                        TC_LOG_INFO("server.loading", "Refreshing bot %s for account %u", bot->GetName().c_str(), account);
+                        TC_LOG_DEBUG("server.loading", "Refreshing bot %s for account %u", bot->GetName().c_str(), account);
                         bot->SetLevel(bot->getLevel() - 1);
                         sRandomPlayerbotMgr.IncreaseLevel(bot);
                     }

@@ -402,13 +402,13 @@ void PlayerbotAI::ChangeEngine(BotState type)
         switch (type)
         {
         case BOT_STATE_COMBAT:
-            TC_LOG_INFO("server.loading", "=== %s COMBAT ===", bot->GetName().c_str());
+            TC_LOG_DEBUG("server.loading", "=== %s COMBAT ===", bot->GetName().c_str());
             break;
         case BOT_STATE_NON_COMBAT:
-            TC_LOG_INFO("server.loading", "=== %s NON-COMBAT ===", bot->GetName().c_str());
+            TC_LOG_DEBUG("server.loading", "=== %s NON-COMBAT ===", bot->GetName().c_str());
             break;
         case BOT_STATE_DEAD:
-            TC_LOG_INFO("server.loading", "=== %s DEAD ===", bot->GetName().c_str());
+            TC_LOG_DEBUG("server.loading", "=== %s DEAD ===", bot->GetName().c_str());
             break;
         }
     }

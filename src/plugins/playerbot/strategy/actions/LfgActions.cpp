@@ -142,20 +142,20 @@ bool LfgJoinAction::JoinProposal()
         list.insert(idx[urand(0, idx.size() - 1)]);
         sLFGMgr->JoinLfg(bot, roles, list, "bot");
 
-        TC_LOG_INFO("server.loading", "Bot %s joined to LFG_TYPE_RANDOM as %d", bot->GetName().c_str(), (uint32)roles);
+        TC_LOG_DEBUG("server.loading", "Bot %s joined to LFG_TYPE_RANDOM as %d", bot->GetName().c_str(), (uint32)roles);
 		return true;
 	}
     else if (heroic)
 	{
-		TC_LOG_INFO("server.loading", "Bot %s joined to LFG_TYPE_HEROIC_DUNGEON as %d", bot->GetName().c_str(), (uint32)roles);
+		TC_LOG_DEBUG("server.loading", "Bot %s joined to LFG_TYPE_HEROIC_DUNGEON as %d", bot->GetName().c_str(), (uint32)roles);
 	}
     else if (raid)
 	{
-		TC_LOG_INFO("server.loading", "Bot %s joined to LFG_TYPE_RAID as %d", bot->GetName().c_str(), (uint32)roles);
+		TC_LOG_DEBUG("server.loading", "Bot %s joined to LFG_TYPE_RAID as %d", bot->GetName().c_str(), (uint32)roles);
 	}
     else
 	{
-		TC_LOG_INFO("server.loading", "Bot %s joined to LFG_TYPE_DUNGEON as %d", bot->GetName().c_str(), (uint32)roles);
+		TC_LOG_DEBUG("server.loading", "Bot %s joined to LFG_TYPE_DUNGEON as %d", bot->GetName().c_str(), (uint32)roles);
 	}
 
     sLFGMgr->JoinLfg(bot, roles, list, "bot");

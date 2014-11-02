@@ -868,7 +868,7 @@ void PlayerbotFactory::EnchantItem(Item* item)
 
     if (ids.empty())
     {
-        TC_LOG_INFO("server.loading",  "%s: no enchantments found for item %d", bot->GetName().c_str(), item->GetTemplate()->ItemId);
+        TC_LOG_DEBUG("server.loading",  "%s: no enchantments found for item %d", bot->GetName().c_str(), item->GetTemplate()->ItemId);
         return;
     }
 
