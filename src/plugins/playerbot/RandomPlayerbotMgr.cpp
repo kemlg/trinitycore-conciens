@@ -532,18 +532,6 @@ uint32 RandomPlayerbotMgr::SetEventValue(uint32 bot, string event, uint32 value,
     return value;
 }
 
-template <typename I>
-I random_element(I begin, I end)
-{
-    const unsigned long n = std::distance(begin, end);
-    const unsigned long divisor = (RAND_MAX + 1) / n;
-    
-    unsigned long k;
-    do { k = std::rand() / divisor; } while (k >= n);
-    
-    return std::advance(begin, k);
-}
-
 bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, char const* args)
 {
     if (!sPlayerbotAIConfig.enabled)
@@ -578,8 +566,9 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
     }
     else if (cmd == "one")
     {
-        uint32 account = *random_element(sPlayerbotAIConfig.randomBotAccounts.begin(),
-                                         sPlayerbotAIConfig.randomBotAccounts.end());
+        std::list<uint32>::iterator it = sPlayerbotAIConfig.randomBotAccounts.begin();
+        std::advance(it, urand(0,sPlayerbotAIConfig.randomBotAccounts.size()));
+        uint32 account = *it;
         if (QueryResult results = CharacterDatabase.PQuery("SELECT guid FROM characters where online = 0 AND account = '%u'", account))
         {
             Field* fields = results->Fetch();
