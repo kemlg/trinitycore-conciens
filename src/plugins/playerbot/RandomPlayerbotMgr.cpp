@@ -111,7 +111,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
       Player* player = GetPlayerBot(bot);
       if (!player || !player->GetGroup())
       {
-        TC_LOG_DEBUG("server.loading", "Bot %d expired", bot);
+        TC_LOG_INFO("server.loading", "Bot %d expired", bot);
         SetEventValue(bot, "add", 0, 0);
       }
       return true;
@@ -119,7 +119,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
 
     if (!GetPlayerBot(bot))
     {
-        TC_LOG_DEBUG("server.loading", "Bot %d logged in", bot);
+        TC_LOG_INFO("server.loading", "Bot %d logged in", bot);
         AddPlayerBot(bot, 0);
         if (!GetEventValue(bot, "online"))
         {
@@ -178,7 +178,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
     uint32 logout = GetEventValue(bot, "logout");
     if (!logout)
     {
-        TC_LOG_DEBUG("server.loading", "Logging out bot %d", bot);
+        TC_LOG_INFO("server.loading", "Logging out bot %d", bot);
         LogoutPlayerBot(bot);
         SetEventValue(bot, "logout", 1, sPlayerbotAIConfig.maxRandomBotInWorldTime);
         return true;
@@ -187,7 +187,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
     uint32 teleport = GetEventValue(bot, "teleport");
     if (!teleport)
     {
-        TC_LOG_DEBUG("server.loading", "Random teleporting bot %d", bot);
+        TC_LOG_INFO("server.loading", "Random teleporting bot %d", bot);
         RandomTeleportForLevel(ai->GetBot());
         SetEventValue(bot, "teleport", 1, sPlayerbotAIConfig.maxRandomBotInWorldTime);
         return true;
@@ -524,6 +524,8 @@ uint32 RandomPlayerbotMgr::SetEventValue(uint32 bot, string event, uint32 value,
             bot, event.c_str());
     if (value)
     {
+      TC_LOG_INFO("server.loading", "insert into ai_playerbot_random_bots (owner, bot, `time`, validIn, event, `value`) values ('%u', '%u', '%u', '%u', '%s', '%u')",
+          0, bot, (uint32)time(0), validIn, event.c_str(), value);
         CharacterDatabase.PExecute(
                 "insert into ai_playerbot_random_bots (owner, bot, `time`, validIn, event, `value`) values ('%u', '%u', '%u', '%u', '%s', '%u')",
                 0, bot, (uint32)time(0), validIn, event.c_str(), value);
@@ -572,15 +574,15 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
         if (QueryResult results = CharacterDatabase.PQuery("SELECT guid FROM characters where online = 0 AND account = '%u'", account))
         {
             Field* fields = results->Fetch();
+            TC_LOG_INFO("server.loading", "Creating bot: %d", fields[0].GetUInt32());
             ObjectGuid guid = ObjectGuid(HIGHGUID_PLAYER, fields[0].GetUInt32());
-            Player* bot = sObjectMgr->GetPlayerByLowGUID(guid);
-            if (bot)
-            {
-                sRandomPlayerbotMgr.SetEventValue(bot->GetGUID(), "add", 0, 0);
-                sRandomPlayerbotMgr.SetEventValue(bot->GetGUID(), "online", 0, 0);
-                bot->TeleportTo(1, 57, -2720, 92, 0);
-            }
+            sRandomPlayerbotMgr.AddPlayerBot(fields[0].GetUInt32(), account);
+            sRandomPlayerbotMgr.SetEventValue(fields[0].GetUInt32(), "add", 1, 1);
+            //sRandomPlayerbotMgr.SetEventValue(fields[0].GetUInt32(), "online", 1, 3600);
+            sRandomPlayerbotMgr.ProcessBot(fields[0].GetUInt32());
+            //bot->TeleportTo(1, 57, -2720, 92, 0);
         }
+        return true;
     }
     else if (cmd == "init" || cmd == "refresh" || cmd == "teleport")
     {
