@@ -576,11 +576,25 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
             Field* fields = results->Fetch();
             TC_LOG_INFO("server.loading", "Creating bot: %d", fields[0].GetUInt32());
             ObjectGuid guid = ObjectGuid(HIGHGUID_PLAYER, fields[0].GetUInt32());
-            sRandomPlayerbotMgr.AddPlayerBot(fields[0].GetUInt32(), account);
-            sRandomPlayerbotMgr.SetEventValue(fields[0].GetUInt32(), "add", 1, 1);
-            //sRandomPlayerbotMgr.SetEventValue(fields[0].GetUInt32(), "online", 1, 3600);
-            sRandomPlayerbotMgr.ProcessBot(fields[0].GetUInt32());
-            //bot->TeleportTo(1, 57, -2720, 92, 0);
+            uint32 bot = fields[0].GetUInt32();
+            TC_LOG_INFO("server.loading", "Bot %d logging in", bot);
+            sRandomPlayerbotMgr.AddPlayerBot(bot, 0);
+            Player* player = sRandomPlayerbotMgr.GetPlayerBot(bot);
+            if (!player)
+            {
+                TC_LOG_INFO("server.loading", "Bot %d not logged in!", bot);
+                return false;
+            }
+            PlayerbotAI* ai = player->GetPlayerbotAI();
+            if (!ai)
+                return false;
+            
+            if (player->GetGroup())
+            {
+                TC_LOG_INFO("server.loading", "Skipping bot %d as it is in group", bot);
+                return false;
+            }
+            player->TeleportTo(1, 57, -2720, 92, 0);
         }
         return true;
     }
