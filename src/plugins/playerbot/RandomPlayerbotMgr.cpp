@@ -532,6 +532,18 @@ uint32 RandomPlayerbotMgr::SetEventValue(uint32 bot, string event, uint32 value,
     return value;
 }
 
+template <typename I>
+I random_element(I begin, I end)
+{
+    const unsigned long n = std::distance(begin, end);
+    const unsigned long divisor = (RAND_MAX + 1) / n;
+    
+    unsigned long k;
+    do { k = std::rand() / divisor; } while (k >= n);
+    
+    return std::advance(begin, k);
+}
+
 bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, char const* args)
 {
     if (!sPlayerbotAIConfig.enabled)
@@ -563,6 +575,23 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
     {
         sRandomPlayerbotMgr.UpdateAIInternal(0);
         return true;
+    }
+    else if (cmd == "one")
+    {
+        uint32 account = *random_element(sPlayerbotAIConfig.randomBotAccounts.begin(),
+                                         sPlayerbotAIConfig.randomBotAccounts.end());
+        if (QueryResult results = CharacterDatabase.PQuery("SELECT guid FROM characters where online = 0 AND account = '%u'", account))
+        {
+            Field* fields = results->Fetch();
+            ObjectGuid guid = ObjectGuid(HIGHGUID_PLAYER, fields[0].GetUInt32());
+            Player* bot = sObjectMgr->GetPlayerByLowGUID(guid);
+            if (bot)
+            {
+                sRandomPlayerbotMgr.SetEventValue(bot->GetGUID(), "add", 0, 0);
+                sRandomPlayerbotMgr.SetEventValue(bot->GetGUID(), "online", 0, 0);
+                bot->TeleportTo(1, 57, -2720, 92, 0);
+            }
+        }
     }
     else if (cmd == "init" || cmd == "refresh" || cmd == "teleport")
     {
