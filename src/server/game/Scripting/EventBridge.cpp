@@ -131,7 +131,8 @@ const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT
     "EVENT_TYPE_PLAYER_UPDATE_ZONE", "EVENT_TYPE_HEAL", "EVENT_TYPE_DAMAGE"
 };
 
-mongo::DBClientConnection           conn;
+mongo::DBClientConnection           connEvents(true, NULL, NULL);
+mongo::DBClientConnection           connActions(true, NULL, NULL);
 const char*                         endMsg          = "\n";
 const int                           port_out        = 6969;
 const int                           port_in         = 6970;
@@ -304,47 +305,56 @@ static bool createGameObject(int objectId, int mapId, double x, double y, double
 
 void* processActions(void *)
 {
-    pthread_t thread2;
-    mongo::auto_ptr<mongo::DBClientCursor> cursor =
-        conn.query("conciens.actions", mongo::BSONObj());
-    
-    while(cursor->more())
+  while(true)
+  {
+    try
     {
+      mongo::auto_ptr<mongo::DBClientCursor> cursor =
+        connActions.query("conciens.actions", mongo::BSONObj());
+
+      while(cursor->more())
+      {
         mongo::BSONObj action = cursor->next();
-        conn.remove("conciens.actions", action);
-        
-        std::string actionId = action["action-id"].toString();
+        connActions.remove("conciens.actions", action);
+
+        std::string actionId = action["action-id"].String();
+        // TC_LOG_INFO("server.loading", "Action arrived: %s", actionId.c_str());
         const ObjectGuid guid(HIGHGUID_UNIT, (uint32)295, (uint32)80346);
-        
-        if(!actionId.compare("create"))
+
+        if(actionId.compare("create") == 0)
         {
-            createGameObject(action["object-id"].Int(),
-                             action["map-id"].Int(),
-                             action["x"].Double(), action["y"].Double(),
-                             action["z"].Double(), action["o"].Double());
+          createGameObject(action["object-id"].Int(),
+              action["map-id"].Int(),
+              action["x"].Double(), action["y"].Double(),
+              action["z"].Double(), action["o"].Double());
         }
-        else if(!actionId.compare("reload-quests"))
+        else if(actionId.compare("reload-quests") == 0)
         {
-            reloadAllQuests();
+          reloadAllQuests();
         }
-        else if(!actionId.compare("add-quest"))
+        else if(actionId.compare("add-quest") == 0)
         {
-            addQuestToDB();
-            reloadAllQuests();
-            updateCreature(guid);
+          addQuestToDB();
+          reloadAllQuests();
+          updateCreature(guid);
         }
-        else if(!actionId.compare("remove-quest"))
+        else if(actionId.compare("remove-quest") == 0)
         {
-            removeQuestFromDB();
-            reloadAllQuests();
-            updateCreature(guid);
+          removeQuestFromDB();
+          reloadAllQuests();
+          updateCreature(guid);
         }
+      }
+      sleep(1);
     }
-    
-    sleep(0.25);
-    pthread_create(&thread2, NULL, processActions, NULL);
-    
-    return NULL;
+    catch(const mongo::DBException& ex)
+    {
+      std::cout << "Reconnecting due to DBException: " << ex.what() << "//" << ex.toString() << std::endl;
+      sleep(0.1);
+    }
+  }
+
+  return NULL;
 }
 
 bool checkPortTCP(short int dwPort, const char *ipAddressStr)
@@ -376,25 +386,40 @@ bool checkPortTCP(short int dwPort, const char *ipAddressStr)
 
 void* processMessages(void *)
 {
-    pthread_t thread1;
     int size;
     std::vector<mongo::BSONObj> vEvents;
     mongo::BSONObj b;
 
-    size = queue.Size();
-    // TC_LOG_INFO("server.loading", "Sending events, size: %d", size);
-    for(int i = 0 ; i < size ; i++) {
-        bool correct = queue.TryDequeue(b);
-        if(correct) {
+    while(true)
+    {
+      try
+      {
+        size = queue.Size();
+        // TC_LOG_INFO("server.loading", "Sending events, size: %d", size);
+        for(int i = 0 ; i < size ; i++) {
+          bool correct = queue.TryDequeue(b);
+          if(correct) {
             vEvents.push_back(b);
+            if(i % 20000 == 0)
+            {
+              connEvents.insert("conciens.events", vEvents);
+              vEvents.clear();
+            }
+          }
         }
-    }
-    
-    conn.insert("conciens.events", vEvents);
-    vEvents.clear();
 
-    sleep(0.25);
-    pthread_create(&thread1, NULL, processMessages, NULL);
+        connEvents.insert("conciens.events", vEvents);
+        vEvents.clear();
+
+        sleep(1);
+      }
+      catch(const mongo::DBException& ex)
+      {
+        std::cout << "Reconnecting due to DBException: " << ex.what() << "//" << ex.toString() << std::endl;
+        vEvents.clear();
+        sleep(0.1);
+      }
+    }
 
     return NULL;
 }
@@ -405,14 +430,15 @@ EventBridge::EventBridge()
 
     TC_LOG_INFO("server.loading", "EventBridge: Starting EventBridge...");
     
-    conn.connect("localhost");
+    connEvents.connect("localhost");
+    connActions.connect("localhost");
 
     /* Create independent threads each of which will execute function */
     pthread_create(&thread1, NULL, processMessages, NULL);
-    pthread_create(&thread2, NULL, processActions, NULL);
 
     /* Wait till threads are complete before main continues. Unless we  */
     /* wait we run the risk of executing an exit which will terminate   */
+    pthread_create(&thread2, NULL, processActions, NULL);
     /* the process and all threads before the threads have completed.   */
     //pthread_join( thread1, NULL);
 }
@@ -464,7 +490,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
         player->GetPosition(x, y, z, o);
         mapId = player->GetMapId();
         builder.append("player",
-                       BSON("guid" << player->GetGUIDLow() <<
+                       BSON("guid" << player->GetEntry() <<
                        "name" << player->GetName().c_str() <<
                        "level" << player->getLevel() <<
                        "description" << player->ToString().c_str() <<
@@ -479,7 +505,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
         actor->GetPosition(x, y, z, o);
         mapId = actor->GetMapId();
         builder.append("actor",
-                       BSON("guid" << actor->GetGUIDLow() <<
+                       BSON("guid" << actor->GetEntry() <<
                        "name" << actor->GetName().c_str() <<
                        "level" << actor->getLevel() <<
                        "description" << actor->ToString().c_str() <<
@@ -494,7 +520,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
         target->GetPosition(x, y, z, o);
         mapId = target->GetMapId();
         builder.append("target",
-                       BSON("guid" << target->GetGUIDLow() <<
+                       BSON("guid" << target->GetEntry() <<
                             "name" << target->GetName().c_str() <<
                             "level" << target->getLevel() <<
                             "x" << x <<
@@ -508,7 +534,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
         creature->GetPosition(x, y, z, o);
         mapId = creature->GetMapId();
         builder.append("creature",
-                       BSON("guid" << creature->GetGUIDLow() <<
+                       BSON("guid" << creature->GetEntry() <<
                             "name" << creature->GetName().c_str() <<
                             "level" << creature->getLevel() <<
                             "x" << x <<
@@ -520,7 +546,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 
     if(item != NULL) {
         builder.append("item",
-                       BSON("guid" << creature->GetGUIDLow() <<
+                       BSON("guid" << item->GetEntry() <<
                             "name" << item->GetTemplate()->Name1.c_str()));
     }
 
@@ -535,7 +561,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
         targets->GetObjectTarget()->GetPosition(x, y, z, o);
         mapId = targets->GetObjectTarget()->GetMapId();
         builder.append("target",
-                       BSON("guid" << targets->GetObjectTarget()->GetGUIDLow() <<
+                       BSON("guid" << targets->GetObjectTarget()->GetEntry() <<
                             "name" << targets->GetObjectTarget()->GetName().c_str() <<
                             "x" << x <<
                             "y" << y <<
@@ -554,7 +580,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
         go->GetPosition(x, y, z, o);
         mapId = go->GetMapId();
         builder.append("game-object",
-                       BSON("guid" << go->GetGUIDLow() <<
+                       BSON("guid" << go->GetEntry() <<
                             "name" << go->GetName().c_str() <<
                             "x" << x <<
                             "y" << y <<
