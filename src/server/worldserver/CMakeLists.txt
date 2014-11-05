@@ -174,9 +174,11 @@ target_link_libraries(worldserver
   ${TERMCAP_LIBRARY}
   ${MYSQL_LIBRARY}
   ${OPENSSL_LIBRARIES}
+  ${MongoDB_LIBRARIES}
   ${ZLIB_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
   restclient-cpp
+  boost_filesystem
   boost_system
   boost_thread
   ${Boost_LIBRARIES}
