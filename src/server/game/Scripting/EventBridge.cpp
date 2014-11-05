@@ -38,6 +38,9 @@
 #include "World.h"
 #include "geohash.cpp"
 
+#include "mongo/client/dbclient.h"
+#include "mongo/bson/bson.h"
+
 template <typename T>
 class SynchronisedQueue
 {
@@ -128,13 +131,14 @@ const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT
     "EVENT_TYPE_PLAYER_UPDATE_ZONE", "EVENT_TYPE_HEAL", "EVENT_TYPE_DAMAGE"
 };
 
-const char*					endMsg		= "\n";
-const int					port_out	= 6969;
-const int					port_in		= 6970;
-const char*					ebServerHost	= "conciens.mooo.com";
-struct hostent*					host;
-struct sockaddr_in				server_addr;
-SynchronisedQueue<rapidjson::Document*>		queue;
+mongo::DBClientConnection           conn;
+const char*                         endMsg          = "\n";
+const int                           port_out        = 6969;
+const int                           port_in         = 6970;
+const char*                         ebServerHost	= "conciens.mooo.com";
+struct hostent*                     host;
+struct sockaddr_in                  server_addr;
+SynchronisedQueue<mongo::BSONObj>	queue;
 
 static bool removeQuestFromDB() {
     SQLTransaction trans = WorldDatabase.BeginTransaction();
@@ -298,36 +302,49 @@ static bool createGameObject(int objectId, int mapId, double x, double y, double
     return true;
 }
 
-void processActions(rapidjson::Document& d)
+void* processActions(void *)
 {
-    for(rapidjson::Value::ConstValueIterator itr = d["actions"].Begin(); itr != d["actions"].End(); ++itr)
+    pthread_t thread2;
+    mongo::auto_ptr<mongo::DBClientCursor> cursor =
+        conn.query("conciens.actions", mongo::BSONObj());
+    
+    while(cursor->more())
     {
-        const rapidjson::Value& action = *itr;
-        const char* actionId = action["action-id"].GetString();
+        mongo::BSONObj action = cursor->next();
+        conn.remove("conciens.actions", action);
+        
+        std::string actionId = action["action-id"].toString();
         const ObjectGuid guid(HIGHGUID_UNIT, (uint32)295, (uint32)80346);
-
-        if(!strcmp(actionId, "create"))
+        
+        if(!actionId.compare("create"))
         {
-            createGameObject(action["object-id"].GetInt(), action["map-id"].GetInt(), action["x"].GetDouble(),
-                             action["y"].GetDouble(), action["z"].GetDouble(), action["o"].GetDouble());
+            createGameObject(action["object-id"].Int(),
+                             action["map-id"].Int(),
+                             action["x"].Double(), action["y"].Double(),
+                             action["z"].Double(), action["o"].Double());
         }
-        else if(!strcmp(actionId, "reload-quests"))
+        else if(!actionId.compare("reload-quests"))
         {
             reloadAllQuests();
         }
-        else if(!strcmp(actionId, "add-quest"))
+        else if(!actionId.compare("add-quest"))
         {
             addQuestToDB();
             reloadAllQuests();
             updateCreature(guid);
         }
-        else if(!strcmp(actionId, "remove-quest"))
+        else if(!actionId.compare("remove-quest"))
         {
             removeQuestFromDB();
             reloadAllQuests();
             updateCreature(guid);
         }
     }
+    
+    sleep(0.25);
+    pthread_create(&thread2, NULL, processActions, NULL);
+    
+    return NULL;
 }
 
 bool checkPortTCP(short int dwPort, const char *ipAddressStr)
@@ -360,69 +377,39 @@ bool checkPortTCP(short int dwPort, const char *ipAddressStr)
 void* processMessages(void *)
 {
     pthread_t thread1;
-    rapidjson::Document 	events, actions;
-    rapidjson::Document* 	d;
     int size;
-    rapidjson::Document::AllocatorType& allocator = events.GetAllocator();
-    std::list<rapidjson::Document*> l;
+    std::vector<mongo::BSONObj> vEvents;
+    mongo::BSONObj b;
 
-    events.SetArray();
     size = queue.Size();
     // TC_LOG_INFO("server.loading", "Sending events, size: %d", size);
-    for(int i=0;i<size;i++) {
-        bool correct = queue.TryDequeue(d);
+    for(int i = 0 ; i < size ; i++) {
+        bool correct = queue.TryDequeue(b);
         if(correct) {
-            rapidjson::Value v(rapidjson::kObjectType);
-            for(rapidjson::Document::MemberIterator it = d->MemberBegin(); it != d->MemberEnd(); ++it) {
-                v.AddMember(it->name, it->value, allocator);
-            }
-            l.push_back(d);
-            events.PushBack(v, allocator);
+            vEvents.push_back(b);
         }
     }
+    
+    conn.insert("conciens.events", vEvents);
+    vEvents.clear();
 
-    rapidjson::StringBuffer buffer;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-    events.Accept(writer);
-
-    if(size > 0 && checkPortTCP(3000, "conciens.mooo.com")) {
-        RestClient::response r = RestClient::post("http://conciens.mooo.com:3000/event", "text/json", buffer.GetString());
-        actions.Parse(r.body.c_str());
-        processActions(actions);
-    }
-
-    while(!l.empty()) {
-        d = l.front();
-        l.pop_front();
-        delete d;
-    }
-
-    sleep(1);
+    sleep(0.25);
     pthread_create(&thread1, NULL, processMessages, NULL);
-
-    //if (strcmp(recv_data, "q") == 0 || strcmp(recv_data, "Q") == 0)
-    //{
-    //	close(sock);
-    //	break;
-    //}
-
-    //else
-    //	printf("\nRecieved data = %s ", recv_data);
-
-    //printf("\nSEND (q or Q to quit) : ");
-    //gets(send_data);
 
     return NULL;
 }
 
 EventBridge::EventBridge()
 {
-    pthread_t	thread1;
+    pthread_t thread1, thread2;
 
     TC_LOG_INFO("server.loading", "EventBridge: Starting EventBridge...");
+    
+    conn.connect("localhost");
 
     /* Create independent threads each of which will execute function */
     pthread_create(&thread1, NULL, processMessages, NULL);
+    pthread_create(&thread2, NULL, processActions, NULL);
 
     /* Wait till threads are complete before main continues. Unless we  */
     /* wait we run the risk of executing an exit which will terminate   */
@@ -451,240 +438,201 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
     int mapId = 0;
     x = y = z = o = lat = lng = 0.0;
     char *geohash, *gharea, *ghsector, *ghbox, *ghstep;
-
-    rapidjson::Document* d = new rapidjson::Document();
-    rapidjson::Value jsonNums(rapidjson::kArrayType);
-    rapidjson::Value jsonPlayer(rapidjson::kObjectType);
-    rapidjson::Value jsonActor(rapidjson::kObjectType);
-    rapidjson::Value jsonCreature (rapidjson::kObjectType);
-    rapidjson::Value jsonItem (rapidjson::kObjectType);
-    rapidjson::Value jsonQuest (rapidjson::kObjectType);
-    rapidjson::Value jsonTarget (rapidjson::kObjectType);
-    rapidjson::Value jsonItemTemplate (rapidjson::kObjectType);
-    rapidjson::Value jsonGameObject (rapidjson::kObjectType);
-    rapidjson::Value jsonWeather (rapidjson::kObjectType);
-    rapidjson::Value jsonAuctionHouseObject (rapidjson::kObjectType);
-    rapidjson::Value jsonAuctionEntry (rapidjson::kObjectType);
-    rapidjson::Value jsonGroup (rapidjson::kObjectType);
-    rapidjson::Value jsonGuild (rapidjson::kObjectType);
-    rapidjson::Value jsonChannel (rapidjson::kObjectType);
-    rapidjson::Value jsonSpell (rapidjson::kObjectType);
-    rapidjson::Value jsonGeometry (rapidjson::kObjectType);
-    rapidjson::Document::AllocatorType& a = d->GetAllocator();
-    d->SetObject();
+    mongo::BSONObjBuilder builder;
 
     std::time_t curtime = sWorld->GetGameTime();
     uint32 nsecs = std::difftime(curtime, basetime);
 
-    d->AddMember(rapidjson::StringRef("timestamp"), nsecs, a);
-    d->AddMember(rapidjson::StringRef("interval"), ((int)(nsecs/900)) * 900, a);
-    d->AddMember(rapidjson::StringRef("event-type"), rapidjson::StringRef(idToEventType[event_type]), a);
-    d->AddMember(rapidjson::StringRef("app"), rapidjson::StringRef(idToEventType[event_type]), a);
+    builder.append("timestamp", nsecs);
+    builder.append("timestamp", nsecs);
+    builder.append("interval", ((int)(nsecs/900)) * 900);
+    builder.append("event-type", idToEventType[event_type]);
+    builder.append("app", idToEventType[event_type]);
 
-    jsonNums.PushBack(num, a).PushBack(num2, a);
-    d->AddMember("num-values", jsonNums, a);
+    builder.append("num-values", BSON_ARRAY(num << num2));
 
     if(st != NULL) {
-        TC_LOG_INFO("server.loading", "%s", st);
-        rapidjson::Value s;
-        s.SetString(st, strlen(st), a);
-        d->AddMember("string-value", s, a);
+        // TC_LOG_INFO("server.loading", "%s", st);
+        builder.append("string-value", st);
     }
 
     if(area != NULL) {
-        d->AddMember("area", area->id, a);
+        builder.append("area", area->id);
     }
 
     if(player != NULL) {
         player->GetPosition(x, y, z, o);
         mapId = player->GetMapId();
-        jsonPlayer.AddMember("guid", player->GetGUIDLow(), a);
-        jsonPlayer.AddMember("name", rapidjson::StringRef(player->GetName().c_str()), a);
-        jsonPlayer.AddMember("level", player->getLevel(), a);
-        rapidjson::Value s;
-        const char* text = player->ToString().c_str();
-        s.SetString(text, strlen(text), a);
-        jsonPlayer.AddMember("description", s, a);
-        jsonPlayer.AddMember("x", x, a);
-        jsonPlayer.AddMember("y", y, a);
-        jsonPlayer.AddMember("z", z, a);
-        jsonPlayer.AddMember("o", o, a);
-        jsonPlayer.AddMember("map", mapId, a);
-        d->AddMember("player", jsonPlayer, a);
+        builder.append("player",
+                       BSON("guid" << player->GetGUIDLow() <<
+                       "name" << player->GetName().c_str() <<
+                       "level" << player->getLevel() <<
+                       "description" << player->ToString().c_str() <<
+                       "x" << x <<
+                       "y" << y <<
+                       "z" << z <<
+                       "o" << o <<
+                       "map"<< mapId));
     }
 
     if(actor != NULL) {
         actor->GetPosition(x, y, z, o);
         mapId = actor->GetMapId();
-        jsonActor.AddMember("guid", actor->GetGUIDLow(), a);
-        jsonActor.AddMember("name", rapidjson::StringRef(actor->GetName().c_str()), a);
-        jsonActor.AddMember("level", actor->getLevel(), a);
-        rapidjson::Value s;
-        const char* text = actor->ToString().c_str();
-        s.SetString(text, strlen(text), a);
-        jsonActor.AddMember("description", s, a);
-        jsonActor.AddMember("x", x, a);
-        jsonActor.AddMember("y", y, a);
-        jsonActor.AddMember("z", z, a);
-        jsonActor.AddMember("o", o, a);
-        jsonActor.AddMember("map", mapId, a);
-        d->AddMember("actor", jsonActor, a);
+        builder.append("actor",
+                       BSON("guid" << actor->GetGUIDLow() <<
+                       "name" << actor->GetName().c_str() <<
+                       "level" << actor->getLevel() <<
+                       "description" << actor->ToString().c_str() <<
+                       "x" << x <<
+                       "y" << y <<
+                       "z" << z <<
+                       "o" << o <<
+                       "map" << mapId));
     }
 
     if(target != NULL) {
         target->GetPosition(x, y, z, o);
         mapId = target->GetMapId();
-        jsonTarget.AddMember("guid", target->GetGUIDLow(), a);
-        jsonTarget.AddMember("name", rapidjson::StringRef(target->GetName().c_str()), a);
-        jsonTarget.AddMember("level", target->getLevel(), a);
-        jsonTarget.AddMember("x", x, a);
-        jsonTarget.AddMember("y", y, a);
-        jsonTarget.AddMember("z", z, a);
-        jsonTarget.AddMember("o", o, a);
-        jsonTarget.AddMember("map", mapId, a);
-        d->AddMember("target", jsonTarget, a);
+        builder.append("target",
+                       BSON("guid" << target->GetGUIDLow() <<
+                            "name" << target->GetName().c_str() <<
+                            "level" << target->getLevel() <<
+                            "x" << x <<
+                            "y" << y <<
+                            "z" << z <<
+                            "o" << o <<
+                            "map" << mapId));
     }
 
     if(creature != NULL) {
         creature->GetPosition(x, y, z, o);
         mapId = creature->GetMapId();
-        jsonCreature.AddMember("guid", creature->GetGUIDLow(), a);
-        jsonCreature.AddMember("name", rapidjson::StringRef(creature->GetName().c_str()), a);
-        jsonCreature.AddMember("level", creature->getLevel(), a);
-        jsonCreature.AddMember("x", x, a);
-        jsonCreature.AddMember("y", y, a);
-        jsonCreature.AddMember("z", z, a);
-        jsonCreature.AddMember("o", o, a);
-        jsonCreature.AddMember("map", mapId, a);
-        d->AddMember("creature", jsonCreature, a);
+        builder.append("creature",
+                       BSON("guid" << creature->GetGUIDLow() <<
+                            "name" << creature->GetName().c_str() <<
+                            "level" << creature->getLevel() <<
+                            "x" << x <<
+                            "y" << y <<
+                            "z" << z <<
+                            "o" << o <<
+                            "map" << mapId));
     }
 
     if(item != NULL) {
-        jsonItem.AddMember("guid", item->GetGUIDLow(), a);
-        jsonItem.AddMember("name", rapidjson::StringRef(item->GetTemplate()->Name1.c_str()), a);
-        d->AddMember("item", jsonItem, a);
+        builder.append("item",
+                       BSON("guid" << creature->GetGUIDLow() <<
+                            "name" << item->GetTemplate()->Name1.c_str()));
     }
 
     if(quest != NULL) {
-        jsonQuest.AddMember("id", quest->GetQuestId(), a);
-        jsonQuest.AddMember("name", rapidjson::StringRef(quest->GetTitle().c_str()), a);
-        jsonQuest.AddMember("description", rapidjson::StringRef(quest->GetDetails().c_str()), a);
-        d->AddMember("quest", jsonQuest, a);
+        builder.append("quest",
+                       BSON("id" << quest->GetQuestId() <<
+                            "name" << quest->GetTitle().c_str() <<
+                            "description" << quest->GetDetails().c_str()));
     }
 
     if(targets != NULL && targets->GetObjectTarget() != NULL) {
         targets->GetObjectTarget()->GetPosition(x, y, z, o);
         mapId = targets->GetObjectTarget()->GetMapId();
-        jsonTarget.AddMember("guid", targets->GetObjectTarget()->GetGUIDLow(), a);
-        jsonTarget.AddMember("name", rapidjson::StringRef(targets->GetObjectTarget()->GetName().c_str()), a);
-        jsonTarget.AddMember("x", x, a);
-        jsonTarget.AddMember("y", y, a);
-        jsonTarget.AddMember("z", z, a);
-        jsonTarget.AddMember("o", o, a);
-        jsonTarget.AddMember("map", mapId, a);
-        d->AddMember("target", jsonTarget, a);
+        builder.append("target",
+                       BSON("guid" << targets->GetObjectTarget()->GetGUIDLow() <<
+                            "name" << targets->GetObjectTarget()->GetName().c_str() <<
+                            "x" << x <<
+                            "y" << y <<
+                            "z" << z <<
+                            "o" << o <<
+                            "map" << mapId));
     }
 
     if(proto != NULL) {
-        jsonItemTemplate.AddMember("id", proto->ItemId, a);
-        jsonItemTemplate.AddMember("name", rapidjson::StringRef(proto->Name1.c_str()), a);
-        d->AddMember("item-template", jsonItemTemplate, a);
+        builder.append("item-template",
+                       BSON("id" << proto->ItemId <<
+                            "name" << proto->Name1.c_str()));
     }
 
     if(go != NULL) {
         go->GetPosition(x, y, z, o);
         mapId = go->GetMapId();
-        jsonGameObject.AddMember("guid", go->GetGUIDLow(), a);
-        jsonGameObject.AddMember("name", rapidjson::StringRef(go->GetName().c_str()), a);
-        jsonGameObject.AddMember("x", x, a);
-        jsonGameObject.AddMember("y", y, a);
-        jsonGameObject.AddMember("z", z, a);
-        jsonGameObject.AddMember("o", o, a);
-        jsonGameObject.AddMember("map", mapId, a);
-        d->AddMember("game-object", jsonGameObject, a);
+        builder.append("game-object",
+                       BSON("guid" << go->GetGUIDLow() <<
+                            "name" << go->GetName().c_str() <<
+                            "x" << x <<
+                            "y" << y <<
+                            "z" << z <<
+                            "o" << o <<
+                            "map" << mapId));
     }
 
     if(weather != NULL) {
-        jsonWeather.AddMember("zone", weather->GetZone(), a);
-        jsonWeather.AddMember("state", state, a);
-        jsonWeather.AddMember("grade", grade, a);
-        d->AddMember("weather", jsonWeather, a);
+        builder.append("weather",
+                       BSON("zone" << weather->GetZone() <<
+                            "state" << state <<
+                            "grade" << grade));
     }
 
     if(ah != NULL) {
-        jsonAuctionHouseObject.AddMember("count", ah->Getcount(), a);
-        d->AddMember("auction-house-object", jsonAuctionHouseObject, a);
+        builder.append("auction-house-object",
+                       BSON("count" << ah->Getcount()));
     }
 
     if(entry != NULL) {
-        jsonAuctionEntry.AddMember("id", entry->itemGUIDLow, a);
-        jsonAuctionEntry.AddMember("bid", entry->bid, a);
-        jsonAuctionEntry.AddMember("bidder", entry->bidder, a);
-        d->AddMember("auction-house-object", jsonAuctionHouseObject, a);
+        builder.append("auction-house-object",
+                       BSON("id" << entry->itemGUIDLow <<
+                            "bid" << entry->bid <<
+                            "bidder" << entry->bidder));
     }
 
     if(group != NULL) {
-        jsonGroup.AddMember("guid", group->GetLowGUID(), a);
-        jsonGroup.AddMember("leader-guid", group->GetLeaderGUID(), a);
-        jsonGroup.AddMember("leader-name", rapidjson::StringRef(group->GetLeaderName()), a);
-        rapidjson::Value jsonGroupMemberList(rapidjson::kArrayType);
-
+        mongo::BSONArrayBuilder bGroup;
         const Group::MemberSlotList& msl = group->GetMemberSlots();
         for(std::list<Group::MemberSlot>::const_iterator it = msl.cbegin(); it != msl.cend(); it++) {
-            rapidjson::Value jsonGroupMember(rapidjson::kObjectType);
-            jsonGroupMember.AddMember("guid", it->guid, a);
-            jsonGroupMember.AddMember("name", rapidjson::StringRef(it->name.c_str()), a);
-            jsonGroupMemberList.PushBack(jsonGroupMember, a);
+            bGroup.append(BSON("guid" << it->guid.GetEntry() <<
+                               "name" << it->name.c_str()));
         }
-
-        jsonGroup.AddMember("member-list", jsonGroupMemberList, a);
-        d->AddMember("group", jsonGroup, a);
+        builder.append("group",
+                       BSON("guid" << group->GetLowGUID() <<
+                            "leader-guid" << group->GetLeaderGUID().GetEntry() <<
+                            "leader-name" << group->GetLeaderName() <<
+                            "member-list" << bGroup.arr()));
     }
 
     if(guild != NULL) {
-        jsonGuild.AddMember("id", guild->GetId(), a);
-        jsonGuild.AddMember("name",rapidjson::StringRef( guild->GetName().c_str()), a);
-        d->AddMember("guild", jsonGuild, a);
+        builder.append("guild",
+                       BSON("id" << guild->GetId() <<
+                            "name" << guild->GetName().c_str()));
     }
 
     if(channel != NULL) {
-        jsonChannel.AddMember("id", channel->GetChannelId(), a);
-        jsonChannel.AddMember("name", rapidjson::StringRef(channel->GetName().c_str()), a);
-        d->AddMember("channel", jsonChannel, a);
-    }
+        builder.append("channel",
+                       BSON("id" << channel->GetChannelId() <<
+                            "name" << channel->GetName().c_str()));
+   }
 
     if(spell != NULL) {
-        jsonSpell.AddMember("id", spell->GetSpellInfo()->Id, a);
-        jsonSpell.AddMember("name", rapidjson::StringRef(*spell->GetSpellInfo()->SpellName), a);
-        jsonSpell.AddMember("family", spell->GetSpellInfo()->SpellFamilyName, a);
-        d->AddMember("spell", jsonSpell, a);
+        builder.append("spell",
+                       BSON("id" << spell->GetSpellInfo()->Id <<
+                            "name" << *spell->GetSpellInfo()->SpellName <<
+                            "family" << spell->GetSpellInfo()->SpellFamilyName));
     }
 
     if(x != 0 && y != 0 && z != 0) {
-        rapidjson::Value jsonGeohash, jsonArea, jsonSector, jsonBox, jsonStep;
-
         lat = ((mapId * 100000.0) + y + shiftCoordinate) / 1000000.0;
         lng = ((mapId * 100000.0) + x + shiftCoordinate) / 1000000.0;
-        jsonGeometry.AddMember("lat", lat, a);
-        jsonGeometry.AddMember("lng", lng, a);
-        d->AddMember("geometry", jsonGeometry, a);
-        d->AddMember("lat", lat, a);
-        d->AddMember("lng", lng, a);
+        builder.append("geometry",
+                       BSON("lat" << lat <<
+                            "lng" << lng));
+        builder.append("lat", lat);
+        builder.append("lng", lng);
         geohash = geohash_encode(lat, lng, 12);
         gharea = geohash_encode(lat, lng, 6);
         ghsector = geohash_encode(lat, lng, 7);
         ghbox = geohash_encode(lat, lng, 8);
         ghstep = geohash_encode(lat, lng, 9);
-        jsonGeohash.SetString(geohash, 12, a);
-        jsonArea.SetString(gharea, 6, a);
-        jsonSector.SetString(ghsector, 7, a);
-        jsonBox.SetString(ghbox, 8, a);
-        jsonStep.SetString(ghstep, 9, a);
-        d->AddMember("geohash", jsonGeohash, a);
-        d->AddMember("area", jsonArea, a);
-        d->AddMember("sector", jsonSector, a);
-        d->AddMember("box", jsonBox, a);
-        d->AddMember("step", jsonStep, a);
+        builder.append("geohash", geohash);
+        builder.append("area", gharea);
+        builder.append("sector", ghsector);
+        builder.append("box", ghbox);
+        builder.append("step", ghstep);
         free(geohash);
         free(gharea);
         free(ghsector);
@@ -692,6 +640,6 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
         free(ghstep);
     }
 
-    queue.Enqueue(d);
+    queue.Enqueue(builder.obj());
 }
 
