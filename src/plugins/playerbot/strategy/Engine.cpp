@@ -480,7 +480,7 @@ void Engine::LogAction(const char* format, ...)
         if (sPlayerbotAIConfig.logInGroupOnly && !bot->GetGroup())
             return;
 
-        TC_LOG_INFO("server.loading", "%s %s", bot->GetName().c_str(), buf);
+        TC_LOG_DEBUG("server.loading", "%s %s", bot->GetName().c_str(), buf);
     }
 }
 
