@@ -44,17 +44,7 @@ Detailed installation guides are available in the wiki for
 ## Install: cOncienS flavor
 
 ```bash
-sudo apt-get install librabbitmq0 libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev
-git clone https://github.com/mrtazz/restclient-cpp
-cd restclient-cpp/
-./autogen.sh
-./configure
-make
-sudo make install
-sudo cp /usr/local/include/restclient-cpp/* /usr/include/
-cd ..
-git clone https://github.com/miloyip/rapidjson
-sudo cp -R rapidjson/include/rapidjson /usr/include/
+sudo apt-get install librabbitmq0 libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev rabbitmq-server mongodb-dev librabbitmq-dev
 git clone https://github.com/kemlg/trinitycore-conciens
 cd trinitycore-conciens
 mkdir build
@@ -90,9 +80,7 @@ cp authserver.conf.dist authserver.conf
 # Configure DB and BindIP
 vi worldserver.conf
 vi authserver.conf
-# Configure realm, e.g. insert into
-realmlist(id,name,address,localAddress,localSubnetMask,port,icon,flag,timezone,allowedSecurityLevel,population,gamebuild)
-values(1,"Trinity","130.211.62.241","10.240.183.175","255.255.0.0",8085,0,2,1,0,0,12340);
+# Configure realm, e.g. insert into realmlist(id,name,address,localAddress,localSubnetMask,port,icon,flag,timezone,allowedSecurityLevel,population,gamebuild) values(1,"Trinity","130.211.62.241","10.240.183.175","255.255.0.0",8085,0,2,1,0,0,12340);
 mysql -u root -p auth
 cd
 wget http://www.trinitycore.org/f/files/getdownload/1266-legacy-tdb-335-full/
