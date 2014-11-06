@@ -44,7 +44,7 @@ Detailed installation guides are available in the wiki for
 ## Install: cOncienS flavor
 
 ```bash
-sudo apt-get install libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev
+sudo apt-get install librabbitmq0 libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev
 git clone https://github.com/mrtazz/restclient-cpp
 cd restclient-cpp/
 ./autogen.sh
