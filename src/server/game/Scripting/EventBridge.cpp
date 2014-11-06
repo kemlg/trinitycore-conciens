@@ -133,12 +133,7 @@ const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT
 
 mongo::DBClientConnection           connEvents(true, NULL, NULL);
 mongo::DBClientConnection           connActions(true, NULL, NULL);
-const char*                         endMsg          = "\n";
-const int                           port_out        = 6969;
-const int                           port_in         = 6970;
 const char*                         ebServerHost	= "conciens.mooo.com";
-struct hostent*                     host;
-struct sockaddr_in                  server_addr;
 SynchronisedQueue<mongo::BSONObj>	queue;
 
 static bool removeQuestFromDB() {
@@ -357,33 +352,6 @@ void* processActions(void *)
   return NULL;
 }
 
-bool checkPortTCP(short int dwPort, const char *ipAddressStr)
-{
-    struct sockaddr_in server_addr;
-    int sock;
-    struct hostent*		host;
-    struct timeval timeout;
-    timeout.tv_sec = 1;
-    timeout.tv_usec = 0;
-
-    host = gethostbyname(ipAddressStr);
-    sock = (int) socket(AF_INET, SOCK_STREAM, 0);
-
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr = *((struct in_addr *) host->h_addr);
-    bzero(&(server_addr.sin_zero), 8);
-    server_addr.sin_port = htons(dwPort);
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout));
-    int result = connect(sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr));
-
-    close(sock);
-
-    if (result == 0) {
-        return true;
-    }
-    else return false;
-}
-
 void* processMessages(void *)
 {
     int size;
@@ -432,6 +400,9 @@ EventBridge::EventBridge()
     
     connEvents.connect("localhost");
     connActions.connect("localhost");
+
+    connEvents.ensureIndex("conciens.events", BSON("player.guid" << 1));
+    connEvents.ensureIndex("conciens.events", BSON("millis" << 1 << "expireAfterSeconds" << 15));
 
     /* Create independent threads each of which will execute function */
     pthread_create(&thread1, NULL, processMessages, NULL);
@@ -665,6 +636,8 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
         free(ghbox);
         free(ghstep);
     }
+
+    builder.appendDate("millis", time(0));
 
     queue.Enqueue(builder.obj());
 }
