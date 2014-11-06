@@ -97,6 +97,15 @@ mysql -u root -p characters < trinitycore-conciens/sql/characters_ai_playerbot_n
 cd
 ```
 
+## Instructions for developing in XCode
+
+```bash
+sudo port install rabbitmq-c mongo-cxx-driver mysql56
+cd build/
+cmake ../ -GXcode -DREADLINE_INCLUDE_DIR=/opt/local/include -DREADLINE_LIBRARY=/opt/local/lib/libreadline.dylib -DACE_INCLUDE_DIR=/opt/local/include -DACE_LIBRARY=/opt/local/lib/libACE.a -DPREFIX=/opt/trinitycore -DWARNINGS=0 -DOPENSSL_INCLUDE_DIR=/opt/local/include -DOPENSSL_LIBRARY=/opt/local/lib/libssl.a -DMYSQL_INCLUDE_DIR=/opt/local/include/mysql56/ -DMYSQL_LIBRARY=/opt/local/lib/mysql56/mysql/libmysqlclient.a -DTOOLS=1 -DSCRIPTS=1 -DSERVERS=1
+open TrinityCore.xcodeproj/
+```
+
 ## Reporting issues
 
 Issues can be reported via the [Github issue tracker](https://github.com/TrinityCore/TrinityCore/issues?labels=Branch-3.3.5a).

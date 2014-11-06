@@ -38,81 +38,10 @@
 #include "World.h"
 #include "geohash.cpp"
 
-#include "mongo/client/dbclient.h"
 #include "mongo/bson/bson.h"
-
-template <typename T>
-class SynchronisedQueue
-{
-public:
-
-    SynchronisedQueue()
-    {
-        RequestToEnd = false;
-        EnqueueData = true;
-    }
-    void Enqueue(const T& data)
-    {
-        boost::unique_lock<boost::mutex> lock(m_mutex);
-
-        if(EnqueueData)
-        {
-            m_queue.push(data);
-            m_cond.notify_one();
-        }
-    }
-
-    bool TryDequeue(T& result)
-    {
-        boost::unique_lock<boost::mutex> lock(m_mutex);
-
-        while (m_queue.empty() && (! RequestToEnd))
-        {
-            m_cond.wait(lock);
-        }
-
-        if( RequestToEnd )
-        {
-            DoEndActions();
-            return false;
-        }
-
-        result= m_queue.front(); m_queue.pop();
-
-        return true;
-    }
-
-    void StopQueue()
-    {
-        RequestToEnd =  true;
-        Enqueue(NULL);
-    }
-
-    int Size()
-    {
-        boost::unique_lock<boost::mutex> lock(m_mutex);
-        return m_queue.size();
-    }
-
-private:
-
-    void DoEndActions()
-    {
-        EnqueueData = false;
-
-        while (!m_queue.empty())
-        {
-            m_queue.pop();
-        }
-    }
-
-    std::queue<T> m_queue;              // Use STL queue to store data
-    boost::mutex m_mutex;               // The mutex to synchronise on
-    boost::condition_variable m_cond;   // The condition to wait for
-
-    bool RequestToEnd;
-    bool EnqueueData;
-};
+#include <amqp_tcp_socket.h>
+#include <amqp.h>
+#include <amqp_framing.h>
 
 const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT_TYPE_ITEM_EXPIRE",
     "EVENT_TYPE_GOSSIP_HELLO", "EVENT_TYPE_GOSSIP_SELECT", "EVENT_TYPE_GOSSIP_SELECT_CODE",
@@ -131,10 +60,7 @@ const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT
     "EVENT_TYPE_PLAYER_UPDATE_ZONE", "EVENT_TYPE_HEAL", "EVENT_TYPE_DAMAGE"
 };
 
-mongo::DBClientConnection           connEvents(true, NULL, NULL);
-mongo::DBClientConnection           connActions(true, NULL, NULL);
-const char*                         ebServerHost	= "conciens.mooo.com";
-SynchronisedQueue<mongo::BSONObj>	queue;
+amqp_connection_state_t conn = amqp_new_connection();
 
 static bool removeQuestFromDB() {
     SQLTransaction trans = WorldDatabase.BeginTransaction();
@@ -300,6 +226,7 @@ static bool createGameObject(int objectId, int mapId, double x, double y, double
 
 void* processActions(void *)
 {
+    /*
   while(true)
   {
     try
@@ -348,12 +275,14 @@ void* processActions(void *)
       sleep(0.1);
     }
   }
+     */
 
   return NULL;
 }
 
 void* processMessages(void *)
 {
+    /*
     int size;
     std::vector<mongo::BSONObj> vEvents;
     mongo::BSONObj b;
@@ -388,6 +317,7 @@ void* processMessages(void *)
         sleep(0.1);
       }
     }
+     */
 
     return NULL;
 }
@@ -395,15 +325,16 @@ void* processMessages(void *)
 EventBridge::EventBridge()
 {
     pthread_t thread1, thread2;
+    amqp_socket_t *socket = NULL;
 
     TC_LOG_INFO("server.loading", "EventBridge: Starting EventBridge...");
     
-    connEvents.connect("localhost");
-    connActions.connect("localhost");
-
-    connEvents.ensureIndex("conciens.events", BSON("player.guid" << 1));
-    connEvents.ensureIndex("conciens.events", BSON("millis" << 1 << "expireAfterSeconds" << 15));
-
+    socket = amqp_tcp_socket_new(conn);
+    amqp_socket_open(socket, "localhost", 5672);
+    amqp_login(conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+    amqp_channel_open(conn, 1);
+    amqp_get_rpc_reply(conn);
+    
     /* Create independent threads each of which will execute function */
     pthread_create(&thread1, NULL, processMessages, NULL);
 
@@ -639,6 +570,20 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 
     builder.appendDate("millis", time(0));
 
-    queue.Enqueue(builder.obj());
+    const mongo::BSONObj bobj = builder.obj();
+    const char *data = bobj.objdata();
+    
+    amqp_bytes_t message_bytes;
+    message_bytes.len = sizeof(data);
+    message_bytes.bytes = (void *)data;
+    
+    amqp_basic_publish(conn,
+                       1,
+                       amqp_cstring_bytes("amq.direct"),
+                       amqp_cstring_bytes("conciens.events"),
+                       0,
+                       0,
+                       NULL,
+                       message_bytes);
 }
 
