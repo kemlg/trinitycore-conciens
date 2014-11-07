@@ -236,6 +236,7 @@ void* processActions(void *)
     amqp_queue_bind(connActions, 2, queuename, amqp_cstring_bytes("amq.direct"),
                     amqp_cstring_bytes("conciens.actions"),
                     amqp_empty_table);
+    amqp_basic_consume(connActions, 2, queuename, amqp_empty_bytes, 0, 0, 0, amqp_empty_table);
     
     while(true)
     {
@@ -245,18 +246,40 @@ void* processActions(void *)
         amqp_maybe_release_buffers(connActions);
         
         res = amqp_consume_message(connActions, &envelope, NULL, 0);
-        
-        printf("Delivery %u, exchange %.*s routingkey %.*s\n",
-               (unsigned) envelope.delivery_tag,
-               (int) envelope.exchange.len, (char *) envelope.exchange.bytes,
-               (int) envelope.routing_key.len, (char *) envelope.routing_key.bytes);
-        
-        if (envelope.message.properties._flags & AMQP_BASIC_CONTENT_TYPE_FLAG) {
-            printf("Content-type: %.*s\n",
-                   (int) envelope.message.properties.content_type.len,
-                   (char *) envelope.message.properties.content_type.bytes);
+
+        if (AMQP_RESPONSE_NORMAL != res.reply_type) {
+          break;
         }
-        printf("----\n");
+
+        mongo::BSONObj action((char *)envelope.message.body.bytes);
+
+        std::string actionId = action["action-id"].String();
+        TC_LOG_INFO("server.loading", "Action arrived: %s", actionId.c_str());
+        const ObjectGuid guid(HIGHGUID_UNIT, (uint32)295, (uint32)80346);
+
+        if(actionId.compare("create") == 0)
+        {
+          createGameObject(action["object-id"].Int(),
+              action["map-id"].Int(),
+              action["x"].Double(), action["y"].Double(),
+              action["z"].Double(), action["o"].Double());
+        }
+        else if(actionId.compare("reload-quests") == 0)
+        {
+          reloadAllQuests();
+        }
+        else if(actionId.compare("add-quest") == 0)
+        {
+          addQuestToDB();
+          reloadAllQuests();
+          updateCreature(guid);
+        }
+        else if(actionId.compare("remove-quest") == 0)
+        {
+          removeQuestFromDB();
+          reloadAllQuests();
+          updateCreature(guid);
+        }
         
         amqp_destroy_envelope(&envelope);
     }
