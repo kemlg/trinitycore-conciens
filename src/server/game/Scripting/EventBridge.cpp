@@ -62,6 +62,7 @@ const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT
 
 amqp_connection_state_t connEvents  = amqp_new_connection();
 amqp_connection_state_t connActions = amqp_new_connection();
+amqp_basic_properties_t propsExpiration, propsNormal;
 
 static bool removeQuestFromDB() {
     SQLTransaction trans = WorldDatabase.BeginTransaction();
@@ -291,8 +292,22 @@ EventBridge::EventBridge()
 {
     pthread_t thread1;
     amqp_socket_t *socket = NULL;
-
+    amqp_bytes_t expiration;
+    
     TC_LOG_INFO("server.loading", "EventBridge: Starting EventBridge...");
+
+    expiration.bytes = (void*)"1000"; // 1 second TTL
+    expiration.len = 4;
+    
+    propsNormal._flags = 0;
+    propsNormal._flags |= AMQP_BASIC_CONTENT_TYPE_FLAG;
+    propsNormal.content_type = amqp_cstring_bytes("application/bson");
+    
+    propsExpiration._flags = 0;
+    propsExpiration._flags |= AMQP_BASIC_CONTENT_TYPE_FLAG;
+    propsExpiration.content_type = amqp_cstring_bytes("application/bson");
+    propsExpiration._flags |= AMQP_BASIC_EXPIRATION_FLAG;
+    propsExpiration.expiration = expiration;
     
     socket = amqp_tcp_socket_new(connEvents);
     amqp_socket_open(socket, "localhost", 5672);
@@ -531,6 +546,12 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 
     builder.appendDate("millis", time(0));
 
+    amqp_basic_properties_t *propsCorrect = &propsNormal;
+    if(event_type == 29 || event_type == 20) // {CREATURE,OBJECT}_UPDATE
+    {
+        propsCorrect = &propsExpiration;
+    }
+    
     const mongo::BSONObj bobj = builder.obj();
     
     amqp_bytes_t message_bytes;
@@ -543,7 +564,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
                        amqp_cstring_bytes("conciens.events"),
                        0,
                        0,
-                       NULL,
+                       propsCorrect,
                        message_bytes);
 }
 
