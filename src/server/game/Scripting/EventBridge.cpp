@@ -334,7 +334,6 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
     uint32 nsecs = std::difftime(curtime, basetime);
 
     builder.append("timestamp", nsecs);
-    builder.append("timestamp", nsecs);
     builder.append("interval", ((int)(nsecs/900)) * 900);
     builder.append("event-type", idToEventType[event_type]);
     builder.append("app", idToEventType[event_type]);
