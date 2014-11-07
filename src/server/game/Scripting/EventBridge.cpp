@@ -60,7 +60,8 @@ const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT
     "EVENT_TYPE_PLAYER_UPDATE_ZONE", "EVENT_TYPE_HEAL", "EVENT_TYPE_DAMAGE"
 };
 
-amqp_connection_state_t conn = amqp_new_connection();
+amqp_connection_state_t connEvents  = amqp_new_connection();
+amqp_connection_state_t connActions = amqp_new_connection();
 
 static bool removeQuestFromDB() {
     SQLTransaction trans = WorldDatabase.BeginTransaction();
@@ -226,58 +227,41 @@ static bool createGameObject(int objectId, int mapId, double x, double y, double
 
 void* processActions(void *)
 {
-    /*
-  while(true)
-  {
-    try
+    amqp_bytes_t queuename;
+    amqp_queue_declare_ok_t *r = amqp_queue_declare(connActions, 2,
+                                                    amqp_empty_bytes,
+                                                    0, 0, 0, 1,
+                                                    amqp_empty_table);
+    queuename = amqp_bytes_malloc_dup(r->queue);
+    amqp_queue_bind(connActions, 2, queuename, amqp_cstring_bytes("amq.direct"),
+                    amqp_cstring_bytes("conciens.actions"),
+                    amqp_empty_table);
+    
+    while(true)
     {
-      mongo::auto_ptr<mongo::DBClientCursor> cursor =
-        connActions.query("conciens.actions", mongo::BSONObj());
-
-      while(cursor->more())
-      {
-        mongo::BSONObj action = cursor->next();
-        connActions.remove("conciens.actions", action);
-
-        std::string actionId = action["action-id"].String();
-        // TC_LOG_INFO("server.loading", "Action arrived: %s", actionId.c_str());
-        const ObjectGuid guid(HIGHGUID_UNIT, (uint32)295, (uint32)80346);
-
-        if(actionId.compare("create") == 0)
-        {
-          createGameObject(action["object-id"].Int(),
-              action["map-id"].Int(),
-              action["x"].Double(), action["y"].Double(),
-              action["z"].Double(), action["o"].Double());
+        amqp_rpc_reply_t res;
+        amqp_envelope_t envelope;
+        
+        amqp_maybe_release_buffers(connActions);
+        
+        res = amqp_consume_message(connActions, &envelope, NULL, 0);
+        
+        printf("Delivery %u, exchange %.*s routingkey %.*s\n",
+               (unsigned) envelope.delivery_tag,
+               (int) envelope.exchange.len, (char *) envelope.exchange.bytes,
+               (int) envelope.routing_key.len, (char *) envelope.routing_key.bytes);
+        
+        if (envelope.message.properties._flags & AMQP_BASIC_CONTENT_TYPE_FLAG) {
+            printf("Content-type: %.*s\n",
+                   (int) envelope.message.properties.content_type.len,
+                   (char *) envelope.message.properties.content_type.bytes);
         }
-        else if(actionId.compare("reload-quests") == 0)
-        {
-          reloadAllQuests();
-        }
-        else if(actionId.compare("add-quest") == 0)
-        {
-          addQuestToDB();
-          reloadAllQuests();
-          updateCreature(guid);
-        }
-        else if(actionId.compare("remove-quest") == 0)
-        {
-          removeQuestFromDB();
-          reloadAllQuests();
-          updateCreature(guid);
-        }
-      }
-      sleep(1);
+        printf("----\n");
+        
+        amqp_destroy_envelope(&envelope);
     }
-    catch(const mongo::DBException& ex)
-    {
-      std::cout << "Reconnecting due to DBException: " << ex.what() << "//" << ex.toString() << std::endl;
-      sleep(0.1);
-    }
-  }
-     */
 
-  return NULL;
+    return NULL;
 }
 
 EventBridge::EventBridge()
@@ -287,11 +271,15 @@ EventBridge::EventBridge()
 
     TC_LOG_INFO("server.loading", "EventBridge: Starting EventBridge...");
     
-    socket = amqp_tcp_socket_new(conn);
+    socket = amqp_tcp_socket_new(connEvents);
     amqp_socket_open(socket, "localhost", 5672);
-    amqp_login(conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
-    amqp_channel_open(conn, 1);
-    amqp_get_rpc_reply(conn);
+    amqp_login(connEvents, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+    amqp_channel_open(connEvents, 1);
+    
+    socket = amqp_tcp_socket_new(connActions);
+    amqp_socket_open(socket, "localhost", 5672);
+    amqp_login(connActions, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+    amqp_channel_open(connActions, 2);
     
     pthread_create(&thread1, NULL, processActions, NULL);
 }
@@ -527,7 +515,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
     message_bytes.len = bobj.objsize();
     message_bytes.bytes = (void *)bobj.objdata();
     
-    amqp_basic_publish(conn,
+    amqp_basic_publish(connEvents,
                        1,
                        amqp_cstring_bytes("amq.direct"),
                        amqp_cstring_bytes("conciens.events"),
