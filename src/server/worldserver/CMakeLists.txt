@@ -175,6 +175,7 @@ target_link_libraries(worldserver
   ${MYSQL_LIBRARY}
   ${OPENSSL_LIBRARIES}
   ${MongoDB_LIBRARIES}
+  ${Rabbitmqc_LIBRARIES}
   ${ZLIB_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
   restclient-cpp

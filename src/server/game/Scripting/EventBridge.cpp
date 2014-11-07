@@ -571,11 +571,10 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
     builder.appendDate("millis", time(0));
 
     const mongo::BSONObj bobj = builder.obj();
-    const char *data = bobj.objdata();
     
     amqp_bytes_t message_bytes;
-    message_bytes.len = sizeof(data);
-    message_bytes.bytes = (void *)data;
+    message_bytes.len = bobj.objsize();
+    message_bytes.bytes = (void *)bobj.objdata();
     
     amqp_basic_publish(conn,
                        1,

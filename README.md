@@ -44,7 +44,22 @@ Detailed installation guides are available in the wiki for
 ## Install: cOncienS flavor
 
 ```bash
-sudo apt-get install librabbitmq0 libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev rabbitmq-server mongodb-dev librabbitmq-dev
+sudo apt-get install librabbitmq0 libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev rabbitmq-server mongodb-dev
+wget https://github.com/alanxz/rabbitmq-c/releases/download/v0.5.2/rabbitmq-c-0.5.2.tar.gz
+tar -xvzf rabbitmq-c-0.5.2.tar.gz
+cd rabbitmq-c-0.5.2
+./configure
+make
+sudo make install
+sudo echo "deb http://www.rabbitmq.com/debian/ testing main" > /etc/apt/sources.list.d/rabbitmq.list
+sudo apt-get update
+curl http://www.rabbitmq.com/rabbitmq-signing-key-public.asc | sudo apt-key add -
+sudo apt-get update
+sudo apt-get install rabbitmq-server
+sudo rabbitmq-plugins enable rabbitmq_management
+sudo vi /etc/rabbitmq/rabbitmq.config
+# Add the following: [{rabbit, [{loopback_users, []}]}].
+sudo service rabbitmq-server restart
 git clone https://github.com/kemlg/trinitycore-conciens
 cd trinitycore-conciens
 mkdir build
