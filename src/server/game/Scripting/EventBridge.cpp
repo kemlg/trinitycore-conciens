@@ -280,51 +280,9 @@ void* processActions(void *)
   return NULL;
 }
 
-void* processMessages(void *)
-{
-    /*
-    int size;
-    std::vector<mongo::BSONObj> vEvents;
-    mongo::BSONObj b;
-
-    while(true)
-    {
-      try
-      {
-        size = queue.Size();
-        // TC_LOG_INFO("server.loading", "Sending events, size: %d", size);
-        for(int i = 0 ; i < size ; i++) {
-          bool correct = queue.TryDequeue(b);
-          if(correct) {
-            vEvents.push_back(b);
-            if(i % 20000 == 0)
-            {
-              connEvents.insert("conciens.events", vEvents);
-              vEvents.clear();
-            }
-          }
-        }
-
-        connEvents.insert("conciens.events", vEvents);
-        vEvents.clear();
-
-        sleep(1);
-      }
-      catch(const mongo::DBException& ex)
-      {
-        std::cout << "Reconnecting due to DBException: " << ex.what() << "//" << ex.toString() << std::endl;
-        vEvents.clear();
-        sleep(0.1);
-      }
-    }
-     */
-
-    return NULL;
-}
-
 EventBridge::EventBridge()
 {
-    pthread_t thread1, thread2;
+    pthread_t thread1;
     amqp_socket_t *socket = NULL;
 
     TC_LOG_INFO("server.loading", "EventBridge: Starting EventBridge...");
@@ -335,14 +293,7 @@ EventBridge::EventBridge()
     amqp_channel_open(conn, 1);
     amqp_get_rpc_reply(conn);
     
-    /* Create independent threads each of which will execute function */
-    pthread_create(&thread1, NULL, processMessages, NULL);
-
-    /* Wait till threads are complete before main continues. Unless we  */
-    /* wait we run the risk of executing an exit which will terminate   */
-    pthread_create(&thread2, NULL, processActions, NULL);
-    /* the process and all threads before the threads have completed.   */
-    //pthread_join( thread1, NULL);
+    pthread_create(&thread1, NULL, processActions, NULL);
 }
 
 EventBridge::~EventBridge()
