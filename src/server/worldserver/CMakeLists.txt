@@ -178,10 +178,6 @@ target_link_libraries(worldserver
   ${Rabbitmqc_LIBRARIES}
   ${ZLIB_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
-  restclient-cpp
-  boost_filesystem
-  boost_system
-  boost_thread
   ${Boost_LIBRARIES}
 )
 
