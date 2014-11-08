@@ -72,6 +72,14 @@ find_path(MYSQL_INCLUDE_DIR
     /usr/local/include
     /usr/local/include/mysql
     /usr/local/mysql/include
+    /usr/local/include/mysql55/
+    /usr/local/include/mysql55/mysql/
+    /opt/local/include/mysql55/
+    /opt/local/include/mysql55/mysql/
+    /usr/local/include/mysql56/
+    /usr/local/include/mysql56/mysql/
+    /opt/local/include/mysql56/
+    /opt/local/include/mysql56/mysql/
     "C:/Program Files/MySQL/MySQL Server 5.6/include"
     "C:/Program Files/MySQL/MySQL Server 5.5/include"
     "C:/Program Files/MySQL/MySQL Server 5.1/include"
@@ -102,7 +110,7 @@ if( UNIX )
   foreach(LIB ${MYSQL_ADD_LIBRARIES})
     find_library( MYSQL_LIBRARY
       NAMES
-        mysql libmysql ${LIB}
+        mysql libmysql ${LIB} libmysqlclient
       PATHS
         ${MYSQL_ADD_LIBRARIES_PATH}
         /usr/lib
@@ -110,6 +118,9 @@ if( UNIX )
         /usr/local/lib
         /usr/local/lib/mysql
         /usr/local/mysql/lib
+        /opt/local/lib/
+        /opt/local/lib/mysql55/mysql/
+        /opt/local/lib/mysql56/mysql/
       DOC "Specify the location of the mysql library here."
     )
   endforeach(LIB ${MYSQL_ADD_LIBRARY})
@@ -118,7 +129,7 @@ endif( UNIX )
 if( WIN32 )
   find_library( MYSQL_LIBRARY
     NAMES
-      libmysql
+      libmysqlclient
     PATHS
       ${MYSQL_ADD_LIBRARIES_PATH}
       "C:/Program Files/MySQL/MySQL Server 5.6/lib"

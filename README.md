@@ -117,7 +117,7 @@ cd
 ```bash
 sudo port install rabbitmq-c mongo-cxx-driver mysql56
 cd build/
-cmake ../ -GXcode -DREADLINE_INCLUDE_DIR=/opt/local/include -DREADLINE_LIBRARY=/opt/local/lib/libreadline.dylib -DACE_INCLUDE_DIR=/opt/local/include -DACE_LIBRARY=/opt/local/lib/libACE.a -DPREFIX=/opt/trinitycore -DWARNINGS=0 -DOPENSSL_INCLUDE_DIR=/opt/local/include -DOPENSSL_LIBRARY=/opt/local/lib/libssl.a -DMYSQL_INCLUDE_DIR=/opt/local/include/mysql56/ -DMYSQL_LIBRARY=/opt/local/lib/mysql56/mysql/libmysqlclient.a -DTOOLS=1 -DSCRIPTS=1 -DSERVERS=1
+cmake ../ -GXcode -DPREFIX=/opt/local/share/trinitycore -DWARNINGS=0 -DTOOLS=1 -DSCRIPTS=1 -DSERVERS=1
 open TrinityCore.xcodeproj/
 ```
 

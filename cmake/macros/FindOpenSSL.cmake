@@ -46,16 +46,18 @@ ENDIF()
 
 FIND_PATH(OPENSSL_ROOT_DIR
   NAMES
-    include/openssl/ssl.h
+    include/openssl/camellia.h
   HINTS
     ${_OPENSSL_ROOT_HINTS}
   PATHS
+    /opt/local/
+    /usr/
     ${_OPENSSL_ROOT_PATHS}
 )
 MARK_AS_ADVANCED(OPENSSL_ROOT_DIR)
 
 # Re-use the previous path:
-FIND_PATH(OPENSSL_INCLUDE_DIR openssl/ssl.h
+FIND_PATH(OPENSSL_INCLUDE_DIR openssl/camellia.h
   ${OPENSSL_ROOT_DIR}/include
 )
 
