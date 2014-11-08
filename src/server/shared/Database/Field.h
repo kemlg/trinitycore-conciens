@@ -21,7 +21,7 @@
 #include "Common.h"
 #include "Log.h"
 
-#include <mysql.h>
+#include <mysql/mysql.h>
 
 class Field
 {
