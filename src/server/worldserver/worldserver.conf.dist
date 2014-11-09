@@ -90,9 +90,9 @@ LogsDir = ""
 #                     "127.0.0.1;3306;trinity;trinity;world"      - (WorldDatabaseInfo)
 #                     "127.0.0.1;3306;trinity;trinity;characters" - (CharacterDatabaseInfo)
 
-LoginDatabaseInfo     = "127.0.0.1;3306;root;trinity;auth"
-WorldDatabaseInfo     = "127.0.0.1;3306;root;trinity;world"
-CharacterDatabaseInfo = "127.0.0.1;3306;root;trinity;characters"
+LoginDatabaseInfo     = "localhost;3306;root;trinity;auth"
+WorldDatabaseInfo     = "localhost;3306;root;trinity;world"
+CharacterDatabaseInfo = "localhost;3306;root;trinity;characters"
 
 #
 #    LoginDatabase.WorkerThreads
