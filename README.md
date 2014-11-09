@@ -112,13 +112,100 @@ mysql -u root -p characters < trinitycore-conciens/sql/characters_ai_playerbot_n
 cd
 ```
 
-## Instructions for developing in XCode
+## OSX Instalation (using xcode)
+Install mysql, rabbit-mq and openSSL version 1.0 or higher.
 
 ```bash
-sudo port install rabbitmq-c mongo-cxx-driver mysql56
+sudo port sync
+sudo port install rabbitmq-c mongo-cxx-driver mysql56 rabbitmq-server p7zip
+sudo port install erlang +ssl
+sudo echo "[{rabbit, [{loopback_users, []}]}]." > /opt/local/etc/rabbitmq/rabbitmq.config
+sudo /opt/local/lib/rabbitmq/lib/rabbitmq_server-3.1.5/sbin/rabbitmq-plugins enable rabbitmq_management
+sudo port unload rabbitmq-server
+sudo port load rabbitmq-server
+```
+
+Create build directory:
+```bash
+mkdir build
 cd build/
-cmake ../ -GXcode -DPREFIX=/opt/local/share/trinitycore -DWARNINGS=0 -DTOOLS=1 -DSCRIPTS=1 -DSERVERS=1
+```
+
+Generate xcode project configuration and open the project using xcode:
+```bash
+cmake ../ -GXcode -DPREFIX=`pwd`/install -DWARNINGS=0 -DTOOLS=1 -DSCRIPTS=1 -DSERVERS=1
 open TrinityCore.xcodeproj/
+```
+
+Once in XCode, build the `install` target.
+
+Download file from
+[gameobject335 location](http://filebeam.com/4f1ec0862cdee726b8977ffeabcbe1fc) and uncompress somewhere.
+
+Install the MySQL server:
+
+```bash
+sudo port install mysql56-server
+sudo /opt/local/lib/mysql56/bin/mysql_install_db --user=mysql
+sudo /opt/local/share/mysql56/support-files/mysql.server start
+/opt/local/lib/mysql56/bin/mysqladmin -u root password 'trinity'
+sudo launchctl load -w /Library/LaunchDaemons/org.macports.mysql56-server.plist
+```
+
+Download the client for the game (version 3.3.5a).
+
+Prepare the following Bash exports:
+
+ * `${REPO}`: the root of this repository.
+ * `${INSTALL}`: the directory of the the directory of the installed binaries.
+ * `${CLIENT}`: the directory of the client.
+ * `${PATCH}`: the directory of the gameobject335 uncompressed directory.
+
+```bash
+cd ${CLIENT}
+cp ${PATCH}/patch-g.mpq Data/
+${INSTALL}/bin/mapextractor
+cp ${PATCH}/GameObjectDisplayInfo.dbc dbc/
+rm -fR Buildings/
+${INSTALL}/bin/vmap4extractor
+mkdir ${INSTALL}/data
+cp -r dbc maps ${INSTALL}/data/
+mkdir vmaps
+${INSTALL}/bin/vmap4assembler Buildings vmaps
+cp -r vmaps ${INSTALL}/data
+find Buildings/ -exec cp {} ${INSTALL}/data/vmaps/ \;
+cd ${INSTALL}
+cd etc/
+cp worldserver.conf.dist worldserver.conf
+cp authserver.conf.dist authserver.conf
+cd /tmp/
+wget http://www.trinitycore.org/f/files/getdownload/1266-legacy-tdb-335-full/
+mv index.html TDB_full_335.57_2014_10_19.7z
+7z x TDB_full_335.57_2014_10_19.7z
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity < ${REPO}/sql/create/create_mysql.sql
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity auth < ${REPO}/sql/base/auth_database.sql 
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/base/characters_database.sql 
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < TDB_full_335.57_2014_10_19.sql
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < /Users/sergio/Documents/xcode-scm/trinitycore-conciens/sql/updates/world/2014_10_19_00_world.sql 
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < /Users/sergio/Documents/xcode-scm/trinitycore-conciens/sql/updates/world/2014_10_19_01_world.sql 
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < /Users/sergio/Documents/xcode-scm/trinitycore-conciens/sql/updates/world/2014_10_20_00_world.sql 
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot.sql
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_auctionhousebot.sql
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot_names.sql
+```
+
+Start the message queue:
+
+```bash
+sudo port load rabbitmq-server
+```
+
+Start the game servers:
+
+```bash
+cd ${INSTALL}/data
+screen -d -m ../bin/authserver
+screen ../bin/worldserver
 ```
 
 ## Reporting issues
