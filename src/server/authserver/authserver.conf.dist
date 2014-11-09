@@ -137,7 +137,7 @@ WrongPass.BanType = 0
 #                                                                           Unix/Linux)
 #        Default:     "127.0.0.1;3306;trinity;trinity;auth"
 
-LoginDatabaseInfo = "127.0.0.1;3306;trinity;trinity;auth"
+LoginDatabaseInfo = "127.0.0.1;3306;root;trinity;auth"
 
 #
 #    LoginDatabase.WorkerThreads
