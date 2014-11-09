@@ -43,6 +43,66 @@
 #include <amqp.h>
 #include <amqp_framing.h>
 
+#include <queue>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+
+template <typename T>
+class Queue
+{
+public:
+    
+    T pop()
+    {
+        std::unique_lock<std::mutex> mlock(mutex_);
+        while (queue_.empty())
+        {
+            cond_.wait(mlock);
+        }
+        auto item = queue_.front();
+        queue_.pop();
+        return item;
+    }
+    
+    void pop(T& item)
+    {
+        std::unique_lock<std::mutex> mlock(mutex_);
+        while (queue_.empty())
+        {
+            cond_.wait(mlock);
+        }
+        item = queue_.front();
+        queue_.pop();
+    }
+    
+    void push(const T& item)
+    {
+        std::unique_lock<std::mutex> mlock(mutex_);
+        queue_.push(item);
+        mlock.unlock();
+        cond_.notify_one();
+    }
+    
+    void push(T&& item)
+    {
+        std::unique_lock<std::mutex> mlock(mutex_);
+        queue_.push(std::move(item));
+        mlock.unlock();
+        cond_.notify_one();
+    }
+    
+    size_t size()
+    {
+        return queue_.size();
+    }
+    
+private:
+    std::queue<T> queue_;
+    std::mutex mutex_;
+    std::condition_variable cond_;
+};
+
 const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT_TYPE_ITEM_EXPIRE",
     "EVENT_TYPE_GOSSIP_HELLO", "EVENT_TYPE_GOSSIP_SELECT", "EVENT_TYPE_GOSSIP_SELECT_CODE",
     "EVENT_TYPE_GOSSIP_HELLO_OBJECT", "EVENT_TYPE_GOSSIP_SELECT_OBJECT", "EVENT_TYPE_GOSSIP_SELECT_CODE_OBJECT",
@@ -63,6 +123,7 @@ const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT
 amqp_connection_state_t connEvents  = amqp_new_connection();
 amqp_connection_state_t connActions = amqp_new_connection();
 amqp_basic_properties_t propsExpiration, propsNormal;
+Queue<std::pair<mongo::BSONObj, amqp_basic_properties_t *>> q;
 
 static bool removeQuestFromDB() {
     SQLTransaction trans = WorldDatabase.BeginTransaction();
@@ -226,6 +287,31 @@ static bool createGameObject(int objectId, int mapId, double x, double y, double
     return true;
 }
 
+void* processMessages(void *)
+{
+    std::pair<mongo::BSONObj, amqp_basic_properties_t *> pair;
+    
+    while(true)
+    {
+        pair = q.pop();
+        mongo::BSONObj bobj = pair.first;
+        amqp_basic_properties_t *propsCorrect = pair.second;
+        
+        amqp_bytes_t message_bytes;
+        message_bytes.len = bobj.objsize();
+        message_bytes.bytes = (void *)bobj.objdata();
+        
+        amqp_basic_publish(connEvents,
+                           1,
+                           amqp_cstring_bytes("amq.direct"),
+                           amqp_cstring_bytes("conciens.events"),
+                           0,
+                           0,
+                           propsCorrect,
+                           message_bytes);
+    }
+}
+
 void* processActions(void *)
 {
     amqp_bytes_t queuename;
@@ -277,9 +363,13 @@ void* processActions(void *)
         }
         else if(actionId.compare("remove-quest") == 0)
         {
-          removeQuestFromDB();
-          reloadAllQuests();
-          updateCreature(guid);
+            removeQuestFromDB();
+            reloadAllQuests();
+            updateCreature(guid);
+        }
+        else if(actionId.compare("print-queue-size") == 0)
+        {
+            TC_LOG_INFO("server.loading", "Queue size: %d", (int)q.size());
         }
         
         amqp_destroy_envelope(&envelope);
@@ -290,7 +380,7 @@ void* processActions(void *)
 
 EventBridge::EventBridge()
 {
-    pthread_t thread1;
+    pthread_t thread1, thread2;
     amqp_socket_t *socket = NULL;
     amqp_bytes_t expiration;
     
@@ -298,7 +388,7 @@ EventBridge::EventBridge()
 
     expiration.bytes = (void*)"1000"; // 1 second TTL
     expiration.len = 4;
-    
+        
     propsNormal._flags = 0;
     propsNormal._flags |= AMQP_BASIC_CONTENT_TYPE_FLAG;
     propsNormal.content_type = amqp_cstring_bytes("application/bson");
@@ -320,6 +410,7 @@ EventBridge::EventBridge()
     amqp_channel_open(connActions, 2);
     
     pthread_create(&thread1, NULL, processActions, NULL);
+    pthread_create(&thread2, NULL, processMessages, NULL);
 }
 
 EventBridge::~EventBridge()
@@ -554,17 +645,6 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
     
     const mongo::BSONObj bobj = builder.obj();
     
-    amqp_bytes_t message_bytes;
-    message_bytes.len = bobj.objsize();
-    message_bytes.bytes = (void *)bobj.objdata();
-    
-    amqp_basic_publish(connEvents,
-                       1,
-                       amqp_cstring_bytes("amq.direct"),
-                       amqp_cstring_bytes("conciens.events"),
-                       0,
-                       0,
-                       propsCorrect,
-                       message_bytes);
+    q.push(std::pair<mongo::BSONObj, amqp_basic_properties_t *>(bobj, propsCorrect));
 }
 
