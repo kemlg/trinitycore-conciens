@@ -112,6 +112,81 @@ mysql -u root -p characters < trinitycore-conciens/sql/characters_ai_playerbot_n
 cd
 ```
 
+## Install: Debian wheezy
+
+```bash
+sudo apt-get update
+sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password password trinity'
+sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password trinity'
+sudo apt-get install -y librabbitmq0 libboost-filesystem* libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev rabbitmq-server mongodb-dev libreadline6 libreadline6-dev
+wget https://github.com/alanxz/rabbitmq-c/releases/download/v0.5.2/rabbitmq-c-0.5.2.tar.gz
+tar -xvzf rabbitmq-c-0.5.2.tar.gz
+cd rabbitmq-c-0.5.2
+./configure
+make
+sudo make install
+sudo echo "deb http://www.rabbitmq.com/debian/ testing main" > /etc/apt/sources.list.d/rabbitmq.list
+sudo apt-get update
+curl http://www.rabbitmq.com/rabbitmq-signing-key-public.asc | sudo apt-key add -
+sudo apt-get update
+sudo apt-get install rabbitmq-server
+sudo rabbitmq-plugins enable rabbitmq_management
+echo "[{rabbit, [{loopback_users, []}]}]." >> rabbitmq.config
+sudo mv rabbitmq.config /etc/rabbitmq/rabbitmq.config
+sudo service rabbitmq-server restart
+cd
+git clone https://github.com/kemlg/trinitycore-conciens
+cd trinitycore-conciens
+git checkout playerbots
+mkdir build
+cd build/
+cmake ../ -DPREFIX=`pwd`/install -DCONF_DIR=`pwd`/install/conf -DLIBSDIR=`pwd`/install/lib  -DUSE_SFMT=1 -DTOOLS=1 -DSCRIPTS=1 -DSERVERS=1 -DWITH_WARNINGS=1
+make -j 4 install
+scp sergio@192.168.1.42:WoW.zip .
+export LANGUAGE=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+sudo locale-gen en_US.UTF-8
+sudo dpkg-reconfigure locales
+cd WoW/
+cd Data/
+cp ../../gameobject335/patch-g.mpq .
+cd ..
+~/server/bin/mapextractor
+cp ~/gameobject335/GameObjectDisplayInfo.dbc dbc/
+rm -fR Buildings/
+~/server/bin/vmap4extractor
+mkdir ~/server/data
+cp -r dbc maps ~/server/data/
+mkdir vmaps
+~/server/bin/vmap4assembler Buildings vmaps
+cp -r vmaps ~/server/data
+cp Buildings/* ~/server/data/vmaps/
+cd
+cd server/
+cd conf/
+cp worldserver.conf.dist worldserver.conf
+cp authserver.conf.dist authserver.conf
+# Configure DB and BindIP
+vi worldserver.conf
+vi authserver.conf
+# Configure realm, e.g. insert into realmlist(id,name,address,localAddress,localSubnetMask,port,icon,flag,timezone,allowedSecurityLevel,population,gamebuild) values(1,"Trinity","130.211.62.241","10.240.183.175","255.255.0.0",8085,0,2,1,0,0,12340);
+mysql -u root -p auth
+cd
+wget http://www.trinitycore.org/f/files/getdownload/1266-legacy-tdb-335-full/
+mv index.html TDB_full_335.57_2014_10_19.7z
+7z x TDB_full_335.57_2014_10_19.7z
+mysql -u root -p < trinitycore-conciens/sql/create/create_mysql.sql
+mysql -u root -p auth < trinitycore-conciens/sql/base/auth_database.sql 
+mysql -u root -p characters < trinitycore-conciens/sql/base/characters_database.sql 
+mysql -u root -p world < TDB_full_335.57_2014_10_19.sql
+mysql -u root -p world < trinitycore-conciens/sql/updates/world/2014_10*.sql
+mysql -u root -p characters < trinitycore-conciens/sql/characters_ai_playerbot.sql
+mysql -u root -p characters < trinitycore-conciens/sql/characters_auctionhousebot.sql
+mysql -u root -p characters < trinitycore-conciens/sql/characters_ai_playerbot_names.sql
+cd
+```
+
 ## OSX Instalation (using xcode)
 Install mysql, rabbit-mq and openSSL version 1.0 or higher.
 
