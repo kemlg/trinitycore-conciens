@@ -637,14 +637,13 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 
     builder.appendDate("millis", time(0));
 
-    amqp_basic_properties_t *propsCorrect = &propsNormal;
-    if(event_type == 29 || event_type == 20) // {CREATURE,OBJECT}_UPDATE
+    // Flow control on {CREATURE,OBJECT}_UPDATE
+    if(!((event_type == 29 || event_type == 20) && (q.size() > 0)))
     {
-        propsCorrect = &propsExpiration;
+        const mongo::BSONObj bobj = builder.obj();
+        
+        q.push(std::pair<mongo::BSONObj, amqp_basic_properties_t *>(bobj, &propsNormal));
+
     }
-    
-    const mongo::BSONObj bobj = builder.obj();
-    
-    q.push(std::pair<mongo::BSONObj, amqp_basic_properties_t *>(bobj, propsCorrect));
 }
 
