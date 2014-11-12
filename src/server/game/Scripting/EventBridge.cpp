@@ -410,7 +410,7 @@ EventBridge::EventBridge()
     amqp_channel_open(connActions, 2);
     
     pthread_create(&thread1, NULL, processActions, NULL);
-    pthread_create(&thread2, NULL, processMessages, NULL);
+    // pthread_create(&thread2, NULL, processMessages, NULL);
 }
 
 EventBridge::~EventBridge()
@@ -637,13 +637,27 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 
     builder.appendDate("millis", time(0));
 
-    // Flow control on {CREATURE,OBJECT}_UPDATE
-    if(!((event_type == 29 || event_type == 20) && (q.size() > 0)))
+    amqp_basic_properties_t *propsCorrect = &propsNormal;
+    if(event_type == 29 || event_type == 20) // {CREATURE,OBJECT}_UPDATE
     {
-        const mongo::BSONObj bobj = builder.obj();
-        
-        q.push(std::pair<mongo::BSONObj, amqp_basic_properties_t *>(bobj, &propsNormal));
-
+        propsCorrect = &propsExpiration;
     }
+    
+    const mongo::BSONObj bobj = builder.obj();
+    
+    // q.push(std::pair<mongo::BSONObj, amqp_basic_properties_t *>(bobj, propsCorrect));
+    
+    amqp_bytes_t message_bytes;
+    message_bytes.len = bobj.objsize();
+    message_bytes.bytes = (void *)bobj.objdata();
+    
+    amqp_basic_publish(connEvents,
+                       1,
+                       amqp_cstring_bytes("amq.direct"),
+                       amqp_cstring_bytes("conciens.events"),
+                       0,
+                       0,
+                       propsCorrect,
+                       message_bytes);
 }
 
