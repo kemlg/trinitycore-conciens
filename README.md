@@ -44,7 +44,7 @@ Detailed installation guides are available in the wiki for
 ## Install: cOncienS flavor
 
 ```bash
-sudo apt-get install librabbitmq0 libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev rabbitmq-server mongodb-dev
+sudo apt-get install librabbitmq0 libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev rabbitmq-server mongodb-dev screen
 wget https://github.com/alanxz/rabbitmq-c/releases/download/v0.5.2/rabbitmq-c-0.5.2.tar.gz
 tar -xvzf rabbitmq-c-0.5.2.tar.gz
 cd rabbitmq-c-0.5.2
@@ -110,6 +110,84 @@ mysql -u root -p characters < trinitycore-conciens/sql/characters_ai_playerbot.s
 mysql -u root -p characters < trinitycore-conciens/sql/characters_auctionhousebot.sql
 mysql -u root -p characters < trinitycore-conciens/sql/characters_ai_playerbot_names.sql
 cd
+```
+
+## Install: Debian wheezy
+
+```bash
+sudo apt-get update
+sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password password trinity'
+sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password trinity'
+sudo apt-get install -y librabbitmq0 libboost-filesystem* libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev mongodb-dev libreadline6 libreadline6-dev
+wget https://github.com/alanxz/rabbitmq-c/releases/download/v0.5.2/rabbitmq-c-0.5.2.tar.gz
+tar -xvzf rabbitmq-c-0.5.2.tar.gz
+cd rabbitmq-c-0.5.2
+./configure
+make
+sudo make install
+sudo echo "deb http://www.rabbitmq.com/debian/ testing main" > /tmp/rabbitmq.list
+sudo mv /tmp/rabbitmq.list /etc/apt/sources.list.d/rabbitmq.list
+curl http://www.rabbitmq.com/rabbitmq-signing-key-public.asc | sudo apt-key add -
+sudo apt-get update
+sudo apt-get install rabbitmq-server
+sudo rabbitmq-plugins enable rabbitmq_management
+echo "[{rabbit, [{loopback_users, []}, {hipe_compile, true}]}]." > /tmp/rabbitmq.config
+sudo mv /tmp/rabbitmq.config /etc/rabbitmq/rabbitmq.config
+sudo service rabbitmq-server restart
+cd
+git clone https://github.com/kemlg/trinitycore-conciens
+cd trinitycore-conciens
+git checkout playerbots
+mkdir build
+cd build/
+cmake ../ -DPREFIX=`pwd`/install -DCONF_DIR=`pwd`/install/conf -DLIBSDIR=`pwd`/install/lib  -DUSE_SFMT=1 -DTOOLS=1 -DSCRIPTS=1 -DSERVERS=1 -DWITH_WARNINGS=1
+make -j 4 install
+cd
+wget http://storage.googleapis.com/conciens/WoW.tar.gz
+tar -xvzf WoW.tar.gz
+rm -f WoW.tar.gz
+wget http://storage.googleapis.com/conciens/gameobject335.zip
+unzip gameobject335.zip
+rm -f gameobject335.zip
+export LANGUAGE=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+sudo locale-gen en_US.UTF-8
+cd WoW/
+cd Data/
+cp ../../gameobject335/patch-g.mpq .
+cd ..
+~/trinitycore-conciens/build/install/bin/mapextractor
+cp ~/gameobject335/GameObjectDisplayInfo.dbc dbc/
+rm -fR Buildings/
+~/trinitycore-conciens/build/install/bin/vmap4extractor
+mkdir ~/trinitycore-conciens/build/install/data
+cp -r dbc maps ~/trinitycore-conciens/build/install/data/
+mkdir vmaps
+~/trinitycore-conciens/build/install/bin/vmap4assembler Buildings vmaps
+cp -r vmaps ~/trinitycore-conciens/build/install/data/
+cp Buildings/* ~/trinitycore-conciens/build/install/data/vmaps/
+cd ~/trinitycore-conciens/build/install/
+cd conf/
+cp worldserver.conf.dist worldserver.conf
+cp authserver.conf.dist authserver.conf
+cd
+wget http://www.trinitycore.org/f/files/getdownload/1266-legacy-tdb-335-full/
+mv index.html TDB_full_335.57_2014_10_19.7z
+7z x TDB_full_335.57_2014_10_19.7z
+mysql -u root -ptrinity < ~/trinitycore-conciens/sql/create/create_mysql.sql
+mysql -u root -ptrinity auth < ~/trinitycore-conciens/sql/base/auth_database.sql 
+mysql -u root -ptrinity characters < ~/trinitycore-conciens/sql/base/characters_database.sql 
+mysql -u root -ptrinity world < TDB_full_335.57_2014_10_19.sql
+mysql -u root -ptrinity world < ~/trinitycore-conciens/sql/updates/world/2014_10_19_00_world.sql 
+mysql -u root -ptrinity world < ~/trinitycore-conciens/sql/updates/world/2014_10_19_01_world.sql 
+mysql -u root -ptrinity world < ~/trinitycore-conciens/sql/updates/world/2014_10_20_00_world.sql 
+mysql -u root -ptrinity characters < ~/trinitycore-conciens/sql/characters_ai_playerbot.sql
+mysql -u root -ptrinity characters < ~/trinitycore-conciens/sql/characters_auctionhousebot.sql
+mysql -u root -ptrinity characters < ~/trinitycore-conciens/sql/characters_ai_playerbot_names.sql
+cd ~/trinitycore-conciens/build/install/data
+screen -d -m ../bin/authserver
+screen ../bin/worldserver
 ```
 
 ## OSX Instalation (using xcode)
@@ -186,9 +264,9 @@ mv index.html TDB_full_335.57_2014_10_19.7z
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity auth < ${REPO}/sql/base/auth_database.sql 
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/base/characters_database.sql 
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < TDB_full_335.57_2014_10_19.sql
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < /Users/sergio/Documents/xcode-scm/trinitycore-conciens/sql/updates/world/2014_10_19_00_world.sql 
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < /Users/sergio/Documents/xcode-scm/trinitycore-conciens/sql/updates/world/2014_10_19_01_world.sql 
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < /Users/sergio/Documents/xcode-scm/trinitycore-conciens/sql/updates/world/2014_10_20_00_world.sql 
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < ${REPO}/sql/updates/world/2014_10_19_00_world.sql 
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < ${REPO}/sql/updates/world/2014_10_19_01_world.sql 
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < ${REPO}/sql/updates/world/2014_10_20_00_world.sql 
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot.sql
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_auctionhousebot.sql
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot_names.sql
