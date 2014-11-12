@@ -118,21 +118,21 @@ cd
 sudo apt-get update
 sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password password trinity'
 sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password trinity'
-sudo apt-get install -y librabbitmq0 libboost-filesystem* libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev rabbitmq-server mongodb-dev libreadline6 libreadline6-dev
+sudo apt-get install -y librabbitmq0 libboost-filesystem* libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev mongodb-dev libreadline6 libreadline6-dev
 wget https://github.com/alanxz/rabbitmq-c/releases/download/v0.5.2/rabbitmq-c-0.5.2.tar.gz
 tar -xvzf rabbitmq-c-0.5.2.tar.gz
 cd rabbitmq-c-0.5.2
 ./configure
 make
 sudo make install
-sudo echo "deb http://www.rabbitmq.com/debian/ testing main" > /etc/apt/sources.list.d/rabbitmq.list
-sudo apt-get update
+sudo echo "deb http://www.rabbitmq.com/debian/ testing main" > /tmp/rabbitmq.list
+sudo mv /tmp/rabbitmq.list /etc/apt/sources.list.d/rabbitmq.list
 curl http://www.rabbitmq.com/rabbitmq-signing-key-public.asc | sudo apt-key add -
 sudo apt-get update
 sudo apt-get install rabbitmq-server
 sudo rabbitmq-plugins enable rabbitmq_management
-echo "[{rabbit, [{loopback_users, []}]}]." >> rabbitmq.config
-sudo mv rabbitmq.config /etc/rabbitmq/rabbitmq.config
+echo "[{rabbit, [{loopback_users, []}, {hipe_compile, true}]}]." > /tmp/rabbitmq.config
+sudo mv /tmp/rabbitmq.config /etc/rabbitmq/rabbitmq.config
 sudo service rabbitmq-server restart
 cd
 git clone https://github.com/kemlg/trinitycore-conciens
