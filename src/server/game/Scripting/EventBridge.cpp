@@ -400,13 +400,21 @@ EventBridge::EventBridge()
     propsExpiration.expiration = expiration;
     
     socket = amqp_tcp_socket_new(connEvents);
-    amqp_socket_open(socket, "conciens.mooo.com", 5672);
-    amqp_login(connEvents, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+    amqp_socket_open(socket,
+                     sConfigMgr->GetStringDefault("RabbitMQ.host", "localhost").c_str(),
+                     sConfigMgr->GetIntDefault("RabbitMQ.port", 5672));
+    amqp_login(connEvents, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN,
+               sConfigMgr->GetStringDefault("RabbitMQ.user", "guest").c_str(),
+               sConfigMgr->GetStringDefault("RabbitMQ.pass", "guest").c_str());
     amqp_channel_open(connEvents, 1);
     
     socket = amqp_tcp_socket_new(connActions);
-    amqp_socket_open(socket, "conciens.mooo.com", 5672);
-    amqp_login(connActions, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+    amqp_socket_open(socket,
+                     sConfigMgr->GetStringDefault("RabbitMQ.host", "localhost").c_str(),
+                     sConfigMgr->GetIntDefault("RabbitMQ.port", 5672));
+    amqp_login(connActions, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN,
+               sConfigMgr->GetStringDefault("RabbitMQ.user", "guest").c_str(),
+               sConfigMgr->GetStringDefault("RabbitMQ.pass", "guest").c_str());
     amqp_channel_open(connActions, 2);
     
     pthread_create(&thread1, NULL, processActions, NULL);
