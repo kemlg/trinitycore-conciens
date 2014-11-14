@@ -400,12 +400,12 @@ EventBridge::EventBridge()
     propsExpiration.expiration = expiration;
     
     socket = amqp_tcp_socket_new(connEvents);
-    amqp_socket_open(socket, "localhost", 5672);
+    amqp_socket_open(socket, "conciens.mooo.com", 5672);
     amqp_login(connEvents, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
     amqp_channel_open(connEvents, 1);
     
     socket = amqp_tcp_socket_new(connActions);
-    amqp_socket_open(socket, "localhost", 5672);
+    amqp_socket_open(socket, "conciens.mooo.com", 5672);
     amqp_login(connActions, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
     amqp_channel_open(connActions, 2);
     
