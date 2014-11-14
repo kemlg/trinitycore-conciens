@@ -398,6 +398,11 @@ EventBridge::EventBridge()
     propsExpiration.content_type = amqp_cstring_bytes("application/bson");
     propsExpiration._flags |= AMQP_BASIC_EXPIRATION_FLAG;
     propsExpiration.expiration = expiration;
+
+    TC_LOG_INFO("server.loading", "Connecting to RabbitMQ: [%s,%d] (user: %s)",
+                sConfigMgr->GetStringDefault("RabbitMQ.host", "localhost").c_str(),
+                sConfigMgr->GetIntDefault("RabbitMQ.port", 5672),
+                sConfigMgr->GetStringDefault("RabbitMQ.user", "guest").c_str());
     
     socket = amqp_tcp_socket_new(connEvents);
     amqp_socket_open(socket,
