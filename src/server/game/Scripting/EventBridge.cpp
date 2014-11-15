@@ -39,8 +39,8 @@
 #include "geohash.cpp"
 #include "Config.h"
 
-#include "mongo/bson/bson.h"
 #include "mongo/client/dbclient.h"
+#include "mongo/bson/bson.h"
 
 #include <amqp_tcp_socket.h>
 #include <amqp.h>
