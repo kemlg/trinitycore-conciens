@@ -549,7 +549,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
         std::string id = std::string(idToEventType[event_type]) + "_" + guid;
         builder.append("_id", id);
         connEvents.update("conciens.events", BSON("_id" << id),
-                          builder.obj());
+                          builder.obj(), true);
     }
     else
     {
