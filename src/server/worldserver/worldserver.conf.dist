@@ -3222,9 +3222,6 @@ PacketSpoof.BanDuration = 86400
 # MANGOS Ai Playerbot Configuration file #
 ##########################################
 
-[AiPlayerbotConf]
-ConfVersion=2010102201
-
 # Enable or disable AI Playerbot
 AiPlayerbot.Enabled = 1
 

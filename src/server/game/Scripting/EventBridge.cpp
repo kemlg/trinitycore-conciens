@@ -400,31 +400,27 @@ EventBridge::EventBridge()
     propsExpiration._flags |= AMQP_BASIC_EXPIRATION_FLAG;
     propsExpiration.expiration = expiration;
 
-    ConfigMgr cmgr;
-    std::string error;
-    cmgr.LoadInitial("worldserver.conf", error);
-    
     TC_LOG_INFO("server.loading", "Connecting to RabbitMQ: [%s,%d] (user: %s)",
-                cmgr.GetStringDefault("RabbitMQ.host", "localhost").c_str(),
-                cmgr.GetIntDefault("RabbitMQ.port", 5672),
-                cmgr.GetStringDefault("RabbitMQ.user", "guest").c_str());
+                sConfigMgr->GetStringDefault("RabbitMQ.host", "localhost").c_str(),
+                sConfigMgr->GetIntDefault("RabbitMQ.port", 5672),
+                sConfigMgr->GetStringDefault("RabbitMQ.user", "guest").c_str());
     
     socket = amqp_tcp_socket_new(connEvents);
     amqp_socket_open(socket,
-                     cmgr.GetStringDefault("RabbitMQ.host", "localhost").c_str(),
-                     cmgr.GetIntDefault("RabbitMQ.port", 5672));
+                     sConfigMgr->GetStringDefault("RabbitMQ.host", "localhost").c_str(),
+                     sConfigMgr->GetIntDefault("RabbitMQ.port", 5672));
     amqp_login(connEvents, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN,
-               cmgr.GetStringDefault("RabbitMQ.user", "guest").c_str(),
-               cmgr.GetStringDefault("RabbitMQ.pass", "guest").c_str());
+               sConfigMgr->GetStringDefault("RabbitMQ.user", "guest").c_str(),
+               sConfigMgr->GetStringDefault("RabbitMQ.pass", "guest").c_str());
     amqp_channel_open(connEvents, 1);
     
     socket = amqp_tcp_socket_new(connActions);
     amqp_socket_open(socket,
-                     cmgr.GetStringDefault("RabbitMQ.host", "localhost").c_str(),
-                     cmgr.GetIntDefault("RabbitMQ.port", 5672));
+                     sConfigMgr->GetStringDefault("RabbitMQ.host", "localhost").c_str(),
+                     sConfigMgr->GetIntDefault("RabbitMQ.port", 5672));
     amqp_login(connActions, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN,
-               cmgr.GetStringDefault("RabbitMQ.user", "guest").c_str(),
-               cmgr.GetStringDefault("RabbitMQ.pass", "guest").c_str());
+               sConfigMgr->GetStringDefault("RabbitMQ.user", "guest").c_str(),
+               sConfigMgr->GetStringDefault("RabbitMQ.pass", "guest").c_str());
     amqp_channel_open(connActions, 2);
     
     pthread_create(&thread1, NULL, processActions, NULL);
