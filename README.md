@@ -118,7 +118,7 @@ cd
 sudo apt-get update
 sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password password trinity'
 sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password trinity'
-sudo apt-get install -y librabbitmq0 libboost-filesystem* libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev mongodb-dev libreadline6 libreadline6-dev
+sudo apt-get install -y librabbitmq0 libboost-filesystem* libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev mongodb-dev libreadline6 libreadline6-dev mongodb-server
 wget https://github.com/alanxz/rabbitmq-c/releases/download/v0.5.2/rabbitmq-c-0.5.2.tar.gz
 tar -xvzf rabbitmq-c-0.5.2.tar.gz
 cd rabbitmq-c-0.5.2
@@ -195,12 +195,13 @@ Install mysql, rabbit-mq and openSSL version 1.0 or higher.
 
 ```bash
 sudo port sync
-sudo port install rabbitmq-c mongo-cxx-driver mysql56 rabbitmq-server p7zip
+sudo port install rabbitmq-c mongo-cxx-driver mysql56 mongodb rabbitmq-server p7zip
 sudo port install erlang +ssl
 sudo echo "[{rabbit, [{loopback_users, []}]}]." > /opt/local/etc/rabbitmq/rabbitmq.config
 sudo /opt/local/lib/rabbitmq/lib/rabbitmq_server-3.1.5/sbin/rabbitmq-plugins enable rabbitmq_management
 sudo port unload rabbitmq-server
 sudo port load rabbitmq-server
+sudo port load mongodb
 ```
 
 Create build directory:
@@ -272,10 +273,11 @@ mv index.html TDB_full_335.57_2014_10_19.7z
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot_names.sql
 ```
 
-Start the message queue:
+Start the message queue and database:
 
 ```bash
 sudo port load rabbitmq-server
+sudo port load mongodb
 ```
 
 Start the game servers:

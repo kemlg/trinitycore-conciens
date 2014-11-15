@@ -40,69 +40,11 @@
 #include "Config.h"
 
 #include "mongo/bson/bson.h"
+#include "mongo/client/dbclient.h"
+
 #include <amqp_tcp_socket.h>
 #include <amqp.h>
 #include <amqp_framing.h>
-
-#include <queue>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-
-template <typename T>
-class Queue
-{
-public:
-    
-    T pop()
-    {
-        std::unique_lock<std::mutex> mlock(mutex_);
-        while (queue_.empty())
-        {
-            cond_.wait(mlock);
-        }
-        auto item = queue_.front();
-        queue_.pop();
-        return item;
-    }
-    
-    void pop(T& item)
-    {
-        std::unique_lock<std::mutex> mlock(mutex_);
-        while (queue_.empty())
-        {
-            cond_.wait(mlock);
-        }
-        item = queue_.front();
-        queue_.pop();
-    }
-    
-    void push(const T& item)
-    {
-        std::unique_lock<std::mutex> mlock(mutex_);
-        queue_.push(item);
-        mlock.unlock();
-        cond_.notify_one();
-    }
-    
-    void push(T&& item)
-    {
-        std::unique_lock<std::mutex> mlock(mutex_);
-        queue_.push(std::move(item));
-        mlock.unlock();
-        cond_.notify_one();
-    }
-    
-    size_t size()
-    {
-        return queue_.size();
-    }
-    
-private:
-    std::queue<T> queue_;
-    std::mutex mutex_;
-    std::condition_variable cond_;
-};
 
 const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT_TYPE_ITEM_EXPIRE",
     "EVENT_TYPE_GOSSIP_HELLO", "EVENT_TYPE_GOSSIP_SELECT", "EVENT_TYPE_GOSSIP_SELECT_CODE",
@@ -121,10 +63,8 @@ const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT
     "EVENT_TYPE_PLAYER_UPDATE_ZONE", "EVENT_TYPE_HEAL", "EVENT_TYPE_DAMAGE"
 };
 
-amqp_connection_state_t connEvents  = amqp_new_connection();
-amqp_connection_state_t connActions = amqp_new_connection();
-amqp_basic_properties_t propsExpiration, propsNormal;
-Queue<std::pair<mongo::BSONObj, amqp_basic_properties_t *>> q;
+amqp_connection_state_t   connActions = amqp_new_connection();
+mongo::DBClientConnection connEvents(true, NULL, NULL);
 
 static bool removeQuestFromDB() {
     SQLTransaction trans = WorldDatabase.BeginTransaction();
@@ -288,31 +228,6 @@ static bool createGameObject(int objectId, int mapId, double x, double y, double
     return true;
 }
 
-void* processMessages(void *)
-{
-    std::pair<mongo::BSONObj, amqp_basic_properties_t *> pair;
-    
-    while(true)
-    {
-        pair = q.pop();
-        mongo::BSONObj bobj = pair.first;
-        amqp_basic_properties_t *propsCorrect = pair.second;
-        
-        amqp_bytes_t message_bytes;
-        message_bytes.len = bobj.objsize();
-        message_bytes.bytes = (void *)bobj.objdata();
-        
-        amqp_basic_publish(connEvents,
-                           1,
-                           amqp_cstring_bytes("amq.direct"),
-                           amqp_cstring_bytes("conciens.events"),
-                           0,
-                           0,
-                           propsCorrect,
-                           message_bytes);
-    }
-}
-
 void* processActions(void *)
 {
     amqp_bytes_t queuename;
@@ -368,10 +283,6 @@ void* processActions(void *)
             reloadAllQuests();
             updateCreature(guid);
         }
-        else if(actionId.compare("print-queue-size") == 0)
-        {
-            TC_LOG_INFO("server.loading", "Queue size: %d", (int)q.size());
-        }
         
         amqp_destroy_envelope(&envelope);
     }
@@ -381,38 +292,17 @@ void* processActions(void *)
 
 EventBridge::EventBridge()
 {
-    pthread_t thread1, thread2;
+    pthread_t thread1;
     amqp_socket_t *socket = NULL;
-    amqp_bytes_t expiration;
     
     TC_LOG_INFO("server.loading", "EventBridge: Starting EventBridge...");
-
-    expiration.bytes = (void*)"1000"; // 1 second TTL
-    expiration.len = 4;
-        
-    propsNormal._flags = 0;
-    propsNormal._flags |= AMQP_BASIC_CONTENT_TYPE_FLAG;
-    propsNormal.content_type = amqp_cstring_bytes("application/bson");
     
-    propsExpiration._flags = 0;
-    propsExpiration._flags |= AMQP_BASIC_CONTENT_TYPE_FLAG;
-    propsExpiration.content_type = amqp_cstring_bytes("application/bson");
-    propsExpiration._flags |= AMQP_BASIC_EXPIRATION_FLAG;
-    propsExpiration.expiration = expiration;
-
+    connEvents.connect("localhost");
+    
     TC_LOG_INFO("server.loading", "Connecting to RabbitMQ: [%s,%d] (user: %s)",
                 sConfigMgr->GetStringDefault("RabbitMQ.host", "localhost").c_str(),
                 sConfigMgr->GetIntDefault("RabbitMQ.port", 5672),
                 sConfigMgr->GetStringDefault("RabbitMQ.user", "guest").c_str());
-    
-    socket = amqp_tcp_socket_new(connEvents);
-    amqp_socket_open(socket,
-                     sConfigMgr->GetStringDefault("RabbitMQ.host", "localhost").c_str(),
-                     sConfigMgr->GetIntDefault("RabbitMQ.port", 5672));
-    amqp_login(connEvents, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN,
-               sConfigMgr->GetStringDefault("RabbitMQ.user", "guest").c_str(),
-               sConfigMgr->GetStringDefault("RabbitMQ.pass", "guest").c_str());
-    amqp_channel_open(connEvents, 1);
     
     socket = amqp_tcp_socket_new(connActions);
     amqp_socket_open(socket,
@@ -424,7 +314,6 @@ EventBridge::EventBridge()
     amqp_channel_open(connActions, 2);
     
     pthread_create(&thread1, NULL, processActions, NULL);
-    // pthread_create(&thread2, NULL, processMessages, NULL);
 }
 
 EventBridge::~EventBridge()
@@ -448,6 +337,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
     int mapId = 0;
     x = y = z = o = lat = lng = 0.0;
     char *geohash, *gharea, *ghsector, *ghbox, *ghstep;
+    std::string guid;
     mongo::BSONObjBuilder builder;
 
     std::time_t curtime = sWorld->GetGameTime();
@@ -472,6 +362,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
     if(player != NULL) {
         player->GetPosition(x, y, z, o);
         mapId = player->GetMapId();
+        guid = player->GetEntry();
         builder.append("player",
                        BSON("guid" << player->GetEntry() <<
                        "name" << player->GetName().c_str() <<
@@ -516,6 +407,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
     if(creature != NULL) {
         creature->GetPosition(x, y, z, o);
         mapId = creature->GetMapId();
+        guid = creature->GetEntry();
         builder.append("creature",
                        BSON("guid" << creature->GetEntry() <<
                             "name" << creature->GetName().c_str() <<
@@ -562,6 +454,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
     if(go != NULL) {
         go->GetPosition(x, y, z, o);
         mapId = go->GetMapId();
+        guid = go->GetEntry();
         builder.append("game-object",
                        BSON("guid" << go->GetEntry() <<
                             "name" << go->GetName().c_str() <<
@@ -651,27 +544,16 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 
     builder.appendDate("millis", time(0));
 
-    amqp_basic_properties_t *propsCorrect = &propsNormal;
     if(event_type == 29 || event_type == 20) // {CREATURE,OBJECT}_UPDATE
     {
-        propsCorrect = &propsExpiration;
+        std::string id = std::string(idToEventType[event_type]) + "_" + guid;
+        builder.append("_id", id);
+        connEvents.update("conciens.events", BSON("_id" << id),
+                          builder.obj());
     }
-    
-    const mongo::BSONObj bobj = builder.obj();
-    
-    // q.push(std::pair<mongo::BSONObj, amqp_basic_properties_t *>(bobj, propsCorrect));
-    
-    amqp_bytes_t message_bytes;
-    message_bytes.len = bobj.objsize();
-    message_bytes.bytes = (void *)bobj.objdata();
-    
-    amqp_basic_publish(connEvents,
-                       1,
-                       amqp_cstring_bytes("amq.direct"),
-                       amqp_cstring_bytes("conciens.events"),
-                       0,
-                       0,
-                       propsCorrect,
-                       message_bytes);
+    else
+    {
+        connEvents.insert("conciens.events", builder.obj());
+    }
 }
 
