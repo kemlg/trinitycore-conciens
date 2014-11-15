@@ -362,7 +362,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
     if(player != NULL) {
         player->GetPosition(x, y, z, o);
         mapId = player->GetMapId();
-        guid = player->GetEntry();
+        guid = std::to_string(player->GetEntry());
         builder.append("player",
                        BSON("guid" << player->GetEntry() <<
                        "name" << player->GetName().c_str() <<
@@ -407,7 +407,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
     if(creature != NULL) {
         creature->GetPosition(x, y, z, o);
         mapId = creature->GetMapId();
-        guid = creature->GetEntry();
+        guid = std::to_string(creature->GetEntry());
         builder.append("creature",
                        BSON("guid" << creature->GetEntry() <<
                             "name" << creature->GetName().c_str() <<
@@ -454,7 +454,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
     if(go != NULL) {
         go->GetPosition(x, y, z, o);
         mapId = go->GetMapId();
-        guid = go->GetEntry();
+        guid = std::to_string(go->GetEntry());
         builder.append("game-object",
                        BSON("guid" << go->GetEntry() <<
                             "name" << go->GetName().c_str() <<
