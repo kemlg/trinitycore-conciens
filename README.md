@@ -195,7 +195,7 @@ Install mysql, rabbit-mq and openSSL version 1.0 or higher.
 
 ```bash
 sudo port sync
-sudo port install rabbitmq-c mongo-cxx-driver mysql56 mongodb rabbitmq-server p7zip
+sudo port install rabbitmq-c mongo-cxx-driver mysql56 mongodb rabbitmq-server p7zip readline wget
 sudo port install erlang +ssl
 sudo echo "[{rabbit, [{loopback_users, []}]}]." > /opt/local/etc/rabbitmq/rabbitmq.config
 sudo /opt/local/lib/rabbitmq/lib/rabbitmq_server-3.1.5/sbin/rabbitmq-plugins enable rabbitmq_management
