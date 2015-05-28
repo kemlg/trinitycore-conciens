@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -876,6 +876,15 @@ class GroupScript : public ScriptObject
 // Placed here due to ScriptRegistry::AddScript dependency.
 #define sScriptMgr ScriptMgr::instance()
 
+// namespace
+// {
+    typedef std::vector<ScriptObject*> UnusedScriptContainer;
+    typedef std::list<std::string> UnusedScriptNamesContainer;
+
+    extern UnusedScriptContainer UnusedScripts;
+    extern UnusedScriptNamesContainer UnusedScriptNames;
+// }
+
 // Manages registration, loading, and execution of scripts.
 class ScriptMgr
 {
@@ -904,6 +913,7 @@ class ScriptMgr
     public: /* Unloading */
 
         void Unload();
+        void UnloadUnusedScripts();
 
     public: /* SpellScriptLoader */
 
@@ -1139,7 +1149,7 @@ class ScriptMgr
         uint32 _scriptCount;
 
         //atomic op counter for active scripts amount
-        std::atomic_long _scheduledScripts;
+        std::atomic<uint32> _scheduledScripts;
 };
 
 #endif

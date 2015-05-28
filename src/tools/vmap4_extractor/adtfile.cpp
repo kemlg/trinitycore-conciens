@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -184,6 +184,7 @@ bool ADTFile::init(uint32 map_num, uint32 tileX, uint32 tileY)
                     ModelInstance inst(ADT,ModelInstansName[id].c_str(), map_num, tileX, tileY, dirfile);
                 }
                 delete[] ModelInstansName;
+                ModelInstansName = NULL;
             }
         }
         else if (!strcmp(fourcc,"MODF"))
@@ -198,6 +199,7 @@ bool ADTFile::init(uint32 map_num, uint32 tileX, uint32 tileY)
                     WMOInstance inst(ADT,WmoInstansName[id].c_str(), map_num, tileX, tileY, dirfile);
                 }
                 delete[] WmoInstansName;
+                WmoInstansName = NULL;
             }
         }
         //======================

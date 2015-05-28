@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -255,7 +255,7 @@ bool WinServiceRun()
 
     if (!StartServiceCtrlDispatcher(serviceTable))
     {
-        TC_LOG_ERROR("server.worldserver", "StartService Failed. Error [%u]", ::GetLastError());
+        TC_LOG_ERROR("server.worldserver", "StartService Failed. Error [%u]", uint32(::GetLastError()));
         return false;
     }
     return true;

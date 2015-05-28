@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -38,29 +38,6 @@ bool SQLQueryHolder::SetQuery(size_t index, const char *sql)
 
     m_queries[index] = SQLResultPair(element, result);
     return true;
-}
-
-bool SQLQueryHolder::SetPQuery(size_t index, const char *format, ...)
-{
-    if (!format)
-    {
-        TC_LOG_ERROR("sql.sql", "Query (index: %u) is empty.", uint32(index));
-        return false;
-    }
-
-    va_list ap;
-    char szQuery [MAX_QUERY_LEN];
-    va_start(ap, format);
-    int res = vsnprintf(szQuery, MAX_QUERY_LEN, format, ap);
-    va_end(ap);
-
-    if (res == -1)
-    {
-        TC_LOG_ERROR("sql.sql", "SQL Query truncated (and not execute) for format: %s", format);
-        return false;
-    }
-
-    return SetQuery(index, szQuery);
 }
 
 bool SQLQueryHolder::SetPreparedQuery(size_t index, PreparedStatement* stmt)

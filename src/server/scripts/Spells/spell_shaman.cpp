@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -25,6 +25,7 @@
 #include "ScriptMgr.h"
 #include "GridNotifiers.h"
 #include "Unit.h"
+#include "SpellHistory.h"
 #include "SpellScript.h"
 #include "SpellAuraEffects.h"
 
@@ -338,7 +339,7 @@ class spell_sha_earth_shield : public SpellScriptLoader
             {
                 //! HACK due to currenct proc system implementation
                 if (Player* player = GetTarget()->ToPlayer())
-                    if (player->HasSpellCooldown(SPELL_SHAMAN_EARTH_SHIELD_HEAL))
+                    if (player->GetSpellHistory()->HasCooldown(SPELL_SHAMAN_EARTH_SHIELD_HEAL))
                         return false;
                 return true;
             }
@@ -351,7 +352,7 @@ class spell_sha_earth_shield : public SpellScriptLoader
 
                 /// @hack: due to currenct proc system implementation
                 if (Player* player = GetTarget()->ToPlayer())
-                    player->AddSpellCooldown(SPELL_SHAMAN_EARTH_SHIELD_HEAL, 0, time(NULL) + 3);
+                    player->GetSpellHistory()->AddCooldown(SPELL_SHAMAN_EARTH_SHIELD_HEAL, 0, std::chrono::seconds(3));
             }
 
             void Register() override
@@ -804,7 +805,7 @@ class spell_sha_item_t10_elemental_2p_bonus : public SpellScriptLoader
             {
                 PreventDefaultAction();
                 if (Player* target = GetTarget()->ToPlayer())
-                    target->ModifySpellCooldown(SPELL_SHAMAN_ELEMENTAL_MASTERY, -aurEff->GetAmount());
+                    target->GetSpellHistory()->ModifyCooldown(SPELL_SHAMAN_ELEMENTAL_MASTERY, -aurEff->GetAmount());
             }
 
             void Register() override

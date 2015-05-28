@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -35,7 +35,10 @@ enum Says
 {
     SAY_AGGRO                      = 0,
     SAY_SLAY                       = 1,
-    SAY_DEATH                      = 2
+    SAY_DEATH                      = 2,
+
+    SAY_CALL_EXECUTIONER_A         = 3,
+    SAY_CALL_EXECUTIONER_H         = 4
 };
 
 enum Spells
@@ -84,10 +87,28 @@ class boss_warchief_kargath_bladefist : public CreatureScript
                 resetcheck_timer = 5000;
             }
 
+            void DoAction(int32 action) override
+            {
+                if (action == ACTION_EXECUTIONER_TAUNT)
+                {
+                    switch (instance->GetData(DATA_TEAM_IN_INSTANCE))
+                    {
+                        case ALLIANCE:
+                            Talk(SAY_CALL_EXECUTIONER_A);
+                            break;
+                        case HORDE:
+                            Talk(SAY_CALL_EXECUTIONER_H);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+
             void Reset() override
             {
                 removeAdds();
-
+                _Reset();
                 me->SetSpeed(MOVE_RUN, 2);
                 me->SetWalk(false);
 
@@ -96,10 +117,9 @@ class boss_warchief_kargath_bladefist : public CreatureScript
 
             void JustDied(Unit* /*killer*/) override
             {
+                _JustDied();
                 Talk(SAY_DEATH);
                 removeAdds();
-
-                instance->SetBossState(DATA_KARGATH, DONE);
             }
 
             void EnterCombat(Unit* /*who*/) override

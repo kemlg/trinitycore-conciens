@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -317,7 +317,7 @@ class instance_icecrown_citadel : public InstanceMapScript
             }
 
             // Weekly quest spawn prevention
-            uint32 GetCreatureEntry(uint32 /*guidLow*/, CreatureData const* data)
+            uint32 GetCreatureEntry(uint32 /*guidLow*/, CreatureData const* data) override
             {
                 uint32 entry = data->id;
                 switch (entry)

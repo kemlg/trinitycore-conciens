@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2010 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -236,9 +236,11 @@ namespace VMAP
                 {
                     floor = info.ground_Z;
                     ASSERT(floor < std::numeric_limits<float>::max());
+                    ASSERT(info.hitModel);
                     type = info.hitModel->GetLiquidType();  // entry from LiquidType.dbc
                     if (reqLiquidType && !(GetLiquidFlagsPtr(type) & reqLiquidType))
                         return false;
+                    ASSERT(info.hitInstance);
                     if (info.hitInstance->GetLiquidLevel(pos, info, level))
                         return true;
                 }

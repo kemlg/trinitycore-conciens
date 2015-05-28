@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -37,6 +37,12 @@ public:
         {
             SetHeaders(DataHeader);
             SetBossNumber(MAX_ENCOUNTER);
+        }
+
+        void OnPlayerEnter(Player* player) override
+        {
+            if (GetBossState(DATA_MALYGOS_EVENT) == DONE)
+                player->CastSpell(player, SPELL_SUMMOM_RED_DRAGON_BUDDY, true);
         }
 
         bool SetBossState(uint32 type, EncounterState state) override

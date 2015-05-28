@@ -1,5 +1,5 @@
 /*
-* Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+* Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
 *
 * This program is free software; you can redistribute it and/or modify it
 * under the terms of the GNU General Public License as published by the
@@ -55,9 +55,9 @@ public:
 
     uint8* GetBasePointer() { return _storage.data(); }
 
-    uint8* GetReadPointer() { return &_storage[_rpos]; }
+    uint8* GetReadPointer() { return GetBasePointer() + _rpos; }
 
-    uint8* GetWritePointer() { return &_storage[_wpos]; }
+    uint8* GetWritePointer() { return GetBasePointer() + _wpos; }
 
     void ReadCompleted(size_type bytes) { _rpos += bytes; }
 
@@ -79,6 +79,14 @@ public:
             _wpos -= _rpos;
             _rpos = 0;
         }
+    }
+
+    // Ensures there's "some" free space, make sure to call Normalize() before this
+    void EnsureFreeSpace()
+    {
+        // Double the size of the buffer if it's already full
+        if (GetRemainingSpace() == 0)
+            _storage.resize(_storage.size() * 2);
     }
 
     void Write(void const* data, std::size_t size)

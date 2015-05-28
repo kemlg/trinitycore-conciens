@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -80,7 +80,8 @@ enum InstanceSpells
     SPELL_VORTEX_5                        = 56263, // damage | used to enter to the vehicle
     SPELL_PORTAL_OPENED                   = 61236,
     SPELL_RIDE_RED_DRAGON_TRIGGERED       = 56072,
-    SPELL_IRIS_OPENED                     = 61012  // visual when starting encounter
+    SPELL_IRIS_OPENED                     = 61012, // visual when starting encounter
+    SPELL_SUMMOM_RED_DRAGON_BUDDY         = 56070
 };
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -688,8 +688,9 @@ class EventMap
 
         /**
         * @name RepeatEvent
-        * @brief Repeats the mostly recently executed event.
-        * @param time Time until the event occurs. Equivalent to Repeat(urand(minTime, maxTime).
+        * @brief Repeats the mostly recently executed event, Equivalent to Repeat(urand(minTime, maxTime).
+        * @param minTime Minimum time until the event occurs.
+        * @param maxTime Maximum time until the event occurs.
         */
         void Repeat(uint32 minTime, uint32 maxTime)
         {
@@ -839,7 +840,7 @@ class EventMap
         /**
         * @name GetTimeUntilEvent
         * @brief Returns time in milliseconds until next event.
-        * @param Id of the event.
+        * @param eventId of the event.
         * @return Time of next event.
         */
         uint32 GetTimeUntilEvent(uint32 eventId) const;

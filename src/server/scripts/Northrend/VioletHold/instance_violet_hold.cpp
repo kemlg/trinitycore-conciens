@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -133,6 +133,7 @@ public:
             uiCyanigosaEventTimer = 3 * IN_MILLISECONDS;
 
             bActive = false;
+            bWiped = false;
             bIsDoorSpellCast = false;
             bCrystalActivated = false;
             defenseless = true;
@@ -793,15 +794,17 @@ public:
             trigger->CastSpell(trigger, spellInfoLightning, true, 0, 0, trigger->GetGUID());
 
             // Kill all mobs registered with SetGuidData(ADD_TRASH_MOB)
-            for (GuidSet::const_iterator itr = trashMobs.begin(); itr != trashMobs.end(); ++itr)
+            for (GuidSet::const_iterator itr = trashMobs.begin(); itr != trashMobs.end();)
             {
                 Creature* creature = instance->GetCreature(*itr);
+                // Increment the iterator before killing the creature because the kill will remove itr from trashMobs
+                ++itr;
                 if (creature && creature->IsAlive())
                     trigger->Kill(creature);
             }
         }
 
-        void ProcessEvent(WorldObject* /*go*/, uint32 uiEventId)
+        void ProcessEvent(WorldObject* /*go*/, uint32 uiEventId) override
         {
             switch (uiEventId)
             {

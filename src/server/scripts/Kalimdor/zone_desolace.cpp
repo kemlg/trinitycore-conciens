@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -88,12 +88,20 @@ public:
                     DoCast(me, SPELL_KODO_KOMBO_DESPAWN_BUFF, true);
 
                     me->UpdateEntry(NPC_TAMED_KODO);
+                    me->CombatStop();
+                    me->DeleteThreatList();
+                    me->SetSpeed(MOVE_RUN, 0.6f, true);
                     me->GetMotionMaster()->MoveFollow(caster, PET_FOLLOW_DIST, me->GetFollowAngle());
+                    me->setActive(true);
                 }
             }
             else if (spell->Id == SPELL_KODO_KOMBO_GOSSIP)
             {
                 me->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+                me->SetHomePosition(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), me->GetOrientation());
+                me->GetMotionMaster()->Clear();
+                me->GetMotionMaster()->MoveIdle();
+                me->setActive(false);
                 me->DespawnOrUnsummon(60000);
             }
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -28,9 +28,6 @@
 #include "ObjectMgr.h"
 #include "GuildMgr.h"
 #include "WorldSession.h"
-#include "BigNumber.h"
-#include "SHA1.h"
-#include "UpdateData.h"
 #include "LootMgr.h"
 #include "Chat.h"
 #include "zlib.h"
@@ -38,19 +35,14 @@
 #include "Object.h"
 #include "Battleground.h"
 #include "OutdoorPvP.h"
-#include "Pet.h"
 #include "SocialMgr.h"
-#include "CellImpl.h"
 #include "AccountMgr.h"
-#include "Vehicle.h"
 #include "CreatureAI.h"
 #include "DBCEnums.h"
 #include "ScriptMgr.h"
 #include "MapManager.h"
-#include "InstanceScript.h"
 #include "GameObjectAI.h"
 #include "Group.h"
-#include "AccountMgr.h"
 #include "Spell.h"
 #include "BattlegroundMgr.h"
 #include "Battlefield.h"

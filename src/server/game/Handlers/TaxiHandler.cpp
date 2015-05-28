@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -24,7 +24,6 @@
 #include "Log.h"
 #include "ObjectMgr.h"
 #include "Player.h"
-#include "UpdateMask.h"
 #include "Path.h"
 #include "WaypointMovementGenerator.h"
 
@@ -238,7 +237,7 @@ void WorldSession::HandleMoveSplineDoneOpcode(WorldPacket& recvData)
             TaxiPathNodeEntry const& node = flight->GetPath()[flight->GetCurrentNode()];
             flight->SkipCurrentNode();
 
-            GetPlayer()->TeleportTo(curDestNode->map_id, node.x, node.y, node.z, GetPlayer()->GetOrientation());
+            GetPlayer()->TeleportTo(curDestNode->map_id, node.LocX, node.LocY, node.LocZ, GetPlayer()->GetOrientation());
         }
         return;
     }

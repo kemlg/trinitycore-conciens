@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -17,14 +17,12 @@
  */
 
 #include "BattlegroundWS.h"
-#include "Creature.h"
 #include "GameObject.h"
 #include "Language.h"
 #include "Object.h"
 #include "ObjectMgr.h"
 #include "BattlegroundMgr.h"
 #include "Player.h"
-#include "World.h"
 #include "WorldPacket.h"
 
 // these variables aren't used outside of this file, so declare them only here

@@ -1,5 +1,5 @@
 /*
-* Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+* Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
 *
 * This program is free software; you can redistribute it and/or modify it
 * under the terms of the GNU General Public License as published by the
@@ -70,7 +70,9 @@ public:
     {
         std::unique_lock<std::mutex> lock(_queueLock);
 
-        _condition.wait(lock, [this]() { return !_queue.empty() || _shutdown; });
+        // we could be using .wait(lock, predicate) overload here but some threading error analysis tools produce false positives
+        while (_queue.empty() && !_shutdown)
+            _condition.wait(lock);
 
         if (_queue.empty() || _shutdown)
             return;

@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+# Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -27,6 +27,7 @@ set(scripts_STAT_SRCS
   Outland/HellfireCitadel/ShatteredHalls/shattered_halls.h
   Outland/HellfireCitadel/ShatteredHalls/boss_warchief_kargath_bladefist.cpp
   Outland/HellfireCitadel/ShatteredHalls/boss_nethekurse.cpp
+  Outland/HellfireCitadel/ShatteredHalls/shattered_halls.cpp
   Outland/HellfireCitadel/ShatteredHalls/instance_shattered_halls.cpp
   Outland/HellfireCitadel/ShatteredHalls/boss_warbringer_omrogg.cpp
   Outland/CoilfangReservoir/SteamVault/boss_mekgineer_steamrigger.cpp

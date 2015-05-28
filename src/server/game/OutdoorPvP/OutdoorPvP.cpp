@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,7 +20,6 @@
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "Map.h"
-#include "MapManager.h"
 #include "Group.h"
 #include "WorldPacket.h"
 #include "GridNotifiers.h"
@@ -509,7 +508,7 @@ bool OPvPCapturePoint::HandleCustomSpell(Player* player, uint32 /*spellId*/, Gam
 {
     if (!player->IsOutdoorPvPActive())
         return false;
-    return false;
+    return true;
 }
 
 bool OutdoorPvP::HandleOpenGo(Player* player, ObjectGuid guid)
