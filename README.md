@@ -200,13 +200,31 @@ Install mysql, rabbit-mq and openSSL version 1.0 or higher. Ignore warnings rela
 
 ```bash
 sudo port sync
-sudo port install rabbitmq-c mongo-cxx-driver mysql56 mongodb rabbitmq-server p7zip readline wget
+sudo port install rabbitmq-c mysql56 mongodb rabbitmq-server p7zip readline wget
 sudo port install erlang +ssl
 sudo echo "[{rabbit, [{loopback_users, []}]}]." > /opt/local/etc/rabbitmq/rabbitmq.config
 sudo /opt/local/lib/rabbitmq/lib/rabbitmq_server-3.1.5/sbin/rabbitmq-plugins enable rabbitmq_management
 sudo port unload rabbitmq-server
 sudo port load rabbitmq-server
 sudo port load mongodb
+cd /tmp/
+wget "https://github.com/cppformat/cppformat/releases/download/1.1.0/cppformat-1.1.0.zip" -O cppformat-1.1.0.zip
+unzip -o cppformat-1.1.0.zip
+cd cppformat-1.1.0
+mkdir build
+cd build
+cmake ../ -DCMAKE_INSTALL_PREFIX=/opt/local/
+make
+sudo make install
+cd -
+cd /tmp/
+git clone -b 26compat https://github.com/mongodb/mongo-cxx-driver.git
+cd -
+cd /tmp/mongo-cxx-driver/build
+cmake ../ -DCMAKE_INSTALL_PATH=/opt/local/
+make
+sudo make install
+cd -
 ```
 
 Create build directory:
@@ -263,14 +281,12 @@ cd etc/
 cp worldserver.conf.dist worldserver.conf
 cp authserver.conf.dist authserver.conf
 cd /tmp/
-wget https://github.com/TrinityCore/TrinityCore/releases/download/TDB335.58/TDB_full_335.58_2015_03_21.7z
+wget https://github.com/TrinityCore/TrinityCore/releases/download/TDB335.58/TDB_full_335.58_2015_03_21.7z -O TDB_full_335.58_2015_03_21.7z
+7z x TDB_full_335.58_2015_03_21.7z
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity < ${REPO}/sql/create/create_mysql.sql
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity auth < ${REPO}/sql/base/auth_database.sql 
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/base/characters_database.sql 
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < TDB_full_335.57_2014_10_19.sql
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < ${REPO}/sql/updates/world/2014_10_19_00_world.sql 
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < ${REPO}/sql/updates/world/2014_10_19_01_world.sql 
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < ${REPO}/sql/updates/world/2014_10_20_00_world.sql 
+find ${REPO}/sql/updates/world/ -exec sh -c '/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < {}' \;
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot.sql
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_auctionhousebot.sql
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot_names.sql

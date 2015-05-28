@@ -18,6 +18,7 @@
 #include "../Groups/Group.h"
 #include "../Entities/Pet/Pet.h"
 #include "../Spells/Auras/SpellAuraEffects.h"
+#include "../Spells/SpellHistory.h"
 
 using namespace ai;
 using namespace std;
@@ -374,7 +375,7 @@ int32 PlayerbotAI::CalculateGlobalCooldown(uint32 spellid)
 
     SpellInfo const *spellInfo = sSpellMgr->GetSpellInfo(spellid);
 
-    if (bot->GetGlobalCooldownMgr().HasGlobalCooldown(spellInfo))
+    if (bot->GetSpellHistory()->HasGlobalCooldown(spellInfo))
         return sPlayerbotAIConfig.globalCoolDown;
 
     return sPlayerbotAIConfig.reactDelay;
@@ -815,7 +816,7 @@ bool PlayerbotAI::CanCastSpell(uint32 spellid, Unit* target, bool checkHasSpell)
     if (checkHasSpell && !bot->HasSpell(spellid))
         return false;
 
-    if (bot->HasSpellCooldown(spellid))
+    if (bot->GetSpellHistory()->HasCooldown(spellid))
         return false;
 
     SpellInfo const *spellInfo = sSpellMgr->GetSpellInfo(spellid );

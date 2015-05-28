@@ -41,6 +41,8 @@
 
 #include "mongo/client/dbclient.h"
 #include "mongo/bson/bson.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/client/dbclientinterface.h"
 
 #include <amqp_tcp_socket.h>
 #include <amqp.h>
@@ -64,7 +66,7 @@ const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT
 };
 
 amqp_connection_state_t   connActions = amqp_new_connection();
-mongo::DBClientConnection connEvents(true, NULL, NULL);
+mongo::DBClientConnection connEvents(true);
 
 static bool removeQuestFromDB() {
     SQLTransaction trans = WorldDatabase.BeginTransaction();
@@ -294,10 +296,14 @@ EventBridge::EventBridge()
 {
     pthread_t thread1;
     amqp_socket_t *socket = NULL;
+    std::string errmsg;
+    const mongo::HostAndPort hap("localhost", 27017);
     
     TC_LOG_INFO("server.loading", "EventBridge: Starting EventBridge...");
     
-    connEvents.connect("localhost");
+    TC_LOG_INFO("server.loading", "%s\n", hap.host().c_str());
+    TC_LOG_INFO("server.loading", "%d\n", hap.port());
+    connEvents.connect(hap, errmsg);
     
     TC_LOG_INFO("server.loading", "Connecting to RabbitMQ: [%s,%d] (user: %s)",
                 sConfigMgr->GetStringDefault("RabbitMQ.host", "localhost").c_str(),
