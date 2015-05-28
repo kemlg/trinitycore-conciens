@@ -191,7 +191,10 @@ screen ../bin/worldserver
 ```
 
 ## OSX Instalation (using xcode)
-Install mysql, rabbit-mq and openSSL version 1.0 or higher.
+
+Add your machine name to `/etc/hosts`: `127.0.0.1   machine-name`.
+
+Install mysql, rabbit-mq and openSSL version 1.0 or higher. Ignore warnings related to the Erlang version.
 
 ```bash
 sudo port sync
@@ -212,7 +215,7 @@ cd build/
 
 Generate xcode project configuration and open the project using xcode:
 ```bash
-cmake ../ -GXcode -DPREFIX=`pwd`/install -DWARNINGS=0 -DTOOLS=1 -DSCRIPTS=1 -DSERVERS=1
+cmake ../ -GXcode -DPREFIX=`pwd`/install -DWARNINGS=0 -DTOOLS=1 -DSCRIPTS=1 -DSERVERS=1 -Wno-dev -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 open TrinityCore.xcodeproj/
 ```
 
@@ -258,9 +261,7 @@ cd etc/
 cp worldserver.conf.dist worldserver.conf
 cp authserver.conf.dist authserver.conf
 cd /tmp/
-wget http://www.trinitycore.org/f/files/getdownload/1266-legacy-tdb-335-full/
-mv index.html TDB_full_335.57_2014_10_19.7z
-7z x TDB_full_335.57_2014_10_19.7z
+wget https://github.com/TrinityCore/TrinityCore/releases/download/TDB335.58/TDB_full_335.58_2015_03_21.7z
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity < ${REPO}/sql/create/create_mysql.sql
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity auth < ${REPO}/sql/base/auth_database.sql 
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/base/characters_database.sql 
