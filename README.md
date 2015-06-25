@@ -290,6 +290,7 @@ find ${REPO}/sql/updates/world/ -exec sh -c '/opt/local/lib/mysql56/bin/mysql -u
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot.sql
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_auctionhousebot.sql
 /opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot_names.sql
+/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < ${PATCH}/gameobjectstrinity.sql
 ```
 
 Start the message queue and database:
