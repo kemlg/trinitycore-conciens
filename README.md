@@ -243,6 +243,7 @@ Prepare the following Bash exports:
  * `${INSTALL}`: the directory of the the directory of the installed binaries.
  * `${CLIENT}`: the directory of the client.
  * `${PATCH}`: the directory of the gameobject335 uncompressed directory.
+ * `${MYSQL}`: the path to the mysql binary (usually `mysql`, sometimes similar to `/opt/local/lib/mysql56/bin/mysql` in OSX).
 
 ```bash
 cd ${CLIENT}
@@ -264,14 +265,14 @@ cp authserver.conf.dist authserver.conf
 cd /tmp/
 wget https://github.com/TrinityCore/TrinityCore/releases/download/TDB335.58/TDB_full_335.58_2015_03_21.7z -O TDB_full_335.58_2015_03_21.7z
 7z x TDB_full_335.58_2015_03_21.7z
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity < ${REPO}/sql/create/create_mysql.sql
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity auth < ${REPO}/sql/base/auth_database.sql 
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/base/characters_database.sql 
+${MYSQL} -u root -ptrinity < ${REPO}/sql/create/create_mysql.sql
+${MYSQL} -u root -ptrinity auth < ${REPO}/sql/base/auth_database.sql 
+${MYSQL} -u root -ptrinity characters < ${REPO}/sql/base/characters_database.sql 
 find ${REPO}/sql/updates/world/ -exec sh -c '/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < {}' \;
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot.sql
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_auctionhousebot.sql
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot_names.sql
-/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < ${PATCH}/gameobjectstrinity.sql
+${MYSQL} -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot.sql
+${MYSQL} -u root -ptrinity characters < ${REPO}/sql/characters_auctionhousebot.sql
+${MYSQL} -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot_names.sql
+${MYSQL} -u root -ptrinity world < ${PATCH}/gameobjectstrinity.sql
 ```
 
 ### Run
