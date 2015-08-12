@@ -213,9 +213,6 @@ open TrinityCore.xcodeproj/
 
 Once in XCode, build the `install` target.
 
-Download file from
-[gameobject335 location](http://filebeam.com/4f1ec0862cdee726b8977ffeabcbe1fc) and uncompress somewhere.
-
 Install the MySQL server:
 
 ```bash
@@ -236,6 +233,9 @@ sudo port load mongodb
 ### Install
 
 Download the client for the game (version 3.3.5a).
+
+Download file from
+[gameobject335 location](http://filebeam.com/4f1ec0862cdee726b8977ffeabcbe1fc) and uncompress somewhere.
 
 Prepare the following Bash exports:
 
