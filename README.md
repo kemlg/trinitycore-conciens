@@ -198,7 +198,7 @@ screen ../bin/worldserver
 sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password password trinity'
 sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password trinity'
 sudo apt-get update
-sudo apt-get install -y cmake librabbitmq1 libboost-dev libboost-all-dev libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar-free openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev rabbitmq-server mongodb-dev screen
+sudo apt-get install -y cmake librabbitmq1 libboost-dev libboost-all-dev libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar-free openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev rabbitmq-server screen scons
 cd /tmp/
 wget https://github.com/alanxz/rabbitmq-c/releases/download/v0.5.2/rabbitmq-c-0.5.2.tar.gz
 tar -xvzf rabbitmq-c-0.5.2.tar.gz
@@ -214,6 +214,13 @@ cd cmake-3.2.2
 ./configure
 make
 sudo make install
+cd -
+cd /tmp/
+git clone -b 26compat https://github.com/mongodb/mongo-cxx-driver.git
+cd -
+cd /tmp/mongo-cxx-driver/
+scons --use-system-boost
+sudo scons --use-system-boost --full
 cd -
 sudo rabbitmq-plugins enable rabbitmq_management
 echo "[{rabbit, [{loopback_users, []}]}]." | sudo tee /etc/rabbitmq/rabbitmq.config
