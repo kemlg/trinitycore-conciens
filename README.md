@@ -265,6 +265,7 @@ cp -r vmaps ${INSTALL}/data
 find Buildings/ -exec cp {} ${INSTALL}/data/vmaps/ \;
 cd ${INSTALL}
 cd etc/
+cd conf/
 cp worldserver.conf.dist worldserver.conf
 cp authserver.conf.dist authserver.conf
 cd /tmp/
