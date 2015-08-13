@@ -162,6 +162,11 @@ cd build/
 cmake ../ -DPREFIX=/home/trinity/server -DCONF_DIR=/home/trinity/server/conf -DLIBSDIR=/home/trinity/server/lib  -DUSE_SFMT=1 -DTOOLS=1 -DSCRIPTS=1 -DSERVERS=1 -DWITH_WARNINGS=1 -DCMAKE_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/ -DCMAKE_CXX_FLAGS=-std=gnu++11 -DCMAKE_C_FLAGS=-std=gnu99
 make
 make install
+export LANGUAGE=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+sudo locale-gen en_US.UTF-8
+sudo dpkg-reconfigure locales
 ```
 
 #### OSX (using xcode)
