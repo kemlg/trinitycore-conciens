@@ -128,7 +128,7 @@ sudo locale-gen en_US.UTF-8
 sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password password trinity'
 sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password trinity'
 sudo apt-get update
-sudo apt-get install -y cmake librabbitmq1 libboost-dev libboost-all-dev libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar-free openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev rabbitmq-server screen scons
+sudo apt-get install -y cmake librabbitmq1 libboost-dev libboost-all-dev libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar-free openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev rabbitmq-server screen scons mongodb
 cd /tmp/
 wget https://github.com/alanxz/rabbitmq-c/releases/download/v0.5.2/rabbitmq-c-0.5.2.tar.gz
 tar -xvzf rabbitmq-c-0.5.2.tar.gz
