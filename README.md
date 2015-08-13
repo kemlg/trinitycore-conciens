@@ -268,7 +268,7 @@ wget https://github.com/TrinityCore/TrinityCore/releases/download/TDB335.58/TDB_
 ${MYSQL} -u root -ptrinity < ${REPO}/sql/create/create_mysql.sql
 ${MYSQL} -u root -ptrinity auth < ${REPO}/sql/base/auth_database.sql 
 ${MYSQL} -u root -ptrinity characters < ${REPO}/sql/base/characters_database.sql 
-find ${REPO}/sql/updates/world/ -exec sh -c '/opt/local/lib/mysql56/bin/mysql -u root -ptrinity world < {}' \;
+find ${REPO}/sql/updates/world/ -exec sh -c '${MYSQL} -u root -ptrinity world < {}' \;
 ${MYSQL} -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot.sql
 ${MYSQL} -u root -ptrinity characters < ${REPO}/sql/characters_auctionhousebot.sql
 ${MYSQL} -u root -ptrinity characters < ${REPO}/sql/characters_ai_playerbot_names.sql
