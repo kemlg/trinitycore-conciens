@@ -165,7 +165,6 @@ public:
 
         void Reset() override
         {
-            ryga = NULL;
         }
 
         // Override Evade Mode event, recast buff that was removed by standard handler
@@ -173,15 +172,6 @@ public:
         {
             npc_escortAI::EnterEvadeMode();
             DoCast(me, SPELL_ANCESTRAL_WOLF_BUFF, true);
-        }
-
-        void MoveInLineOfSight(Unit* who) override
-        {
-            if (!ryga && who->GetEntry() == NPC_RYGA && me->IsWithinDistInMap(who, 15.0f))
-                if (Creature* temp = who->ToCreature())
-                    ryga = temp;
-
-            npc_escortAI::MoveInLineOfSight(who);
         }
 
         void WaypointReached(uint32 waypointId) override
@@ -238,9 +228,6 @@ public:
                     break;
             }
         }
-
-    private:
-        Creature* ryga;
     };
 
     CreatureAI* GetAI(Creature* creature) const override
@@ -770,7 +757,8 @@ public:
         void Initialize()
         {
             circleRounds = 0;
-            point = 0;
+            point = 3;
+            wpreached = false;
         }
 
         void Reset() override
@@ -778,9 +766,7 @@ public:
             events.Reset();
 
             summons.DespawnAll();
-            circleRounds = 0;
-            point = 3;
-            wpreached = false;
+            Initialize();
         }
 
         void DoAction(int32 action) override

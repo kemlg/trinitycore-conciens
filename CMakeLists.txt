@@ -58,11 +58,11 @@ set(OPENSSL_EXPECTED_VERSION 1.0.0)
 find_package(PCHSupport)
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
+find_package(MySQL)
 find_package(MongoDB REQUIRED)
 find_package(Rabbitmqc REQUIRED)
 
 include(ConfigureBoost)
-find_package(MySQL REQUIRED)
 
 if( UNIX )
   find_package(Readline)

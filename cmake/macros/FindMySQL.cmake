@@ -63,6 +63,19 @@ if( UNIX )
   endif( MYSQL_CONFIG )
 endif( UNIX )
 
+if( WIN32 )
+  # read environment variables and change \ to /
+  SET(PROGRAM_FILES_32 $ENV{ProgramFiles})
+  if (${PROGRAM_FILES_32})
+    STRING(REPLACE "\\\\" "/" PROGRAM_FILES_32 ${PROGRAM_FILES_32})
+  endif(${PROGRAM_FILES_32})
+
+  SET(PROGRAM_FILES_64 $ENV{ProgramW6432})
+  if (${PROGRAM_FILES_64})
+     STRING(REPLACE "\\\\" "/" PROGRAM_FILES_64 ${PROGRAM_FILES_64})
+  endif(${PROGRAM_FILES_64})
+endif ( WIN32 )
+
 find_path(MYSQL_INCLUDE_DIR
   NAMES
     mysql.h
@@ -92,13 +105,22 @@ find_path(MYSQL_INCLUDE_DIR
     "C:/Program Files (x86)/MySQL/MySQL Server 5.0/include"
     "C:/Program Files (x86)/MySQL/include"
     "C:/MySQL/include"
+    "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.7;Location]/include"
     "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.6;Location]/include"
     "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.5;Location]/include"
     "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.1;Location]/include"
-    "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.0;Location]/include"
+    "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.7;Location]/include"
     "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.6;Location]/include"
     "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.5;Location]/include"
     "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.1;Location]/include"
+    "$ENV{ProgramFiles}/MySQL/MySQL Server 5.7/include"
+    "$ENV{ProgramFiles}/MySQL/MySQL Server 5.6/include"
+    "$ENV{ProgramFiles}/MySQL/MySQL Server 5.5/include"
+    "$ENV{ProgramFiles}/MySQL/MySQL Server 5.1/include"
+    "$ENV{SystemDrive}/MySQL/MySQL Server 5.7/include"
+    "$ENV{SystemDrive}/MySQL/MySQL Server 5.6/include"
+    "$ENV{SystemDrive}/MySQL/MySQL Server 5.5/include"
+    "$ENV{SystemDrive}/MySQL/MySQL Server 5.1/include"
     "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.0;Location]/include"
     "$ENV{ProgramFiles}/MySQL/*/include"
     "$ENV{SystemDrive}/MySQL/*/include"
@@ -112,7 +134,7 @@ if( UNIX )
   foreach(LIB ${MYSQL_ADD_LIBRARIES})
     find_library( MYSQL_LIBRARY
       NAMES
-        mysql libmysql ${LIB} libmysqlclient
+        mysql libmysql ${LIB}
       PATHS
         ${MYSQL_ADD_LIBRARIES_PATH}
         /usr/lib
@@ -131,46 +153,52 @@ endif( UNIX )
 if( WIN32 )
   find_library( MYSQL_LIBRARY
     NAMES
-      libmysqlclient
+      libmysql
     PATHS
       ${MYSQL_ADD_LIBRARIES_PATH}
-      "C:/Program Files/MySQL/MySQL Server 5.6/lib"
-      "C:/Program Files/MySQL/MySQL Server 5.6/lib/opt"
-      "C:/Program Files/MySQL/MySQL Server 5.5/lib"
-      "C:/Program Files/MySQL/MySQL Server 5.5/lib/opt"
-      "C:/Program Files/MySQL/MySQL Server 5.1/lib"
-      "C:/Program Files/MySQL/MySQL Server 5.1/lib/opt"
-      "C:/Program Files/MySQL/MySQL Server 5.0/lib"
-      "C:/Program Files/MySQL/MySQL Server 5.0/lib/opt"
-      "C:/Program Files/MySQL/lib"
-      "C:/Program Files (x86)/MySQL/MySQL Server 5.6/lib"
-      "C:/Program Files (x86)/MySQL/MySQL Server 5.6/lib/opt"
-      "C:/Program Files (x86)/MySQL/MySQL Server 5.5/lib"
-      "C:/Program Files (x86)/MySQL/MySQL Server 5.5/lib/opt"
-      "C:/Program Files (x86)/MySQL/MySQL Server 5.1/lib"
-      "C:/Program Files (x86)/MySQL/MySQL Server 5.1/lib/opt"
-      "C:/Program Files (x86)/MySQL/MySQL Server 5.0/lib"
-      "C:/Program Files (x86)/MySQL/MySQL Server 5.0/lib/opt"
-      "C:/Program Files (x86)/MySQL/lib"
+      "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.7/lib"
+      "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.6/lib"
+      "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.5/lib"
+      "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.1/lib"
+      "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.7/lib/opt"
+      "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.6/lib/opt"
+      "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.5/lib/opt"
+      "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.1/lib/opt"
+      "${PROGRAM_FILES_64}/MySQL/lib"
+      "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.7/lib"
+      "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.6/lib"
+      "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.5/lib"
+      "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.1/lib"
+      "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.7/lib/opt"
+      "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.6/lib/opt"
+      "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.5/lib/opt"
+      "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.1/lib/opt"
+      "${PROGRAM_FILES_32}/MySQL/lib"
       "C:/MySQL/lib/debug"
+      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.7;Location]/lib"
       "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.6;Location]/lib"
-      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.6;Location]/lib/opt"
       "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.5;Location]/lib"
-      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.5;Location]/lib/opt"
       "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.1;Location]/lib"
+      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.7;Location]/lib/opt"
+      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.6;Location]/lib/opt"
+      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.5;Location]/lib/opt"
       "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.1;Location]/lib/opt"
-      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.0;Location]/lib"
-      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.0;Location]/lib/opt"
+      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.7;Location]/lib"
       "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.6;Location]/lib"
-      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.6;Location]/lib/opt"
       "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.5;Location]/lib"
-      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.5;Location]/lib/opt"
       "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.1;Location]/lib"
+      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.7;Location]/lib/opt"
+      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.6;Location]/lib/opt"
+      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.5;Location]/lib/opt"
       "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.1;Location]/lib/opt"
-      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.0;Location]/lib"
-      "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.0;Location]/lib/opt"
-      "$ENV{ProgramFiles}/MySQL/*/lib/opt"
-      "$ENV{SystemDrive}/MySQL/*/lib/opt"
+      "$ENV{ProgramFiles}/MySQL/MySQL Server 5.7/lib/opt"
+      "$ENV{ProgramFiles}/MySQL/MySQL Server 5.6/lib/opt"
+      "$ENV{ProgramFiles}/MySQL/MySQL Server 5.5/lib/opt"
+      "$ENV{ProgramFiles}/MySQL/MySQL Server 5.1/lib/opt"
+      "$ENV{SystemDrive}/MySQL/MySQL Server 5.7/lib/opt"
+      "$ENV{SystemDrive}/MySQL/MySQL Server 5.6/lib/opt"
+      "$ENV{SystemDrive}/MySQL/MySQL Server 5.5/lib/opt"
+      "$ENV{SystemDrive}/MySQL/MySQL Server 5.1/lib/opt"
       "c:/msys/local/include"
       "$ENV{MYSQL_ROOT}/lib"
     DOC "Specify the location of the mysql library here."
@@ -209,43 +237,49 @@ endif( UNIX )
 if( WIN32 )
     find_program(MYSQL_EXECUTABLE mysql
       PATHS
-        "C:/Program Files/MySQL/MySQL Server 5.6/bin"
-        "C:/Program Files/MySQL/MySQL Server 5.6/bin/opt"
-        "C:/Program Files/MySQL/MySQL Server 5.5/bin"
-        "C:/Program Files/MySQL/MySQL Server 5.5/bin/opt"
-        "C:/Program Files/MySQL/MySQL Server 5.1/bin"
-        "C:/Program Files/MySQL/MySQL Server 5.1/bin/opt"
-        "C:/Program Files/MySQL/MySQL Server 5.0/bin"
-        "C:/Program Files/MySQL/MySQL Server 5.0/bin/opt"
-        "C:/Program Files/MySQL/bin"
-        "C:/Program Files (x86)/MySQL/MySQL Server 5.6/bin"
-        "C:/Program Files (x86)/MySQL/MySQL Server 5.6/bin/opt"
-        "C:/Program Files (x86)/MySQL/MySQL Server 5.5/bin"
-        "C:/Program Files (x86)/MySQL/MySQL Server 5.5/bin/opt"
-        "C:/Program Files (x86)/MySQL/MySQL Server 5.1/bin"
-        "C:/Program Files (x86)/MySQL/MySQL Server 5.1/bin/opt"
-        "C:/Program Files (x86)/MySQL/MySQL Server 5.0/bin"
-        "C:/Program Files (x86)/MySQL/MySQL Server 5.0/bin/opt"
-        "C:/Program Files (x86)/MySQL/bin"
+        "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.7/bin"
+        "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.6/bin"
+        "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.5/bin"
+        "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.1/bin"
+        "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.7/bin/opt"
+        "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.6/bin/opt"
+        "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.5/bin/opt"
+        "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.1/bin/opt"
+        "${PROGRAM_FILES_64}/MySQL/bin"
+        "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.7/bin"
+        "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.6/bin"
+        "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.5/bin"
+        "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.1/bin"
+        "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.7/bin/opt"
+        "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.6/bin/opt"
+        "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.5/bin/opt"
+        "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.1/bin/opt"
+        "${PROGRAM_FILES_32}/MySQL/bin"
         "C:/MySQL/bin/debug"
+        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.7;Location]/bin"
         "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.6;Location]/bin"
-        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.6;Location]/bin/opt"
         "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.5;Location]/bin"
-        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.5;Location]/bin/opt"
         "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.1;Location]/bin"
+        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.7;Location]/bin/opt"
+        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.6;Location]/bin/opt"
+        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.5;Location]/bin/opt"
         "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.1;Location]/bin/opt"
-        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.0;Location]/bin"
-        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.0;Location]/bin/opt"
+        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.7;Location]/bin"
         "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.6;Location]/bin"
-        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.6;Location]/bin/opt"
         "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.5;Location]/bin"
-        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.5;Location]/bin/opt"
         "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.1;Location]/bin"
+        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.7;Location]/bin/opt"
+        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.6;Location]/bin/opt"
+        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.5;Location]/bin/opt"
         "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.1;Location]/bin/opt"
-        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.0;Location]/bin"
-        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.0;Location]/bin/opt"
-        "$ENV{ProgramFiles}/MySQL/*/bin/opt"
-        "$ENV{SystemDrive}/MySQL/*/bin/opt"
+        "$ENV{ProgramFiles}/MySQL/MySQL Server 5.7/bin/opt"
+        "$ENV{ProgramFiles}/MySQL/MySQL Server 5.6/bin/opt"
+        "$ENV{ProgramFiles}/MySQL/MySQL Server 5.5/bin/opt"
+        "$ENV{ProgramFiles}/MySQL/MySQL Server 5.1/bin/opt"
+        "$ENV{SystemDrive}/MySQL/MySQL Server 5.7/bin/opt"
+        "$ENV{SystemDrive}/MySQL/MySQL Server 5.6/bin/opt"
+        "$ENV{SystemDrive}/MySQL/MySQL Server 5.5/bin/opt"
+        "$ENV{SystemDrive}/MySQL/MySQL Server 5.1/bin/opt"
         "c:/msys/local/include"
         "$ENV{MYSQL_ROOT}/bin"
      DOC

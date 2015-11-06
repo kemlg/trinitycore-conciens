@@ -514,7 +514,7 @@ void BattlegroundMgr::LoadBattlegroundTemplates()
     _battlegroundTemplates.clear();
 
     //                                               0   1                  2                  3       4       5                 6               7              8            9             10      11
-    QueryResult result = WorldDatabase.Query("SELECT id, MinPlayersPerTeam, MaxPlayersPerTeam, MinLvl, MaxLvl, AllianceStartLoc, AllianceStartO, HordeStartLoc, HordeStartO, StartMaxDist, Weight, ScriptName FROM battleground_template");
+    QueryResult result = WorldDatabase.Query("SELECT ID, MinPlayersPerTeam, MaxPlayersPerTeam, MinLvl, MaxLvl, AllianceStartLoc, AllianceStartO, HordeStartLoc, HordeStartO, StartMaxDist, Weight, ScriptName FROM battleground_template");
     if (!result)
     {
         TC_LOG_ERROR("server.loading", ">> Loaded 0 battlegrounds. DB table `battleground_template` is empty.");
@@ -821,7 +821,8 @@ void BattlegroundMgr::ToggleArenaTesting()
 
 void BattlegroundMgr::SetHolidayWeekends(uint32 mask)
 {
-    for (uint32 bgtype = 1; bgtype < MAX_BATTLEGROUND_TYPE_ID; ++bgtype)
+    // The current code supports battlegrounds up to BattlegroundTypeId(31)
+    for (uint32 bgtype = 1; bgtype < MAX_BATTLEGROUND_TYPE_ID && bgtype < 32; ++bgtype)
         if (Battleground* bg = GetBattlegroundTemplate(BattlegroundTypeId(bgtype)))
             bg->SetHoliday((mask & (1 << bgtype)) != 0);
 }

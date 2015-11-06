@@ -54,6 +54,15 @@ MinionData const minionData[] =
     { 0,                  0,                    }
 };
 
+ObjectData const creatureData[] =
+{
+    { NPC_BRANN_BRONZEBEARD_INTRO,  DATA_BRANN_BRONZEBEARD_INTRO  },
+    { NPC_LORE_KEEPER_OF_NORGANNON, DATA_LORE_KEEPER_OF_NORGANNON },
+    { NPC_HIGH_EXPLORER_DELLORAH,   DATA_DELLORAH                 },
+    { NPC_BRONZEBEARD_RADIO,        DATA_BRONZEBEARD_RADIO        },
+    { 0,                            0,                            }
+};
+
 class instance_ulduar : public InstanceMapScript
 {
     public:
@@ -68,6 +77,7 @@ class instance_ulduar : public InstanceMapScript
 
                 LoadDoorData(doorData);
                 LoadMinionData(minionData);
+                LoadObjectData(creatureData, nullptr);
 
                 _algalonTimer = 61;
                 _maxArmorItemLevel = 0;
@@ -420,6 +430,8 @@ class instance_ulduar : public InstanceMapScript
                             algalon->AI()->JustSummoned(creature);
                         break;
                 }
+
+                InstanceScript::OnCreatureCreate(creature);
             }
 
             void OnCreatureRemove(Creature* creature) override
@@ -446,6 +458,8 @@ class instance_ulduar : public InstanceMapScript
                     default:
                         break;
                 }
+
+                InstanceScript::OnCreatureRemove(creature);
             }
 
             void OnGameObjectCreate(GameObject* gameObject) override
@@ -690,22 +704,7 @@ class instance_ulduar : public InstanceMapScript
                 {
                     case BOSS_LEVIATHAN:
                         if (state == DONE)
-                        {
-                            // Eject all players from vehicles and make them untargetable.
-                            // They will be despawned after a while
-                            for (auto const& vehicleGuid : LeviathanVehicleGUIDs)
-                            {
-                                if (Creature* vehicleCreature = instance->GetCreature(vehicleGuid))
-                                {
-                                    if (Vehicle* vehicle = vehicleCreature->GetVehicleKit())
-                                    {
-                                        vehicle->RemoveAllPassengers();
-                                        vehicleCreature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                                        vehicleCreature->DespawnOrUnsummon(5 * MINUTE * IN_MILLISECONDS);
-                                    }
-                                }
-                            }
-                        }
+                            _events.ScheduleEvent(EVENT_DESPAWN_LEVIATHAN_VEHICLES, 5 * IN_MILLISECONDS);
                         break;
                     case BOSS_IGNIS:
                     case BOSS_RAZORSCALE:
@@ -1162,6 +1161,22 @@ class instance_ulduar : public InstanceMapScript
                                 _events.CancelEvent(EVENT_UPDATE_ALGALON_TIMER);
                                 if (Creature* algalon = instance->GetCreature(AlgalonGUID))
                                     algalon->AI()->DoAction(EVENT_DESPAWN_ALGALON);
+                            }
+                            break;
+                        case EVENT_DESPAWN_LEVIATHAN_VEHICLES:
+                            // Eject all players from vehicles and make them untargetable.
+                            // They will be despawned after a while
+                            for (auto const& vehicleGuid : LeviathanVehicleGUIDs)
+                            {
+                                if (Creature* vehicleCreature = instance->GetCreature(vehicleGuid))
+                                {
+                                    if (Vehicle* vehicle = vehicleCreature->GetVehicleKit())
+                                    {
+                                        vehicle->RemoveAllPassengers();
+                                        vehicleCreature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                                        vehicleCreature->DespawnOrUnsummon(5 * MINUTE * IN_MILLISECONDS);
+                                    }
+                                }
                             }
                             break;
                     }

@@ -45,9 +45,9 @@ class misc_commandscript : public CommandScript
 public:
     misc_commandscript() : CommandScript("misc_commandscript") { }
 
-    ChatCommand* GetCommands() const override
+    std::vector<ChatCommand> GetCommands() const override
     {
-        static ChatCommand commandTable[] =
+        static std::vector<ChatCommand> commandTable =
         {
             { "additem",          rbac::RBAC_PERM_COMMAND_ADDITEM,          false, &HandleAddItemCommand,          "", NULL },
             { "additemset",       rbac::RBAC_PERM_COMMAND_ADDITEMSET,       false, &HandleAddItemSetCommand,       "", NULL },
@@ -607,8 +607,10 @@ public:
             target->SaveToDB();
         }
         else
-            // will resurrected at login without corpse
-            sObjectAccessor->ConvertCorpseForPlayer(targetGuid);
+        {
+            SQLTransaction trans(nullptr);
+            Player::OfflineResurrect(targetGuid, trans);
+        }
 
         return true;
     }
@@ -648,7 +650,7 @@ public:
             return false;
         }
 
-        handler->PSendSysMessage(LANG_OBJECT_GUID, guid.GetCounter(), guid.GetHigh());
+        handler->PSendSysMessage(LANG_OBJECT_GUID, guid.ToString().c_str());
         return true;
     }
 
@@ -827,7 +829,7 @@ public:
     // Save all players in the world
     static bool HandleSaveAllCommand(ChatHandler* handler, char const* /*args*/)
     {
-        sObjectAccessor->SaveAllPlayers();
+        ObjectAccessor::SaveAllPlayers();
         handler->SendSysMessage(LANG_PLAYERS_SAVED);
         return true;
     }
@@ -1332,8 +1334,8 @@ public:
 
     static bool HandleMaxSkillCommand(ChatHandler* handler, char const* /*args*/)
     {
-        Player* SelectedPlayer = handler->getSelectedPlayer();
-        if (!SelectedPlayer)
+        Player* player = handler->getSelectedPlayerOrSelf();
+        if (!player)
         {
             handler->SendSysMessage(LANG_NO_CHAR_SELECTED);
             handler->SetSentErrorMessage(true);
@@ -1341,7 +1343,7 @@ public:
         }
 
         // each skills that have max skill value dependent from level seted to current level max skill value
-        SelectedPlayer->UpdateSkillsToMaxSkillsForLevel();
+        player->UpdateSkillsToMaxSkillsForLevel();
         return true;
     }
 
@@ -1428,7 +1430,7 @@ public:
         PreparedStatement* stmt = NULL;
 
         // To make sure we get a target, we convert our guid to an omniversal...
-        ObjectGuid parseGUID(HIGHGUID_PLAYER, uint32(atoul(args)));
+        ObjectGuid parseGUID(HighGuid::Player, uint32(atoul(args)));
 
         // ... and make sure we get a target, somehow.
         if (sObjectMgr->GetPlayerNameByGUID(parseGUID, targetName))
@@ -1475,7 +1477,7 @@ public:
         // Account data print variables
         std::string userName          = handler->GetTrinityString(LANG_ERROR);
         uint32 accId                  = 0;
-        uint32 lowguid                = targetGuid.GetCounter();
+        ObjectGuid::LowType lowguid   = targetGuid.GetCounter();
         std::string eMail             = handler->GetTrinityString(LANG_ERROR);
         std::string regMail           = handler->GetTrinityString(LANG_ERROR);
         uint32 security               = 0;
@@ -1664,7 +1666,7 @@ public:
         {
             Field* fields = result4->Fetch();
             xp            = fields[0].GetUInt32(); // Used for "current xp" output and "%u XP Left" calculation
-            uint32 gguid  = fields[1].GetUInt32(); // We check if have a guild for the person, so we might not require to query it at all
+            ObjectGuid::LowType gguid  = fields[1].GetUInt32(); // We check if have a guild for the person, so we might not require to query it at all
             xptotal = sObjectMgr->GetXPForLevel(level);
 
             if (gguid != 0)
@@ -1779,21 +1781,13 @@ public:
         PreparedQueryResult result6 = CharacterDatabase.Query(stmt4);
         if (result6)
         {
-            // Define the variables, so the compiler knows they exist
-            uint32 rmailint = 0;
-
-            // Fetch the fields - readmail is a SUM(x) and given out as char! Thus...
-            // ... while totalmail is a COUNT(x), which is given out as INt64, which we just convert on fetch...
             Field* fields         = result6->Fetch();
-            std::string readmail  = fields[0].GetString();
+            uint32 readmail       = uint32(fields[0].GetDouble());
             uint32 totalmail      = uint32(fields[1].GetUInt64());
-
-            // ... we have to convert it from Char to int. We can use totalmail as it is
-            rmailint = atoul(readmail.c_str());
 
             // Output XXI. LANG_INFO_CHR_MAILS if at least one mail is given
             if (totalmail >= 1)
-               handler->PSendSysMessage(LANG_PINFO_CHR_MAILS, rmailint, totalmail);
+               handler->PSendSysMessage(LANG_PINFO_CHR_MAILS, readmail, totalmail);
         }
 
         return true;
@@ -2025,7 +2019,7 @@ public:
             return false;
         }
 
-        handler->PSendSysMessage(LANG_MOVEGENS_LIST, (unit->GetTypeId() == TYPEID_PLAYER ? "Player" : "Creature"), unit->GetGUIDLow());
+        handler->PSendSysMessage(LANG_MOVEGENS_LIST, (unit->GetTypeId() == TYPEID_PLAYER ? "Player" : "Creature"), unit->GetGUID().GetCounter());
 
         MotionMaster* motionMaster = unit->GetMotionMaster();
         float x, y, z;
@@ -2068,9 +2062,9 @@ public:
                     if (!target)
                         handler->SendSysMessage(LANG_MOVEGENS_CHASE_NULL);
                     else if (target->GetTypeId() == TYPEID_PLAYER)
-                        handler->PSendSysMessage(LANG_MOVEGENS_CHASE_PLAYER, target->GetName().c_str(), target->GetGUIDLow());
+                        handler->PSendSysMessage(LANG_MOVEGENS_CHASE_PLAYER, target->GetName().c_str(), target->GetGUID().GetCounter());
                     else
-                        handler->PSendSysMessage(LANG_MOVEGENS_CHASE_CREATURE, target->GetName().c_str(), target->GetGUIDLow());
+                        handler->PSendSysMessage(LANG_MOVEGENS_CHASE_CREATURE, target->GetName().c_str(), target->GetGUID().GetCounter());
                     break;
                 }
                 case FOLLOW_MOTION_TYPE:
@@ -2084,9 +2078,9 @@ public:
                     if (!target)
                         handler->SendSysMessage(LANG_MOVEGENS_FOLLOW_NULL);
                     else if (target->GetTypeId() == TYPEID_PLAYER)
-                        handler->PSendSysMessage(LANG_MOVEGENS_FOLLOW_PLAYER, target->GetName().c_str(), target->GetGUIDLow());
+                        handler->PSendSysMessage(LANG_MOVEGENS_FOLLOW_PLAYER, target->GetName().c_str(), target->GetGUID().GetCounter());
                     else
-                        handler->PSendSysMessage(LANG_MOVEGENS_FOLLOW_CREATURE, target->GetName().c_str(), target->GetGUIDLow());
+                        handler->PSendSysMessage(LANG_MOVEGENS_FOLLOW_CREATURE, target->GetName().c_str(), target->GetGUID().GetCounter());
                     break;
                 }
                 case HOME_MOTION_TYPE:
@@ -2492,7 +2486,7 @@ public:
 
                 // If player found: delete his freeze aura
                 Field* fields = result->Fetch();
-                uint32 lowGuid = fields[0].GetUInt32();
+                ObjectGuid::LowType lowGuid = fields[0].GetUInt32();
 
                 stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_AURA_FROZEN);
                 stmt->setUInt32(0, lowGuid);

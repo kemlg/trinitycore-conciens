@@ -161,19 +161,6 @@ class spell_ioc_gunship_portal : public SpellScriptLoader
                  * Position: X: 7.305609 Y: -0.095246 Z: 34.51022 O: 0
                  */
                 caster->TeleportTo(GetHitCreature()->GetWorldLocation(), TELE_TO_NOT_LEAVE_TRANSPORT);
-                /*
-                 * HACK: This aura should be added by 20212 and 20213 but can't find any SMSG_SPELL_GO. Could't find their position.
-                 * ServerToClient: SMSG_AURA_UPDATE (0x0072)
-                 * [0] CasterGUID: Full: xxxxx Type: Unit Entry: 20212 Low: xxx
-                 * [0] Flags: None (0)
-                 * [0] Caster Level: 60
-                 * [0] Spell ID: 66656
-                 * [0] Charges: 0
-                 * [0] Effect Mask: 1
-                 * [0] Slot: 37
-                 * Guid: Full: xxxxx Type: Player2 Low: xxxxx
-                 */
-                caster->AddAura(SPELL_PARACHUTE, caster);
             }
 
             void Register() override
@@ -219,7 +206,7 @@ class spell_ioc_parachute_ic : public SpellScriptLoader
 class StartLaunchEvent : public BasicEvent
 {
     public:
-        StartLaunchEvent(float x, float y, float z, uint32 lowGuid) : _x(x), _y(y), _z(z), _lowGuid(lowGuid)
+        StartLaunchEvent(float x, float y, float z, ObjectGuid::LowType lowGuid) : _x(x), _y(y), _z(z), _lowGuid(lowGuid)
         {
         }
 
@@ -240,7 +227,7 @@ class StartLaunchEvent : public BasicEvent
 
     private:
         float _x, _y, _z;
-        uint32 _lowGuid;
+        ObjectGuid::LowType _lowGuid;
 };
 
 class spell_ioc_launch : public SpellScriptLoader
@@ -261,7 +248,7 @@ class spell_ioc_launch : public SpellScriptLoader
                 x = GetExplTargetDest()->GetPositionX();
                 y = GetExplTargetDest()->GetPositionY();
                 z = GetExplTargetDest()->GetPositionZ();
-                GetCaster()->ToCreature()->m_Events.AddEvent(new StartLaunchEvent(x, y, z, GetHitPlayer()->GetGUIDLow()), GetCaster()->ToCreature()->m_Events.CalculateTime(2500));
+                GetCaster()->ToCreature()->m_Events.AddEvent(new StartLaunchEvent(x, y, z, GetHitPlayer()->GetGUID().GetCounter()), GetCaster()->ToCreature()->m_Events.CalculateTime(2500));
             }
 
             void Register() override
