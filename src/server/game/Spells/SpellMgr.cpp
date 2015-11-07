@@ -3105,11 +3105,13 @@ void SpellMgr::LoadSpellInfoCorrections()
             case 28796: // Poison Bolt Volly - Faerlina
                 spellInfo->MaxAffectedTargets = 5;
                 break;
+            case 54835: // Curse of the Plaguebringer - Noth (H)
+                spellInfo->MaxAffectedTargets = 8;
+                break;
             case 40827: // Sinful Beam
             case 40859: // Sinister Beam
             case 40860: // Vile Beam
             case 40861: // Wicked Beam
-            case 54835: // Curse of the Plaguebringer - Noth (H)
             case 54098: // Poison Bolt Volly - Faerlina (H)
                 spellInfo->MaxAffectedTargets = 10;
                 break;
@@ -3180,13 +3182,13 @@ void SpellMgr::LoadSpellInfoCorrections()
             // Master Shapeshifter: missing stance data for forms other than bear - bear version has correct data
             // To prevent aura staying on target after talent unlearned
             case 48420:
-                spellInfo->Stances = 1 << (FORM_CAT - 1);
+                spellInfo->Stances = UI64LIT(1) << (FORM_CAT - 1);
                 break;
             case 48421:
-                spellInfo->Stances = 1 << (FORM_MOONKIN - 1);
+                spellInfo->Stances = UI64LIT(1) << (FORM_MOONKIN - 1);
                 break;
             case 48422:
-                spellInfo->Stances = 1 << (FORM_TREE - 1);
+                spellInfo->Stances = UI64LIT(1) << (FORM_TREE - 1);
                 break;
             case 51466: // Elemental Oath (Rank 1)
             case 51470: // Elemental Oath (Rank 2)

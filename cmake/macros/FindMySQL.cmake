@@ -86,16 +86,24 @@ find_path(MYSQL_INCLUDE_DIR
     /usr/local/include
     /usr/local/include/mysql
     /usr/local/mysql/include
-    "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.7/include"
-    "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.6/include"
-    "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.5/include"
-    "${PROGRAM_FILES_64}/MySQL/MySQL Server 5.1/include"
-    "${PROGRAM_FILES_64}/MySQL/include"
-    "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.7/include"
-    "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.6/include"
-    "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.5/include"
-    "${PROGRAM_FILES_32}/MySQL/MySQL Server 5.1/include"
-    "${PROGRAM_FILES_32}/MySQL/include"
+    /usr/local/include/mysql55/
+    /usr/local/include/mysql55/mysql/
+    /opt/local/include/mysql55/
+    /opt/local/include/mysql55/mysql/
+    /usr/local/include/mysql56/
+    /usr/local/include/mysql56/mysql/
+    /opt/local/include/mysql56/
+    /opt/local/include/mysql56/mysql/
+    "C:/Program Files/MySQL/MySQL Server 5.6/include"
+    "C:/Program Files/MySQL/MySQL Server 5.5/include"
+    "C:/Program Files/MySQL/MySQL Server 5.1/include"
+    "C:/Program Files/MySQL/MySQL Server 5.0/include"
+    "C:/Program Files/MySQL/include"
+    "C:/Program Files (x86)/MySQL/MySQL Server 5.6/include"
+    "C:/Program Files (x86)/MySQL/MySQL Server 5.5/include"
+    "C:/Program Files (x86)/MySQL/MySQL Server 5.1/include"
+    "C:/Program Files (x86)/MySQL/MySQL Server 5.0/include"
+    "C:/Program Files (x86)/MySQL/include"
     "C:/MySQL/include"
     "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.7;Location]/include"
     "[HKEY_LOCAL_MACHINE\\SOFTWARE\\MySQL AB\\MySQL Server 5.6;Location]/include"
@@ -113,6 +121,9 @@ find_path(MYSQL_INCLUDE_DIR
     "$ENV{SystemDrive}/MySQL/MySQL Server 5.6/include"
     "$ENV{SystemDrive}/MySQL/MySQL Server 5.5/include"
     "$ENV{SystemDrive}/MySQL/MySQL Server 5.1/include"
+    "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\MySQL AB\\MySQL Server 5.0;Location]/include"
+    "$ENV{ProgramFiles}/MySQL/*/include"
+    "$ENV{SystemDrive}/MySQL/*/include"
     "c:/msys/local/include"
     "$ENV{MYSQL_ROOT}/include"
   DOC
@@ -131,6 +142,9 @@ if( UNIX )
         /usr/local/lib
         /usr/local/lib/mysql
         /usr/local/mysql/lib
+        /opt/local/lib/
+        /opt/local/lib/mysql55/mysql/
+        /opt/local/lib/mysql56/mysql/
       DOC "Specify the location of the mysql library here."
     )
   endforeach(LIB ${MYSQL_ADD_LIBRARY})

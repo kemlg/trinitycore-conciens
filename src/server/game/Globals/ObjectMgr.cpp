@@ -291,8 +291,8 @@ void ObjectMgr::LoadCreatureLocales()
 
     _creatureLocaleStore.clear();                              // need for reload case
 
-    QueryResult result = WorldDatabase.Query("SELECT entry, name_loc1, subname_loc1, name_loc2, subname_loc2, name_loc3, subname_loc3, name_loc4, subname_loc4, name_loc5, subname_loc5, name_loc6, subname_loc6, name_loc7, subname_loc7, name_loc8, subname_loc8 FROM locales_creature");
-
+    //                                               0      1       2     3
+    QueryResult result = WorldDatabase.Query("SELECT entry, locale, Name, Title FROM creature_template_locale");
     if (!result)
         return;
 
@@ -300,16 +300,20 @@ void ObjectMgr::LoadCreatureLocales()
     {
         Field* fields = result->Fetch();
 
-        uint32 entry = fields[0].GetUInt32();
+        uint32 id               = fields[0].GetUInt32();
+        std::string localeName  = fields[1].GetString();
 
-        CreatureLocale& data = _creatureLocaleStore[entry];
+        std::string name        = fields[2].GetString();
+        std::string title       = fields[3].GetString();
 
-        for (uint8 i = TOTAL_LOCALES - 1; i > 0; --i)
-        {
-            LocaleConstant locale = (LocaleConstant) i;
-            AddLocaleString(fields[1 + 2 * (i - 1)].GetString(), locale, data.Name);
-            AddLocaleString(fields[1 + 2 * (i - 1) + 1].GetString(), locale, data.SubName);
-        }
+        CreatureLocale& data = _creatureLocaleStore[id];
+        LocaleConstant locale = GetLocaleByName(localeName);
+        if (locale == LOCALE_enUS)
+            continue;
+
+        AddLocaleString(name,       locale, data.Name);
+        AddLocaleString(title,      locale, data.Title);
+
     } while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded %u creature locale strings in %u ms", uint32(_creatureLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
@@ -442,7 +446,7 @@ void ObjectMgr::LoadCreatureTemplate(Field* fields)
     creatureTemplate.Modelid3         = fields[8].GetUInt32();
     creatureTemplate.Modelid4         = fields[9].GetUInt32();
     creatureTemplate.Name             = fields[10].GetString();
-    creatureTemplate.SubName          = fields[11].GetString();
+    creatureTemplate.Title            = fields[11].GetString();
     creatureTemplate.IconName         = fields[12].GetString();
     creatureTemplate.GossipMenuId     = fields[13].GetUInt32();
     creatureTemplate.minlevel         = fields[14].GetUInt8();
@@ -961,7 +965,7 @@ void ObjectMgr::LoadCreatureAddons()
     {
         Field* fields = result->Fetch();
 
-        uint32 guid = fields[0].GetUInt32();
+        ObjectGuid::LowType guid = fields[0].GetUInt32();
 
         CreatureData const* creData = GetCreatureData(guid);
         if (!creData)
@@ -1084,7 +1088,7 @@ GameObjectAddon const* ObjectMgr::GetGameObjectAddon(ObjectGuid::LowType lowguid
     return NULL;
 }
 
-CreatureAddon const* ObjectMgr::GetCreatureAddon(uint32 lowguid)
+CreatureAddon const* ObjectMgr::GetCreatureAddon(ObjectGuid::LowType lowguid)
 {
     CreatureAddonContainer::const_iterator itr = _creatureAddonStore.find(lowguid);
     if (itr != _creatureAddonStore.end())
@@ -1338,8 +1342,8 @@ void ObjectMgr::LoadLinkedRespawn()
     {
         Field* fields = result->Fetch();
 
-        uint32 guidLow = fields[0].GetUInt32();
-        uint32 linkedGuidLow = fields[1].GetUInt32();
+        ObjectGuid::LowType guidLow = fields[0].GetUInt32();
+        ObjectGuid::LowType linkedGuidLow = fields[1].GetUInt32();
         uint8  linkType = fields[2].GetUInt8();
 
         ObjectGuid guid, linkedGuid;
@@ -1504,7 +1508,7 @@ void ObjectMgr::LoadLinkedRespawn()
     TC_LOG_INFO("server.loading", ">> Loaded " UI64FMTD " linked respawns in %u ms", uint64(_linkedRespawnStore.size()), GetMSTimeDiffToNow(oldMSTime));
 }
 
-bool ObjectMgr::SetCreatureLinkedRespawn(uint32 guidLow, uint32 linkedGuidLow)
+bool ObjectMgr::SetCreatureLinkedRespawn(ObjectGuid::LowType guidLow, ObjectGuid::LowType linkedGuidLow)
 {
     if (!guidLow)
         return false;
@@ -1672,7 +1676,7 @@ void ObjectMgr::LoadCreatures()
     {
         Field* fields = result->Fetch();
 
-        uint32 guid         = fields[0].GetUInt32();
+        ObjectGuid::LowType guid = fields[0].GetUInt32();
         uint32 entry        = fields[1].GetUInt32();
 
         CreatureTemplate const* cInfo = GetCreatureTemplate(entry);
@@ -1803,7 +1807,7 @@ void ObjectMgr::LoadCreatures()
     TC_LOG_INFO("server.loading", ">> Loaded " SZFMTD " creatures in %u ms", _creatureDataStore.size(), GetMSTimeDiffToNow(oldMSTime));
 }
 
-void ObjectMgr::AddCreatureToGrid(uint32 guid, CreatureData const* data)
+void ObjectMgr::AddCreatureToGrid(ObjectGuid::LowType guid, CreatureData const* data)
 {
     uint8 mask = data->spawnMask;
     for (uint8 i = 0; mask != 0; i++, mask >>= 1)
@@ -1817,7 +1821,7 @@ void ObjectMgr::AddCreatureToGrid(uint32 guid, CreatureData const* data)
     }
 }
 
-void ObjectMgr::RemoveCreatureFromGrid(uint32 guid, CreatureData const* data)
+void ObjectMgr::RemoveCreatureFromGrid(ObjectGuid::LowType guid, CreatureData const* data)
 {
     uint8 mask = data->spawnMask;
     for (uint8 i = 0; mask != 0; i++, mask >>= 1)
@@ -1831,7 +1835,7 @@ void ObjectMgr::RemoveCreatureFromGrid(uint32 guid, CreatureData const* data)
     }
 }
 
-uint32 ObjectMgr::AddGOData(uint32 entry, uint32 mapId, float x, float y, float z, float o, uint32 spawntimedelay, float rotation0, float rotation1, float rotation2, float rotation3)
+ObjectGuid::LowType ObjectMgr::AddGOData(uint32 entry, uint32 mapId, float x, float y, float z, float o, uint32 spawntimedelay, float rotation0, float rotation1, float rotation2, float rotation3)
 {
     GameObjectTemplate const* goinfo = GetGameObjectTemplate(entry);
     if (!goinfo)
@@ -1841,7 +1845,7 @@ uint32 ObjectMgr::AddGOData(uint32 entry, uint32 mapId, float x, float y, float 
     if (!map)
         return 0;
 
-    uint32 guid = GenerateGameObjectSpawnId();
+    ObjectGuid::LowType guid = GenerateGameObjectSpawnId();
 
     GameObjectData& data = NewGOData(guid);
     data.id             = entry;
@@ -1883,7 +1887,7 @@ uint32 ObjectMgr::AddGOData(uint32 entry, uint32 mapId, float x, float y, float 
 }
 
 
-uint32 ObjectMgr::AddCreatureData(uint32 entry, uint32 mapId, float x, float y, float z, float o, uint32 spawntimedelay /*= 0*/)
+ObjectGuid::LowType ObjectMgr::AddCreatureData(uint32 entry, uint32 mapId, float x, float y, float z, float o, uint32 spawntimedelay /*= 0*/)
 {
     CreatureTemplate const* cInfo = GetCreatureTemplate(entry);
     if (!cInfo)
@@ -1895,7 +1899,7 @@ uint32 ObjectMgr::AddCreatureData(uint32 entry, uint32 mapId, float x, float y, 
     if (!map)
         return 0;
 
-    uint32 guid = GenerateCreatureSpawnId();
+    ObjectGuid::LowType guid = GenerateCreatureSpawnId();
     CreatureData& data = NewOrExistCreatureData(guid);
     data.id = entry;
     data.mapid = mapId;
@@ -1966,7 +1970,7 @@ void ObjectMgr::LoadGameobjects()
     {
         Field* fields = result->Fetch();
 
-        uint32 guid         = fields[0].GetUInt32();
+        ObjectGuid::LowType guid = fields[0].GetUInt32();
         uint32 entry        = fields[1].GetUInt32();
 
         GameObjectTemplate const* gInfo = GetGameObjectTemplate(entry);
@@ -2094,7 +2098,7 @@ void ObjectMgr::LoadGameobjects()
     TC_LOG_INFO("server.loading", ">> Loaded " SZFMTD " gameobjects in %u ms", _gameObjectDataStore.size(), GetMSTimeDiffToNow(oldMSTime));
 }
 
-void ObjectMgr::AddGameobjectToGrid(uint32 guid, GameObjectData const* data)
+void ObjectMgr::AddGameobjectToGrid(ObjectGuid::LowType guid, GameObjectData const* data)
 {
     uint8 mask = data->spawnMask;
     for (uint8 i = 0; mask != 0; i++, mask >>= 1)
@@ -2108,7 +2112,7 @@ void ObjectMgr::AddGameobjectToGrid(uint32 guid, GameObjectData const* data)
     }
 }
 
-void ObjectMgr::RemoveGameobjectFromGrid(uint32 guid, GameObjectData const* data)
+void ObjectMgr::RemoveGameobjectFromGrid(ObjectGuid::LowType guid, GameObjectData const* data)
 {
     uint8 mask = data->spawnMask;
     for (uint8 i = 0; mask != 0; i++, mask >>= 1)
@@ -2122,7 +2126,7 @@ void ObjectMgr::RemoveGameobjectFromGrid(uint32 guid, GameObjectData const* data
     }
 }
 
-Player* ObjectMgr::GetPlayerByLowGUID(uint32 lowguid) const
+Player* ObjectMgr::GetPlayerByLowGUID(ObjectGuid::LowType lowguid) const
 {
     ObjectGuid guid(HighGuid::Player, lowguid);
     return ObjectAccessor::FindPlayer(guid);
@@ -2192,23 +2196,8 @@ uint32 ObjectMgr::GetPlayerTeamByGUID(ObjectGuid guid) const
 
 uint32 ObjectMgr::GetPlayerAccountIdByGUID(ObjectGuid guid) const
 {
-    // prevent DB access for online player
-    if (Player* player = ObjectAccessor::FindConnectedPlayer(guid))
-    {
-        return player->GetSession()->GetAccountId();
-    }
-
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_ACCOUNT_BY_GUID);
-
-    stmt->setUInt32(0, guid.GetCounter());
-
-    PreparedQueryResult result = CharacterDatabase.Query(stmt);
-
-    if (result)
-    {
-        uint32 acc = (*result)[0].GetUInt32();
-        return acc;
-    }
+    if (CharacterInfo const* characterInfo = sWorld->GetCharacterInfo(guid))
+        return characterInfo->AccountId;
 
     return 0;
 }
@@ -2530,7 +2519,7 @@ void ObjectMgr::LoadItemTemplates()
             if (!req)
                 for (uint8 j = 0; j < MAX_ITEM_PROTO_SPELLS; ++j)
                 {
-                    if (itemTemplate.Spells[j].SpellId)
+                    if (itemTemplate.Spells[j].SpellId > 0)
                     {
                         req = true;
                         break;
@@ -2714,15 +2703,6 @@ void ObjectMgr::LoadItemTemplates()
                     {
                         TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has broken spell in spellid_%d (%d)", entry, j+1, itemTemplate.Spells[j].SpellId);
                         itemTemplate.Spells[j].SpellId = 0;
-                    }
-
-                    if (spellInfo && itemTemplate.Spells[j].SpellCategory
-                        && itemTemplate.Spells[j].SpellCategory != SPELL_CATEGORY_FOOD)
-                    {
-                        bool added = sSpellsByCategoryStore[itemTemplate.Spells[j].SpellCategory].insert(itemTemplate.Spells[j].SpellId).second;
-                        if (added)
-                            TC_LOG_DEBUG("sql.sql", "Item(Entry: %u) spellid_%d (%d) category %u added to sSpellsByCategoryStore",
-                                          entry, j + 1, itemTemplate.Spells[j].SpellId, itemTemplate.Spells[j].SpellCategory);
                     }
                 }
             }
@@ -6542,6 +6522,8 @@ void ObjectMgr::LoadGameObjectLocales()
 
         GameObjectLocale& data = _gameObjectLocaleStore[id];
         LocaleConstant locale = GetLocaleByName(localeName);
+        if (locale == LOCALE_enUS)
+            continue;
 
         AddLocaleString(name, locale, data.Name);
         AddLocaleString(castBarCaption, locale, data.CastBarCaption);
@@ -7338,7 +7320,7 @@ void ObjectMgr::LoadNPCSpellClickSpells()
     TC_LOG_INFO("server.loading", ">> Loaded %u spellclick definitions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
-void ObjectMgr::DeleteCreatureData(uint32 guid)
+void ObjectMgr::DeleteCreatureData(ObjectGuid::LowType guid)
 {
     // remove mapid*cellid -> guid_set map
     CreatureData const* data = GetCreatureData(guid);
@@ -7348,7 +7330,7 @@ void ObjectMgr::DeleteCreatureData(uint32 guid)
     _creatureDataStore.erase(guid);
 }
 
-void ObjectMgr::DeleteGOData(uint32 guid)
+void ObjectMgr::DeleteGOData(ObjectGuid::LowType guid)
 {
     // remove mapid*cellid -> guid_set map
     GameObjectData const* data = GetGOData(guid);
@@ -7584,7 +7566,7 @@ bool isValidString(const std::wstring& wstr, uint32 strictMask, bool numericOrSp
     return false;
 }
 
-ResponseCodes ObjectMgr::CheckPlayerName(const std::string& name, bool create)
+ResponseCodes ObjectMgr::CheckPlayerName(std::string const& name, LocaleConstant locale, bool create /*= false*/)
 {
     std::wstring wname;
     if (!Utf8toWStr(name, wname))
@@ -7606,7 +7588,7 @@ ResponseCodes ObjectMgr::CheckPlayerName(const std::string& name, bool create)
         if (wname[i] == wname[i-1] && wname[i] == wname[i-2])
             return CHAR_NAME_THREE_CONSECUTIVE;
 
-    return CHAR_NAME_SUCCESS;
+    return ValidateName(name, locale);
 }
 
 bool ObjectMgr::IsValidCharterName(const std::string& name)
@@ -7627,7 +7609,7 @@ bool ObjectMgr::IsValidCharterName(const std::string& name)
     return isValidString(wname, strictMask, true);
 }
 
-PetNameInvalidReason ObjectMgr::CheckPetName(const std::string& name)
+PetNameInvalidReason ObjectMgr::CheckPetName(const std::string& name, LocaleConstant locale)
 {
     std::wstring wname;
     if (!Utf8toWStr(name, wname))
@@ -7644,6 +7626,17 @@ PetNameInvalidReason ObjectMgr::CheckPetName(const std::string& name)
     if (!isValidString(wname, strictMask, false))
         return PET_NAME_MIXED_LANGUAGES;
 
+    switch (ValidateName(name, locale))
+    {
+        case CHAR_NAME_PROFANE:
+            return PET_NAME_PROFANE;
+        case CHAR_NAME_RESERVED:
+            return PET_NAME_RESERVED;
+        case RESPONSE_FAILURE:
+            return PET_NAME_INVALID;
+        default:
+            break;
+    }
     return PET_NAME_SUCCESS;
 }
 

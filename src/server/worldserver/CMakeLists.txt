@@ -133,6 +133,7 @@ target_link_libraries(worldserver
   game
   plugins
   common
+  plugins
   shared
   database
   scripts
@@ -145,6 +146,8 @@ target_link_libraries(worldserver
   ${TERMCAP_LIBRARY}
   ${MYSQL_LIBRARY}
   ${OPENSSL_LIBRARIES}
+  ${MongoDB_LIBRARIES}
+  ${Rabbitmqc_LIBRARIES}
   ${ZLIB_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
   ${Boost_LIBRARIES}

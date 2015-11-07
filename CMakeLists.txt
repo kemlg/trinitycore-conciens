@@ -59,6 +59,8 @@ find_package(PCHSupport)
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 find_package(MySQL)
+find_package(MongoDB REQUIRED)
+find_package(Rabbitmqc REQUIRED)
 
 include(ConfigureBoost)
 

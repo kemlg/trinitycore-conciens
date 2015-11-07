@@ -599,6 +599,38 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
         sRandomPlayerbotMgr.UpdateAIInternal(0);
         return true;
     }
+    else if (cmd == "one")
+    {
+        std::list<uint32>::iterator it = sPlayerbotAIConfig.randomBotAccounts.begin();
+        std::advance(it, urand(0,sPlayerbotAIConfig.randomBotAccounts.size()));
+        uint32 account = *it;
+        if (QueryResult results = CharacterDatabase.PQuery("SELECT guid FROM characters where online = 0 AND account = '%u'", account))
+        {
+            Field* fields = results->Fetch();
+            TC_LOG_INFO("server.loading", "Creating bot: %d", fields[0].GetUInt32());
+            ObjectGuid guid = ObjectGuid(HighGuid::Player, fields[0].GetUInt32());
+            uint32 bot = fields[0].GetUInt32();
+            TC_LOG_INFO("server.loading", "Bot %d logging in", bot);
+            sRandomPlayerbotMgr.AddPlayerBot(bot, 0);
+            Player* player = sRandomPlayerbotMgr.GetPlayerBot(bot);
+            if (!player)
+            {
+                TC_LOG_INFO("server.loading", "Bot %d not logged in!", bot);
+                return false;
+            }
+            PlayerbotAI* ai = player->GetPlayerbotAI();
+            if (!ai)
+                return false;
+            
+            if (player->GetGroup())
+            {
+                TC_LOG_INFO("server.loading", "Skipping bot %d as it is in group", bot);
+                return false;
+            }
+            player->TeleportTo(1, 57, -2720, 92, 0);
+        }
+        return true;
+    }
     else if (cmd == "init" || cmd == "refresh" || cmd == "teleport")
     {
 		sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Randomizing bots for %d accounts", sPlayerbotAIConfig.randomBotAccounts.size());

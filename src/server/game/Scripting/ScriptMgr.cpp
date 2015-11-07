@@ -33,6 +33,7 @@
 #include "Player.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
+#include "Chat.h"
 
 // namespace
 // {
@@ -198,6 +199,9 @@ void ScriptMgr::Initialize()
 
     FillSpellSummary();
     AddScripts();
+
+    // cOncienS
+    eb = new EventBridge();
 
 #ifdef SCRIPTS
     for (std::string const& scriptName : UnusedScriptNames)
@@ -701,6 +705,7 @@ bool ScriptMgr::OnQuestAccept(Player* player, Item* item, Quest const* quest)
     ASSERT(item);
     ASSERT(quest);
 
+    eb->sendEvent(EVENT_TYPE_QUEST_ACCEPT, player, (Creature*)NULL, (uint32)NULL, item, quest);
     GET_SCRIPT_RET(ItemScript, item->GetScriptId(), tmpscript, false);
     player->PlayerTalkClass->ClearMenus();
     return tmpscript->OnQuestAccept(player, item, quest);
@@ -711,6 +716,7 @@ bool ScriptMgr::OnItemUse(Player* player, Item* item, SpellCastTargets const& ta
     ASSERT(player);
     ASSERT(item);
 
+    eb->sendEvent(EVENT_TYPE_ITEM_USE, player, NULL, 0, item, NULL, &targets);
     GET_SCRIPT_RET(ItemScript, item->GetScriptId(), tmpscript, false);
     return tmpscript->OnUse(player, item, targets);
 }
@@ -720,6 +726,7 @@ bool ScriptMgr::OnItemExpire(Player* player, ItemTemplate const* proto)
     ASSERT(player);
     ASSERT(proto);
 
+    eb->sendEvent(EVENT_TYPE_ITEM_EXPIRE, player, NULL, 0, NULL, NULL, NULL, proto);
     GET_SCRIPT_RET(ItemScript, proto->ScriptId, tmpscript, false);
     return tmpscript->OnExpire(player, proto);
 }
@@ -729,6 +736,7 @@ bool ScriptMgr::OnItemRemove(Player* player, Item* item)
     ASSERT(player);
     ASSERT(item);
 
+    eb->sendEvent(EVENT_TYPE_ITEM_REMOVE, player, NULL, 0, item);
     GET_SCRIPT_RET(ItemScript, item->GetScriptId(), tmpscript, false);
     return tmpscript->OnRemove(player, item);
 }
@@ -747,6 +755,7 @@ bool ScriptMgr::OnGossipHello(Player* player, Creature* creature)
     ASSERT(player);
     ASSERT(creature);
 
+    eb->sendEvent(EVENT_TYPE_GOSSIP_HELLO, player, creature);
     GET_SCRIPT_RET(CreatureScript, creature->GetScriptId(), tmpscript, false);
     player->PlayerTalkClass->ClearMenus();
     return tmpscript->OnGossipHello(player, creature);
@@ -757,6 +766,7 @@ bool ScriptMgr::OnGossipSelect(Player* player, Creature* creature, uint32 sender
     ASSERT(player);
     ASSERT(creature);
 
+    eb->sendEvent(EVENT_TYPE_GOSSIP_SELECT, player, creature, sender, NULL, NULL, NULL, NULL, action);
     GET_SCRIPT_RET(CreatureScript, creature->GetScriptId(), tmpscript, false);
     return tmpscript->OnGossipSelect(player, creature, sender, action);
 }
@@ -767,6 +777,7 @@ bool ScriptMgr::OnGossipSelectCode(Player* player, Creature* creature, uint32 se
     ASSERT(creature);
     ASSERT(code);
 
+    eb->sendEvent(EVENT_TYPE_GOSSIP_SELECT_CODE, player, creature, sender, NULL, NULL, NULL, NULL, action, code);
     GET_SCRIPT_RET(CreatureScript, creature->GetScriptId(), tmpscript, false);
     return tmpscript->OnGossipSelectCode(player, creature, sender, action, code);
 }
@@ -777,6 +788,7 @@ bool ScriptMgr::OnQuestAccept(Player* player, Creature* creature, Quest const* q
     ASSERT(creature);
     ASSERT(quest);
 
+    eb->sendEvent(EVENT_TYPE_QUEST_ACCEPT, player, creature, 0, NULL, quest);
     GET_SCRIPT_RET(CreatureScript, creature->GetScriptId(), tmpscript, false);
     player->PlayerTalkClass->ClearMenus();
     return tmpscript->OnQuestAccept(player, creature, quest);
@@ -788,6 +800,7 @@ bool ScriptMgr::OnQuestSelect(Player* player, Creature* creature, Quest const* q
     ASSERT(creature);
     ASSERT(quest);
 
+    eb->sendEvent(EVENT_TYPE_QUEST_SELECT, player, creature, 0, NULL, quest);
     GET_SCRIPT_RET(CreatureScript, creature->GetScriptId(), tmpscript, false);
     player->PlayerTalkClass->ClearMenus();
     return tmpscript->OnQuestSelect(player, creature, quest);
@@ -798,7 +811,8 @@ bool ScriptMgr::OnQuestReward(Player* player, Creature* creature, Quest const* q
     ASSERT(player);
     ASSERT(creature);
     ASSERT(quest);
-
+    
+    eb->sendEvent(EVENT_TYPE_QUEST_REWARD, player, creature, opt, NULL, quest);
     GET_SCRIPT_RET(CreatureScript, creature->GetScriptId(), tmpscript, false);
     player->PlayerTalkClass->ClearMenus();
     return tmpscript->OnQuestReward(player, creature, quest, opt);
@@ -809,6 +823,7 @@ uint32 ScriptMgr::GetDialogStatus(Player* player, Creature* creature)
     ASSERT(player);
     ASSERT(creature);
 
+    eb->sendEvent(EVENT_TYPE_GET_DIALOG_STATUS, player, creature);
     GET_SCRIPT_RET(CreatureScript, creature->GetScriptId(), tmpscript, DIALOG_STATUS_SCRIPTED_NO_STATUS);
     player->PlayerTalkClass->ClearMenus();
     return tmpscript->GetDialogStatus(player, creature);
@@ -834,6 +849,7 @@ void ScriptMgr::OnCreatureUpdate(Creature* creature, uint32 diff)
 {
     ASSERT(creature);
 
+    eb->sendEvent(EVENT_TYPE_CREATURE_UPDATE, NULL, creature, diff);
     GET_SCRIPT(CreatureScript, creature->GetScriptId(), tmpscript);
     tmpscript->OnUpdate(creature, diff);
 }
@@ -842,7 +858,8 @@ bool ScriptMgr::OnGossipHello(Player* player, GameObject* go)
 {
     ASSERT(player);
     ASSERT(go);
-
+    
+    eb->sendEvent(EVENT_TYPE_GOSSIP_HELLO_OBJECT, player, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, go);
     GET_SCRIPT_RET(GameObjectScript, go->GetScriptId(), tmpscript, false);
     player->PlayerTalkClass->ClearMenus();
     return tmpscript->OnGossipHello(player, go);
@@ -853,6 +870,7 @@ bool ScriptMgr::OnGossipSelect(Player* player, GameObject* go, uint32 sender, ui
     ASSERT(player);
     ASSERT(go);
 
+    eb->sendEvent(EVENT_TYPE_GOSSIP_SELECT_OBJECT, player, NULL, sender, NULL, NULL, NULL, NULL, action, NULL, go);
     GET_SCRIPT_RET(GameObjectScript, go->GetScriptId(), tmpscript, false);
     return tmpscript->OnGossipSelect(player, go, sender, action);
 }
@@ -862,7 +880,8 @@ bool ScriptMgr::OnGossipSelectCode(Player* player, GameObject* go, uint32 sender
     ASSERT(player);
     ASSERT(go);
     ASSERT(code);
-
+    
+    eb->sendEvent(EVENT_TYPE_GOSSIP_SELECT_CODE_OBJECT, player, NULL, sender, NULL, NULL, NULL, NULL, action, code, go);
     GET_SCRIPT_RET(GameObjectScript, go->GetScriptId(), tmpscript, false);
     return tmpscript->OnGossipSelectCode(player, go, sender, action, code);
 }
@@ -873,6 +892,7 @@ bool ScriptMgr::OnQuestAccept(Player* player, GameObject* go, Quest const* quest
     ASSERT(go);
     ASSERT(quest);
 
+    eb->sendEvent(EVENT_TYPE_QUEST_ACCEPT_OBJECT, player, NULL, 0, NULL, quest, NULL, NULL, 0, NULL, go);
     GET_SCRIPT_RET(GameObjectScript, go->GetScriptId(), tmpscript, false);
     player->PlayerTalkClass->ClearMenus();
     return tmpscript->OnQuestAccept(player, go, quest);
@@ -884,6 +904,7 @@ bool ScriptMgr::OnQuestReward(Player* player, GameObject* go, Quest const* quest
     ASSERT(go);
     ASSERT(quest);
 
+    eb->sendEvent(EVENT_TYPE_QUEST_REWARD_OBJECT, player, NULL, opt, NULL, quest, NULL, NULL, 0, NULL, go);
     GET_SCRIPT_RET(GameObjectScript, go->GetScriptId(), tmpscript, false);
     player->PlayerTalkClass->ClearMenus();
     return tmpscript->OnQuestReward(player, go, quest, opt);
@@ -894,6 +915,7 @@ uint32 ScriptMgr::GetDialogStatus(Player* player, GameObject* go)
     ASSERT(player);
     ASSERT(go);
 
+    eb->sendEvent(EVENT_TYPE_GET_DIALOG_STATUS_OBJECT, player, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, go);
     GET_SCRIPT_RET(GameObjectScript, go->GetScriptId(), tmpscript, DIALOG_STATUS_SCRIPTED_NO_STATUS);
     player->PlayerTalkClass->ClearMenus();
     return tmpscript->GetDialogStatus(player, go);
@@ -903,6 +925,7 @@ void ScriptMgr::OnGameObjectDestroyed(GameObject* go, Player* player)
 {
     ASSERT(go);
 
+    eb->sendEvent(EVENT_TYPE_GAME_OBJECT_DESTROYED, player, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, go);
     GET_SCRIPT(GameObjectScript, go->GetScriptId(), tmpscript);
     tmpscript->OnDestroyed(go, player);
 }
@@ -911,6 +934,7 @@ void ScriptMgr::OnGameObjectDamaged(GameObject* go, Player* player)
 {
     ASSERT(go);
 
+    eb->sendEvent(EVENT_TYPE_GAME_OBJECT_DAMAGED, player, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, go);
     GET_SCRIPT(GameObjectScript, go->GetScriptId(), tmpscript);
     tmpscript->OnDamaged(go, player);
 }
@@ -919,6 +943,7 @@ void ScriptMgr::OnGameObjectLootStateChanged(GameObject* go, uint32 state, Unit*
 {
     ASSERT(go);
 
+    eb->sendEvent(EVENT_TYPE_GAME_OBJECT_LOOT_STATE_CHANGED, NULL, NULL, state, NULL, NULL, NULL, NULL, 0, NULL, go, NULL, NULL, 0, 0, unit);
     GET_SCRIPT(GameObjectScript, go->GetScriptId(), tmpscript);
     tmpscript->OnLootStateChanged(go, state, unit);
 }
@@ -927,6 +952,7 @@ void ScriptMgr::OnGameObjectStateChanged(GameObject* go, uint32 state)
 {
     ASSERT(go);
 
+    eb->sendEvent(EVENT_TYPE_OBJECT_CHANGED, NULL, NULL, state, NULL, NULL, NULL, NULL, 0, NULL, go);
     GET_SCRIPT(GameObjectScript, go->GetScriptId(), tmpscript);
     tmpscript->OnGameObjectStateChanged(go, state);
 }
@@ -934,7 +960,8 @@ void ScriptMgr::OnGameObjectStateChanged(GameObject* go, uint32 state)
 void ScriptMgr::OnGameObjectUpdate(GameObject* go, uint32 diff)
 {
     ASSERT(go);
-
+    
+    eb->sendEvent(EVENT_TYPE_OBJECT_UPDATE, NULL, NULL, diff, NULL, NULL, NULL, NULL, 0, NULL, go);
     GET_SCRIPT(GameObjectScript, go->GetScriptId(), tmpscript);
     tmpscript->OnUpdate(go, diff);
 }
@@ -953,6 +980,7 @@ bool ScriptMgr::OnAreaTrigger(Player* player, AreaTriggerEntry const* trigger)
     ASSERT(player);
     ASSERT(trigger);
 
+    eb->sendEvent(EVENT_TYPE_AREA_TRIGGER,player,NULL,0,NULL,NULL,NULL,NULL,0,NULL,NULL,trigger);
     GET_SCRIPT_RET(AreaTriggerScript, sObjectMgr->GetAreaTriggerScriptId(trigger->id), tmpscript, false);
     return tmpscript->OnTrigger(player, trigger);
 }
@@ -972,12 +1000,15 @@ OutdoorPvP* ScriptMgr::CreateOutdoorPvP(OutdoorPvPData const* data)
     return tmpscript->GetOutdoorPvP();
 }
 
-std::vector<ChatCommand*> ScriptMgr::GetChatCommands()
+std::vector<ChatCommand> ScriptMgr::GetChatCommands()
 {
-    std::vector<ChatCommand*> table;
+    std::vector<ChatCommand> table;
 
     FOR_SCRIPTS_RET(CommandScript, itr, end, table)
-        table.push_back(itr->second->GetCommands());
+    {
+        std::vector<ChatCommand> cmds = itr->second->GetCommands();
+        table.insert(table.end(), cmds.begin(), cmds.end());
+    }
 
     return table;
 }
@@ -986,6 +1017,7 @@ void ScriptMgr::OnWeatherChange(Weather* weather, WeatherState state, float grad
 {
     ASSERT(weather);
 
+    eb->sendEvent(EVENT_TYPE_WEATHER_CHANGE, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, weather, state, grade);
     GET_SCRIPT(WeatherScript, weather->GetScriptId(), tmpscript);
     tmpscript->OnChange(weather, state, grade);
 }
@@ -993,7 +1025,8 @@ void ScriptMgr::OnWeatherChange(Weather* weather, WeatherState state, float grad
 void ScriptMgr::OnWeatherUpdate(Weather* weather, uint32 diff)
 {
     ASSERT(weather);
-
+    
+    eb->sendEvent(EVENT_TYPE_WEATHER_UPDATE, NULL, NULL, diff, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, weather);
     GET_SCRIPT(WeatherScript, weather->GetScriptId(), tmpscript);
     tmpscript->OnUpdate(weather, diff);
 }
@@ -1003,6 +1036,7 @@ void ScriptMgr::OnAuctionAdd(AuctionHouseObject* ah, AuctionEntry* entry)
     ASSERT(ah);
     ASSERT(entry);
 
+    eb->sendEvent(EVENT_TYPE_AUCTION_ADD, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, NULL, ah, entry);
     FOREACH_SCRIPT(AuctionHouseScript)->OnAuctionAdd(ah, entry);
 }
 
@@ -1011,6 +1045,7 @@ void ScriptMgr::OnAuctionRemove(AuctionHouseObject* ah, AuctionEntry* entry)
     ASSERT(ah);
     ASSERT(entry);
 
+    eb->sendEvent(EVENT_TYPE_AUCTION_REMOVE, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, NULL, ah, entry);
     FOREACH_SCRIPT(AuctionHouseScript)->OnAuctionRemove(ah, entry);
 }
 
@@ -1019,6 +1054,7 @@ void ScriptMgr::OnAuctionSuccessful(AuctionHouseObject* ah, AuctionEntry* entry)
     ASSERT(ah);
     ASSERT(entry);
 
+    eb->sendEvent(EVENT_TYPE_AUCTION_SUCCESSFUL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, NULL, ah, entry);
     FOREACH_SCRIPT(AuctionHouseScript)->OnAuctionSuccessful(ah, entry);
 }
 
@@ -1027,10 +1063,11 @@ void ScriptMgr::OnAuctionExpire(AuctionHouseObject* ah, AuctionEntry* entry)
     ASSERT(ah);
     ASSERT(entry);
 
+    eb->sendEvent(EVENT_TYPE_AUCTION_EXPIRE, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, NULL, ah, entry);
     FOREACH_SCRIPT(AuctionHouseScript)->OnAuctionExpire(ah, entry);
 }
 
-bool ScriptMgr::OnConditionCheck(Condition* condition, ConditionSourceInfo& sourceInfo)
+bool ScriptMgr::OnConditionCheck(Condition const* condition, ConditionSourceInfo& sourceInfo)
 {
     ASSERT(condition);
 
@@ -1166,21 +1203,25 @@ bool ScriptMgr::OnCriteriaCheck(uint32 scriptId, Player* source, Unit* target)
 // Player
 void ScriptMgr::OnPVPKill(Player* killer, Player* killed)
 {
+    eb->sendEvent(EVENT_TYPE_PVP_KILL, killer, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, killed);
     FOREACH_SCRIPT(PlayerScript)->OnPVPKill(killer, killed);
 }
 
 void ScriptMgr::OnCreatureKill(Player* killer, Creature* killed)
 {
+    eb->sendEvent(EVENT_TYPE_CREATURE_KILL, killer, killed);
     FOREACH_SCRIPT(PlayerScript)->OnCreatureKill(killer, killed);
 }
 
 void ScriptMgr::OnPlayerKilledByCreature(Creature* killer, Player* killed)
 {
+    eb->sendEvent(EVENT_TYPE_KILLED_BY_CREATURE, killed, killer);
     FOREACH_SCRIPT(PlayerScript)->OnPlayerKilledByCreature(killer, killed);
 }
 
 void ScriptMgr::OnPlayerLevelChanged(Player* player, uint8 oldLevel)
 {
+    eb->sendEvent(EVENT_TYPE_LEVEL_CHANGED, player, NULL, (uint32)oldLevel);
     FOREACH_SCRIPT(PlayerScript)->OnLevelChanged(player, oldLevel);
 }
 
@@ -1196,6 +1237,7 @@ void ScriptMgr::OnPlayerTalentsReset(Player* player, bool noCost)
 
 void ScriptMgr::OnPlayerMoneyChanged(Player* player, int32& amount)
 {
+    eb->sendEvent(EVENT_TYPE_MONEY_CHANGED,player,NULL,(uint32)amount);
     FOREACH_SCRIPT(PlayerScript)->OnMoneyChanged(player, amount);
 }
 
@@ -1231,61 +1273,77 @@ void ScriptMgr::OnPlayerDuelEnd(Player* winner, Player* loser, DuelCompleteType 
 
 void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::string& msg)
 {
+    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str());
     FOREACH_SCRIPT(PlayerScript)->OnChat(player, type, lang, msg);
 }
 
 void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::string& msg, Player* receiver)
 {
+    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str(), NULL, NULL, NULL, 0, 0, receiver);
     FOREACH_SCRIPT(PlayerScript)->OnChat(player, type, lang, msg, receiver);
 }
 
 void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::string& msg, Group* group)
 {
+    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str(), NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, group);
     FOREACH_SCRIPT(PlayerScript)->OnChat(player, type, lang, msg, group);
 }
 
 void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::string& msg, Guild* guild)
 {
+    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str(), NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, guild);
     FOREACH_SCRIPT(PlayerScript)->OnChat(player, type, lang, msg, guild);
 }
 
 void ScriptMgr::OnPlayerChat(Player* player, uint32 type, uint32 lang, std::string& msg, Channel* channel)
 {
+    eb->sendEvent(EVENT_TYPE_PLAYER_CHAT, player, NULL, type, NULL, NULL, NULL, NULL, lang, msg.c_str(), NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, channel);
     FOREACH_SCRIPT(PlayerScript)->OnChat(player, type, lang, msg, channel);
 }
 
 void ScriptMgr::OnPlayerEmote(Player* player, uint32 emote)
 {
+    eb->sendEvent(EVENT_TYPE_EMOTE, player, NULL, emote);
     FOREACH_SCRIPT(PlayerScript)->OnEmote(player, emote);
 }
 
 void ScriptMgr::OnPlayerTextEmote(Player* player, uint32 textEmote, uint32 emoteNum, ObjectGuid guid)
 {
+    eb->sendEvent(EVENT_TYPE_EMOTE, player, NULL, emoteNum); // TODO: complete fields
     FOREACH_SCRIPT(PlayerScript)->OnTextEmote(player, textEmote, emoteNum, guid);
 }
 
 void ScriptMgr::OnPlayerSpellCast(Player* player, Spell* spell, bool skipCheck)
 {
-    FOREACH_SCRIPT(PlayerScript)->OnSpellCast(player, spell, skipCheck);
+   eb->sendEvent(EVENT_TYPE_PLAYER_SPELL_CAST, player, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, spell);
+   FOREACH_SCRIPT(PlayerScript)->OnSpellCast(player, spell, skipCheck);
 }
 
 void ScriptMgr::OnPlayerLogin(Player* player, bool firstLogin)
 {
+    eb->sendEvent(EVENT_TYPE_PLAYER_LOGIN, player); // TODO: complete fields
     FOREACH_SCRIPT(PlayerScript)->OnLogin(player, firstLogin);
 }
 
 void ScriptMgr::OnPlayerLogout(Player* player)
 {
+    eb->sendEvent(EVENT_TYPE_PLAYER_LOGOUT, player);
     FOREACH_SCRIPT(PlayerScript)->OnLogout(player);
 }
 
 void ScriptMgr::OnPlayerCreate(Player* player)
 {
+    eb->sendEvent(EVENT_TYPE_PLAYER_CREATE, player);
     FOREACH_SCRIPT(PlayerScript)->OnCreate(player);
 }
 
 void ScriptMgr::OnPlayerDelete(ObjectGuid guid, uint32 accountId)
 {
+    std::ostringstream sin;
+    sin << guid;
+    std::string intAsString(sin.str());
+    // TODO: complete fields
+    eb->sendEvent(EVENT_TYPE_PLAYER_DELETE, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, intAsString.c_str());
     FOREACH_SCRIPT(PlayerScript)->OnDelete(guid, accountId);
 }
 
@@ -1296,6 +1354,7 @@ void ScriptMgr::OnPlayerFailedDelete(ObjectGuid guid, uint32 accountId)
 
 void ScriptMgr::OnPlayerSave(Player* player)
 {
+    eb->sendEvent(EVENT_TYPE_PLAYER_SAVE, player);
     FOREACH_SCRIPT(PlayerScript)->OnSave(player);
 }
 
@@ -1306,11 +1365,19 @@ void ScriptMgr::OnPlayerBindToInstance(Player* player, Difficulty difficulty, ui
 
 void ScriptMgr::OnPlayerUpdateZone(Player* player, uint32 newZone, uint32 newArea)
 {
+    eb->sendEvent(EVENT_TYPE_PLAYER_UPDATE_ZONE, player, NULL, newZone, NULL, NULL, NULL, NULL, newArea);
     FOREACH_SCRIPT(PlayerScript)->OnUpdateZone(player, newZone, newArea);
+}
+
+// cOncienS
+void ScriptMgr::OnPlayerUpdatePosition(Player* player)
+{
+    eb->sendEvent(EVENT_TYPE_PLAYER_UPDATE, player);
 }
 
 void ScriptMgr::OnQuestStatusChange(Player* player, uint32 questId, QuestStatus status)
 {
+    eb->sendEvent(EVENT_TYPE_QUEST_STATUS_CHANGE, player, NULL, questId, NULL, NULL, NULL, NULL, status);
     FOREACH_SCRIPT(PlayerScript)->OnQuestStatusChange(player, questId, status);
 }
 
@@ -1392,12 +1459,12 @@ void ScriptMgr::OnGuildItemMove(Guild* guild, Player* player, Item* pItem, bool 
     FOREACH_SCRIPT(GuildScript)->OnItemMove(guild, player, pItem, isSrcBank, srcContainer, srcSlotId, isDestBank, destContainer, destSlotId);
 }
 
-void ScriptMgr::OnGuildEvent(Guild* guild, uint8 eventType, uint32 playerGuid1, uint32 playerGuid2, uint8 newRank)
+void ScriptMgr::OnGuildEvent(Guild* guild, uint8 eventType, ObjectGuid::LowType playerGuid1, ObjectGuid::LowType playerGuid2, uint8 newRank)
 {
     FOREACH_SCRIPT(GuildScript)->OnEvent(guild, eventType, playerGuid1, playerGuid2, newRank);
 }
 
-void ScriptMgr::OnGuildBankEvent(Guild* guild, uint8 eventType, uint8 tabId, uint32 playerGuid, uint32 itemOrMoney, uint16 itemStackCount, uint8 destTabId)
+void ScriptMgr::OnGuildBankEvent(Guild* guild, uint8 eventType, uint8 tabId, ObjectGuid::LowType playerGuid, uint32 itemOrMoney, uint16 itemStackCount, uint8 destTabId)
 {
     FOREACH_SCRIPT(GuildScript)->OnBankEvent(guild, eventType, tabId, playerGuid, itemOrMoney, itemStackCount, destTabId);
 }
@@ -1436,11 +1503,13 @@ void ScriptMgr::OnGroupDisband(Group* group)
 // Unit
 void ScriptMgr::OnHeal(Unit* healer, Unit* reciever, uint32& gain)
 {
+    eb->sendEvent(EVENT_TYPE_HEAL, NULL, NULL, 0, NULL, NULL, NULL, NULL, gain, NULL, NULL, NULL, NULL, 0, 0.0, healer, NULL, NULL, NULL, NULL, NULL, NULL, reciever);
     FOREACH_SCRIPT(UnitScript)->OnHeal(healer, reciever, gain);
 }
 
 void ScriptMgr::OnDamage(Unit* attacker, Unit* victim, uint32& damage)
 {
+    eb->sendEvent(EVENT_TYPE_DAMAGE, NULL, NULL, 0, NULL, NULL, NULL, NULL, damage, NULL, NULL, NULL, NULL, 0, 0.0, attacker, NULL, NULL, NULL, NULL, NULL, NULL, victim);
     FOREACH_SCRIPT(UnitScript)->OnDamage(attacker, victim, damage);
 }
 

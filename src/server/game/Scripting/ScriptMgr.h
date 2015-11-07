@@ -27,6 +27,9 @@
 #include "World.h"
 #include "Weather.h"
 
+// cOncienS
+#include "EventBridge.h"
+
 class AccountMgr;
 class AuctionHouseObject;
 class AuraScript;
@@ -60,12 +63,12 @@ class WorldPacket;
 class WorldSocket;
 class WorldObject;
 class WorldSession;
+class AuctionEntry;
+class ItemTemplate;
 
 struct AchievementCriteriaData;
-struct AuctionEntry;
 struct ConditionSourceInfo;
 struct Condition;
-struct ItemTemplate;
 struct OutdoorPvPData;
 
 #define VISIBLE_RANGE       166.0f                          //MAX visible range (size of grid)
@@ -554,7 +557,7 @@ class CommandScript : public ScriptObject
     public:
 
         // Should return a pointer to a valid command table (ChatCommand array) to be used by ChatHandler.
-        virtual ChatCommand* GetCommands() const = 0;
+        virtual std::vector<ChatCommand> GetCommands() const = 0;
 };
 
 class WeatherScript : public ScriptObject, public UpdatableScript<Weather>
@@ -603,7 +606,7 @@ class ConditionScript : public ScriptObject
         bool IsDatabaseBound() const final override { return true; }
 
         // Called when a single condition is checked for a player.
-        virtual bool OnConditionCheck(Condition* /*condition*/, ConditionSourceInfo& /*sourceInfo*/) { return true; }
+        virtual bool OnConditionCheck(Condition const* /*condition*/, ConditionSourceInfo& /*sourceInfo*/) { return true; }
 };
 
 class VehicleScript : public ScriptObject
@@ -839,9 +842,9 @@ class GuildScript : public ScriptObject
         virtual void OnItemMove(Guild* /*guild*/, Player* /*player*/, Item* /*pItem*/, bool /*isSrcBank*/, uint8 /*srcContainer*/, uint8 /*srcSlotId*/,
             bool /*isDestBank*/, uint8 /*destContainer*/, uint8 /*destSlotId*/) { }
 
-        virtual void OnEvent(Guild* /*guild*/, uint8 /*eventType*/, uint32 /*playerGuid1*/, uint32 /*playerGuid2*/, uint8 /*newRank*/) { }
+        virtual void OnEvent(Guild* /*guild*/, uint8 /*eventType*/, ObjectGuid::LowType /*playerGuid1*/, ObjectGuid::LowType /*playerGuid2*/, uint8 /*newRank*/) { }
 
-        virtual void OnBankEvent(Guild* /*guild*/, uint8 /*eventType*/, uint8 /*tabId*/, uint32 /*playerGuid*/, uint32 /*itemOrMoney*/, uint16 /*itemStackCount*/, uint8 /*destTabId*/) { }
+        virtual void OnBankEvent(Guild* /*guild*/, uint8 /*eventType*/, uint8 /*tabId*/, ObjectGuid::LowType /*playerGuid*/, uint32 /*itemOrMoney*/, uint16 /*itemStackCount*/, uint8 /*destTabId*/) { }
 };
 
 class GroupScript : public ScriptObject
@@ -1014,7 +1017,7 @@ class ScriptMgr
 
     public: /* CommandScript */
 
-        std::vector<ChatCommand*> GetChatCommands();
+        std::vector<ChatCommand> GetChatCommands();
 
     public: /* WeatherScript */
 
@@ -1030,7 +1033,7 @@ class ScriptMgr
 
     public: /* ConditionScript */
 
-        bool OnConditionCheck(Condition* condition, ConditionSourceInfo& sourceInfo);
+        bool OnConditionCheck(Condition const* condition, ConditionSourceInfo& sourceInfo);
 
     public: /* VehicleScript */
 
@@ -1088,6 +1091,7 @@ class ScriptMgr
         void OnPlayerSave(Player* player);
         void OnPlayerBindToInstance(Player* player, Difficulty difficulty, uint32 mapid, bool permanent);
         void OnPlayerUpdateZone(Player* player, uint32 newZone, uint32 newArea);
+        void OnPlayerUpdatePosition(Player* player);
         void OnQuestStatusChange(Player* player, uint32 questId, QuestStatus status);
 
     public: /* AccountScript */
@@ -1111,8 +1115,8 @@ class ScriptMgr
         void OnGuildMemberDepositMoney(Guild* guild, Player* player, uint32 &amount);
         void OnGuildItemMove(Guild* guild, Player* player, Item* pItem, bool isSrcBank, uint8 srcContainer, uint8 srcSlotId,
             bool isDestBank, uint8 destContainer, uint8 destSlotId);
-        void OnGuildEvent(Guild* guild, uint8 eventType, uint32 playerGuid1, uint32 playerGuid2, uint8 newRank);
-        void OnGuildBankEvent(Guild* guild, uint8 eventType, uint8 tabId, uint32 playerGuid, uint32 itemOrMoney, uint16 itemStackCount, uint8 destTabId);
+        void OnGuildEvent(Guild* guild, uint8 eventType, ObjectGuid::LowType playerGuid1, ObjectGuid::LowType playerGuid2, uint8 newRank);
+        void OnGuildBankEvent(Guild* guild, uint8 eventType, uint8 tabId, ObjectGuid::LowType playerGuid, uint32 itemOrMoney, uint16 itemStackCount, uint8 destTabId);
 
     public: /* GroupScript */
 
@@ -1138,6 +1142,9 @@ class ScriptMgr
         bool IsScriptScheduled() const { return _scheduledScripts > 0; }
 
     private:
+
+        // cOncienS
+        EventBridge*	eb;
 
         uint32 _scriptCount;
 
