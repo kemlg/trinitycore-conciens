@@ -2,15 +2,15 @@
 #include "playerbot.h"
 #include "PlayerbotAIConfig.h"
 #include "PlayerbotFactory.h"
-#include "../../shared/Database/DatabaseEnv.h"
+#include "DatabaseEnv.h"
 #include "PlayerbotAI.h"
 #include "../Entities/Player/Player.h"
 #include "RandomPlayerbotFactory.h"
-#include "SystemConfig.h"
+#include "Config.h"
 
 map<uint8, vector<uint8> > RandomPlayerbotFactory::availableRaces;
 
-RandomPlayerbotFactory::RandomPlayerbotFactory(uint32 accountId) : accountId(accountId)
+RandomPlayerbotFactory::RandomPlayerbotFactory(uint32 accountId, string accountName) : accountId(accountId), accountName(accountName)
 {
     availableRaces[CLASS_WARRIOR].push_back(RACE_HUMAN);
     availableRaces[CLASS_WARRIOR].push_back(RACE_NIGHTELF);
@@ -91,7 +91,7 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls)
     uint8 facialHair = urand(0, 7);
     uint8 outfitId = 0;
 
-    WorldSession* session = new WorldSession(accountId, NULL, SEC_PLAYER, 2, 0, LOCALE_enUS, 0, false);
+    WorldSession* session = new WorldSession(accountId, std::move(accountName), NULL, SEC_PLAYER, 2, 0, LOCALE_enUS, 0, false);
     if (!session)
     {
         TC_LOG_INFO("server.loading", "Couldn't create session for random bot account %d", accountId);
@@ -113,7 +113,8 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls)
     cci.FacialHair = facialHair;
     cci.OutfitId = outfitId;
     
-    if (!player->Create(sObjectMgr->GenerateLowGuid(HIGHGUID_PLAYER), &cci))
+    
+    if (!player->Create(sObjectMgr->GetGenerator<HighGuid::Player>().Generate(), &cci))
     {
         player->DeleteFromDB(player->GetGUID(), accountId, true, true);
         delete session;

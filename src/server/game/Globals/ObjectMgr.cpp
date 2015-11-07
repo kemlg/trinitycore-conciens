@@ -2199,8 +2199,6 @@ uint32 ObjectMgr::GetPlayerAccountIdByGUID(ObjectGuid guid) const
     if (CharacterInfo const* characterInfo = sWorld->GetCharacterInfo(guid))
         return characterInfo->AccountId;
 
-
-
     return 0;
 }
 

@@ -17,7 +17,7 @@ sudo scons --prefix=/opt/local --extrapath=/opt/local/ --use-system-boost --full
 cd -
 mkdir build
 cd build/
-cmake ../ -GXcode -DPREFIX=`pwd`/install -DWARNINGS=0 -DTOOLS=1 -DSCRIPTS=1 -DSERVERS=1 -Wno-dev -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+cmake ../ -GXcode -DPREFIX=`pwd`/install -DWARNINGS=0 -DTOOLS=1 -DSCRIPTS=1 -DSERVERS=1 -Wno-dev -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX=`pwd`/install
 sudo port install mysql56-server
 sudo /opt/local/lib/mysql56/bin/mysql_install_db --user=mysql
 sudo /opt/local/share/mysql56/support-files/mysql.server start

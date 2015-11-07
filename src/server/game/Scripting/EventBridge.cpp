@@ -217,7 +217,7 @@ static bool updateCreature(uint64 guid)
         WorldSession* ws = itr->second;
         if(ws->GetPlayer())
         {
-            Creature *obj = sObjectAccessor->GetCreatureOrPetOrVehicle(*ws->GetPlayer(), ObjectGuid(guid));
+            Creature *obj = ObjectAccessor::GetCreatureOrPetOrVehicle(*ws->GetPlayer(), ObjectGuid(guid));
             int phaseMask = obj->GetPhaseMask();
             int tmpPhaseMask = phaseMask == 2 ? 3 : 2;
             obj->SendUpdateToPlayer(ws->GetPlayer());
@@ -253,7 +253,7 @@ static bool createGameObject(int objectId, int mapId, double x, double y, double
     Map* map = sMapMgr->FindMap(mapId, 0);
 
     GameObject* object = new GameObject;
-    uint32 guidLow = sObjectMgr->GenerateLowGuid(HIGHGUID_GAMEOBJECT);
+    uint32 guidLow = map->GenerateLowGuid<HighGuid::GameObject>();
 
     if (!object->Create(guidLow, objectInfo->entry, map, uint32(PHASEMASK_ANYWHERE), x, y, z, o, 0.0f, 0.0f, 0.0f, 0.0f, 0, GO_STATE_READY))
     {
@@ -343,7 +343,7 @@ void* processActions(void *)
 
         std::string actionId = action["action-id"].String();
         TC_LOG_INFO("server.loading", "Action arrived: %s", actionId.c_str());
-        const ObjectGuid guid(HIGHGUID_UNIT, (uint32)295, (uint32)80346);
+        const ObjectGuid guid(HighGuid::Unit, (uint32)295, (uint32)80346);
 
         if(actionId.compare("create") == 0)
         {

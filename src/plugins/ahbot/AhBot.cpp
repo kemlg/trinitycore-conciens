@@ -533,12 +533,12 @@ int AhBot::AddAuction(int auction, Category* category, ItemTemplate const* proto
 
     AuctionEntry* auctionEntry = new AuctionEntry;
     auctionEntry->Id = sObjectMgr->GenerateAuctionID();
-    auctionEntry->itemGUIDLow = item->GetGUIDLow();
+    auctionEntry->itemGUIDLow = item->GetGUID().GetCounter();
     auctionEntry->itemEntry = item->GetEntry();
     auctionEntry->owner = owner;
     auctionEntry->startbid = bidPrice;
     auctionEntry->buyout = buyoutPrice;
-    auctionEntry->auctioneer = auctioneers[auction];
+    auctionEntry->houseId = auctioneers[auction];
     auctionEntry->bidder = 0;
     auctionEntry->bid = 0;
     auctionEntry->deposit = 0;

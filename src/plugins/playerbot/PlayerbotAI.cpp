@@ -649,7 +649,7 @@ Unit* PlayerbotAI::GetUnit(ObjectGuid guid)
     if (!map)
         return NULL;
 
-    return ObjectAccessor::GetObjectInMap(guid, map, (Unit*)NULL);
+    return (Unit*) (map->GetGameObject(guid));
 }
 
 

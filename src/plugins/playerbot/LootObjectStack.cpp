@@ -84,9 +84,12 @@ void LootObject::Refresh(Player* bot, ObjectGuid guid)
         if (!lockInfo)
             return;
 
+        GameObjectQuestItemList const* items =
+            sObjectMgr->GetGameObjectQuestItemList(go->GetGOInfo()->entry);
+        
         for(uint32 i = 0; i < 6; ++i)
         {
-            if (go->GetGOInfo()->questItems[i])
+            if ((*items)[i])
             {
                 this->guid = guid;
                 return;

@@ -165,7 +165,7 @@ void PlayerbotFactory::InitPet()
             if (!petInfo)
                 continue;
 
-            uint32 guid = sObjectMgr->GenerateLowGuid(HIGHGUID_PET);
+            uint32 guid = map->GenerateLowGuid<HighGuid::Pet>();
             pet = new Pet(bot, HUNTER_PET);
             if (!pet->Create(guid, map, 0, ids[index], 0))
             {
@@ -1148,7 +1148,7 @@ ObjectGuid PlayerbotFactory::GetRandomBot()
         do
         {
             Field* fields = result->Fetch();
-            ObjectGuid guid = ObjectGuid(HIGHGUID_PLAYER, fields[0].GetUInt32());
+            ObjectGuid guid = ObjectGuid::Create<HighGuid::Player>(fields[0].GetUInt32());
             if (!sObjectMgr->GetPlayerByLowGUID(guid))
                 guids.push_back(guid);
         } while (result->NextRow());
@@ -1163,8 +1163,7 @@ ObjectGuid PlayerbotFactory::GetRandomBot()
 
 void PlayerbotFactory::InitQuests()
 {
-    QueryResult results = WorldDatabase.PQuery("SELECT Id, RequiredClasses, RequiredRaces FROM quest_template where Level = -1 and MinLevel <= '%u'",
-            bot->getLevel());
+    QueryResult results = WorldDatabase.PQuery("SELECT qt.ID, qta.AllowableClasses, qt.AllowableRaces FROM quest_template qt, quest_template_addon qta where qt.ID = qta.ID and qt.QuestLevel = -1 and qt.MinLevel <= '%u'", bot->getLevel());
 
     list<uint32> ids;
     do

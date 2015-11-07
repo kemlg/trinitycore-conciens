@@ -15,7 +15,7 @@ using namespace std;
 class RandomPlayerbotFactory
 {
     public:
-        RandomPlayerbotFactory(uint32 accountId);
+        RandomPlayerbotFactory(uint32 accountId, string accountName);
 		virtual ~RandomPlayerbotFactory() {}
 
 	public:
@@ -26,6 +26,7 @@ class RandomPlayerbotFactory
 
     private:
         uint32 accountId;
+        string accountName;
         static map<uint8, vector<uint8> > availableRaces;
 };
 

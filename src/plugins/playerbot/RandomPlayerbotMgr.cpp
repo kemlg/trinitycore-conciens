@@ -2,7 +2,7 @@
 #include "playerbot.h"
 #include "PlayerbotAIConfig.h"
 #include "PlayerbotFactory.h"
-#include "../../shared/Database/DatabaseEnv.h"
+#include "DatabaseEnv.h"
 #include "PlayerbotAI.h"
 #include "AiFactory.h"
 #include "../../game/Maps/MapManager.h"
@@ -575,7 +575,7 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
         {
             Field* fields = results->Fetch();
             TC_LOG_INFO("server.loading", "Creating bot: %d", fields[0].GetUInt32());
-            ObjectGuid guid = ObjectGuid(HIGHGUID_PLAYER, fields[0].GetUInt32());
+            ObjectGuid guid = ObjectGuid(HighGuid::Player, fields[0].GetUInt32());
             uint32 bot = fields[0].GetUInt32();
             TC_LOG_INFO("server.loading", "Bot %d logging in", bot);
             sRandomPlayerbotMgr.AddPlayerBot(bot, 0);
@@ -609,7 +609,7 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
                 do
                 {
                     Field* fields = results->Fetch();
-                    ObjectGuid guid = ObjectGuid(HIGHGUID_PLAYER, fields[0].GetUInt32());
+                    ObjectGuid guid = ObjectGuid(HighGuid::Player, fields[0].GetUInt32());
                     Player* bot = sObjectMgr->GetPlayerByLowGUID(guid);
                     if (!bot)
                         continue;
@@ -632,9 +632,9 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
                     }
                     uint32 randomTime = urand(sPlayerbotAIConfig.minRandomBotRandomizeTime, sPlayerbotAIConfig.maxRandomBotRandomizeTime);
                     CharacterDatabase.PExecute("update ai_playerbot_random_bots set validIn = '%u' where event = 'randomize' and bot = '%u'",
-                            randomTime, bot->GetGUIDLow());
+                            randomTime, bot->GetGUID().GetCounter());
                     CharacterDatabase.PExecute("update ai_playerbot_random_bots set validIn = '%u' where event = 'logout' and bot = '%u'",
-                            sPlayerbotAIConfig.maxRandomBotInWorldTime, bot->GetGUIDLow());
+                            sPlayerbotAIConfig.maxRandomBotInWorldTime, bot->GetGUID().GetCounter());
                 } while (results->NextRow());
             }
         }

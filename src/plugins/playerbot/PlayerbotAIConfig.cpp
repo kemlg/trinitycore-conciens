@@ -3,7 +3,7 @@
 #include "playerbot.h"
 #include "RandomPlayerbotFactory.h"
 #include "../../game/Accounts/AccountMgr.h"
-#include "../../shared/SystemConfig.h"
+#include "Config.h"
 
 using namespace std;
 
@@ -274,7 +274,7 @@ void PlayerbotAIConfig::CreateRandomBots()
             continue;
         }
 
-        RandomPlayerbotFactory factory(accountId);
+        RandomPlayerbotFactory factory(accountId, accountName);
         for (uint8 cls = CLASS_WARRIOR; cls < MAX_CLASSES; ++cls)
         {
             if (cls != 10 && cls != CLASS_DEATH_KNIGHT)
