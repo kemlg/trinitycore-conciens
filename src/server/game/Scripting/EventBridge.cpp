@@ -122,7 +122,7 @@ const char* idToEventType[] = {"EVENT_TYPE_EMOTE", "EVENT_TYPE_ITEM_USE", "EVENT
 };
 
 amqp_connection_state_t connEvents  = amqp_new_connection();
-amqp_connection_state_t   connActions = amqp_new_connection();
+amqp_connection_state_t connActions = amqp_new_connection();
 amqp_basic_properties_t propsExpiration, propsNormal;
 Queue<std::pair<mongo::BSONObj, amqp_basic_properties_t *>> q;
 

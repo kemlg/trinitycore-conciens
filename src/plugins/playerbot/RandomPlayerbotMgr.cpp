@@ -91,7 +91,7 @@ uint32 RandomPlayerbotMgr::AddRandomBot(bool alliance)
     SetEventValue(bot, "add", 1, urand(sPlayerbotAIConfig.minRandomBotInWorldTime, sPlayerbotAIConfig.maxRandomBotInWorldTime));
     uint32 randomTime = 30 + urand(sPlayerbotAIConfig.randomBotUpdateInterval, sPlayerbotAIConfig.randomBotUpdateInterval * 3);
     ScheduleRandomize(bot, randomTime);
-    sLog->outMessage("playerbot", LOG_LEVEL_DEBUG, "Random bot %d added", bot);
+    sLog->outMessage("playerbot", LOG_LEVEL_DEBUG, "Random bot %d added, time to randomize: %d", bot,randomTime);
     return bot;
 }
 
@@ -607,15 +607,15 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
         if (QueryResult results = CharacterDatabase.PQuery("SELECT guid FROM characters where online = 0 AND account = '%u'", account))
         {
             Field* fields = results->Fetch();
-            TC_LOG_INFO("server.loading", "Creating bot: %d", fields[0].GetUInt32());
-            ObjectGuid guid = ObjectGuid(HighGuid::Player, fields[0].GetUInt32());
-            uint32 bot = fields[0].GetUInt32();
-            TC_LOG_INFO("server.loading", "Bot %d logging in", bot);
-            sRandomPlayerbotMgr.AddPlayerBot(bot, 0);
-            Player* player = sRandomPlayerbotMgr.GetPlayerBot(bot);
+            uint32 botId = fields[0].GetUInt32();
+            TC_LOG_INFO("playerbot", "Creating bot: %d", botId);
+            ObjectGuid guid = ObjectGuid(HighGuid::Player, botId);
+            TC_LOG_INFO("playerbot", "Bot %d logging in", botId);
+            sRandomPlayerbotMgr.AddPlayerBot(guid, 0);
+            Player* player = sRandomPlayerbotMgr.GetPlayerBot(guid);
             if (!player)
             {
-                TC_LOG_INFO("server.loading", "Bot %d not logged in!", bot);
+                TC_LOG_INFO("playerbot", "Bot %d not logged in!", botId);
                 return false;
             }
             PlayerbotAI* ai = player->GetPlayerbotAI();
@@ -624,7 +624,7 @@ bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* handler, cha
             
             if (player->GetGroup())
             {
-                TC_LOG_INFO("server.loading", "Skipping bot %d as it is in group", bot);
+                TC_LOG_INFO("playerbot", "Skipping bot %d as it is in group", botId);
                 return false;
             }
             player->TeleportTo(1, 57, -2720, 92, 0);

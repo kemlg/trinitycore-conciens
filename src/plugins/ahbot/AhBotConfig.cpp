@@ -1,5 +1,6 @@
 #include "../pchdef.h"
 #include "AhBotConfig.h"
+#include "World.h"
 std::vector<std::string> split(const std::string &s, char delim);
 
 using namespace std;
@@ -25,7 +26,10 @@ void LoadSet(string value, T &res)
 bool AhBotConfig::Initialize()
 {
     string error;
-    if (!config.LoadInitial("ahbot.conf", error))
+    string worldserverconf = sConfigMgr->GetFilename();
+    string aiplayerconf = worldserverconf.substr(0, worldserverconf.find_last_of("/")) + "/ahbot.conf";
+
+    if (!config.LoadInitial(aiplayerconf, error))
     {
         sLog->outMessage("ahbot", LOG_LEVEL_INFO, "AhBot is Disabled. Unable to open configuration file ahbot.conf");
         return false;

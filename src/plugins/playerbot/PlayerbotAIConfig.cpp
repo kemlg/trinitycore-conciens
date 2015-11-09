@@ -29,8 +29,11 @@ bool PlayerbotAIConfig::Initialize()
     sLog->outMessage("playerbot", LOG_LEVEL_INFO, "Initializing AI Playerbot by ike3, based on the original Playerbot by blueboy");
 
     string error;
-    if (!config.LoadInitial("aiplayerbot.conf", error))
+    string worldserverconf = sConfigMgr->GetFilename();
+    string aiplayerconf = worldserverconf.substr(0, worldserverconf.find_last_of("/")) + "/aiplayerbot.conf";
+    if (!config.LoadInitial(aiplayerconf, error))
     {
+        sLog->outMessage("playerbot", LOG_LEVEL_INFO, "%s", aiplayerconf);
         sLog->outMessage("playerbot", LOG_LEVEL_INFO, "AI Playerbot is Disabled. Unable to open configuration file aiplayerbot.conf");
         return false;
     }
