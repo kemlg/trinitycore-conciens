@@ -11,7 +11,7 @@ uint32 Category::GetStackCount(ItemTemplate const* proto)
     if (proto->Quality > ITEM_QUALITY_UNCOMMON)
         return 1;
 
-    return urand(1, proto->GetMaxStackSize());
+    return 1 + rand() % proto->GetMaxStackSize();
 }
 
 uint32 Category::GetMaxAllowedItemAuctionCount(ItemTemplate const* proto)

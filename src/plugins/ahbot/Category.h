@@ -55,9 +55,9 @@ namespace ahbot
                 return 1;
 
             if (maxStackSize <= 10)
-                return urand(1, 10);
+                return 1 + (rand() % 10);
 
-            return urand(1, 4) * maxStackSize / 5;
+            return (1 + (rand() % 4)) * maxStackSize / 5;
         }
     };
 
@@ -85,10 +85,10 @@ namespace ahbot
 
             uint32 maxStackSize = proto->GetMaxStackSize();
             if (proto->Quality == ITEM_QUALITY_UNCOMMON && maxStackSize > 10)
-                maxStackSize = urand(1, 10);
+                maxStackSize = 1 + rand() % 10;
 
             if (maxStackSize > 20)
-                maxStackSize = urand(1, 20);
+                maxStackSize = 1 + rand() % 20;
 
             return maxStackSize;
         }
@@ -122,7 +122,7 @@ namespace ahbot
             case ITEM_QUALITY_NORMAL:
                 return maxStack;
             case ITEM_QUALITY_UNCOMMON:
-                return urand(1, maxStack);
+                return 1 + rand() % maxStack;
             }
 
             return 1;

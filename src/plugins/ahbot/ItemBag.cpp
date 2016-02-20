@@ -1,6 +1,7 @@
 #include "../pchdef.h"
 #include "Category.h"
 #include "ItemBag.h"
+#include "ObjectMgr.h"
 #include "ConsumableCategory.h"
 #include "TradeCategory.h"
 #include "AhBotConfig.h"

@@ -28,8 +28,8 @@ namespace ahbot
         uint32 count = items.size();
         for (uint32 i = 0; i < count * 5; i++)
         {
-            int i1 = urand(0, count - 1);
-            int i2 = urand(0, count - 1);
+            int i1 = rand() % count;
+            int i2 = rand() % count;
 
             T item = items[i1];
             items[i1] = items[i2];

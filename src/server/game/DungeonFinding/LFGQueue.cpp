@@ -16,6 +16,7 @@
  */
 
 #include "ObjectDefines.h"
+#include "ObjectMgr.h"
 #include "Containers.h"
 #include "DBCStructure.h"
 #include "DBCStores.h"

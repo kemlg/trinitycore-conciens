@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SharedDefines.h"
+#include "Common.h"
 #include "Config.h"
 
 using namespace std;

@@ -2,6 +2,7 @@
 #define _PLAYERBOTMGR_H
 
 #include "Common.h"
+#include "ObjectGuid.h"
 #include "PlayerbotAIBase.h"
 #include "../pchdef.h"
 

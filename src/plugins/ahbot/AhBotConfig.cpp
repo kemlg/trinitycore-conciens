@@ -1,6 +1,7 @@
 #include "../pchdef.h"
 #include "AhBotConfig.h"
 #include "Config.h"
+#include "Log.h"
 std::vector<std::string> split(const std::string &s, char delim);
 
 using namespace std;
@@ -28,14 +29,14 @@ bool AhBotConfig::Initialize()
     string error;
     if (!config.LoadInitial("ahbot.conf", error))
     {
-        sLog->outMessage("ahbot", LOG_LEVEL_INFO, "AhBot is Disabled. Unable to open configuration file ahbot.conf");
+        TC_LOG_INFO("ahbot", "AhBot is Disabled. Unable to open configuration file ahbot.conf");
         return false;
     }
 
     enabled = config.GetBoolDefault("AhBot.Enabled", true);
 
     if (!enabled)
-        sLog->outMessage("ahbot", LOG_LEVEL_INFO, "AhBot is Disabled in ahbot.conf");
+        TC_LOG_INFO("ahbot", "AhBot is Disabled in ahbot.conf");
 
     guid = (uint64)config.GetIntDefault("AhBot.GUID", 0);
     updateInterval = config.GetIntDefault("AhBot.UpdateIntervalInSeconds", 300);
