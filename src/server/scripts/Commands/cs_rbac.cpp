@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,16 +22,19 @@ Comment: All role based access control related commands (including account relat
 Category: commandscripts
 EndScriptData */
 
+#include "ScriptMgr.h"
 #include "AccountMgr.h"
-#include "Config.h"
 #include "Chat.h"
+#include "Config.h"
 #include "Language.h"
 #include "Player.h"
-#include "ScriptMgr.h"
+#include "Realm.h"
+#include "World.h"
+#include "WorldSession.h"
 
 struct RBACCommandData
 {
-    RBACCommandData(): id(0), realmId(0), rbac(NULL), needDelete(false) { }
+    RBACCommandData(): id(0), realmId(0), rbac(nullptr), needDelete(false) { }
     ~RBACCommandData()
     {
         if (needDelete)
@@ -49,28 +52,25 @@ class rbac_commandscript : public CommandScript
 public:
     rbac_commandscript() : CommandScript("rbac_commandscript") { }
 
-    ChatCommand* GetCommands() const
+    std::vector<ChatCommand> GetCommands() const override
     {
-        static ChatCommand rbacAccountCommandTable[] =
+        static std::vector<ChatCommand> rbacAccountCommandTable =
         {
-            {        "list", rbac::RBAC_PERM_COMMAND_RBAC_ACC_PERM_LIST,   true, &HandleRBACPermListCommand,    "", NULL },
-            {       "grant", rbac::RBAC_PERM_COMMAND_RBAC_ACC_PERM_GRANT,  true, &HandleRBACPermGrantCommand,   "", NULL },
-            {        "deny", rbac::RBAC_PERM_COMMAND_RBAC_ACC_PERM_DENY,   true, &HandleRBACPermDenyCommand,    "", NULL },
-            {      "revoke", rbac::RBAC_PERM_COMMAND_RBAC_ACC_PERM_REVOKE, true, &HandleRBACPermRevokeCommand,  "", NULL },
-            {          NULL, 0, false, NULL, "", NULL }
+            {        "list", rbac::RBAC_PERM_COMMAND_RBAC_ACC_PERM_LIST,   true, &HandleRBACPermListCommand,    "" },
+            {       "grant", rbac::RBAC_PERM_COMMAND_RBAC_ACC_PERM_GRANT,  true, &HandleRBACPermGrantCommand,   "" },
+            {        "deny", rbac::RBAC_PERM_COMMAND_RBAC_ACC_PERM_DENY,   true, &HandleRBACPermDenyCommand,    "" },
+            {      "revoke", rbac::RBAC_PERM_COMMAND_RBAC_ACC_PERM_REVOKE, true, &HandleRBACPermRevokeCommand,  "" },
         };
 
-        static ChatCommand rbacCommandTable[] =
+        static std::vector<ChatCommand> rbacCommandTable =
         {
-            {    "account", rbac::RBAC_PERM_COMMAND_RBAC_ACC,  true, NULL, "", rbacAccountCommandTable },
-            {       "list", rbac::RBAC_PERM_COMMAND_RBAC_LIST, true, &HandleRBACListPermissionsCommand, "", NULL },
-            {         NULL, 0, false, NULL, "", NULL }
+            {    "account", rbac::RBAC_PERM_COMMAND_RBAC_ACC,  true, nullptr, "", rbacAccountCommandTable },
+            {       "list", rbac::RBAC_PERM_COMMAND_RBAC_LIST, true, &HandleRBACListPermissionsCommand, "" },
         };
 
-        static ChatCommand commandTable[] =
+        static std::vector<ChatCommand> commandTable =
         {
-            {       "rbac", rbac::RBAC_PERM_COMMAND_RBAC, true, NULL, "", rbacCommandTable },
-            {         NULL, 0, false, NULL, "", NULL }
+            {       "rbac", rbac::RBAC_PERM_COMMAND_RBAC, true, nullptr, "", rbacCommandTable },
         };
 
         return commandTable;
@@ -79,18 +79,18 @@ public:
     static RBACCommandData* ReadParams(ChatHandler* handler, char const* args, bool checkParams = true)
     {
         if (!args)
-            return NULL;
+            return nullptr;
 
         char* param1 = strtok((char*)args, " ");
-        char* param2 = strtok(NULL, " ");
-        char* param3 = strtok(NULL, " ");
+        char* param2 = strtok(nullptr, " ");
+        char* param3 = strtok(nullptr, " ");
 
         int32 realmId = -1;
         uint32 accountId = 0;
         std::string accountName;
         uint32 id = 0;
-        RBACCommandData* data = NULL;
-        rbac::RBACData* rdata = NULL;
+        RBACCommandData* data = nullptr;
+        rbac::RBACData* rdata = nullptr;
         bool useSelectedPlayer = false;
 
         if (checkParams)
@@ -115,14 +115,14 @@ public:
             {
                 handler->PSendSysMessage(LANG_RBAC_WRONG_PARAMETER_ID, id);
                 handler->SetSentErrorMessage(true);
-                return NULL;
+                return nullptr;
             }
 
             if (realmId < -1 || !realmId)
             {
                 handler->PSendSysMessage(LANG_RBAC_WRONG_PARAMETER_REALM, realmId);
                 handler->SetSentErrorMessage(true);
-                return NULL;
+                return nullptr;
             }
         }
         else if (!param1)
@@ -132,7 +132,7 @@ public:
         {
             Player* player = handler->getSelectedPlayer();
             if (!player)
-                return NULL;
+                return nullptr;
 
             rdata = player->GetSession()->GetRBACData();
             accountId = rdata->GetId();
@@ -142,25 +142,25 @@ public:
         {
             accountName = param1;
 
-            if (AccountMgr::normalizeString(accountName))
+            if (Utf8ToUpperOnlyLatin(accountName))
                 accountId = AccountMgr::GetId(accountName);
 
             if (!accountId)
             {
                 handler->PSendSysMessage(LANG_ACCOUNT_NOT_EXIST, accountName.c_str());
                 handler->SetSentErrorMessage(true);
-                return NULL;
+                return nullptr;
             }
         }
 
-        if (checkParams && handler->HasLowerSecurityAccount(NULL, accountId, true))
-            return NULL;
+        if (checkParams && handler->HasLowerSecurityAccount(nullptr, accountId, true))
+            return nullptr;
 
         data = new RBACCommandData();
 
         if (!rdata)
         {
-            data->rbac = new rbac::RBACData(accountId, accountName, realmID, AccountMgr::GetSecurity(accountId, realmID));
+            data->rbac = new rbac::RBACData(accountId, accountName, realm.Id.Realm, AccountMgr::GetSecurity(accountId, realm.Id.Realm));
             data->rbac->LoadFromDB();
             data->needDelete = true;
         }

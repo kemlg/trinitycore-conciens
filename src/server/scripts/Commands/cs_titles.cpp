@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,36 +22,34 @@ Comment: All titles related commands
 Category: commandscripts
 EndScriptData */
 
-#include "Chat.h"
-#include "Language.h"
-#include "ObjectMgr.h"
-#include "Player.h"
 #include "ScriptMgr.h"
+#include "Chat.h"
+#include "DBCStores.h"
+#include "Language.h"
+#include "Player.h"
+#include "RBAC.h"
 
 class titles_commandscript : public CommandScript
 {
 public:
     titles_commandscript() : CommandScript("titles_commandscript") { }
 
-    ChatCommand* GetCommands() const override
+    std::vector<ChatCommand> GetCommands() const override
     {
-        static ChatCommand titlesSetCommandTable[] =
+        static std::vector<ChatCommand> titlesSetCommandTable =
         {
-            { "mask", rbac::RBAC_PERM_COMMAND_TITLES_SET_MASK, false, &HandleTitlesSetMaskCommand, "", NULL },
-            { NULL,   0,                                 false, NULL,                        "", NULL }
+            { "mask", rbac::RBAC_PERM_COMMAND_TITLES_SET_MASK, false, &HandleTitlesSetMaskCommand, "" },
         };
-        static ChatCommand titlesCommandTable[] =
+        static std::vector<ChatCommand> titlesCommandTable =
         {
-            { "add",     rbac::RBAC_PERM_COMMAND_TITLES_ADD,     false, &HandleTitlesAddCommand,     "", NULL },
-            { "current", rbac::RBAC_PERM_COMMAND_TITLES_CURRENT, false, &HandleTitlesCurrentCommand, "", NULL },
-            { "remove",  rbac::RBAC_PERM_COMMAND_TITLES_REMOVE,  false, &HandleTitlesRemoveCommand,  "", NULL },
-            { "set",     rbac::RBAC_PERM_COMMAND_TITLES_SET,     false, NULL,       "", titlesSetCommandTable },
-            { NULL,      0,                                false, NULL,                        "", NULL }
+            { "add",     rbac::RBAC_PERM_COMMAND_TITLES_ADD,     false, &HandleTitlesAddCommand,     "" },
+            { "current", rbac::RBAC_PERM_COMMAND_TITLES_CURRENT, false, &HandleTitlesCurrentCommand, "" },
+            { "remove",  rbac::RBAC_PERM_COMMAND_TITLES_REMOVE,  false, &HandleTitlesRemoveCommand,  "" },
+            { "set",     rbac::RBAC_PERM_COMMAND_TITLES_SET,     false, nullptr,       "", titlesSetCommandTable },
         };
-        static ChatCommand commandTable[] =
+        static std::vector<ChatCommand> commandTable =
         {
-            { "titles", rbac::RBAC_PERM_COMMAND_TITLES, false, NULL, "", titlesCommandTable },
-            { NULL,     0,                        false, NULL, "", NULL }
+            { "titles", rbac::RBAC_PERM_COMMAND_TITLES, false, nullptr, "", titlesCommandTable },
         };
         return commandTable;
     }
@@ -228,7 +226,7 @@ public:
             if (CharTitlesEntry const* tEntry = sCharTitlesStore.LookupEntry(i))
                 titles2 &= ~(uint64(1) << tEntry->bit_index);
 
-        titles &= ~titles2;                                     // remove not existed titles
+        titles &= ~titles2;                                     // remove non-existing titles
 
         target->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES, titles);
         handler->SendSysMessage(LANG_DONE);

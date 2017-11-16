@@ -1,25 +1,26 @@
 /*
- * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "MoveSpline.h"
-#include <sstream>
 #include "Log.h"
 #include "Creature.h"
+
+#include <sstream>
 
 namespace Movement{
 
@@ -59,8 +60,8 @@ Location MoveSpline::ComputePosition() const
             c.orientation = std::atan2(hermite.y, hermite.x);
         }
 
-        if (splineflags.orientationInversed)
-            c.orientation = -c.orientation;
+        if (splineflags.backward)
+            c.orientation = c.orientation - float(M_PI);
     }
     return c;
 }
@@ -116,9 +117,9 @@ struct CommonInitializer
     }
 };
 
-void MoveSpline::init_spline(const MoveSplineInitArgs& args)
+void MoveSpline::init_spline(MoveSplineInitArgs const& args)
 {
-    const SplineBase::EvaluationMode modes[2] = {SplineBase::ModeLinear, SplineBase::ModeCatmullrom};
+    static SplineBase::EvaluationMode const modes[2] = { SplineBase::ModeLinear, SplineBase::ModeCatmullrom };
     if (args.flags.cyclic)
     {
         uint32 cyclic_point = 0;
@@ -128,9 +129,7 @@ void MoveSpline::init_spline(const MoveSplineInitArgs& args)
         spline.init_cyclic_spline(&args.path[0], args.path.size(), modes[args.flags.isSmooth()], cyclic_point);
     }
     else
-    {
         spline.init_spline(&args.path[0], args.path.size(), modes[args.flags.isSmooth()]);
-    }
 
     // init spline timestamps
     if (splineflags.falling)
@@ -147,7 +146,7 @@ void MoveSpline::init_spline(const MoveSplineInitArgs& args)
     /// @todo what to do in such cases? problem is in input data (all points are at same coords)
     if (spline.length() < minimal_duration)
     {
-        TC_LOG_ERROR("misc", "MoveSpline::init_spline: zero length spline, wrong input data?");
+        TC_LOG_DEBUG("misc", "MoveSpline::init_spline: zero length spline, wrong input data?");
         spline.set_length(spline.last(), spline.isCyclic() ? 1000 : 1);
     }
     point_Idx = spline.first();
@@ -201,11 +200,11 @@ bool MoveSplineInitArgs::Validate(Unit* unit) const
 #define CHECK(exp) \
     if (!(exp))\
     {\
-        TC_LOG_ERROR("misc", "MoveSplineInitArgs::Validate: expression '%s' failed for GUID: %u Entry: %u", #exp, unit->GetTypeId() == TYPEID_PLAYER ? unit->GetGUIDLow() : unit->ToCreature()->GetDBTableGUIDLow(), unit->GetEntry());\
+        TC_LOG_ERROR("misc.movesplineinitargs", "MoveSplineInitArgs::Validate: expression '%s' failed for GUID: %u Entry: %u", #exp, unit->GetTypeId() == TYPEID_PLAYER ? unit->GetGUID().GetCounter() : unit->ToCreature()->GetSpawnId(), unit->GetEntry());\
         return false;\
     }
     CHECK(path.size() > 1);
-    CHECK(velocity > 0.1f);
+    CHECK(velocity >= 0.01f);
     CHECK(time_perc >= 0.f && time_perc <= 1.f);
     //CHECK(_checkPathBounds());
     return true;
@@ -235,6 +234,15 @@ bool MoveSplineInitArgs::_checkPathBounds() const
     }
     return true;
 }
+
+MoveSplineInitArgs::MoveSplineInitArgs(size_t path_capacity /*= 16*/) : path_Idx_offset(0), velocity(0.f),
+parabolic_amplitude(0.f), time_perc(0.f), splineId(0), initialOrientation(0.f),
+walk(false), HasVelocity(false), TransformForTransport(true)
+{
+    path.reserve(path_capacity);
+}
+
+MoveSplineInitArgs::~MoveSplineInitArgs() = default;
 
 /// ============================================================================================
 

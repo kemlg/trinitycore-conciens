@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -85,7 +85,7 @@ enum ArenaTeamTypes
     ARENA_TEAM_5v5      = 5
 };
 
-struct ArenaTeamMember
+struct TC_GAME_API ArenaTeamMember
 {
     ObjectGuid Guid;
     std::string Name;
@@ -113,7 +113,7 @@ struct ArenaTeamStats
 
 #define MAX_ARENA_SLOT 3                                    // 0..2 slots
 
-class ArenaTeam
+class TC_GAME_API ArenaTeam
 {
     public:
         ArenaTeam();
@@ -131,7 +131,7 @@ class ArenaTeam
         static uint8 GetSlotByType(uint32 type);
         ObjectGuid GetCaptain() const  { return CaptainGuid; }
         std::string const& GetName() const { return TeamName; }
-        const ArenaTeamStats& GetStats() const { return Stats; }
+        ArenaTeamStats const& GetStats() const { return Stats; }
 
         uint32 GetRating() const          { return Stats.Rating; }
         uint32 GetAverageMMR(Group* group) const;
@@ -180,7 +180,7 @@ class ArenaTeam
 
         void UpdateArenaPointsHelper(std::map<uint32, uint32> & PlayerPoints);
 
-        void FinishWeek();
+        bool FinishWeek(); // returns true if arena team played this week
         void FinishGame(int32 mod);
 
     protected:

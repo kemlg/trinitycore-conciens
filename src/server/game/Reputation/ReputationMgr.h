@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -61,7 +61,7 @@ typedef std::map<uint32, ReputationRank> ForcedReactions;
 
 class Player;
 
-class ReputationMgr
+class TC_GAME_API ReputationMgr
 {
     public:                                                 // constructors and global modifiers
         explicit ReputationMgr(Player* owner) : _player(owner),
@@ -72,8 +72,8 @@ class ReputationMgr
         void LoadFromDB(PreparedQueryResult result);
     public:                                                 // statics
         static const int32 PointsInRank[MAX_REPUTATION_RANK];
-        static const int32 Reputation_Cap    =  42999;
-        static const int32 Reputation_Bottom = -42000;
+        static const int32 Reputation_Cap;
+        static const int32 Reputation_Bottom;
 
         static ReputationRank ReputationToRank(int32 standing);
     public:                                                 // accessors
@@ -86,13 +86,13 @@ class ReputationMgr
 
         FactionState const* GetState(FactionEntry const* factionEntry) const
         {
-            return factionEntry->CanHaveReputation() ? GetState(factionEntry->reputationListID) : NULL;
+            return factionEntry->CanHaveReputation() ? GetState(factionEntry->reputationListID) : nullptr;
         }
 
         FactionState const* GetState(RepListID id) const
         {
             FactionStateList::const_iterator repItr = _factions.find (id);
-            return repItr != _factions.end() ? &repItr->second : NULL;
+            return repItr != _factions.end() ? &repItr->second : nullptr;
         }
 
         bool IsAtWar(uint32 faction_id) const;
@@ -112,17 +112,17 @@ class ReputationMgr
         ReputationRank const* GetForcedRankIfAny(FactionTemplateEntry const* factionTemplateEntry) const
         {
             ForcedReactions::const_iterator forceItr = _forcedReactions.find(factionTemplateEntry->faction);
-            return forceItr != _forcedReactions.end() ? &forceItr->second : NULL;
+            return forceItr != _forcedReactions.end() ? &forceItr->second : nullptr;
         }
 
     public:                                                 // modifiers
         bool SetReputation(FactionEntry const* factionEntry, int32 standing)
         {
-            return SetReputation(factionEntry, standing, false);
+            return SetReputation(factionEntry, standing, false, false);
         }
-        bool ModifyReputation(FactionEntry const* factionEntry, int32 standing)
+        bool ModifyReputation(FactionEntry const* factionEntry, int32 standing, bool spillOverOnly = false)
         {
-            return SetReputation(factionEntry, standing, true);
+            return SetReputation(factionEntry, standing, true, spillOverOnly);
         }
 
         void SetVisible(FactionTemplateEntry const* factionTemplateEntry);
@@ -139,12 +139,11 @@ class ReputationMgr
         void SendInitialReputations();
         void SendForceReactions();
         void SendState(FactionState const* faction);
-        void SendStates();
 
     private:                                                // internal helper functions
         void Initialize();
         uint32 GetDefaultStateFlags(FactionEntry const* factionEntry) const;
-        bool SetReputation(FactionEntry const* factionEntry, int32 standing, bool incremental);
+        bool SetReputation(FactionEntry const* factionEntry, int32 standing, bool incremental, bool spillOverOnly);
         void SetVisible(FactionState* faction);
         void SetAtWar(FactionState* faction, bool atWar) const;
         void SetInactive(FactionState* faction, bool inactive) const;

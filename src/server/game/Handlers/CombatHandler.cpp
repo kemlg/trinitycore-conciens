@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -16,17 +16,15 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Common.h"
-#include "Log.h"
-#include "WorldPacket.h"
 #include "WorldSession.h"
-#include "ObjectAccessor.h"
+#include "Common.h"
 #include "CreatureAI.h"
-#include "ObjectDefines.h"
-#include "Vehicle.h"
-#include "VehicleDefines.h"
+#include "DBCStructure.h"
+#include "Log.h"
+#include "ObjectAccessor.h"
 #include "Player.h"
-#include "Opcodes.h"
+#include "Vehicle.h"
+#include "WorldPacket.h"
 
 void WorldSession::HandleAttackSwingOpcode(WorldPacket& recvData)
 {
@@ -40,7 +38,7 @@ void WorldSession::HandleAttackSwingOpcode(WorldPacket& recvData)
     if (!pEnemy)
     {
         // stop attack state at client
-        SendAttackStop(NULL);
+        SendAttackStop(nullptr);
         return;
     }
 
@@ -78,7 +76,7 @@ void WorldSession::HandleSetSheathedOpcode(WorldPacket& recvData)
     uint32 sheathed;
     recvData >> sheathed;
 
-    //TC_LOG_DEBUG("network", "WORLD: Recvd CMSG_SETSHEATHED Message guidlow:%u value1:%u", GetPlayer()->GetGUIDLow(), sheathed);
+    //TC_LOG_DEBUG("network", "WORLD: Recvd CMSG_SETSHEATHED Message guidlow:%u value1:%u", GetPlayer()->GetGUID().GetCounter(), sheathed);
 
     if (sheathed >= MAX_SHEATH_STATE)
     {

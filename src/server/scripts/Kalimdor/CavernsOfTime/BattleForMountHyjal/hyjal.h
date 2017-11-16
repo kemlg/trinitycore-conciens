@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -19,11 +19,14 @@
 #ifndef DEF_HYJAL_H
 #define DEF_HYJAL_H
 
+#include "CreatureAIImpl.h"
+
+#define HyjalScriptName "instance_hyjal"
 #define DataHeader "HY"
 
 uint32 const EncounterCount     = 5;
 
-enum DataTypes
+enum HYDataTypes
 {
     DATA_ANETHERON              = 1,
     DATA_ANETHERONEVENT         = 2,
@@ -44,17 +47,18 @@ enum DataTypes
     DATA_HORDE_RETREAT          = 17,
     DATA_RAIDDAMAGE             = 18,
     DATA_RESET_RAIDDAMAGE       = 19,
-    TYPE_RETREAT                = 20
+    TYPE_RETREAT                = 20,
+    DATA_CHANNEL_TARGET         = 21
 };
 
-enum WorldStateIds
+enum HYWorldStateIds
 {
     WORLD_STATE_WAVES           = 2842,
     WORLD_STATE_ENEMY           = 2453,
     WORLD_STATE_ENEMYCOUNT      = 2454
 };
 
-enum CreaturesIds
+enum HYCreaturesIds
 {
     // Trash Mobs summoned in waves
     NECROMANCER                 = 17899,
@@ -77,10 +81,11 @@ enum CreaturesIds
     KAZROGAL                    = 17888,
     AZGALOR                     = 17842,
     ARCHIMONDE                  = 17968,
-    NPC_WORLD_TRIGGER_TINY      = 21987
+    NPC_WORLD_TRIGGER_TINY      = 21987,
+    NPC_CHANNEL_TARGET          = 22418
 };
 
-enum GameobjectIds
+enum HYGameobjectIds
 {
     GO_HORDE_ENCAMPMENT_PORTAL  = 182060,
     GO_NIGHT_ELF_VILLAGE_PORTAL = 182061,
@@ -89,5 +94,12 @@ enum GameobjectIds
     GO_ROARING_FLAME            = 182592
 };
 
-#endif
+#define MINRAIDDAMAGE 700000 // minimal damage before trash can drop loot and reputation, resets if faction leader dies
 
+template <class AI, class T>
+inline AI* GetHyjalAI(T* obj)
+{
+    return GetInstanceAI<AI>(obj, HyjalScriptName);
+}
+
+#endif

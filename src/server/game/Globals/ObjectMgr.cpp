@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -16,39 +16,42 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "AccountMgr.h"
+#include "ObjectMgr.h"
 #include "AchievementMgr.h"
-#include "ArenaTeam.h"
 #include "ArenaTeamMgr.h"
-#include "BattlegroundMgr.h"
+#include "Bag.h"
 #include "Chat.h"
-#include "Common.h"
+#include "CreatureAIFactory.h"
 #include "DatabaseEnv.h"
 #include "DisableMgr.h"
-#include "GameEventMgr.h"
+#include "GameObject.h"
+#include "GameObjectAIFactory.h"
 #include "GossipDef.h"
 #include "GroupMgr.h"
 #include "GuildMgr.h"
 #include "InstanceSaveMgr.h"
+#include "InstanceScript.h"
 #include "Language.h"
 #include "LFGMgr.h"
 #include "Log.h"
+#include "LootMgr.h"
+#include "Mail.h"
 #include "MapManager.h"
-#include "Object.h"
-#include "ObjectMgr.h"
-#include "Pet.h"
+#include "MotionMaster.h"
+#include "ObjectAccessor.h"
+#include "Player.h"
 #include "PoolMgr.h"
+#include "QueryPackets.h"
+#include "Random.h"
 #include "ReputationMgr.h"
 #include "ScriptMgr.h"
 #include "SpellAuras.h"
-#include "Spell.h"
 #include "SpellMgr.h"
 #include "SpellScript.h"
-#include "Transport.h"
+#include "TemporarySummon.h"
 #include "UpdateMask.h"
 #include "Util.h"
 #include "Vehicle.h"
-#include "WaypointManager.h"
 #include "World.h"
 
 ScriptMapMap sSpellScripts;
@@ -70,7 +73,7 @@ std::string GetScriptsTableNameByType(ScriptsType type)
 
 ScriptMapMap* GetScriptsMapByType(ScriptsType type)
 {
-    ScriptMapMap* res = NULL;
+    ScriptMapMap* res = nullptr;
     switch (type)
     {
         case SCRIPTS_SPELL:         res = &sSpellScripts;       break;
@@ -114,6 +117,7 @@ std::string GetScriptCommandName(ScriptCommands command)
         case SCRIPT_COMMAND_MODEL: res = "SCRIPT_COMMAND_MODEL"; break;
         case SCRIPT_COMMAND_CLOSE_GOSSIP: res = "SCRIPT_COMMAND_CLOSE_GOSSIP"; break;
         case SCRIPT_COMMAND_PLAYMOVIE: res = "SCRIPT_COMMAND_PLAYMOVIE"; break;
+        case SCRIPT_COMMAND_MOVEMENT: res = "SCRIPT_COMMAND_MOVEMENT"; break;
         default:
         {
             char sz[32];
@@ -184,7 +188,7 @@ LanguageDesc const* GetLanguageDescByID(uint32 lang)
             return &lang_description[i];
     }
 
-    return NULL;
+    return nullptr;
 }
 
 bool SpellClickInfo::IsFitToRequirements(Unit const* clicker, Unit const* clickee) const
@@ -193,7 +197,7 @@ bool SpellClickInfo::IsFitToRequirements(Unit const* clicker, Unit const* clicke
     if (!playerClicker)
         return true;
 
-    Unit const* summoner = NULL;
+    Unit const* summoner = nullptr;
     // Check summoners for party
     if (clickee->IsSummon())
         summoner = clickee->ToTempSummon()->GetSummoner();
@@ -225,26 +229,24 @@ bool SpellClickInfo::IsFitToRequirements(Unit const* clicker, Unit const* clicke
 ObjectMgr::ObjectMgr():
     _auctionId(1),
     _equipmentSetGuid(1),
-    _itemTextId(1),
     _mailId(1),
     _hiPetNumber(1),
-    _hiCharGuid(1),
-    _hiCreatureGuid(1),
-    _hiPetGuid(1),
-    _hiVehicleGuid(1),
-    _hiItemGuid(1),
-    _hiGoGuid(1),
-    _hiDoGuid(1),
-    _hiCorpseGuid(1),
-    _hiMoTransGuid(1),
+    _creatureSpawnId(1),
+    _gameObjectSpawnId(1),
     DBCLocaleIndex(LOCALE_enUS)
 {
     for (uint8 i = 0; i < MAX_CLASSES; ++i)
     {
-        _playerClassInfo[i] = NULL;
+        _playerClassInfo[i] = nullptr;
         for (uint8 j = 0; j < MAX_RACES; ++j)
-            _playerInfo[j][i] = NULL;
+            _playerInfo[j][i] = nullptr;
     }
+}
+
+ObjectMgr* ObjectMgr::instance()
+{
+    static ObjectMgr instance;
+    return &instance;
 }
 
 ObjectMgr::~ObjectMgr()
@@ -286,14 +288,14 @@ ObjectMgr::~ObjectMgr()
         delete itr->second;
 }
 
-void ObjectMgr::AddLocaleString(std::string const& s, LocaleConstant locale, StringVector& data)
+void ObjectMgr::AddLocaleString(std::string const& value, LocaleConstant localeConstant, std::vector<std::string>& data)
 {
-    if (!s.empty())
+    if (!value.empty())
     {
-        if (data.size() <= size_t(locale))
-            data.resize(locale + 1);
+        if (data.size() <= size_t(localeConstant))
+            data.resize(localeConstant + 1);
 
-        data[locale] = s;
+        data[localeConstant] = value;
     }
 }
 
@@ -303,8 +305,8 @@ void ObjectMgr::LoadCreatureLocales()
 
     _creatureLocaleStore.clear();                              // need for reload case
 
-    QueryResult result = WorldDatabase.Query("SELECT entry, name_loc1, subname_loc1, name_loc2, subname_loc2, name_loc3, subname_loc3, name_loc4, subname_loc4, name_loc5, subname_loc5, name_loc6, subname_loc6, name_loc7, subname_loc7, name_loc8, subname_loc8 FROM locales_creature");
-
+    //                                               0      1       2     3
+    QueryResult result = WorldDatabase.Query("SELECT entry, locale, Name, Title FROM creature_template_locale");
     if (!result)
         return;
 
@@ -312,16 +314,20 @@ void ObjectMgr::LoadCreatureLocales()
     {
         Field* fields = result->Fetch();
 
-        uint32 entry = fields[0].GetUInt32();
+        uint32 id               = fields[0].GetUInt32();
+        std::string localeName  = fields[1].GetString();
 
-        CreatureLocale& data = _creatureLocaleStore[entry];
+        std::string name        = fields[2].GetString();
+        std::string title       = fields[3].GetString();
 
-        for (uint8 i = TOTAL_LOCALES - 1; i > 0; --i)
-        {
-            LocaleConstant locale = (LocaleConstant) i;
-            AddLocaleString(fields[1 + 2 * (i - 1)].GetString(), locale, data.Name);
-            AddLocaleString(fields[1 + 2 * (i - 1) + 1].GetString(), locale, data.SubName);
-        }
+        CreatureLocale& data = _creatureLocaleStore[id];
+        LocaleConstant locale = GetLocaleByName(localeName);
+        if (locale == LOCALE_enUS)
+            continue;
+
+        AddLocaleString(name,       locale, data.Name);
+        AddLocaleString(title,      locale, data.Title);
+
     } while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded %u creature locale strings in %u ms", uint32(_creatureLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
@@ -333,12 +339,8 @@ void ObjectMgr::LoadGossipMenuItemsLocales()
 
     _gossipMenuItemsLocaleStore.clear();                              // need for reload case
 
-    QueryResult result = WorldDatabase.Query("SELECT menu_id, id, "
-        "option_text_loc1, box_text_loc1, option_text_loc2, box_text_loc2, "
-        "option_text_loc3, box_text_loc3, option_text_loc4, box_text_loc4, "
-        "option_text_loc5, box_text_loc5, option_text_loc6, box_text_loc6, "
-        "option_text_loc7, box_text_loc7, option_text_loc8, box_text_loc8 "
-        "FROM locales_gossip_menu_option");
+    //                                               0       1            2       3           4
+    QueryResult result = WorldDatabase.Query("SELECT MenuID, OptionID, Locale, OptionText, BoxText FROM gossip_menu_option_locale");
 
     if (!result)
         return;
@@ -347,19 +349,20 @@ void ObjectMgr::LoadGossipMenuItemsLocales()
     {
         Field* fields = result->Fetch();
 
-        uint16 menuId   = fields[0].GetUInt16();
-        uint16 id       = fields[1].GetUInt16();
+        uint16 menuId           = fields[0].GetUInt16();
+        uint16 optionId         = fields[1].GetUInt16();
+        std::string localeName  = fields[2].GetString();
+        std::string optionText  = fields[3].GetString();
+        std::string boxText     = fields[4].GetString();
 
-        GossipMenuItemsLocale& data = _gossipMenuItemsLocaleStore[MAKE_PAIR32(menuId, id)];
+        GossipMenuItemsLocale& data = _gossipMenuItemsLocaleStore[MAKE_PAIR32(menuId, optionId)];
+        LocaleConstant locale       = GetLocaleByName(localeName);
+        if (locale == LOCALE_enUS)
+            continue;
 
-        for (uint8 i = TOTAL_LOCALES - 1; i > 0; --i)
-        {
-            LocaleConstant locale = (LocaleConstant) i;
-            AddLocaleString(fields[2 + 2 * (i - 1)].GetString(), locale, data.OptionText);
-            AddLocaleString(fields[2 + 2 * (i - 1) + 1].GetString(), locale, data.BoxText);
-        }
-    }
-    while (result->NextRow());
+        AddLocaleString(optionText, locale, data.OptionText);
+        AddLocaleString(boxText, locale, data.BoxText);
+    } while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded %u gossip_menu_option locale strings in %u ms", uint32(_gossipMenuItemsLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
 }
@@ -370,7 +373,8 @@ void ObjectMgr::LoadPointOfInterestLocales()
 
     _pointOfInterestLocaleStore.clear();                              // need for reload case
 
-    QueryResult result = WorldDatabase.Query("SELECT entry, icon_name_loc1, icon_name_loc2, icon_name_loc3, icon_name_loc4, icon_name_loc5, icon_name_loc6, icon_name_loc7, icon_name_loc8 FROM locales_points_of_interest");
+    //                                               0   1       2
+    QueryResult result = WorldDatabase.Query("SELECT ID, locale, Name FROM points_of_interest_locale");
 
     if (!result)
         return;
@@ -379,12 +383,14 @@ void ObjectMgr::LoadPointOfInterestLocales()
     {
         Field* fields = result->Fetch();
 
-        uint32 entry = fields[0].GetUInt32();
+        uint32 id               = fields[0].GetUInt32();
+        std::string localeName  = fields[1].GetString();
+        std::string name        = fields[2].GetString();
 
-        PointOfInterestLocale& data = _pointOfInterestLocaleStore[entry];
+        PointOfInterestLocale& data = _pointOfInterestLocaleStore[id];
+        LocaleConstant locale = GetLocaleByName(localeName);
 
-        for (uint8 i = TOTAL_LOCALES - 1; i > 0; --i)
-            AddLocaleString(fields[i].GetString(), LocaleConstant(i), data.IconName);
+        AddLocaleString(name, locale, data.Name);
     } while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded %u points_of_interest locale strings in %u ms", uint32(_pointOfInterestLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
@@ -408,8 +414,8 @@ void ObjectMgr::LoadCreatureTemplates()
                                              "spell2, spell3, spell4, spell5, spell6, spell7, spell8, PetSpellDataId, VehicleId, mingold, maxgold, AIName, MovementType, "
     //                                        62           63           64              65            66             67              68                  69
                                              "InhabitType, HoverHeight, HealthModifier, ManaModifier, ArmorModifier, DamageModifier, ExperienceModifier, RacialLeader, "
-    //                                        70          71          72          73          74          75          76          77           78                    79           80
-                                             "questItem1, questItem2, questItem3, questItem4, questItem5, questItem6, movementId, RegenHealth, mechanic_immune_mask, flags_extra, ScriptName "
+    //                                             70          71                72               73          74
+                                             "movementId, RegenHealth, mechanic_immune_mask, flags_extra, ScriptName "
                                              "FROM creature_template;");
 
     if (!result)
@@ -419,12 +425,10 @@ void ObjectMgr::LoadCreatureTemplates()
     }
 
     _creatureTemplateStore.rehash(result->GetRowCount());
-    uint32 count = 0;
     do
     {
         Field* fields = result->Fetch();
         LoadCreatureTemplate(fields);
-        ++count;
     }
     while (result->NextRow());
 
@@ -432,7 +436,7 @@ void ObjectMgr::LoadCreatureTemplates()
     for (CreatureTemplateContainer::const_iterator itr = _creatureTemplateStore.begin(); itr != _creatureTemplateStore.end(); ++itr)
         CheckCreatureTemplate(&itr->second);
 
-    TC_LOG_INFO("server.loading", ">> Loaded %u creature definitions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    TC_LOG_INFO("server.loading", ">> Loaded %u creature definitions in %u ms", uint32(_creatureTemplateStore.size()), GetMSTimeDiffToNow(oldMSTime));
 }
 
 void ObjectMgr::LoadCreatureTemplate(Field* fields)
@@ -454,7 +458,7 @@ void ObjectMgr::LoadCreatureTemplate(Field* fields)
     creatureTemplate.Modelid3         = fields[8].GetUInt32();
     creatureTemplate.Modelid4         = fields[9].GetUInt32();
     creatureTemplate.Name             = fields[10].GetString();
-    creatureTemplate.SubName          = fields[11].GetString();
+    creatureTemplate.Title            = fields[11].GetString();
     creatureTemplate.IconName         = fields[12].GetString();
     creatureTemplate.GossipMenuId     = fields[13].GetUInt32();
     creatureTemplate.minlevel         = fields[14].GetUInt8();
@@ -475,7 +479,7 @@ void ObjectMgr::LoadCreatureTemplate(Field* fields)
     creatureTemplate.unit_flags       = fields[29].GetUInt32();
     creatureTemplate.unit_flags2      = fields[30].GetUInt32();
     creatureTemplate.dynamicflags     = fields[31].GetUInt32();
-    creatureTemplate.family           = fields[32].GetUInt8();
+    creatureTemplate.family           = CreatureFamily(fields[32].GetUInt8());
     creatureTemplate.trainer_type     = fields[33].GetUInt8();
     creatureTemplate.trainer_spell    = fields[34].GetUInt32();
     creatureTemplate.trainer_class    = fields[35].GetUInt8();
@@ -489,7 +493,7 @@ void ObjectMgr::LoadCreatureTemplate(Field* fields)
     for (uint8 i = SPELL_SCHOOL_HOLY; i < MAX_SPELL_SCHOOL; ++i)
         creatureTemplate.resistance[i] = fields[42 + i - 1].GetInt16();
 
-    for (uint8 i = 0; i < CREATURE_MAX_SPELLS; ++i)
+    for (uint8 i = 0; i < MAX_CREATURE_SPELLS; ++i)
         creatureTemplate.spells[i] = fields[48 + i].GetUInt32();
 
     creatureTemplate.PetSpellDataId = fields[56].GetUInt32();
@@ -507,14 +511,11 @@ void ObjectMgr::LoadCreatureTemplate(Field* fields)
     creatureTemplate.ModExperience  = fields[68].GetFloat();
     creatureTemplate.RacialLeader   = fields[69].GetBool();
 
-    for (uint8 i = 0; i < MAX_CREATURE_QUEST_ITEMS; ++i)
-        creatureTemplate.questItems[i] = fields[70 + i].GetUInt32();
-
-    creatureTemplate.movementId         = fields[76].GetUInt32();
-    creatureTemplate.RegenHealth        = fields[77].GetBool();
-    creatureTemplate.MechanicImmuneMask = fields[78].GetUInt32();
-    creatureTemplate.flags_extra        = fields[79].GetUInt32();
-    creatureTemplate.ScriptID           = GetScriptId(fields[80].GetCString());
+    creatureTemplate.movementId         = fields[70].GetUInt32();
+    creatureTemplate.RegenHealth        = fields[71].GetBool();
+    creatureTemplate.MechanicImmuneMask = fields[72].GetUInt32();
+    creatureTemplate.flags_extra        = fields[73].GetUInt32();
+    creatureTemplate.ScriptID           = GetScriptId(fields[74].GetString());
 }
 
 void ObjectMgr::LoadCreatureTemplateAddons()
@@ -556,17 +557,23 @@ void ObjectMgr::LoadCreatureTemplateAddons()
         creatureAddon.auras.resize(tokens.size());
         for (Tokenizer::const_iterator itr = tokens.begin(); itr != tokens.end(); ++itr)
         {
-            SpellInfo const* AdditionalSpellInfo = sSpellMgr->GetSpellInfo(uint32(atol(*itr)));
+            SpellInfo const* AdditionalSpellInfo = sSpellMgr->GetSpellInfo(atoul(*itr));
             if (!AdditionalSpellInfo)
             {
-                TC_LOG_ERROR("sql.sql", "Creature (Entry: %u) has wrong spell %u defined in `auras` field in `creature_template_addon`.", entry, uint32(atol(*itr)));
+                TC_LOG_ERROR("sql.sql", "Creature (Entry: %u) has wrong spell %lu defined in `auras` field in `creature_template_addon`.", entry, atoul(*itr));
                 continue;
             }
 
             if (AdditionalSpellInfo->HasAura(SPELL_AURA_CONTROL_VEHICLE))
-                TC_LOG_ERROR("sql.sql", "Creature (Entry: %u) has SPELL_AURA_CONTROL_VEHICLE aura %u defined in `auras` field in `creature_template_addon`.", entry, uint32(atol(*itr)));
+                TC_LOG_ERROR("sql.sql", "Creature (Entry: %u) has SPELL_AURA_CONTROL_VEHICLE aura %lu defined in `auras` field in `creature_template_addon`.", entry, atoul(*itr));
 
-            creatureAddon.auras[i++] = uint32(atol(*itr));
+            if (std::find(creatureAddon.auras.begin(), creatureAddon.auras.end(), atoul(*itr)) != creatureAddon.auras.end())
+            {
+                TC_LOG_ERROR("sql.sql", "Creature (Entry: %u) has duplicate aura (spell %lu) in `auras` field in `creature_template_addon`.", entry, atoul(*itr));
+                continue;
+            }
+
+            creatureAddon.auras[i++] = atoul(*itr);
         }
 
         if (creatureAddon.mount)
@@ -642,25 +649,25 @@ void ObjectMgr::CheckCreatureTemplate(CreatureTemplate const* cInfo)
 
         if (cInfo->expansion > difficultyInfo->expansion)
         {
-            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, exp %u) has different `exp` in difficulty %u mode (Entry: %u, exp %u).",
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, exp: %u) has different `exp` in difficulty %u mode (Entry: %u, exp: %u).",
                 cInfo->Entry, cInfo->expansion, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->expansion);
         }
 
         if (cInfo->minlevel > difficultyInfo->minlevel)
         {
-            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, minlevel %u) has lower `minlevel` in difficulty %u mode (Entry: %u, minlevel %u).",
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, minlevel: %u) has lower `minlevel` in difficulty %u mode (Entry: %u, minlevel: %u).",
                 cInfo->Entry, cInfo->minlevel, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->minlevel);
         }
 
         if (cInfo->maxlevel > difficultyInfo->maxlevel)
         {
-            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, maxlevel %u) has lower `maxlevel` in difficulty %u mode (Entry: %u, maxlevel %u).",
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, maxlevel: %u) has lower `maxlevel` in difficulty %u mode (Entry: %u, maxlevel: %u).",
                 cInfo->Entry, cInfo->maxlevel, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->maxlevel);
         }
 
         if (cInfo->faction != difficultyInfo->faction)
         {
-            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, faction %u) has different `faction` in difficulty %u mode (Entry: %u, faction %u).",
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, faction: %u) has different `faction` in difficulty %u mode (Entry: %u, faction: %u).",
                 cInfo->Entry, cInfo->faction, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->faction);
             TC_LOG_ERROR("sql.sql", "Possible FIX: UPDATE `creature_template` SET `faction`=%u WHERE `entry`=%u;",
                 cInfo->faction, cInfo->DifficultyEntry[diff]);
@@ -668,25 +675,42 @@ void ObjectMgr::CheckCreatureTemplate(CreatureTemplate const* cInfo)
 
         if (cInfo->unit_class != difficultyInfo->unit_class)
         {
-            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, class %u) has different `unit_class` in difficulty %u mode (Entry: %u, class %u).",
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, class: %u) has different `unit_class` in difficulty %u mode (Entry: %u, class: %u).",
                 cInfo->Entry, cInfo->unit_class, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->unit_class);
             TC_LOG_ERROR("sql.sql", "Possible FIX: UPDATE `creature_template` SET `unit_class`=%u WHERE `entry`=%u;",
                 cInfo->unit_class, cInfo->DifficultyEntry[diff]);
             continue;
         }
 
+        uint32 differenceMask = cInfo->npcflag ^ difficultyInfo->npcflag;
         if (cInfo->npcflag != difficultyInfo->npcflag)
         {
             TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, `npcflag`: %u) has different `npcflag` in difficulty %u mode (Entry: %u, `npcflag`: %u).",
                 cInfo->Entry, cInfo->npcflag, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->npcflag);
-            TC_LOG_ERROR("sql.sql", "Possible FIX: UPDATE `creature_template` SET `npcflag`=%u WHERE `entry`=%u;",
-                cInfo->npcflag, cInfo->DifficultyEntry[diff]);
-            continue;
+            TC_LOG_ERROR("sql.sql", "Possible FIX: UPDATE `creature_template` SET `npcflag`=`npcflag`^%u WHERE `entry`=%u;",
+                differenceMask, cInfo->DifficultyEntry[diff]);
+        }
+
+        if (cInfo->dmgschool != difficultyInfo->dmgschool)
+        {
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, `dmgschool`: %u) has different `dmgschool` in difficulty %u mode (Entry: %u, `dmgschool`: %u).",
+                cInfo->Entry, cInfo->dmgschool, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->dmgschool);
+            TC_LOG_ERROR("sql.sql", "Possible FIX: UPDATE `creature_template` SET `dmgschool`=%u WHERE `entry`=%u;",
+                cInfo->dmgschool, cInfo->DifficultyEntry[diff]);
+        }
+
+        differenceMask = cInfo->unit_flags2 ^ difficultyInfo->unit_flags2;
+        if (cInfo->unit_flags2 != difficultyInfo->unit_flags2)
+        {
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, `unit_flags2`: %u) has different `unit_flags2` in difficulty %u mode (Entry: %u, `unit_flags2`: %u).",
+                cInfo->Entry, cInfo->unit_flags2, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->unit_flags2);
+            TC_LOG_ERROR("sql.sql", "Possible FIX: UPDATE `creature_template` SET `unit_flags2`=`unit_flags2`^%u WHERE `entry`=%u;",
+                differenceMask, cInfo->DifficultyEntry[diff]);
         }
 
         if (cInfo->family != difficultyInfo->family)
         {
-            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, family %u) has different `family` in difficulty %u mode (Entry: %u, family %u).",
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, family: %u) has different `family` in difficulty %u mode (Entry: %u, family: %u).",
                 cInfo->Entry, cInfo->family, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->family);
             TC_LOG_ERROR("sql.sql", "Possible FIX: UPDATE `creature_template` SET `family`=%u WHERE `entry`=%u;",
                 cInfo->family, cInfo->DifficultyEntry[diff]);
@@ -727,7 +751,7 @@ void ObjectMgr::CheckCreatureTemplate(CreatureTemplate const* cInfo)
 
         if (cInfo->type != difficultyInfo->type)
         {
-            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, type %u) has different `type` in difficulty %u mode (Entry: %u, type %u).",
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, type: %u) has different `type` in difficulty %u mode (Entry: %u, type: %u).",
                 cInfo->Entry, cInfo->type, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->type);
             TC_LOG_ERROR("sql.sql", "Possible FIX: UPDATE `creature_template` SET `type`=%u WHERE `entry`=%u;",
                 cInfo->type, cInfo->DifficultyEntry[diff]);
@@ -735,8 +759,34 @@ void ObjectMgr::CheckCreatureTemplate(CreatureTemplate const* cInfo)
 
         if (!cInfo->VehicleId && difficultyInfo->VehicleId)
         {
-            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, VehicleId %u) has different `VehicleId` in difficulty %u mode (Entry: %u, VehicleId %u).",
+            TC_LOG_ERROR("sql.sql", "Non-vehicle Creature (Entry: %u, VehicleId: %u) has `VehicleId` set in difficulty %u mode (Entry: %u, VehicleId: %u).",
                 cInfo->Entry, cInfo->VehicleId, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->VehicleId);
+        }
+
+        if (cInfo->RegenHealth != difficultyInfo->RegenHealth)
+        {
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, RegenHealth: %u) has different `RegenHealth` in difficulty %u mode (Entry: %u, RegenHealth: %u).",
+                cInfo->Entry, cInfo->RegenHealth, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->RegenHealth);
+            TC_LOG_ERROR("sql.sql", "Possible FIX: UPDATE `creature_template` SET `RegenHealth`=%u WHERE `entry`=%u;",
+                cInfo->RegenHealth, cInfo->DifficultyEntry[diff]);
+        }
+
+        differenceMask = cInfo->MechanicImmuneMask & (~difficultyInfo->MechanicImmuneMask);
+        if (differenceMask)
+        {
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, mechanic_immune_mask: %u) has weaker immunities in difficulty %u mode (Entry: %u, mechanic_immune_mask: %u).",
+                cInfo->Entry, cInfo->MechanicImmuneMask, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->MechanicImmuneMask);
+            TC_LOG_ERROR("sql.sql", "Possible FIX: UPDATE `creature_template` SET `mechanic_immune_mask`=`mechanic_immune_mask`|%u WHERE `entry`=%u;",
+                differenceMask, cInfo->DifficultyEntry[diff]);
+        }
+
+        differenceMask = (cInfo->flags_extra ^ difficultyInfo->flags_extra) & (~CREATURE_FLAG_EXTRA_INSTANCE_BIND);
+        if (differenceMask)
+        {
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u, flags_extra: %u) has different `flags_extra` in difficulty %u mode (Entry: %u, flags_extra: %u).",
+                cInfo->Entry, cInfo->flags_extra, diff + 1, cInfo->DifficultyEntry[diff], difficultyInfo->flags_extra);
+            TC_LOG_ERROR("sql.sql", "Possible FIX: UPDATE `creature_template` SET `flags_extra`=`flags_extra`^%u WHERE `entry`=%u;",
+                differenceMask, cInfo->DifficultyEntry[diff]);
         }
 
         if (!difficultyInfo->AIName.empty())
@@ -758,12 +808,21 @@ void ObjectMgr::CheckCreatureTemplate(CreatureTemplate const* cInfo)
         ok = true;
     }
 
+    if (!cInfo->AIName.empty() && !sCreatureAIRegistry->HasItem(cInfo->AIName))
+    {
+        TC_LOG_ERROR("sql.sql", "Creature (Entry: %u) has non-registered `AIName` '%s' set, removing", cInfo->Entry, cInfo->AIName.c_str());
+        const_cast<CreatureTemplate*>(cInfo)->AIName.clear();
+    }
+
     FactionTemplateEntry const* factionTemplate = sFactionTemplateStore.LookupEntry(cInfo->faction);
     if (!factionTemplate)
-        TC_LOG_ERROR("sql.sql", "Creature (Entry: %u) has non-existing faction template (%u).", cInfo->Entry, cInfo->faction);
+    {
+        TC_LOG_FATAL("sql.sql", "Creature (Entry: %u) has non-existing faction template (%u). This can lead to crashes, aborting.", cInfo->Entry, cInfo->faction);
+        ABORT();
+    }
 
     // used later for scale
-    CreatureDisplayInfoEntry const* displayScaleEntry = NULL;
+    CreatureDisplayInfoEntry const* displayScaleEntry = nullptr;
 
     if (cInfo->Modelid1)
     {
@@ -773,7 +832,7 @@ void ObjectMgr::CheckCreatureTemplate(CreatureTemplate const* cInfo)
             TC_LOG_ERROR("sql.sql", "Creature (Entry: %u) lists non-existing Modelid1 id (%u), this can crash the client.", cInfo->Entry, cInfo->Modelid1);
             const_cast<CreatureTemplate*>(cInfo)->Modelid1 = 0;
         }
-        else if (!displayScaleEntry)
+        else
             displayScaleEntry = displayEntry;
 
         CreatureModelInfo const* modelInfo = GetCreatureModelInfo(cInfo->Modelid1);
@@ -832,7 +891,7 @@ void ObjectMgr::CheckCreatureTemplate(CreatureTemplate const* cInfo)
     if (!displayScaleEntry)
         TC_LOG_ERROR("sql.sql", "Creature (Entry: %u) does not have any existing display id in Modelid1/Modelid2/Modelid3/Modelid4.", cInfo->Entry);
 
-    for (int k = 0; k < MAX_KILL_CREDIT; ++k)
+    for (uint8 k = 0; k < MAX_KILL_CREDIT; ++k)
     {
         if (cInfo->KillCredit[k])
         {
@@ -887,7 +946,7 @@ void ObjectMgr::CheckCreatureTemplate(CreatureTemplate const* cInfo)
     if (cInfo->family && !sCreatureFamilyStore.LookupEntry(cInfo->family) && cInfo->family != CREATURE_FAMILY_HORSE_CUSTOM)
     {
         TC_LOG_ERROR("sql.sql", "Creature (Entry: %u) has invalid creature family (%u) in `family`.", cInfo->Entry, cInfo->family);
-        const_cast<CreatureTemplate*>(cInfo)->family = 0;
+        const_cast<CreatureTemplate*>(cInfo)->family = CREATURE_FAMILY_NONE;
     }
 
     if (cInfo->InhabitType <= 0 || cInfo->InhabitType > INHABIT_ANYWHERE)
@@ -919,7 +978,7 @@ void ObjectMgr::CheckCreatureTemplate(CreatureTemplate const* cInfo)
             TC_LOG_ERROR("sql.sql", "Creature (Entry: %u) has non-existing PetSpellDataId (%u).", cInfo->Entry, cInfo->PetSpellDataId);
     }
 
-    for (uint8 j = 0; j < CREATURE_MAX_SPELLS; ++j)
+    for (uint8 j = 0; j < MAX_CREATURE_SPELLS; ++j)
     {
         if (cInfo->spells[j] && !sSpellMgr->GetSpellInfo(cInfo->spells[j]))
         {
@@ -976,7 +1035,7 @@ void ObjectMgr::LoadCreatureAddons()
     {
         Field* fields = result->Fetch();
 
-        uint32 guid = fields[0].GetUInt32();
+        ObjectGuid::LowType guid = fields[0].GetUInt32();
 
         CreatureData const* creData = GetCreatureData(guid);
         if (!creData)
@@ -1004,17 +1063,23 @@ void ObjectMgr::LoadCreatureAddons()
         creatureAddon.auras.resize(tokens.size());
         for (Tokenizer::const_iterator itr = tokens.begin(); itr != tokens.end(); ++itr)
         {
-            SpellInfo const* AdditionalSpellInfo = sSpellMgr->GetSpellInfo(uint32(atol(*itr)));
+            SpellInfo const* AdditionalSpellInfo = sSpellMgr->GetSpellInfo(atoul(*itr));
             if (!AdditionalSpellInfo)
             {
-                TC_LOG_ERROR("sql.sql", "Creature (GUID: %u) has wrong spell %u defined in `auras` field in `creature_addon`.", guid, uint32(atol(*itr)));
+                TC_LOG_ERROR("sql.sql", "Creature (GUID: %u) has wrong spell %lu defined in `auras` field in `creature_addon`.", guid, atoul(*itr));
                 continue;
             }
 
             if (AdditionalSpellInfo->HasAura(SPELL_AURA_CONTROL_VEHICLE))
-                TC_LOG_ERROR("sql.sql", "Creature (GUID: %u) has SPELL_AURA_CONTROL_VEHICLE aura %u defined in `auras` field in `creature_addon`.", guid, uint32(atol(*itr)));
+                TC_LOG_ERROR("sql.sql", "Creature (GUID: %u) has SPELL_AURA_CONTROL_VEHICLE aura %lu defined in `auras` field in `creature_addon`.", guid, atoul(*itr));
 
-            creatureAddon.auras[i++] = uint32(atol(*itr));
+            if (std::find(creatureAddon.auras.begin(), creatureAddon.auras.end(), atoul(*itr)) != creatureAddon.auras.end())
+            {
+                TC_LOG_ERROR("sql.sql", "Creature (GUID: %u) has duplicate aura (spell %lu) in `auras` field in `creature_addon`.", guid, atoul(*itr));
+                continue;
+            }
+
+            creatureAddon.auras[i++] = atoul(*itr);
         }
 
         if (creatureAddon.mount)
@@ -1039,32 +1104,99 @@ void ObjectMgr::LoadCreatureAddons()
     TC_LOG_INFO("server.loading", ">> Loaded %u creature addons in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
-CreatureAddon const* ObjectMgr::GetCreatureAddon(uint32 lowguid)
+void ObjectMgr::LoadGameObjectAddons()
+{
+    uint32 oldMSTime = getMSTime();
+
+    //                                               0     1                 2                 3                 4                 5                 6
+    QueryResult result = WorldDatabase.Query("SELECT guid, parent_rotation0, parent_rotation1, parent_rotation2, parent_rotation3, invisibilityType, invisibilityValue FROM gameobject_addon");
+
+    if (!result)
+    {
+        TC_LOG_INFO("server.loading", ">> Loaded 0 gameobject addon definitions. DB table `gameobject_addon` is empty.");
+        return;
+    }
+
+    uint32 count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+
+        ObjectGuid::LowType guid = fields[0].GetUInt32();
+
+        GameObjectData const* goData = GetGameObjectData(guid);
+        if (!goData)
+        {
+            TC_LOG_ERROR("sql.sql", "GameObject (GUID: %u) does not exist but has a record in `gameobject_addon`", guid);
+            continue;
+        }
+
+        GameObjectAddon& gameObjectAddon = _gameObjectAddonStore[guid];
+        gameObjectAddon.ParentRotation = QuaternionData(fields[1].GetFloat(), fields[2].GetFloat(), fields[3].GetFloat(), fields[4].GetFloat());
+        gameObjectAddon.invisibilityType = InvisibilityType(fields[5].GetUInt8());
+        gameObjectAddon.InvisibilityValue = fields[6].GetUInt32();
+
+        if (gameObjectAddon.invisibilityType >= TOTAL_INVISIBILITY_TYPES)
+        {
+            TC_LOG_ERROR("sql.sql", "GameObject (GUID: %u) has invalid InvisibilityType in `gameobject_addon`, disabled invisibility", guid);
+            gameObjectAddon.invisibilityType = INVISIBILITY_GENERAL;
+            gameObjectAddon.InvisibilityValue = 0;
+        }
+
+        if (gameObjectAddon.invisibilityType && !gameObjectAddon.InvisibilityValue)
+        {
+            TC_LOG_ERROR("sql.sql", "GameObject (GUID: %u) has InvisibilityType set but has no InvisibilityValue in `gameobject_addon`, set to 1", guid);
+            gameObjectAddon.InvisibilityValue = 1;
+        }
+
+        if (!gameObjectAddon.ParentRotation.isUnit())
+        {
+            TC_LOG_ERROR("sql.sql", "GameObject (GUID: %u) has invalid parent rotation in `gameobject_addon`, set to default", guid);
+            gameObjectAddon.ParentRotation = QuaternionData();
+        }
+
+        ++count;
+    }
+    while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded %u gameobject addons in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+}
+
+GameObjectAddon const* ObjectMgr::GetGameObjectAddon(ObjectGuid::LowType lowguid) const
+{
+    GameObjectAddonContainer::const_iterator itr = _gameObjectAddonStore.find(lowguid);
+    if (itr != _gameObjectAddonStore.end())
+        return &(itr->second);
+
+    return nullptr;
+}
+
+CreatureAddon const* ObjectMgr::GetCreatureAddon(ObjectGuid::LowType lowguid) const
 {
     CreatureAddonContainer::const_iterator itr = _creatureAddonStore.find(lowguid);
     if (itr != _creatureAddonStore.end())
         return &(itr->second);
 
-    return NULL;
+    return nullptr;
 }
 
-CreatureAddon const* ObjectMgr::GetCreatureTemplateAddon(uint32 entry)
+CreatureAddon const* ObjectMgr::GetCreatureTemplateAddon(uint32 entry) const
 {
     CreatureAddonContainer::const_iterator itr = _creatureTemplateAddonStore.find(entry);
     if (itr != _creatureTemplateAddonStore.end())
         return &(itr->second);
 
-    return NULL;
+    return nullptr;
 }
 
-EquipmentInfo const* ObjectMgr::GetEquipmentInfo(uint32 entry, int8& id)
+EquipmentInfo const* ObjectMgr::GetEquipmentInfo(uint32 entry, int8& id) const
 {
     EquipmentInfoContainer::const_iterator itr = _equipmentInfoStore.find(entry);
     if (itr == _equipmentInfoStore.end())
-        return NULL;
+        return nullptr;
 
     if (itr->second.empty())
-        return NULL;
+        return nullptr;
 
     if (id == -1) // select a random element
     {
@@ -1080,15 +1212,15 @@ EquipmentInfo const* ObjectMgr::GetEquipmentInfo(uint32 entry, int8& id)
             return &itr2->second;
     }
 
-    return NULL;
+    return nullptr;
 }
 
 void ObjectMgr::LoadEquipmentTemplates()
 {
     uint32 oldMSTime = getMSTime();
 
-    //                                                 0     1       2           3           4
-    QueryResult result = WorldDatabase.Query("SELECT entry, id, itemEntry1, itemEntry2, itemEntry3 FROM creature_equip_template");
+    //                                                 0         1       2       3       4
+    QueryResult result = WorldDatabase.Query("SELECT CreatureID, ID, ItemID1, ItemID2, ItemID3 FROM creature_equip_template");
 
     if (!result)
     {
@@ -1160,25 +1292,29 @@ void ObjectMgr::LoadEquipmentTemplates()
     TC_LOG_INFO("server.loading", ">> Loaded %u equipment templates in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
-CreatureModelInfo const* ObjectMgr::GetCreatureModelInfo(uint32 modelId)
+CreatureModelInfo const* ObjectMgr::GetCreatureModelInfo(uint32 modelId) const
 {
     CreatureModelContainer::const_iterator itr = _creatureModelStore.find(modelId);
     if (itr != _creatureModelStore.end())
         return &(itr->second);
 
-    return NULL;
+    return nullptr;
 }
 
-uint32 ObjectMgr::ChooseDisplayId(CreatureTemplate const* cinfo, CreatureData const* data /*= NULL*/)
+uint32 ObjectMgr::ChooseDisplayId(CreatureTemplate const* cinfo, CreatureData const* data /*= nullptr*/)
 {
     // Load creature model (display id)
     if (data && data->displayid)
         return data->displayid;
 
-    return cinfo->GetRandomValidModelId();
+    if (!(cinfo->flags_extra & CREATURE_FLAG_EXTRA_TRIGGER))
+        return cinfo->GetRandomValidModelId();
+
+    // Triggers by default receive the invisible model
+    return cinfo->GetFirstInvisibleModel();
 }
 
-void ObjectMgr::ChooseCreatureFlags(const CreatureTemplate* cinfo, uint32& npcflag, uint32& unit_flags, uint32& dynamicflags, const CreatureData* data /*= NULL*/)
+void ObjectMgr::ChooseCreatureFlags(CreatureTemplate const* cinfo, uint32& npcflag, uint32& unit_flags, uint32& dynamicflags, CreatureData const* data /*= nullptr*/)
 {
     npcflag = cinfo->npcflag;
     unit_flags = cinfo->unit_flags;
@@ -1197,11 +1333,11 @@ void ObjectMgr::ChooseCreatureFlags(const CreatureTemplate* cinfo, uint32& npcfl
     }
 }
 
-CreatureModelInfo const* ObjectMgr::GetCreatureModelRandomGender(uint32* displayID)
+CreatureModelInfo const* ObjectMgr::GetCreatureModelRandomGender(uint32* displayID) const
 {
     CreatureModelInfo const* modelInfo = GetCreatureModelInfo(*displayID);
     if (!modelInfo)
-        return NULL;
+        return nullptr;
 
     // If a model for another gender exists, 50% chance to use it
     if (modelInfo->modelid_other_gender != 0 && urand(0, 1) == 0)
@@ -1223,8 +1359,8 @@ CreatureModelInfo const* ObjectMgr::GetCreatureModelRandomGender(uint32* display
 void ObjectMgr::LoadCreatureModelInfo()
 {
     uint32 oldMSTime = getMSTime();
-
-    QueryResult result = WorldDatabase.Query("SELECT modelid, bounding_radius, combat_reach, gender, modelid_other_gender FROM creature_model_info");
+    //                                                   0             1             2          3               4
+    QueryResult result = WorldDatabase.Query("SELECT DisplayID, BoundingRadius, CombatReach, Gender, DisplayID_Other_Gender FROM creature_model_info");
 
     if (!result)
     {
@@ -1240,6 +1376,12 @@ void ObjectMgr::LoadCreatureModelInfo()
         Field* fields = result->Fetch();
 
         uint32 modelId = fields[0].GetUInt32();
+        CreatureDisplayInfoEntry const* creatureDisplay = sCreatureDisplayInfoStore.LookupEntry(modelId);
+        if (!creatureDisplay)
+        {
+            TC_LOG_ERROR("sql.sql", "Table `creature_model_info` has model for nonexistent display id (%u).", modelId);
+            continue;
+        }
 
         CreatureModelInfo& modelInfo = _creatureModelStore[modelId];
 
@@ -1247,11 +1389,9 @@ void ObjectMgr::LoadCreatureModelInfo()
         modelInfo.combat_reach         = fields[2].GetFloat();
         modelInfo.gender               = fields[3].GetUInt8();
         modelInfo.modelid_other_gender = fields[4].GetUInt32();
+        modelInfo.is_trigger           = false;
 
         // Checks
-
-        if (!sCreatureDisplayInfoStore.LookupEntry(modelId))
-            TC_LOG_ERROR("sql.sql", "Table `creature_model_info` has model for nonexistent display id (%u).", modelId);
 
         if (modelInfo.gender > GENDER_NONE)
         {
@@ -1266,7 +1406,10 @@ void ObjectMgr::LoadCreatureModelInfo()
         }
 
         if (modelInfo.combat_reach < 0.1f)
-            modelInfo.combat_reach = DEFAULT_COMBAT_REACH;
+            modelInfo.combat_reach = DEFAULT_PLAYER_COMBAT_REACH;
+
+        if (CreatureModelDataEntry const* modelData = sCreatureModelDataStore.LookupEntry(creatureDisplay->ModelId))
+            modelInfo.is_trigger = strstr(modelData->ModelPath, "InvisibleStalker") != nullptr;
 
         ++count;
     }
@@ -1285,7 +1428,7 @@ void ObjectMgr::LoadLinkedRespawn()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 linked respawns. DB table `linked_respawn` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 linked respawns. DB table `linked_respawn` is empty.");
         return;
     }
 
@@ -1293,8 +1436,8 @@ void ObjectMgr::LoadLinkedRespawn()
     {
         Field* fields = result->Fetch();
 
-        uint32 guidLow = fields[0].GetUInt32();
-        uint32 linkedGuidLow = fields[1].GetUInt32();
+        ObjectGuid::LowType guidLow = fields[0].GetUInt32();
+        ObjectGuid::LowType linkedGuidLow = fields[1].GetUInt32();
         uint8  linkType = fields[2].GetUInt8();
 
         ObjectGuid guid, linkedGuid;
@@ -1303,7 +1446,7 @@ void ObjectMgr::LoadLinkedRespawn()
         {
             case CREATURE_TO_CREATURE:
             {
-                const CreatureData* slave = GetCreatureData(guidLow);
+                CreatureData const* slave = GetCreatureData(guidLow);
                 if (!slave)
                 {
                     TC_LOG_ERROR("sql.sql", "LinkedRespawn: Creature (guid) '%u' not found in creature table", guidLow);
@@ -1311,7 +1454,7 @@ void ObjectMgr::LoadLinkedRespawn()
                     break;
                 }
 
-                const CreatureData* master = GetCreatureData(linkedGuidLow);
+                CreatureData const* master = GetCreatureData(linkedGuidLow);
                 if (!master)
                 {
                     TC_LOG_ERROR("sql.sql", "LinkedRespawn: Creature (linkedGuid) '%u' not found in creature table", linkedGuidLow);
@@ -1319,8 +1462,8 @@ void ObjectMgr::LoadLinkedRespawn()
                     break;
                 }
 
-                const MapEntry* const map = sMapStore.LookupEntry(master->mapid);
-                if (!map || !map->Instanceable() || (master->mapid != slave->mapid))
+                MapEntry const* const map = sMapStore.LookupEntry(master->spawnPoint.GetMapId());
+                if (!map || !map->Instanceable() || (master->spawnPoint.GetMapId() != slave->spawnPoint.GetMapId()))
                 {
                     TC_LOG_ERROR("sql.sql", "LinkedRespawn: Creature '%u' linking to Creature '%u' on an unpermitted map.", guidLow, linkedGuidLow);
                     error = true;
@@ -1334,13 +1477,13 @@ void ObjectMgr::LoadLinkedRespawn()
                     break;
                 }
 
-                guid = ObjectGuid(HIGHGUID_UNIT, slave->id, guidLow);
-                linkedGuid = ObjectGuid(HIGHGUID_UNIT, master->id, linkedGuidLow);
+                guid = ObjectGuid(HighGuid::Unit, slave->id, guidLow);
+                linkedGuid = ObjectGuid(HighGuid::Unit, master->id, linkedGuidLow);
                 break;
             }
             case CREATURE_TO_GO:
             {
-                const CreatureData* slave = GetCreatureData(guidLow);
+                CreatureData const* slave = GetCreatureData(guidLow);
                 if (!slave)
                 {
                     TC_LOG_ERROR("sql.sql", "LinkedRespawn: Creature (guid) '%u' not found in creature table", guidLow);
@@ -1348,7 +1491,7 @@ void ObjectMgr::LoadLinkedRespawn()
                     break;
                 }
 
-                const GameObjectData* master = GetGOData(linkedGuidLow);
+                GameObjectData const* master = GetGameObjectData(linkedGuidLow);
                 if (!master)
                 {
                     TC_LOG_ERROR("sql.sql", "LinkedRespawn: Gameobject (linkedGuid) '%u' not found in gameobject table", linkedGuidLow);
@@ -1356,8 +1499,8 @@ void ObjectMgr::LoadLinkedRespawn()
                     break;
                 }
 
-                const MapEntry* const map = sMapStore.LookupEntry(master->mapid);
-                if (!map || !map->Instanceable() || (master->mapid != slave->mapid))
+                MapEntry const* const map = sMapStore.LookupEntry(master->spawnPoint.GetMapId());
+                if (!map || !map->Instanceable() || (master->spawnPoint.GetMapId() != slave->spawnPoint.GetMapId()))
                 {
                     TC_LOG_ERROR("sql.sql", "LinkedRespawn: Creature '%u' linking to Gameobject '%u' on an unpermitted map.", guidLow, linkedGuidLow);
                     error = true;
@@ -1371,13 +1514,13 @@ void ObjectMgr::LoadLinkedRespawn()
                     break;
                 }
 
-                guid = ObjectGuid(HIGHGUID_UNIT, slave->id, guidLow);
-                linkedGuid = ObjectGuid(HIGHGUID_GAMEOBJECT, master->id, linkedGuidLow);
+                guid = ObjectGuid(HighGuid::Unit, slave->id, guidLow);
+                linkedGuid = ObjectGuid(HighGuid::GameObject, master->id, linkedGuidLow);
                 break;
             }
             case GO_TO_GO:
             {
-                const GameObjectData* slave = GetGOData(guidLow);
+                GameObjectData const* slave = GetGameObjectData(guidLow);
                 if (!slave)
                 {
                     TC_LOG_ERROR("sql.sql", "LinkedRespawn: Gameobject (guid) '%u' not found in gameobject table", guidLow);
@@ -1385,7 +1528,7 @@ void ObjectMgr::LoadLinkedRespawn()
                     break;
                 }
 
-                const GameObjectData* master = GetGOData(linkedGuidLow);
+                GameObjectData const* master = GetGameObjectData(linkedGuidLow);
                 if (!master)
                 {
                     TC_LOG_ERROR("sql.sql", "LinkedRespawn: Gameobject (linkedGuid) '%u' not found in gameobject table", linkedGuidLow);
@@ -1393,8 +1536,8 @@ void ObjectMgr::LoadLinkedRespawn()
                     break;
                 }
 
-                const MapEntry* const map = sMapStore.LookupEntry(master->mapid);
-                if (!map || !map->Instanceable() || (master->mapid != slave->mapid))
+                MapEntry const* const map = sMapStore.LookupEntry(master->spawnPoint.GetMapId());
+                if (!map || !map->Instanceable() || (master->spawnPoint.GetMapId() != slave->spawnPoint.GetMapId()))
                 {
                     TC_LOG_ERROR("sql.sql", "LinkedRespawn: Gameobject '%u' linking to Gameobject '%u' on an unpermitted map.", guidLow, linkedGuidLow);
                     error = true;
@@ -1408,13 +1551,13 @@ void ObjectMgr::LoadLinkedRespawn()
                     break;
                 }
 
-                guid = ObjectGuid(HIGHGUID_GAMEOBJECT, slave->id, guidLow);
-                linkedGuid = ObjectGuid(HIGHGUID_GAMEOBJECT, master->id, linkedGuidLow);
+                guid = ObjectGuid(HighGuid::GameObject, slave->id, guidLow);
+                linkedGuid = ObjectGuid(HighGuid::GameObject, master->id, linkedGuidLow);
                 break;
             }
             case GO_TO_CREATURE:
             {
-                const GameObjectData* slave = GetGOData(guidLow);
+                GameObjectData const* slave = GetGameObjectData(guidLow);
                 if (!slave)
                 {
                     TC_LOG_ERROR("sql.sql", "LinkedRespawn: Gameobject (guid) '%u' not found in gameobject table", guidLow);
@@ -1422,7 +1565,7 @@ void ObjectMgr::LoadLinkedRespawn()
                     break;
                 }
 
-                const CreatureData* master = GetCreatureData(linkedGuidLow);
+                CreatureData const* master = GetCreatureData(linkedGuidLow);
                 if (!master)
                 {
                     TC_LOG_ERROR("sql.sql", "LinkedRespawn: Creature (linkedGuid) '%u' not found in creature table", linkedGuidLow);
@@ -1430,8 +1573,8 @@ void ObjectMgr::LoadLinkedRespawn()
                     break;
                 }
 
-                const MapEntry* const map = sMapStore.LookupEntry(master->mapid);
-                if (!map || !map->Instanceable() || (master->mapid != slave->mapid))
+                MapEntry const* const map = sMapStore.LookupEntry(master->spawnPoint.GetMapId());
+                if (!map || !map->Instanceable() || (master->spawnPoint.GetMapId() != slave->spawnPoint.GetMapId()))
                 {
                     TC_LOG_ERROR("sql.sql", "LinkedRespawn: Gameobject '%u' linking to Creature '%u' on an unpermitted map.", guidLow, linkedGuidLow);
                     error = true;
@@ -1445,8 +1588,8 @@ void ObjectMgr::LoadLinkedRespawn()
                     break;
                 }
 
-                guid = ObjectGuid(HIGHGUID_GAMEOBJECT, slave->id, guidLow);
-                linkedGuid = ObjectGuid(HIGHGUID_UNIT, master->id, linkedGuidLow);
+                guid = ObjectGuid(HighGuid::GameObject, slave->id, guidLow);
+                linkedGuid = ObjectGuid(HighGuid::Unit, master->id, linkedGuidLow);
                 break;
             }
         }
@@ -1459,14 +1602,14 @@ void ObjectMgr::LoadLinkedRespawn()
     TC_LOG_INFO("server.loading", ">> Loaded " UI64FMTD " linked respawns in %u ms", uint64(_linkedRespawnStore.size()), GetMSTimeDiffToNow(oldMSTime));
 }
 
-bool ObjectMgr::SetCreatureLinkedRespawn(uint32 guidLow, uint32 linkedGuidLow)
+bool ObjectMgr::SetCreatureLinkedRespawn(ObjectGuid::LowType guidLow, ObjectGuid::LowType linkedGuidLow)
 {
     if (!guidLow)
         return false;
 
     CreatureData const* master = GetCreatureData(guidLow);
     ASSERT(master);
-    ObjectGuid guid(HIGHGUID_UNIT, master->id, guidLow);
+    ObjectGuid guid(HighGuid::Unit, master->id, guidLow);
 
     if (!linkedGuidLow) // we're removing the linking
     {
@@ -1484,8 +1627,8 @@ bool ObjectMgr::SetCreatureLinkedRespawn(uint32 guidLow, uint32 linkedGuidLow)
         return false;
     }
 
-    MapEntry const* map = sMapStore.LookupEntry(master->mapid);
-    if (!map || !map->Instanceable() || (master->mapid != slave->mapid))
+    MapEntry const* map = sMapStore.LookupEntry(master->spawnPoint.GetMapId());
+    if (!map || !map->Instanceable() || (master->spawnPoint.GetMapId() != slave->spawnPoint.GetMapId()))
     {
         TC_LOG_ERROR("sql.sql", "Creature '%u' linking to '%u' on an unpermitted map.", guidLow, linkedGuidLow);
         return false;
@@ -1497,7 +1640,7 @@ bool ObjectMgr::SetCreatureLinkedRespawn(uint32 guidLow, uint32 linkedGuidLow)
         return false;
     }
 
-    ObjectGuid linkedGuid(HIGHGUID_UNIT, slave->id, linkedGuidLow);
+    ObjectGuid linkedGuid(HighGuid::Unit, slave->id, linkedGuidLow);
 
     _linkedRespawnStore[guid] = linkedGuid;
     PreparedStatement *stmt = WorldDatabase.GetPreparedStatement(WORLD_REP_CREATURE_LINKED_RESPAWN);
@@ -1599,17 +1742,19 @@ void ObjectMgr::LoadCreatures()
 {
     uint32 oldMSTime = getMSTime();
 
-    //                                               0              1   2    3        4             5           6           7           8            9              10
-    QueryResult result = WorldDatabase.Query("SELECT creature.guid, id, map, modelid, equipment_id, position_x, position_y, position_z, orientation, spawntimesecs, spawndist, "
+    //                                               0              1   2    3           4           5           6            7        8             9              10
+    QueryResult result = WorldDatabase.Query("SELECT creature.guid, id, map, position_x, position_y, position_z, orientation, modelid, equipment_id, spawntimesecs, spawndist, "
     //   11               12         13       14            15         16         17          18          19                20                   21
-        "currentwaypoint, curhealth, curmana, MovementType, spawnMask, phaseMask, eventEntry, pool_entry, creature.npcflag, creature.unit_flags, creature.dynamicflags "
+        "currentwaypoint, curhealth, curmana, MovementType, spawnMask, phaseMask, eventEntry, pool_entry, creature.npcflag, creature.unit_flags, creature.dynamicflags, "
+    //   22
+        "creature.ScriptName "
         "FROM creature "
         "LEFT OUTER JOIN game_event_creature ON creature.guid = game_event_creature.guid "
         "LEFT OUTER JOIN pool_creature ON creature.guid = pool_creature.guid");
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 creatures. DB table `creature` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 creatures. DB table `creature` is empty.");
         return;
     }
 
@@ -1627,7 +1772,7 @@ void ObjectMgr::LoadCreatures()
     {
         Field* fields = result->Fetch();
 
-        uint32 guid         = fields[0].GetUInt32();
+        ObjectGuid::LowType guid = fields[0].GetUInt32();
         uint32 entry        = fields[1].GetUInt32();
 
         CreatureTemplate const* cInfo = GetCreatureTemplate(entry);
@@ -1638,14 +1783,11 @@ void ObjectMgr::LoadCreatures()
         }
 
         CreatureData& data = _creatureDataStore[guid];
+        data.spawnId        = guid;
         data.id             = entry;
-        data.mapid          = fields[2].GetUInt16();
-        data.displayid      = fields[3].GetUInt32();
-        data.equipmentId    = fields[4].GetInt8();
-        data.posX           = fields[5].GetFloat();
-        data.posY           = fields[6].GetFloat();
-        data.posZ           = fields[7].GetFloat();
-        data.orientation    = fields[8].GetFloat();
+        data.spawnPoint.WorldRelocate(fields[2].GetUInt16(), fields[3].GetFloat(), fields[4].GetFloat(), fields[5].GetFloat(), fields[6].GetFloat());
+        data.displayid      = fields[7].GetUInt32();
+        data.equipmentId    = fields[8].GetInt8();
         data.spawntimesecs  = fields[9].GetUInt32();
         data.spawndist      = fields[10].GetFloat();
         data.currentwaypoint= fields[11].GetUInt32();
@@ -1659,17 +1801,19 @@ void ObjectMgr::LoadCreatures()
         data.npcflag        = fields[19].GetUInt32();
         data.unit_flags     = fields[20].GetUInt32();
         data.dynamicflags   = fields[21].GetUInt32();
+        data.scriptId       = GetScriptId(fields[22].GetString());
+        data.spawnGroupData = &_spawnGroupDataStore[0];
 
-        MapEntry const* mapEntry = sMapStore.LookupEntry(data.mapid);
+        MapEntry const* mapEntry = sMapStore.LookupEntry(data.spawnPoint.GetMapId());
         if (!mapEntry)
         {
-            TC_LOG_ERROR("sql.sql", "Table `creature` has creature (GUID: %u) that spawned at nonexistent map (Id: %u), skipped.", guid, data.mapid);
+            TC_LOG_ERROR("sql.sql", "Table `creature` has creature (GUID: %u) that spawned at nonexistent map (Id: %u), skipped.", guid, data.spawnPoint.GetMapId());
             continue;
         }
 
         // Skip spawnMask check for transport maps
-        if (!IsTransportMap(data.mapid) && data.spawnMask & ~spawnMasks[data.mapid])
-            TC_LOG_ERROR("sql.sql", "Table `creature` has creature (GUID: %u) that have wrong spawn mask %u including unsupported difficulty modes for map (Id: %u).", guid, data.spawnMask, data.mapid);
+        if (!IsTransportMap(data.spawnPoint.GetMapId()) && data.spawnMask & ~spawnMasks[data.spawnPoint.GetMapId()])
+            TC_LOG_ERROR("sql.sql", "Table `creature` has creature (GUID: %u) that have wrong spawn mask %u including unsupported difficulty modes for map (Id: %u).", guid, data.spawnMask, data.spawnPoint.GetMapId());
 
         bool ok = true;
         for (uint32 diff = 0; diff < MAX_DIFFICULTY - 1 && ok; ++diff)
@@ -1684,7 +1828,7 @@ void ObjectMgr::LoadCreatures()
         if (!ok)
             continue;
 
-        // -1 random, 0 no equipment,
+        // -1 random, 0 no equipment
         if (data.equipmentId != 0)
         {
             if (!GetEquipmentInfo(data.id, data.equipmentId))
@@ -1696,8 +1840,14 @@ void ObjectMgr::LoadCreatures()
 
         if (cInfo->flags_extra & CREATURE_FLAG_EXTRA_INSTANCE_BIND)
         {
-            if (!mapEntry || !mapEntry->IsDungeon())
+            if (!mapEntry->IsDungeon())
                 TC_LOG_ERROR("sql.sql", "Table `creature` has creature (GUID: %u Entry: %u) with `creature_template`.`flags_extra` including CREATURE_FLAG_EXTRA_INSTANCE_BIND but creature is not in instance.", guid, data.id);
+        }
+
+        if (data.movementType >= MAX_DB_MOTION_TYPE)
+        {
+            TC_LOG_ERROR("sql.sql", "Table `creature` has creature (GUID: %u Entry: %u) with wrong movement generator type (%u), ignored and set to IDLE.", guid, data.id, data.movementType);
+            data.movementType = IDLE_MOTION_TYPE;
         }
 
         if (data.spawndist < 0.0f)
@@ -1728,17 +1878,11 @@ void ObjectMgr::LoadCreatures()
             data.phaseMask = 1;
         }
 
-        if (std::abs(data.orientation) > 2 * float(M_PI))
-        {
-            TC_LOG_ERROR("sql.sql", "Table `creature` has creature (GUID: %u Entry: %u) with abs(`orientation`) > 2*PI (orientation is expressed in radians), normalized.", guid, data.id);
-            data.orientation = Position::NormalizeOrientation(data.orientation);
-        }
-
         if (sWorld->getBoolConfig(CONFIG_CALCULATE_CREATURE_ZONE_AREA_DATA))
         {
             uint32 zoneId = 0;
             uint32 areaId = 0;
-            sMapMgr->GetZoneAndAreaId(zoneId, areaId, data.mapid, data.posX, data.posY, data.posZ);
+            sMapMgr->GetZoneAndAreaId(zoneId, areaId, data.spawnPoint);
 
             PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_UPD_CREATURE_ZONE_AREA_DATA);
 
@@ -1758,35 +1902,35 @@ void ObjectMgr::LoadCreatures()
     TC_LOG_INFO("server.loading", ">> Loaded " SZFMTD " creatures in %u ms", _creatureDataStore.size(), GetMSTimeDiffToNow(oldMSTime));
 }
 
-void ObjectMgr::AddCreatureToGrid(uint32 guid, CreatureData const* data)
+void ObjectMgr::AddCreatureToGrid(ObjectGuid::LowType guid, CreatureData const* data)
 {
     uint8 mask = data->spawnMask;
     for (uint8 i = 0; mask != 0; i++, mask >>= 1)
     {
         if (mask & 1)
         {
-            CellCoord cellCoord = Trinity::ComputeCellCoord(data->posX, data->posY);
-            CellObjectGuids& cell_guids = _mapObjectGuidsStore[MAKE_PAIR32(data->mapid, i)][cellCoord.GetId()];
+            CellCoord cellCoord = Trinity::ComputeCellCoord(data->spawnPoint.GetPositionX(), data->spawnPoint.GetPositionY());
+            CellObjectGuids& cell_guids = _mapObjectGuidsStore[MAKE_PAIR32(data->spawnPoint.GetMapId(), i)][cellCoord.GetId()];
             cell_guids.creatures.insert(guid);
         }
     }
 }
 
-void ObjectMgr::RemoveCreatureFromGrid(uint32 guid, CreatureData const* data)
+void ObjectMgr::RemoveCreatureFromGrid(ObjectGuid::LowType guid, CreatureData const* data)
 {
     uint8 mask = data->spawnMask;
     for (uint8 i = 0; mask != 0; i++, mask >>= 1)
     {
         if (mask & 1)
         {
-            CellCoord cellCoord = Trinity::ComputeCellCoord(data->posX, data->posY);
-            CellObjectGuids& cell_guids = _mapObjectGuidsStore[MAKE_PAIR32(data->mapid, i)][cellCoord.GetId()];
+            CellCoord cellCoord = Trinity::ComputeCellCoord(data->spawnPoint.GetPositionX(), data->spawnPoint.GetPositionY());
+            CellObjectGuids& cell_guids = _mapObjectGuidsStore[MAKE_PAIR32(data->spawnPoint.GetMapId(), i)][cellCoord.GetId()];
             cell_guids.creatures.erase(guid);
         }
     }
 }
 
-uint32 ObjectMgr::AddGOData(uint32 entry, uint32 mapId, float x, float y, float z, float o, uint32 spawntimedelay, float rotation0, float rotation1, float rotation2, float rotation3)
+ObjectGuid::LowType ObjectMgr::AddGameObjectData(uint32 entry, uint32 mapId, Position const& pos, QuaternionData const& rot, uint32 spawntimedelay /*= 0*/)
 {
     GameObjectTemplate const* goinfo = GetGameObjectTemplate(entry);
     if (!goinfo)
@@ -1796,80 +1940,44 @@ uint32 ObjectMgr::AddGOData(uint32 entry, uint32 mapId, float x, float y, float 
     if (!map)
         return 0;
 
-    uint32 guid = GenerateLowGuid(HIGHGUID_GAMEOBJECT);
-    GameObjectData& data = NewGOData(guid);
+    ObjectGuid::LowType spawnId = GenerateGameObjectSpawnId();
+
+    GameObjectData& data = NewOrExistGameObjectData(spawnId);
+    data.spawnId        = spawnId;
     data.id             = entry;
-    data.mapid          = mapId;
-    data.posX           = x;
-    data.posY           = y;
-    data.posZ           = z;
-    data.orientation    = o;
-    data.rotation0      = rotation0;
-    data.rotation1      = rotation1;
-    data.rotation2      = rotation2;
-    data.rotation3      = rotation3;
+    data.spawnPoint.WorldRelocate(mapId,pos);
+    data.rotation       = rot;
     data.spawntimesecs  = spawntimedelay;
     data.animprogress   = 100;
     data.spawnMask      = 1;
-    data.go_state       = GO_STATE_READY;
+    data.goState        = GO_STATE_READY;
     data.phaseMask      = PHASEMASK_NORMAL;
     data.artKit         = goinfo->type == GAMEOBJECT_TYPE_CAPTURE_POINT ? 21 : 0;
-    data.dbData = false;
+    data.dbData         = false;
+    data.spawnGroupData = GetLegacySpawnGroup();
 
-    AddGameobjectToGrid(guid, &data);
+    AddGameobjectToGrid(spawnId, &data);
 
     // Spawn if necessary (loaded grids only)
     // We use spawn coords to spawn
-    if (!map->Instanceable() && map->IsGridLoaded(x, y))
+    if (!map->Instanceable() && map->IsGridLoaded(data.spawnPoint))
     {
         GameObject* go = new GameObject;
-        if (!go->LoadGameObjectFromDB(guid, map))
+        if (!go->LoadFromDB(spawnId, map, true))
         {
-            TC_LOG_ERROR("misc", "AddGOData: cannot add gameobject entry %u to map", entry);
+            TC_LOG_ERROR("misc", "AddGameObjectData: cannot add gameobject entry %u to map", entry);
             delete go;
             return 0;
         }
     }
 
-    TC_LOG_DEBUG("maps", "AddGOData: dbguid %u entry %u map %u x %f y %f z %f o %f", guid, entry, mapId, x, y, z, o);
+    TC_LOG_DEBUG("maps", "AddGameObjectData: dbguid %u entry %u map %u pos %s", spawnId, entry, mapId, data.spawnPoint.ToString().c_str());
 
-    return guid;
+    return spawnId;
 }
 
-bool ObjectMgr::MoveCreData(uint32 guid, uint32 mapId, const Position& pos)
-{
-    CreatureData& data = NewOrExistCreatureData(guid);
-    if (!data.id)
-        return false;
 
-    RemoveCreatureFromGrid(guid, &data);
-    if (data.posX == pos.GetPositionX() && data.posY == pos.GetPositionY() && data.posZ == pos.GetPositionZ())
-        return true;
-    data.posX = pos.GetPositionX();
-    data.posY = pos.GetPositionY();
-    data.posZ = pos.GetPositionZ();
-    data.orientation = pos.GetOrientation();
-    AddCreatureToGrid(guid, &data);
-
-    // Spawn if necessary (loaded grids only)
-    if (Map* map = sMapMgr->CreateBaseMap(mapId))
-    {
-        // We use spawn coords to spawn
-        if (!map->Instanceable() && map->IsGridLoaded(data.posX, data.posY))
-        {
-            Creature* creature = new Creature();
-            if (!creature->LoadCreatureFromDB(guid, map))
-            {
-                TC_LOG_ERROR("misc", "MoveCreData: Cannot add creature guid %u to map", guid);
-                delete creature;
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-uint32 ObjectMgr::AddCreData(uint32 entry, uint32 mapId, float x, float y, float z, float o, uint32 spawntimedelay /*= 0*/)
+ObjectGuid::LowType ObjectMgr::AddCreatureData(uint32 entry, uint32 mapId, Position const& pos, uint32 spawntimedelay /*= 0*/)
 {
     CreatureTemplate const* cInfo = GetCreatureTemplate(entry);
     if (!cInfo)
@@ -1877,17 +1985,17 @@ uint32 ObjectMgr::AddCreData(uint32 entry, uint32 mapId, float x, float y, float
 
     uint32 level = cInfo->minlevel == cInfo->maxlevel ? cInfo->minlevel : urand(cInfo->minlevel, cInfo->maxlevel); // Only used for extracting creature base stats
     CreatureBaseStats const* stats = GetCreatureBaseStats(level, cInfo->unit_class);
+    Map* map = sMapMgr->CreateBaseMap(mapId);
+    if (!map)
+        return 0;
 
-    uint32 guid = GenerateLowGuid(HIGHGUID_UNIT);
-    CreatureData& data = NewOrExistCreatureData(guid);
+    ObjectGuid::LowType spawnId = GenerateCreatureSpawnId();
+    CreatureData& data = NewOrExistCreatureData(spawnId);
+    data.spawnId = spawnId;
     data.id = entry;
-    data.mapid = mapId;
+    data.spawnPoint.WorldRelocate(mapId, pos);
     data.displayid = 0;
     data.equipmentId = 0;
-    data.posX = x;
-    data.posY = y;
-    data.posZ = z;
-    data.orientation = o;
     data.spawntimesecs = spawntimedelay;
     data.spawndist = 0;
     data.currentwaypoint = 0;
@@ -1900,42 +2008,41 @@ uint32 ObjectMgr::AddCreData(uint32 entry, uint32 mapId, float x, float y, float
     data.npcflag = cInfo->npcflag;
     data.unit_flags = cInfo->unit_flags;
     data.dynamicflags = cInfo->dynamicflags;
+    data.spawnGroupData = GetLegacySpawnGroup();
 
-    AddCreatureToGrid(guid, &data);
+    AddCreatureToGrid(spawnId, &data);
 
-    // Spawn if necessary (loaded grids only)
-    if (Map* map = sMapMgr->CreateBaseMap(mapId))
+    // We use spawn coords to spawn
+    if (!map->Instanceable() && !map->IsRemovalGrid(data.spawnPoint))
     {
-        // We use spawn coords to spawn
-        if (!map->Instanceable() && !map->IsRemovalGrid(x, y))
+        Creature* creature = new Creature();
+        if (!creature->LoadFromDB(spawnId, map, true, true))
         {
-            Creature* creature = new Creature();
-            if (!creature->LoadCreatureFromDB(guid, map))
-            {
-                TC_LOG_ERROR("misc", "AddCreature: Cannot add creature entry %u to map", entry);
-                delete creature;
-                return 0;
-            }
+            TC_LOG_ERROR("misc", "AddCreature: Cannot add creature entry %u to map", entry);
+            delete creature;
+            return 0;
         }
     }
 
-    return guid;
+    return spawnId;
 }
 
-void ObjectMgr::LoadGameobjects()
+void ObjectMgr::LoadGameObjects()
 {
     uint32 oldMSTime = getMSTime();
 
     //                                                0                1   2    3           4           5           6
     QueryResult result = WorldDatabase.Query("SELECT gameobject.guid, id, map, position_x, position_y, position_z, orientation, "
     //   7          8          9          10         11             12            13     14         15         16          17
-        "rotation0, rotation1, rotation2, rotation3, spawntimesecs, animprogress, state, spawnMask, phaseMask, eventEntry, pool_entry "
+        "rotation0, rotation1, rotation2, rotation3, spawntimesecs, animprogress, state, spawnMask, phaseMask, eventEntry, pool_entry, "
+    //   18
+        "ScriptName "
         "FROM gameobject LEFT OUTER JOIN game_event_gameobject ON gameobject.guid = game_event_gameobject.guid "
         "LEFT OUTER JOIN pool_gameobject ON gameobject.guid = pool_gameobject.guid");
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 gameobjects. DB table `gameobject` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 gameobjects. DB table `gameobject` is empty.");
         return;
     }
 
@@ -1953,7 +2060,7 @@ void ObjectMgr::LoadGameobjects()
     {
         Field* fields = result->Fetch();
 
-        uint32 guid         = fields[0].GetUInt32();
+        ObjectGuid::LowType guid = fields[0].GetUInt32();
         uint32 entry        = fields[1].GetUInt32();
 
         GameObjectTemplate const* gInfo = GetGameObjectTemplate(entry);
@@ -1984,22 +2091,20 @@ void ObjectMgr::LoadGameobjects()
 
         GameObjectData& data = _gameObjectDataStore[guid];
 
+        data.spawnId        = guid;
         data.id             = entry;
-        data.mapid          = fields[2].GetUInt16();
-        data.posX           = fields[3].GetFloat();
-        data.posY           = fields[4].GetFloat();
-        data.posZ           = fields[5].GetFloat();
-        data.orientation    = fields[6].GetFloat();
-        data.rotation0      = fields[7].GetFloat();
-        data.rotation1      = fields[8].GetFloat();
-        data.rotation2      = fields[9].GetFloat();
-        data.rotation3      = fields[10].GetFloat();
+        data.spawnPoint.WorldRelocate(fields[2].GetUInt16(), fields[3].GetFloat(), fields[4].GetFloat(), fields[5].GetFloat(), fields[6].GetFloat());
+        data.rotation.x     = fields[7].GetFloat();
+        data.rotation.y     = fields[8].GetFloat();
+        data.rotation.z     = fields[9].GetFloat();
+        data.rotation.w     = fields[10].GetFloat();
         data.spawntimesecs  = fields[11].GetInt32();
+        data.spawnGroupData = &_spawnGroupDataStore[0];
 
-        MapEntry const* mapEntry = sMapStore.LookupEntry(data.mapid);
+        MapEntry const* mapEntry = sMapStore.LookupEntry(data.spawnPoint.GetMapId());
         if (!mapEntry)
         {
-            TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) spawned on a non-existed map (Id: %u), skip", guid, data.id, data.mapid);
+            TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) spawned on a non-existed map (Id: %u), skip", guid, data.id, data.spawnPoint.GetMapId());
             continue;
         }
 
@@ -2017,36 +2122,44 @@ void ObjectMgr::LoadGameobjects()
             TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) with invalid `state` (%u) value, skip", guid, data.id, go_state);
             continue;
         }
-        data.go_state       = GOState(go_state);
+        data.goState       = GOState(go_state);
 
         data.spawnMask      = fields[14].GetUInt8();
 
-        if (!IsTransportMap(data.mapid) && data.spawnMask & ~spawnMasks[data.mapid])
-            TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) that has wrong spawn mask %u including unsupported difficulty modes for map (Id: %u), skip", guid, data.id, data.spawnMask, data.mapid);
+        if (!IsTransportMap(data.spawnPoint.GetMapId()) && data.spawnMask & ~spawnMasks[data.spawnPoint.GetMapId()])
+            TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) that has wrong spawn mask %u including unsupported difficulty modes for map (Id: %u), skip", guid, data.id, data.spawnMask, data.spawnPoint.GetMapId());
 
         data.phaseMask      = fields[15].GetUInt32();
         int16 gameEvent     = fields[16].GetInt8();
         uint32 PoolId        = fields[17].GetUInt32();
 
-        if (std::abs(data.orientation) > 2 * float(M_PI))
-        {
-            TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) with abs(`orientation`) > 2*PI (orientation is expressed in radians), normalized.", guid, data.id);
-            data.orientation = Position::NormalizeOrientation(data.orientation);
-        }
+        data.scriptId = GetScriptId(fields[18].GetString());
 
-        if (data.rotation2 < -1.0f || data.rotation2 > 1.0f)
+        if (data.rotation.x < -1.0f || data.rotation.x > 1.0f)
         {
-            TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) with invalid rotation2 (%f) value, skip", guid, data.id, data.rotation2);
+            TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) with invalid rotationX (%f) value, skip", guid, data.id, data.rotation.x);
             continue;
         }
 
-        if (data.rotation3 < -1.0f || data.rotation3 > 1.0f)
+        if (data.rotation.y < -1.0f || data.rotation.y > 1.0f)
         {
-            TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) with invalid rotation3 (%f) value, skip", guid, data.id, data.rotation3);
+            TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) with invalid rotationY (%f) value, skip", guid, data.id, data.rotation.y);
             continue;
         }
 
-        if (!MapManager::IsValidMapCoord(data.mapid, data.posX, data.posY, data.posZ, data.orientation))
+        if (data.rotation.z < -1.0f || data.rotation.z > 1.0f)
+        {
+            TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) with invalid rotationZ (%f) value, skip", guid, data.id, data.rotation.z);
+            continue;
+        }
+
+        if (data.rotation.w < -1.0f || data.rotation.w > 1.0f)
+        {
+            TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) with invalid rotationW (%f) value, skip", guid, data.id, data.rotation.w);
+            continue;
+        }
+
+        if (!MapManager::IsValidMapCoord(data.spawnPoint))
         {
             TC_LOG_ERROR("sql.sql", "Table `gameobject` has gameobject (GUID: %u Entry: %u) with invalid coordinates, skip", guid, data.id);
             continue;
@@ -2062,7 +2175,7 @@ void ObjectMgr::LoadGameobjects()
         {
             uint32 zoneId = 0;
             uint32 areaId = 0;
-            sMapMgr->GetZoneAndAreaId(zoneId, areaId, data.mapid, data.posX, data.posY, data.posZ);
+            sMapMgr->GetZoneAndAreaId(zoneId, areaId, data.spawnPoint);
 
             PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_UPD_GAMEOBJECT_ZONE_AREA_DATA);
 
@@ -2081,140 +2194,233 @@ void ObjectMgr::LoadGameobjects()
     TC_LOG_INFO("server.loading", ">> Loaded " SZFMTD " gameobjects in %u ms", _gameObjectDataStore.size(), GetMSTimeDiffToNow(oldMSTime));
 }
 
-void ObjectMgr::AddGameobjectToGrid(uint32 guid, GameObjectData const* data)
+void ObjectMgr::LoadSpawnGroupTemplates()
+{
+    uint32 oldMSTime = getMSTime();
+
+    //                                               0        1          2
+    QueryResult result = WorldDatabase.Query("SELECT groupId, groupName, groupFlags FROM spawn_group_template");
+
+    if (result)
+    {
+        do
+        {
+            Field* fields = result->Fetch();
+            uint32 groupId = fields[0].GetUInt32();
+            SpawnGroupTemplateData& group = _spawnGroupDataStore[groupId];
+            group.groupId = groupId;
+            group.name = fields[1].GetString();
+            group.mapId = SPAWNGROUP_MAP_UNSET;
+            uint32 flags = fields[2].GetUInt32();
+            if (flags & ~SPAWNGROUP_FLAGS_ALL)
+            {
+                flags &= SPAWNGROUP_FLAGS_ALL;
+                TC_LOG_ERROR("sql.sql", "Invalid spawn group flag %u on group ID %u (%s), reduced to valid flag %u.", flags, groupId, group.name.c_str(), uint32(group.flags));
+            }
+            if (flags & SPAWNGROUP_FLAG_SYSTEM && flags & SPAWNGROUP_FLAG_MANUAL_SPAWN)
+            {
+                flags &= ~SPAWNGROUP_FLAG_MANUAL_SPAWN;
+                TC_LOG_ERROR("sql.sql", "System spawn group %u (%s) has invalid manual spawn flag. Ignored.", groupId, group.name.c_str());
+            }
+            group.flags = SpawnGroupFlags(flags);
+        } while (result->NextRow());
+    }
+
+    if (_spawnGroupDataStore.find(0) == _spawnGroupDataStore.end())
+    {
+        TC_LOG_ERROR("sql.sql", "Default spawn group (index 0) is missing from DB! Manually inserted.");
+        SpawnGroupTemplateData& data = _spawnGroupDataStore[0];
+        data.groupId = 0;
+        data.name = "Default Group";
+        data.mapId = 0;
+        data.flags = SPAWNGROUP_FLAG_SYSTEM;
+    }
+    if (_spawnGroupDataStore.find(1) == _spawnGroupDataStore.end())
+    {
+        TC_LOG_ERROR("sql.sql", "Default legacy spawn group (index 1) is missing from DB! Manually inserted.");
+        SpawnGroupTemplateData&data = _spawnGroupDataStore[1];
+        data.groupId = 1;
+        data.name = "Legacy Group";
+        data.mapId = 0;
+        data.flags = SpawnGroupFlags(SPAWNGROUP_FLAG_SYSTEM | SPAWNGROUP_FLAG_COMPATIBILITY_MODE);
+    }
+
+    if (result)
+        TC_LOG_INFO("server.loading", ">> Loaded " SZFMTD " spawn group templates in %u ms", _spawnGroupDataStore.size(), GetMSTimeDiffToNow(oldMSTime));
+    else
+        TC_LOG_INFO("server.loading", ">> Loaded 0 spawn group templates. DB table `spawn_group_template` is empty.");
+
+    return;
+}
+
+void ObjectMgr::LoadSpawnGroups()
+{
+    uint32 oldMSTime = getMSTime();
+
+    //                                               0        1          2
+    QueryResult result = WorldDatabase.Query("SELECT groupId, spawnType, spawnId FROM spawn_group");
+
+    if (!result)
+    {
+        TC_LOG_INFO("server.loading", ">> Loaded 0 spawn group members. DB table `spawn_group` is empty.");
+        return;
+    }
+
+    uint32 numMembers = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+        uint32 groupId = fields[0].GetUInt32();
+        SpawnObjectType spawnType;
+        {
+            uint32 type = fields[1].GetUInt8();
+            if (type >= SPAWN_TYPE_MAX)
+            {
+                TC_LOG_ERROR("sql.sql", "Spawn data with invalid type %u listed for spawn group %u. Skipped.", type, groupId);
+                continue;
+            }
+            spawnType = SpawnObjectType(type);
+        }
+        ObjectGuid::LowType spawnId = fields[2].GetUInt32();
+
+        SpawnData const* data = GetSpawnData(spawnType, spawnId);
+        if (!data)
+        {
+            TC_LOG_ERROR("sql.sql", "Spawn data with ID (%u,%u) not found, but is listed as a member of spawn group %u!", uint32(spawnType), spawnId, groupId);
+            continue;
+        }
+        else if (data->spawnGroupData->groupId)
+        {
+            TC_LOG_ERROR("sql.sql", "Spawn with ID (%u,%u) is listed as a member of spawn group %u, but is already a member of spawn group %u. Skipping.", uint32(spawnType), spawnId, groupId, data->spawnGroupData->groupId);
+            continue;
+        }
+        auto it = _spawnGroupDataStore.find(groupId);
+        if (it == _spawnGroupDataStore.end())
+        {
+            TC_LOG_ERROR("sql.sql", "Spawn group %u assigned to spawn ID (%u,%u), but group is found!", groupId, uint32(spawnType), spawnId);
+            continue;
+        }
+        else
+        {
+            SpawnGroupTemplateData& groupTemplate = it->second;
+            if (groupTemplate.mapId == SPAWNGROUP_MAP_UNSET)
+                groupTemplate.mapId = data->spawnPoint.GetMapId();
+            else if (groupTemplate.mapId != data->spawnPoint.GetMapId() && !(groupTemplate.flags & SPAWNGROUP_FLAG_SYSTEM))
+            {
+                TC_LOG_ERROR("sql.sql", "Spawn group %u has map ID %u, but spawn (%u,%u) has map id %u - spawn NOT added to group!", groupId, groupTemplate.mapId, uint32(spawnType), spawnId, data->spawnPoint.GetMapId());
+                continue;
+            }
+            const_cast<SpawnData*>(data)->spawnGroupData = &groupTemplate;
+            if (!(groupTemplate.flags & SPAWNGROUP_FLAG_SYSTEM))
+                _spawnGroupMapStore.emplace(groupId, data);
+            ++numMembers;
+        }
+    } while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded %u spawn group members in %u ms", numMembers, GetMSTimeDiffToNow(oldMSTime));
+}
+
+void ObjectMgr::LoadInstanceSpawnGroups()
+{
+    uint32 oldMSTime = getMSTime();
+
+    //                                               0              1            2           3             4
+    QueryResult result = WorldDatabase.Query("SELECT instanceMapId, bossStateId, bossStates, spawnGroupId, flags FROM instance_spawn_groups");
+
+    if (!result)
+    {
+        TC_LOG_INFO("server.loading", ">> Loaded 0 instance spawn groups. DB table `instance_spawn_groups` is empty.");
+        return;
+    }
+
+    uint32 n = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+        uint32 const spawnGroupId = fields[3].GetUInt32();
+        auto it = _spawnGroupDataStore.find(spawnGroupId);
+        if (it == _spawnGroupDataStore.end() || (it->second.flags & SPAWNGROUP_FLAG_SYSTEM))
+        {
+            TC_LOG_ERROR("sql.sql", "Invalid spawn group %u specified for instance %u. Skipped.", spawnGroupId, fields[0].GetUInt16());
+            continue;
+        }
+
+        uint16 const instanceMapId = fields[0].GetUInt16();
+        auto& vector = _instanceSpawnGroupStore[instanceMapId];
+        vector.emplace_back();
+        InstanceSpawnGroupInfo& info = vector.back();
+        info.SpawnGroupId = spawnGroupId;
+        info.BossStateId = fields[1].GetUInt8();
+
+        uint8 const ALL_STATES = (1 << TO_BE_DECIDED) - 1;
+        uint8 const states = fields[2].GetUInt8();
+        if (states & ~ALL_STATES)
+        {
+            info.BossStates = states & ALL_STATES;
+            TC_LOG_ERROR("sql.sql", "Instance spawn group (%u,%u) had invalid boss state mask %u - truncated to %u.", instanceMapId, spawnGroupId, states, info.BossStates);
+        }
+        else
+            info.BossStates = states;
+
+        uint8 const flags = fields[4].GetUInt8();
+        if (flags & ~InstanceSpawnGroupInfo::FLAG_ALL)
+        {
+            info.Flags = flags & InstanceSpawnGroupInfo::FLAG_ALL;
+            TC_LOG_ERROR("sql.sql", "Instance spawn group (%u,%u) had invalid flags %u - truncated to %u.", instanceMapId, spawnGroupId, flags, info.Flags);
+        }
+        else
+            info.Flags = flags;
+
+        ++n;
+    } while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded %u instance spawn groups in %u ms", n, GetMSTimeDiffToNow(oldMSTime));
+}
+
+void ObjectMgr::OnDeleteSpawnData(SpawnData const* data)
+{
+    auto templateIt = _spawnGroupDataStore.find(data->spawnGroupData->groupId);
+    ASSERT(templateIt != _spawnGroupDataStore.end(), "Creature data for (%u,%u) is being deleted and has invalid spawn group index %u!", uint32(data->type), data->spawnId, data->spawnGroupData->groupId);
+    if (templateIt->second.flags & SPAWNGROUP_FLAG_SYSTEM) // system groups don't store their members in the map
+        return;
+
+    auto pair = _spawnGroupMapStore.equal_range(data->spawnGroupData->groupId);
+    for (auto it = pair.first; it != pair.second; ++it)
+    {
+        if (it->second != data)
+            continue;
+        _spawnGroupMapStore.erase(it);
+        return;
+    }
+    ASSERT(false, "Spawn data (%u,%u) being removed is member of spawn group %u, but not actually listed in the lookup table for that group!", uint32(data->type), data->spawnId, data->spawnGroupData->groupId);
+}
+
+void ObjectMgr::AddGameobjectToGrid(ObjectGuid::LowType guid, GameObjectData const* data)
 {
     uint8 mask = data->spawnMask;
     for (uint8 i = 0; mask != 0; i++, mask >>= 1)
     {
         if (mask & 1)
         {
-            CellCoord cellCoord = Trinity::ComputeCellCoord(data->posX, data->posY);
-            CellObjectGuids& cell_guids = _mapObjectGuidsStore[MAKE_PAIR32(data->mapid, i)][cellCoord.GetId()];
+            CellCoord cellCoord = Trinity::ComputeCellCoord(data->spawnPoint.GetPositionX(), data->spawnPoint.GetPositionY());
+            CellObjectGuids& cell_guids = _mapObjectGuidsStore[MAKE_PAIR32(data->spawnPoint.GetMapId(), i)][cellCoord.GetId()];
             cell_guids.gameobjects.insert(guid);
         }
     }
 }
 
-void ObjectMgr::RemoveGameobjectFromGrid(uint32 guid, GameObjectData const* data)
+void ObjectMgr::RemoveGameobjectFromGrid(ObjectGuid::LowType guid, GameObjectData const* data)
 {
     uint8 mask = data->spawnMask;
     for (uint8 i = 0; mask != 0; i++, mask >>= 1)
     {
         if (mask & 1)
         {
-            CellCoord cellCoord = Trinity::ComputeCellCoord(data->posX, data->posY);
-            CellObjectGuids& cell_guids = _mapObjectGuidsStore[MAKE_PAIR32(data->mapid, i)][cellCoord.GetId()];
+            CellCoord cellCoord = Trinity::ComputeCellCoord(data->spawnPoint.GetPositionX(), data->spawnPoint.GetPositionY());
+            CellObjectGuids& cell_guids = _mapObjectGuidsStore[MAKE_PAIR32(data->spawnPoint.GetMapId(), i)][cellCoord.GetId()];
             cell_guids.gameobjects.erase(guid);
         }
     }
-}
-
-Player* ObjectMgr::GetPlayerByLowGUID(uint32 lowguid) const
-{
-    ObjectGuid guid(HIGHGUID_PLAYER, lowguid);
-    return ObjectAccessor::FindPlayer(guid);
-}
-
-// name must be checked to correctness (if received) before call this function
-ObjectGuid ObjectMgr::GetPlayerGUIDByName(std::string const& name) const
-{
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_GUID_BY_NAME);
-
-    stmt->setString(0, name);
-
-    PreparedQueryResult result = CharacterDatabase.Query(stmt);
-
-    if (result)
-        return ObjectGuid(HIGHGUID_PLAYER, (*result)[0].GetUInt32());
-
-    return ObjectGuid::Empty;
-}
-
-bool ObjectMgr::GetPlayerNameByGUID(ObjectGuid guid, std::string& name) const
-{
-    // prevent DB access for online player
-    if (Player* player = ObjectAccessor::FindConnectedPlayer(guid))
-    {
-        name = player->GetName();
-        return true;
-    }
-
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_CHARACTER_NAME);
-
-    stmt->setUInt32(0, guid.GetCounter());
-
-    PreparedQueryResult result = CharacterDatabase.Query(stmt);
-
-    if (result)
-    {
-        name = (*result)[0].GetString();
-        return true;
-    }
-
-    return false;
-}
-
-uint32 ObjectMgr::GetPlayerTeamByGUID(ObjectGuid guid) const
-{
-    // prevent DB access for online player
-    if (Player* player = ObjectAccessor::FindConnectedPlayer(guid))
-    {
-        return Player::TeamForRace(player->getRace());
-    }
-
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_CHAR_RACE);
-
-    stmt->setUInt32(0, guid.GetCounter());
-
-    PreparedQueryResult result = CharacterDatabase.Query(stmt);
-
-    if (result)
-    {
-        uint8 race = (*result)[0].GetUInt8();
-        return Player::TeamForRace(race);
-    }
-
-    return 0;
-}
-
-uint32 ObjectMgr::GetPlayerAccountIdByGUID(ObjectGuid guid) const
-{
-    // prevent DB access for online player
-    if (Player* player = ObjectAccessor::FindConnectedPlayer(guid))
-    {
-        return player->GetSession()->GetAccountId();
-    }
-
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_ACCOUNT_BY_GUID);
-
-    stmt->setUInt32(0, guid.GetCounter());
-
-    PreparedQueryResult result = CharacterDatabase.Query(stmt);
-
-    if (result)
-    {
-        uint32 acc = (*result)[0].GetUInt32();
-        return acc;
-    }
-
-    return 0;
-}
-
-uint32 ObjectMgr::GetPlayerAccountIdByPlayerName(const std::string& name) const
-{
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_ACCOUNT_BY_NAME);
-
-    stmt->setString(0, name);
-
-    PreparedQueryResult result = CharacterDatabase.Query(stmt);
-
-    if (result)
-    {
-        uint32 acc = (*result)[0].GetUInt32();
-        return acc;
-    }
-
-    return 0;
 }
 
 void ObjectMgr::LoadItemLocales()
@@ -2223,8 +2429,8 @@ void ObjectMgr::LoadItemLocales()
 
     _itemLocaleStore.clear();                                 // need for reload case
 
-    QueryResult result = WorldDatabase.Query("SELECT entry, name_loc1, description_loc1, name_loc2, description_loc2, name_loc3, description_loc3, name_loc4, description_loc4, name_loc5, description_loc5, name_loc6, description_loc6, name_loc7, description_loc7, name_loc8, description_loc8 FROM locales_item");
-
+    //                                               0   1       2     3
+    QueryResult result = WorldDatabase.Query("SELECT ID, locale, Name, Description FROM item_template_locale");
     if (!result)
         return;
 
@@ -2232,16 +2438,18 @@ void ObjectMgr::LoadItemLocales()
     {
         Field* fields = result->Fetch();
 
-        uint32 entry = fields[0].GetUInt32();
+        uint32 id               = fields[0].GetUInt32();
+        std::string localeName  = fields[1].GetString();
+        std::string Name        = fields[2].GetString();
+        std::string Description = fields[3].GetString();
 
-        ItemLocale& data = _itemLocaleStore[entry];
+        ItemLocale& data        = _itemLocaleStore[id];
+        LocaleConstant locale   = GetLocaleByName(localeName);
+        if (locale == LOCALE_enUS)
+            continue;
 
-        for (uint8 i = TOTAL_LOCALES - 1; i > 0; --i)
-        {
-            LocaleConstant locale = (LocaleConstant) i;
-            AddLocaleString(fields[1 + 2 * (i - 1)].GetString(), locale, data.Name);
-            AddLocaleString(fields[1 + 2 * (i - 1) + 1].GetString(), locale, data.Description);
-        }
+        AddLocaleString(Name, locale, data.Name);
+        AddLocaleString(Description, locale, data.Description);
     } while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded %u Item locale strings in %u ms", uint32(_itemLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
@@ -2331,6 +2539,12 @@ void ObjectMgr::LoadItemTemplates()
         itemTemplate.ContainerSlots            = uint32(fields[26].GetUInt8());
         itemTemplate.StatsCount                = uint32(fields[27].GetUInt8());
 
+        if (itemTemplate.StatsCount > MAX_ITEM_PROTO_STATS)
+        {
+            TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has too large value in statscount (%u), replace by hardcoded limit (%u).", entry, itemTemplate.StatsCount, MAX_ITEM_PROTO_STATS);
+            itemTemplate.StatsCount = MAX_ITEM_PROTO_STATS;
+        }
+
         for (uint8 i = 0; i < itemTemplate.StatsCount; ++i)
         {
             itemTemplate.ItemStat[i].ItemStatType  = uint32(fields[28 + i*2].GetUInt8());
@@ -2401,7 +2615,7 @@ void ObjectMgr::LoadItemTemplates()
         itemTemplate.Duration                = fields[129].GetUInt32();
         itemTemplate.ItemLimitCategory       = uint32(fields[130].GetInt16());
         itemTemplate.HolidayId               = fields[131].GetUInt32();
-        itemTemplate.ScriptId                = sObjectMgr->GetScriptId(fields[132].GetCString());
+        itemTemplate.ScriptId                = sObjectMgr->GetScriptId(fields[132].GetString());
         itemTemplate.DisenchantID            = fields[133].GetUInt32();
         itemTemplate.FoodType                = uint32(fields[134].GetUInt8());
         itemTemplate.MinMoneyLoot            = fields[135].GetUInt32();
@@ -2474,23 +2688,23 @@ void ObjectMgr::LoadItemTemplates()
             itemTemplate.Quality = ITEM_QUALITY_NORMAL;
         }
 
-        if (itemTemplate.Flags2 & ITEM_FLAGS_EXTRA_HORDE_ONLY)
+        if (itemTemplate.Flags2 & ITEM_FLAG2_FACTION_HORDE)
         {
             if (FactionEntry const* faction = sFactionStore.LookupEntry(HORDE))
                 if ((itemTemplate.AllowableRace & faction->BaseRepRaceMask[0]) == 0)
-                    TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has value (%u) in `AllowableRace` races, not compatible with ITEM_FLAGS_EXTRA_HORDE_ONLY (%u) in Flags field, item cannot be equipped or used by these races.",
-                        entry, itemTemplate.AllowableRace, ITEM_FLAGS_EXTRA_HORDE_ONLY);
+                    TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has value (%u) in `AllowableRace` races, not compatible with ITEM_FLAG2_FACTION_HORDE (%u) in Flags field, item cannot be equipped or used by these races.",
+                        entry, itemTemplate.AllowableRace, ITEM_FLAG2_FACTION_HORDE);
 
-            if (itemTemplate.Flags2 & ITEM_FLAGS_EXTRA_ALLIANCE_ONLY)
-                TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has value (%u) in `Flags2` flags (ITEM_FLAGS_EXTRA_ALLIANCE_ONLY) and ITEM_FLAGS_EXTRA_HORDE_ONLY (%u) in Flags field, this is a wrong combination.",
-                    entry, ITEM_FLAGS_EXTRA_ALLIANCE_ONLY, ITEM_FLAGS_EXTRA_HORDE_ONLY);
+            if (itemTemplate.Flags2 & ITEM_FLAG2_FACTION_ALLIANCE)
+                TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has value (%u) in `Flags2` flags (ITEM_FLAG2_FACTION_ALLIANCE) and ITEM_FLAG2_FACTION_HORDE (%u) in Flags field, this is a wrong combination.",
+                    entry, ITEM_FLAG2_FACTION_ALLIANCE, ITEM_FLAG2_FACTION_HORDE);
         }
-        else if (itemTemplate.Flags2 & ITEM_FLAGS_EXTRA_ALLIANCE_ONLY)
+        else if (itemTemplate.Flags2 & ITEM_FLAG2_FACTION_ALLIANCE)
         {
             if (FactionEntry const* faction = sFactionStore.LookupEntry(ALLIANCE))
                 if ((itemTemplate.AllowableRace & faction->BaseRepRaceMask[0]) == 0)
-                    TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has value (%u) in `AllowableRace` races, not compatible with ITEM_FLAGS_EXTRA_ALLIANCE_ONLY (%u) in Flags field, item cannot be equipped or used by these races.",
-                        entry, itemTemplate.AllowableRace, ITEM_FLAGS_EXTRA_ALLIANCE_ONLY);
+                    TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has value (%u) in `AllowableRace` races, not compatible with ITEM_FLAG2_FACTION_ALLIANCE (%u) in Flags field, item cannot be equipped or used by these races.",
+                        entry, itemTemplate.AllowableRace, ITEM_FLAG2_FACTION_ALLIANCE);
         }
 
         if (itemTemplate.BuyCount <= 0)
@@ -2517,7 +2731,7 @@ void ObjectMgr::LoadItemTemplates()
             if (!req)
                 for (uint8 j = 0; j < MAX_ITEM_PROTO_SPELLS; ++j)
                 {
-                    if (itemTemplate.Spells[j].SpellId)
+                    if (itemTemplate.Spells[j].SpellId > 0)
                     {
                         req = true;
                         break;
@@ -2576,12 +2790,6 @@ void ObjectMgr::LoadItemTemplates()
         {
             TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has too large value in ContainerSlots (%u), replace by hardcoded limit (%u).", entry, itemTemplate.ContainerSlots, MAX_BAG_SIZE);
             itemTemplate.ContainerSlots = MAX_BAG_SIZE;
-        }
-
-        if (itemTemplate.StatsCount > MAX_ITEM_PROTO_STATS)
-        {
-            TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has too large value in statscount (%u), replace by hardcoded limit (%u).", entry, itemTemplate.StatsCount, MAX_ITEM_PROTO_STATS);
-            itemTemplate.StatsCount = MAX_ITEM_PROTO_STATS;
         }
 
         for (uint8 j = 0; j < itemTemplate.StatsCount; ++j)
@@ -2643,7 +2851,7 @@ void ObjectMgr::LoadItemTemplates()
             else if (itemTemplate.Spells[1].SpellId != -1)
             {
                 SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(itemTemplate.Spells[1].SpellId);
-                if (!spellInfo && !DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, itemTemplate.Spells[1].SpellId, NULL))
+                if (!spellInfo && !DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, itemTemplate.Spells[1].SpellId, nullptr))
                 {
                     TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has wrong (not existing) spell in spellid_%d (%d)", entry, 1+1, itemTemplate.Spells[1].SpellId);
                     itemTemplate.Spells[0].SpellId = 0;
@@ -2691,7 +2899,7 @@ void ObjectMgr::LoadItemTemplates()
                 if (itemTemplate.Spells[j].SpellId && itemTemplate.Spells[j].SpellId != -1)
                 {
                     SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(itemTemplate.Spells[j].SpellId);
-                    if (!spellInfo && !DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, itemTemplate.Spells[j].SpellId, NULL))
+                    if (!spellInfo && !DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, itemTemplate.Spells[j].SpellId, nullptr))
                     {
                         TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has wrong (not existing) spell in spellid_%d (%d)", entry, j+1, itemTemplate.Spells[j].SpellId);
                         itemTemplate.Spells[j].SpellId = 0;
@@ -2746,7 +2954,7 @@ void ObjectMgr::LoadItemTemplates()
             itemTemplate.ItemSet = 0;
         }
 
-        if (itemTemplate.Area && !GetAreaEntryByAreaID(itemTemplate.Area))
+        if (itemTemplate.Area && !sAreaTableStore.LookupEntry(itemTemplate.Area))
             TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has wrong Area (%u)", entry, itemTemplate.Area);
 
         if (itemTemplate.Map && !sMapStore.LookupEntry(itemTemplate.Map))
@@ -2820,6 +3028,9 @@ void ObjectMgr::LoadItemTemplates()
             itemTemplate.FlagsCu &= ~ITEM_FLAGS_CU_DURATION_REAL_TIME;
         }
 
+        // Load cached data
+        itemTemplate._LoadTotalAP();
+
         ++count;
     }
     while (result->NextRow());
@@ -2850,13 +3061,13 @@ void ObjectMgr::LoadItemTemplates()
     TC_LOG_INFO("server.loading", ">> Loaded %u item templates in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
-ItemTemplate const* ObjectMgr::GetItemTemplate(uint32 entry)
+ItemTemplate const* ObjectMgr::GetItemTemplate(uint32 entry) const
 {
     ItemTemplateContainer::const_iterator itr = _itemTemplateStore.find(entry);
     if (itr != _itemTemplateStore.end())
         return &(itr->second);
 
-    return NULL;
+    return nullptr;
 }
 
 void ObjectMgr::LoadItemSetNameLocales()
@@ -2865,8 +3076,8 @@ void ObjectMgr::LoadItemSetNameLocales()
 
     _itemSetNameLocaleStore.clear();                                 // need for reload case
 
-    QueryResult result = WorldDatabase.Query("SELECT `entry`, `name_loc1`, `name_loc2`, `name_loc3`, `name_loc4`, `name_loc5`, `name_loc6`, `name_loc7`, `name_loc8` FROM `locales_item_set_names`");
-
+    //                                               0   1       2
+    QueryResult result = WorldDatabase.Query("SELECT ID, locale, Name FROM item_set_names_locale");
     if (!result)
         return;
 
@@ -2874,12 +3085,16 @@ void ObjectMgr::LoadItemSetNameLocales()
     {
         Field* fields = result->Fetch();
 
-        uint32 entry = fields[0].GetUInt32();
+        uint32 id               = fields[0].GetUInt32();
+        std::string localeName  = fields[1].GetString();
+        std::string Name        = fields[2].GetString();
 
-        ItemSetNameLocale& data = _itemSetNameLocaleStore[entry];
+        ItemSetNameLocale& data = _itemSetNameLocaleStore[id];
+        LocaleConstant locale   = GetLocaleByName(localeName);
+        if (locale == LOCALE_enUS)
+            continue;
 
-        for (uint8 i = TOTAL_LOCALES - 1; i > 0; --i)
-            AddLocaleString(fields[i].GetString(), LocaleConstant(i), data.Name);
+        AddLocaleString(Name, locale, data.Name);
     } while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded " UI64FMTD " Item set name locale strings in %u ms", uint64(_itemSetNameLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
@@ -2980,7 +3195,7 @@ void ObjectMgr::LoadVehicleTemplateAccessories()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 vehicle template accessories. DB table `vehicle_template_accessory` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 vehicle template accessories. DB table `vehicle_template_accessory` is empty.");
         return;
     }
 
@@ -3074,7 +3289,7 @@ void ObjectMgr::LoadPetLevelInfo()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 level pet stats definitions. DB table `pet_levelstats` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 level pet stats definitions. DB table `pet_levelstats` is empty.");
         return;
     }
 
@@ -3110,8 +3325,7 @@ void ObjectMgr::LoadPetLevelInfo()
         }
 
         PetLevelInfo*& pInfoMapEntry = _petInfoStore[creature_id];
-
-        if (pInfoMapEntry == NULL)
+        if (!pInfoMapEntry)
             pInfoMapEntry = new PetLevelInfo[sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL)];
 
         // data for level 1 stored in [0] array element, ...
@@ -3163,7 +3377,7 @@ PetLevelInfo const* ObjectMgr::GetPetLevelInfo(uint32 creature_id, uint8 level) 
 
     PetLevelInfoContainer::const_iterator itr = _petInfoStore.find(creature_id);
     if (itr == _petInfoStore.end())
-        return NULL;
+        return nullptr;
 
     return &itr->second[level-1];                           // data for level 1 stored in [0] array element, ...
 }
@@ -3369,7 +3583,7 @@ void ObjectMgr::LoadPlayerInfo()
 
         if (!result)
         {
-            TC_LOG_ERROR("server.loading", ">> Loaded 0 player create skills. DB table `playercreateinfo_skills` is empty.");
+            TC_LOG_INFO("server.loading", ">> Loaded 0 player create skills. DB table `playercreateinfo_skills` is empty.");
         }
         else
         {
@@ -3443,7 +3657,7 @@ void ObjectMgr::LoadPlayerInfo()
 
         if (!result)
         {
-            TC_LOG_ERROR("server.loading", ">> Loaded 0 player create spells. DB table `playercreateinfo_spell_custom` is empty.");
+            TC_LOG_INFO("server.loading", ">> Loaded 0 player create spells. DB table `playercreateinfo_spell_custom` is empty.");
         }
         else
         {
@@ -3496,6 +3710,61 @@ void ObjectMgr::LoadPlayerInfo()
         }
     }
 
+    // Load playercreate cast spell
+    TC_LOG_INFO("server.loading", "Loading Player Create Cast Spell Data...");
+    {
+        uint32 oldMSTime = getMSTime();
+
+        QueryResult result = WorldDatabase.PQuery("SELECT raceMask, classMask, spell FROM playercreateinfo_cast_spell");
+
+        if (!result)
+            TC_LOG_INFO("server.loading", ">> Loaded 0 player create cast spells. DB table `playercreateinfo_cast_spell` is empty.");
+        else
+        {
+            uint32 count = 0;
+
+            do
+            {
+                Field* fields       = result->Fetch();
+                uint32 raceMask     = fields[0].GetUInt32();
+                uint32 classMask    = fields[1].GetUInt32();
+                uint32 spellId      = fields[2].GetUInt32();
+
+                if (raceMask != 0 && !(raceMask & RACEMASK_ALL_PLAYABLE))
+                {
+                    TC_LOG_ERROR("sql.sql", "Wrong race mask %u in `playercreateinfo_cast_spell` table, ignoring.", raceMask);
+                    continue;
+                }
+
+                if (classMask != 0 && !(classMask & CLASSMASK_ALL_PLAYABLE))
+                {
+                    TC_LOG_ERROR("sql.sql", "Wrong class mask %u in `playercreateinfo_cast_spell` table, ignoring.", classMask);
+                    continue;
+                }
+
+                for (uint32 raceIndex = RACE_HUMAN; raceIndex < MAX_RACES; ++raceIndex)
+                {
+                    if (raceMask == 0 || ((1 << (raceIndex - 1)) & raceMask))
+                    {
+                        for (uint32 classIndex = CLASS_WARRIOR; classIndex < MAX_CLASSES; ++classIndex)
+                        {
+                            if (classMask == 0 || ((1 << (classIndex - 1)) & classMask))
+                            {
+                                if (PlayerInfo* info = _playerInfo[raceIndex][classIndex])
+                                {
+                                    info->castSpells.push_back(spellId);
+                                    ++count;
+                                }
+                            }
+                        }
+                    }
+                }
+            } while (result->NextRow());
+
+            TC_LOG_INFO("server.loading", ">> Loaded %u player create cast spells in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+        }
+    }
+
     // Load playercreate actions
     TC_LOG_INFO("server.loading", "Loading Player Create Action Data...");
     {
@@ -3506,7 +3775,7 @@ void ObjectMgr::LoadPlayerInfo()
 
         if (!result)
         {
-            TC_LOG_ERROR("server.loading", ">> Loaded 0 player create actions. DB table `playercreateinfo_action` is empty.");
+            TC_LOG_INFO("server.loading", ">> Loaded 0 player create actions. DB table `playercreateinfo_action` is empty.");
         }
         else
         {
@@ -3740,8 +4009,8 @@ void ObjectMgr::LoadPlayerInfo()
         for (uint8 level = 0; level < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL); ++level)
             _playerXPperLevel[level] = 0;
 
-        //                                                 0    1
-        QueryResult result  = WorldDatabase.Query("SELECT lvl, xp_for_next_level FROM player_xp_for_level");
+        //                                                  0         1
+        QueryResult result  = WorldDatabase.Query("SELECT Level, Experience FROM player_xp_for_level");
 
         if (!result)
         {
@@ -3898,47 +4167,43 @@ void ObjectMgr::LoadQuests()
     uint32 oldMSTime = getMSTime();
 
     // For reload case
-    for (QuestMap::const_iterator itr=_questTemplates.begin(); itr != _questTemplates.end(); ++itr)
+    for (auto itr = _questTemplates.begin(); itr != _questTemplates.end(); ++itr)
         delete itr->second;
     _questTemplates.clear();
 
-    mExclusiveQuestGroups.clear();
+    _exclusiveQuestGroups.clear();
 
     QueryResult result = WorldDatabase.Query("SELECT "
-        //0     1      2        3        4           5       6            7             8              9               10             11                 12
-        "Id, Method, Level, MinLevel, MaxLevel, ZoneOrSort, Type, SuggestedPlayers, LimitTime, RequiredClasses, RequiredRaces, RequiredSkillId, RequiredSkillPoints, "
-        //         13                 14                    15                   16                      17                  18                         19                  20
-        "RequiredFactionId1, RequiredFactionId2, RequiredFactionValue1, RequiredFactionValue2, RequiredMinRepFaction, RequiredMaxRepFaction, RequiredMinRepValue, RequiredMaxRepValue, "
-        //     21         22             23                24             25              26                    27                28            29              30              31
-        "PrevQuestId, NextQuestId, ExclusiveGroup, NextQuestIdChain, RewardXPId, RewardOrRequiredMoney, RewardMoneyMaxLevel, RewardSpell, RewardSpellCast, RewardHonor, RewardHonorMultiplier, "
-        //         32                  33            34             35               36         37         38            39                40                41               42
-        "RewardMailTemplateId, RewardMailDelay, SourceItemId, SourceItemCount, SourceSpellId, Flags, SpecialFlags, RewardTitleId, RequiredPlayerKills, RewardTalents, RewardArenaPoints, "
-        //      43            44             45              46              47               48                 49               50
-        "RewardItemId1, RewardItemId2, RewardItemId3, RewardItemId4, RewardItemCount1, RewardItemCount2, RewardItemCount3, RewardItemCount4, "
-        //         51                  52                  53                    54                    55                   56                      57                  58                        59                       60                      61                      62
-        "RewardChoiceItemId1, RewardChoiceItemId2, RewardChoiceItemId3, RewardChoiceItemId4, RewardChoiceItemId5, RewardChoiceItemId6, RewardChoiceItemCount1, RewardChoiceItemCount2, RewardChoiceItemCount3, RewardChoiceItemCount4, RewardChoiceItemCount5, RewardChoiceItemCount6, "
-        //        63                64                65                66               67                    68                        69                        70                        71                        72
-        "RewardFactionId1, RewardFactionId2, RewardFactionId3, RewardFactionId4, RewardFactionId5, RewardFactionValueId1, RewardFactionValueId2, RewardFactionValueId3, RewardFactionValueId4, RewardFactionValueId5, "
-        //                73                                  74                              75                               76                                77
-        "RewardFactionValueIdOverride1, RewardFactionValueIdOverride2, RewardFactionValueIdOverride3, RewardFactionValueIdOverride4, RewardFactionValueIdOverride5, "
-        //    78        79      80         81
-        "PointMapId, PointX, PointY, PointOption, "
-        // 82        83         84      85           86                87              88
-        "Title, Objectives, Details, EndText, OfferRewardText, RequestItemsText, CompletedText, "
-        //        89               90                 91                92                 93                    94                       95                     96
+        //0      1           2         3           4            5                6              7             8
+        "ID, QuestType, QuestLevel, MinLevel, QuestSortID, QuestInfoID, SuggestedGroupNum, TimeAllowed, AllowableRaces,"
+        //      9                     10                   11                    12
+        "RequiredFactionId1, RequiredFactionId2, RequiredFactionValue1, RequiredFactionValue2, "
+        //     13                 14               15             16                17               18            19            20
+        "RewardNextQuest, RewardXPDifficulty, RewardMoney, RewardBonusMoney, RewardDisplaySpell, RewardSpell, RewardHonor, RewardKillHonor, "
+        //   21       22        23              24                25               26
+        "StartItem, Flags, RewardTitle, RequiredPlayerKills, RewardTalents, RewardArenaPoints, "
+        //    27            28            29           30             31            32            33            34
+        "RewardItem1, RewardAmount1, RewardItem2, RewardAmount2, RewardItem3, RewardAmount3, RewardItem4, RewardAmount4, "
+        //        35                      36                      37                      38                      39                      40                      41                      42                      43                      44                     45                      46
+        "RewardChoiceItemID1, RewardChoiceItemQuantity1, RewardChoiceItemID2, RewardChoiceItemQuantity2, RewardChoiceItemID3, RewardChoiceItemQuantity3, RewardChoiceItemID4, RewardChoiceItemQuantity4, RewardChoiceItemID5, RewardChoiceItemQuantity5, RewardChoiceItemID6, RewardChoiceItemQuantity6, "
+        //       47                 48                     49                  50                  51                     52                 53                  54                     55                  56                  57                    58                   59                 60                      61
+        "RewardFactionID1, RewardFactionValue1, RewardFactionOverride1, RewardFactionID2, RewardFactionValue2, RewardFactionOverride2, RewardFactionID3, RewardFactionValue3, RewardFactionOverride3, RewardFactionID4, RewardFactionValue4, RewardFactionOverride4, RewardFactionID5, RewardFactionValue5,  RewardFactionOverride5,"
+        //    62        63    64       65
+        "POIContinent, POIx, POIy, POIPriority, "
+        //   66          67               68                69                70
+        "LogTitle, LogDescription, QuestDescription, AreaDescription, QuestCompletionLog, "
+        //      71                72                73                74                   75                     76                    77                      78
         "RequiredNpcOrGo1, RequiredNpcOrGo2, RequiredNpcOrGo3, RequiredNpcOrGo4, RequiredNpcOrGoCount1, RequiredNpcOrGoCount2, RequiredNpcOrGoCount3, RequiredNpcOrGoCount4, "
-        //          97                     98                     99                   100                        101                         102                        103                        104
-        "RequiredSourceItemId1, RequiredSourceItemId2, RequiredSourceItemId3, RequiredSourceItemId4, RequiredSourceItemCount1, RequiredSourceItemCount2, RequiredSourceItemCount3, RequiredSourceItemCount4, "
-        //       105               106             107             108              109             110                 111                  112                113                114                115                  116
+        //   79         80         81         82            83                 84                  85                86
+        "ItemDrop1, ItemDrop2, ItemDrop3, ItemDrop4, ItemDropQuantity1, ItemDropQuantity2, ItemDropQuantity3, ItemDropQuantity4, "
+        //      87               88               89               90               91               92                93                  94                  95                  96                  97                  98
         "RequiredItemId1, RequiredItemId2, RequiredItemId3, RequiredItemId4, RequiredItemId5, RequiredItemId6, RequiredItemCount1, RequiredItemCount2, RequiredItemCount3, RequiredItemCount4, RequiredItemCount5, RequiredItemCount6, "
-        //  117          118             119             120             121          122            123              124            125               126                 127                 128                 129
-        "Unknown0, ObjectiveText1, ObjectiveText2, ObjectiveText3, ObjectiveText4, DetailsEmote1, DetailsEmote2, DetailsEmote3, DetailsEmote4, DetailsEmoteDelay1, DetailsEmoteDelay2, DetailsEmoteDelay3, DetailsEmoteDelay4, "
-        //     130                 131               132               133                 134                 135                136                      137                       138                    139
-        "EmoteOnIncomplete, EmoteOnComplete, OfferRewardEmote1, OfferRewardEmote2, OfferRewardEmote3, OfferRewardEmote4, OfferRewardEmoteDelay1, OfferRewardEmoteDelay2, OfferRewardEmoteDelay3, OfferRewardEmoteDelay4"
+        //  99          100             101             102             103
+        "Unknown0, ObjectiveText1, ObjectiveText2, ObjectiveText3, ObjectiveText4"
         " FROM quest_template");
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 quests definitions. DB table `quest_template` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 quests definitions. DB table `quest_template` is empty.");
         return;
     }
 
@@ -3953,261 +4218,314 @@ void ObjectMgr::LoadQuests()
         _questTemplates[newQuest->GetQuestId()] = newQuest;
     } while (result->NextRow());
 
-    std::map<uint32, uint32> usedMailTemplates;
+    std::unordered_map<uint32, uint32> usedMailTemplates;
+
+    struct QuestLoaderHelper
+    {
+        typedef void(Quest::*QuestLoaderFunction)(Field* fields);
+
+        char const* QueryFields;
+        char const* TableName;
+        char const* TableDesc;
+        QuestLoaderFunction LoaderFunction;
+    };
+
+    static std::vector<QuestLoaderHelper> const QuestLoaderHelpers =
+    {
+        // 0   1       2       3       4       5            6            7            8
+        { "ID, Emote1, Emote2, Emote3, Emote4, EmoteDelay1, EmoteDelay2, EmoteDelay3, EmoteDelay4",                                                                       "quest_details",        "details",             &Quest::LoadQuestDetails       },
+
+        // 0   1                2                  3
+        { "ID, EmoteOnComplete, EmoteOnIncomplete, CompletionText",                                                                                                       "quest_request_items",  "request items",       &Quest::LoadQuestRequestItems  },
+
+        // 0   1       2       3       4       5            6            7            8            9
+        { "ID, Emote1, Emote2, Emote3, Emote4, EmoteDelay1, EmoteDelay2, EmoteDelay3, EmoteDelay4, RewardText",                                                           "quest_offer_reward",   "reward emotes",       &Quest::LoadQuestOfferReward   },
+
+        // 0   1         2                 3              4            5            6               7                     8
+        { "ID, MaxLevel, AllowableClasses, SourceSpellID, PrevQuestID, NextQuestID, ExclusiveGroup, RewardMailTemplateID, RewardMailDelay,"
+        // 9               10                   11                     12                     13                   14                   15                 16
+        " RequiredSkillID, RequiredSkillPoints, RequiredMinRepFaction, RequiredMaxRepFaction, RequiredMinRepValue, RequiredMaxRepValue, ProvidedItemCount, SpecialFlags", "quest_template_addon", "template addons",     &Quest::LoadQuestTemplateAddon },
+
+        // 0        1
+        { "QuestId, RewardMailSenderEntry",                                                                                                                               "quest_mail_sender",    "mail sender entries", &Quest::LoadQuestMailSender    }
+    };
+
+    for (QuestLoaderHelper const& loader : QuestLoaderHelpers)
+    {
+        QueryResult result = WorldDatabase.PQuery("SELECT %s FROM %s", loader.QueryFields, loader.TableName);
+        if (!result)
+            TC_LOG_INFO("server.loading", ">> Loaded 0 quest %s. DB table `%s` is empty.", loader.TableDesc, loader.TableName);
+        else
+        {
+            do
+            {
+                Field* fields = result->Fetch();
+                uint32 questId = fields[0].GetUInt32();
+
+                auto itr = _questTemplates.find(questId);
+                if (itr != _questTemplates.end())
+                    (itr->second->*loader.LoaderFunction)(fields);
+                else
+                    TC_LOG_ERROR("server.loading", "Table `%s` has data for quest %u but such quest does not exist", loader.TableName, questId);
+            } while (result->NextRow());
+        }
+    }
 
     // Post processing
-    for (QuestMap::iterator iter = _questTemplates.begin(); iter != _questTemplates.end(); ++iter)
+    for (auto iter = _questTemplates.begin(); iter != _questTemplates.end(); ++iter)
     {
         // skip post-loading checks for disabled quests
-        if (DisableMgr::IsDisabledFor(DISABLE_TYPE_QUEST, iter->first, NULL))
+        if (DisableMgr::IsDisabledFor(DISABLE_TYPE_QUEST, iter->first, nullptr))
             continue;
 
-        Quest * qinfo = iter->second;
+        Quest* qinfo = iter->second;
 
         // additional quest integrity checks (GO, creature_template and item_template must be loaded already)
 
         if (qinfo->GetQuestMethod() >= 3)
             TC_LOG_ERROR("sql.sql", "Quest %u has `Method` = %u, expected values are 0, 1 or 2.", qinfo->GetQuestId(), qinfo->GetQuestMethod());
 
-        if (qinfo->SpecialFlags & ~QUEST_SPECIAL_FLAGS_DB_ALLOWED)
+        if (qinfo->_specialFlags & ~QUEST_SPECIAL_FLAGS_DB_ALLOWED)
         {
             TC_LOG_ERROR("sql.sql", "Quest %u has `SpecialFlags` = %u > max allowed value. Correct `SpecialFlags` to value <= %u",
-                qinfo->GetQuestId(), qinfo->SpecialFlags, QUEST_SPECIAL_FLAGS_DB_ALLOWED);
-            qinfo->SpecialFlags &= QUEST_SPECIAL_FLAGS_DB_ALLOWED;
+                qinfo->GetQuestId(), qinfo->_specialFlags, QUEST_SPECIAL_FLAGS_DB_ALLOWED);
+            qinfo->_specialFlags &= QUEST_SPECIAL_FLAGS_DB_ALLOWED;
         }
 
-        if (qinfo->Flags & QUEST_FLAGS_DAILY && qinfo->Flags & QUEST_FLAGS_WEEKLY)
+        if (qinfo->_flags & QUEST_FLAGS_DAILY && qinfo->_flags & QUEST_FLAGS_WEEKLY)
         {
             TC_LOG_ERROR("sql.sql", "Weekly Quest %u is marked as daily quest in `Flags`, removed daily flag.", qinfo->GetQuestId());
-            qinfo->Flags &= ~QUEST_FLAGS_DAILY;
+            qinfo->_flags &= ~QUEST_FLAGS_DAILY;
         }
 
-        if (qinfo->Flags & QUEST_FLAGS_DAILY)
+        if (qinfo->_flags & QUEST_FLAGS_DAILY)
         {
-            if (!(qinfo->SpecialFlags & QUEST_SPECIAL_FLAGS_REPEATABLE))
+            if (!(qinfo->_specialFlags & QUEST_SPECIAL_FLAGS_REPEATABLE))
             {
                 TC_LOG_ERROR("sql.sql", "Daily Quest %u not marked as repeatable in `SpecialFlags`, added.", qinfo->GetQuestId());
-                qinfo->SpecialFlags |= QUEST_SPECIAL_FLAGS_REPEATABLE;
+                qinfo->_specialFlags |= QUEST_SPECIAL_FLAGS_REPEATABLE;
             }
         }
 
-        if (qinfo->Flags & QUEST_FLAGS_WEEKLY)
+        if (qinfo->_flags & QUEST_FLAGS_WEEKLY)
         {
-            if (!(qinfo->SpecialFlags & QUEST_SPECIAL_FLAGS_REPEATABLE))
+            if (!(qinfo->_specialFlags & QUEST_SPECIAL_FLAGS_REPEATABLE))
             {
                 TC_LOG_ERROR("sql.sql", "Weekly Quest %u not marked as repeatable in `SpecialFlags`, added.", qinfo->GetQuestId());
-                qinfo->SpecialFlags |= QUEST_SPECIAL_FLAGS_REPEATABLE;
+                qinfo->_specialFlags |= QUEST_SPECIAL_FLAGS_REPEATABLE;
             }
         }
 
-        if (qinfo->SpecialFlags & QUEST_SPECIAL_FLAGS_MONTHLY)
+        if (qinfo->_specialFlags & QUEST_SPECIAL_FLAGS_MONTHLY)
         {
-            if (!(qinfo->SpecialFlags & QUEST_SPECIAL_FLAGS_REPEATABLE))
+            if (!(qinfo->_specialFlags & QUEST_SPECIAL_FLAGS_REPEATABLE))
             {
                 TC_LOG_ERROR("sql.sql", "Monthly quest %u not marked as repeatable in `SpecialFlags`, added.", qinfo->GetQuestId());
-                qinfo->SpecialFlags |= QUEST_SPECIAL_FLAGS_REPEATABLE;
+                qinfo->_specialFlags |= QUEST_SPECIAL_FLAGS_REPEATABLE;
             }
         }
 
-        if (qinfo->Flags & QUEST_FLAGS_TRACKING)
+        if (qinfo->_flags & QUEST_FLAGS_TRACKING)
         {
             // at auto-reward can be rewarded only RewardChoiceItemId[0]
-            for (int j = 1; j < QUEST_REWARD_CHOICES_COUNT; ++j )
+            for (uint32 j = 1; j < QUEST_REWARD_CHOICES_COUNT; ++j)
             {
                 if (uint32 id = qinfo->RewardChoiceItemId[j])
                 {
                     TC_LOG_ERROR("sql.sql", "Quest %u has `RewardChoiceItemId%d` = %u but item from `RewardChoiceItemId%d` can't be rewarded with quest flag QUEST_FLAGS_TRACKING.",
-                        qinfo->GetQuestId(), j+1, id, j+1);
+                        qinfo->GetQuestId(), j + 1, id, j + 1);
                     // no changes, quest ignore this data
                 }
             }
         }
 
         // client quest log visual (area case)
-        if (qinfo->ZoneOrSort > 0)
+        if (qinfo->_zoneOrSort > 0)
         {
-            if (!GetAreaEntryByAreaID(qinfo->ZoneOrSort))
+            if (!sAreaTableStore.LookupEntry(qinfo->_zoneOrSort))
             {
                 TC_LOG_ERROR("sql.sql", "Quest %u has `ZoneOrSort` = %u (zone case) but zone with this id does not exist.",
-                    qinfo->GetQuestId(), qinfo->ZoneOrSort);
+                    qinfo->GetQuestId(), qinfo->_zoneOrSort);
                 // no changes, quest not dependent from this value but can have problems at client
             }
         }
         // client quest log visual (sort case)
-        if (qinfo->ZoneOrSort < 0)
+        if (qinfo->_zoneOrSort < 0)
         {
-            QuestSortEntry const* qSort = sQuestSortStore.LookupEntry(-int32(qinfo->ZoneOrSort));
+            QuestSortEntry const* qSort = sQuestSortStore.LookupEntry(-int32(qinfo->_zoneOrSort));
             if (!qSort)
             {
                 TC_LOG_ERROR("sql.sql", "Quest %u has `ZoneOrSort` = %i (sort case) but quest sort with this id does not exist.",
-                    qinfo->GetQuestId(), qinfo->ZoneOrSort);
+                    qinfo->GetQuestId(), qinfo->_zoneOrSort);
                 // no changes, quest not dependent from this value but can have problems at client (note some may be 0, we must allow this so no check)
             }
             //check for proper RequiredSkillId value (skill case)
-            if (uint32 skill_id = SkillByQuestSort(-int32(qinfo->ZoneOrSort)))
+            if (uint32 skill_id = SkillByQuestSort(-qinfo->_zoneOrSort))
             {
-                if (qinfo->RequiredSkillId != skill_id)
+                if (qinfo->_requiredSkillId != skill_id)
                 {
                     TC_LOG_ERROR("sql.sql", "Quest %u has `ZoneOrSort` = %i but `RequiredSkillId` does not have a corresponding value (%d).",
-                        qinfo->GetQuestId(), qinfo->ZoneOrSort, skill_id);
+                        qinfo->GetQuestId(), qinfo->_zoneOrSort, skill_id);
                     //override, and force proper value here?
                 }
             }
         }
 
         // RequiredClasses, can be 0/CLASSMASK_ALL_PLAYABLE to allow any class
-        if (qinfo->RequiredClasses)
+        if (qinfo->_requiredClasses)
         {
-            if (!(qinfo->RequiredClasses & CLASSMASK_ALL_PLAYABLE))
+            if (!(qinfo->_requiredClasses & CLASSMASK_ALL_PLAYABLE))
             {
-                TC_LOG_ERROR("sql.sql", "Quest %u does not contain any playable classes in `RequiredClasses` (%u), value set to 0 (all classes).", qinfo->GetQuestId(), qinfo->RequiredClasses);
-                    qinfo->RequiredClasses = 0;
-            }
-        }
-        // RequiredRaces, can be 0/RACEMASK_ALL_PLAYABLE to allow any race
-        if (qinfo->RequiredRaces)
-            {
-            if (!(qinfo->RequiredRaces & RACEMASK_ALL_PLAYABLE))
-                {
-                    TC_LOG_ERROR("sql.sql", "Quest %u does not contain any playable races in `RequiredRaces` (%u), value set to 0 (all races).", qinfo->GetQuestId(), qinfo->RequiredRaces);
-                    qinfo->RequiredRaces = 0;
-                }
-            }
-        // RequiredSkillId, can be 0
-        if (qinfo->RequiredSkillId)
-        {
-            if (!sSkillLineStore.LookupEntry(qinfo->RequiredSkillId))
-            {
-                TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredSkillId` = %u but this skill does not exist",
-                    qinfo->GetQuestId(), qinfo->RequiredSkillId);
+                TC_LOG_ERROR("sql.sql", "Quest %u does not contain any playable classes in `RequiredClasses` (%u), value set to 0 (all classes).", qinfo->GetQuestId(), qinfo->_requiredClasses);
+                    qinfo->_requiredClasses = 0;
             }
         }
 
-        if (qinfo->RequiredSkillPoints)
+        // AllowableRaces, can be 0/RACEMASK_ALL_PLAYABLE to allow any race
+        if (qinfo->_allowableRaces)
         {
-            if (qinfo->RequiredSkillPoints > sWorld->GetConfigMaxSkillValue())
+            if (!(qinfo->_allowableRaces & RACEMASK_ALL_PLAYABLE))
+            {
+                TC_LOG_ERROR("sql.sql", "Quest %u does not contain any playable races in `AllowableRaces` (%u), value set to 0 (all races).", qinfo->GetQuestId(), qinfo->_allowableRaces);
+                qinfo->_allowableRaces = 0;
+            }
+        }
+
+        // RequiredSkillId, can be 0
+        if (qinfo->_requiredSkillId)
+        {
+            if (!sSkillLineStore.LookupEntry(qinfo->_requiredSkillId))
+            {
+                TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredSkillId` = %u but this skill does not exist",
+                    qinfo->GetQuestId(), qinfo->_requiredSkillId);
+            }
+        }
+
+        if (qinfo->_requiredSkillPoints)
+        {
+            if (qinfo->_requiredSkillPoints > sWorld->GetConfigMaxSkillValue())
             {
                 TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredSkillPoints` = %u but max possible skill is %u, quest can't be done.",
-                    qinfo->GetQuestId(), qinfo->RequiredSkillPoints, sWorld->GetConfigMaxSkillValue());
+                    qinfo->GetQuestId(), qinfo->_requiredSkillPoints, sWorld->GetConfigMaxSkillValue());
                 // no changes, quest can't be done for this requirement
             }
         }
         // else Skill quests can have 0 skill level, this is ok
 
-        if (qinfo->RequiredFactionId2 && !sFactionStore.LookupEntry(qinfo->RequiredFactionId2))
+        if (qinfo->_requiredFactionId2 && !sFactionStore.LookupEntry(qinfo->_requiredFactionId2))
         {
             TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredFactionId2` = %u but faction template %u does not exist, quest can't be done.",
-                qinfo->GetQuestId(), qinfo->RequiredFactionId2, qinfo->RequiredFactionId2);
+                qinfo->GetQuestId(), qinfo->_requiredFactionId2, qinfo->_requiredFactionId2);
             // no changes, quest can't be done for this requirement
         }
 
-        if (qinfo->RequiredFactionId1 && !sFactionStore.LookupEntry(qinfo->RequiredFactionId1))
+        if (qinfo->_requiredFactionId1 && !sFactionStore.LookupEntry(qinfo->_requiredFactionId1))
         {
             TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredFactionId1` = %u but faction template %u does not exist, quest can't be done.",
-                qinfo->GetQuestId(), qinfo->RequiredFactionId1, qinfo->RequiredFactionId1);
+                qinfo->GetQuestId(), qinfo->_requiredFactionId1, qinfo->_requiredFactionId1);
             // no changes, quest can't be done for this requirement
         }
 
-        if (qinfo->RequiredMinRepFaction && !sFactionStore.LookupEntry(qinfo->RequiredMinRepFaction))
+        if (qinfo->_requiredMinRepFaction && !sFactionStore.LookupEntry(qinfo->_requiredMinRepFaction))
         {
             TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredMinRepFaction` = %u but faction template %u does not exist, quest can't be done.",
-                qinfo->GetQuestId(), qinfo->RequiredMinRepFaction, qinfo->RequiredMinRepFaction);
+                qinfo->GetQuestId(), qinfo->_requiredMinRepFaction, qinfo->_requiredMinRepFaction);
             // no changes, quest can't be done for this requirement
         }
 
-        if (qinfo->RequiredMaxRepFaction && !sFactionStore.LookupEntry(qinfo->RequiredMaxRepFaction))
+        if (qinfo->_requiredMaxRepFaction && !sFactionStore.LookupEntry(qinfo->_requiredMaxRepFaction))
         {
             TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredMaxRepFaction` = %u but faction template %u does not exist, quest can't be done.",
-                qinfo->GetQuestId(), qinfo->RequiredMaxRepFaction, qinfo->RequiredMaxRepFaction);
+                qinfo->GetQuestId(), qinfo->_requiredMaxRepFaction, qinfo->_requiredMaxRepFaction);
             // no changes, quest can't be done for this requirement
         }
 
-        if (qinfo->RequiredMinRepValue && qinfo->RequiredMinRepValue > ReputationMgr::Reputation_Cap)
+        if (qinfo->_requiredMinRepValue && qinfo->_requiredMinRepValue > ReputationMgr::Reputation_Cap)
         {
             TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredMinRepValue` = %d but max reputation is %u, quest can't be done.",
-                qinfo->GetQuestId(), qinfo->RequiredMinRepValue, ReputationMgr::Reputation_Cap);
+                qinfo->GetQuestId(), qinfo->_requiredMinRepValue, ReputationMgr::Reputation_Cap);
             // no changes, quest can't be done for this requirement
         }
 
-        if (qinfo->RequiredMinRepValue && qinfo->RequiredMaxRepValue && qinfo->RequiredMaxRepValue <= qinfo->RequiredMinRepValue)
+        if (qinfo->_requiredMinRepValue && qinfo->_requiredMaxRepValue && qinfo->_requiredMaxRepValue <= qinfo->_requiredMinRepValue)
         {
             TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredMaxRepValue` = %d and `RequiredMinRepValue` = %d, quest can't be done.",
-                qinfo->GetQuestId(), qinfo->RequiredMaxRepValue, qinfo->RequiredMinRepValue);
+                qinfo->GetQuestId(), qinfo->_requiredMaxRepValue, qinfo->_requiredMinRepValue);
             // no changes, quest can't be done for this requirement
         }
 
-        if (!qinfo->RequiredFactionId1 && qinfo->RequiredFactionValue1 != 0)
+        if (!qinfo->_requiredFactionId1 && qinfo->_requiredFactionValue1 != 0)
         {
             TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredFactionValue1` = %d but `RequiredFactionId1` is 0, value has no effect",
-                qinfo->GetQuestId(), qinfo->RequiredFactionValue1);
+                qinfo->GetQuestId(), qinfo->_requiredFactionValue1);
             // warning
         }
 
-        if (!qinfo->RequiredFactionId2 && qinfo->RequiredFactionValue2 != 0)
+        if (!qinfo->_requiredFactionId2 && qinfo->_requiredFactionValue2 != 0)
         {
             TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredFactionValue2` = %d but `RequiredFactionId2` is 0, value has no effect",
-                qinfo->GetQuestId(), qinfo->RequiredFactionValue2);
+                qinfo->GetQuestId(), qinfo->_requiredFactionValue2);
             // warning
         }
 
-        if (!qinfo->RequiredMinRepFaction && qinfo->RequiredMinRepValue != 0)
+        if (!qinfo->_requiredMinRepFaction && qinfo->_requiredMinRepValue != 0)
         {
             TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredMinRepValue` = %d but `RequiredMinRepFaction` is 0, value has no effect",
-                qinfo->GetQuestId(), qinfo->RequiredMinRepValue);
+                qinfo->GetQuestId(), qinfo->_requiredMinRepValue);
             // warning
         }
 
-        if (!qinfo->RequiredMaxRepFaction && qinfo->RequiredMaxRepValue != 0)
+        if (!qinfo->_requiredMaxRepFaction && qinfo->_requiredMaxRepValue != 0)
         {
             TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredMaxRepValue` = %d but `RequiredMaxRepFaction` is 0, value has no effect",
-                qinfo->GetQuestId(), qinfo->RequiredMaxRepValue);
+                qinfo->GetQuestId(), qinfo->_requiredMaxRepValue);
             // warning
         }
 
-        if (qinfo->RewardTitleId && !sCharTitlesStore.LookupEntry(qinfo->RewardTitleId))
+        if (qinfo->_rewardTitleId && !sCharTitlesStore.LookupEntry(qinfo->_rewardTitleId))
         {
             TC_LOG_ERROR("sql.sql", "Quest %u has `RewardTitleId` = %u but CharTitle Id %u does not exist, quest can't be rewarded with title.",
                 qinfo->GetQuestId(), qinfo->GetCharTitleId(), qinfo->GetCharTitleId());
-            qinfo->RewardTitleId = 0;
+            qinfo->_rewardTitleId = 0;
             // quest can't reward this title
         }
 
-        if (qinfo->SourceItemId)
+        if (qinfo->_startItem)
         {
-            if (!sObjectMgr->GetItemTemplate(qinfo->SourceItemId))
+            if (!sObjectMgr->GetItemTemplate(qinfo->_startItem))
             {
-                TC_LOG_ERROR("sql.sql", "Quest %u has `SourceItemId` = %u but item with entry %u does not exist, quest can't be done.",
-                    qinfo->GetQuestId(), qinfo->SourceItemId, qinfo->SourceItemId);
-                qinfo->SourceItemId = 0;                       // quest can't be done for this requirement
+                TC_LOG_ERROR("sql.sql", "Quest %u has `StartItem` = %u but item with entry %u does not exist, quest can't be done.",
+                    qinfo->GetQuestId(), qinfo->_startItem, qinfo->_startItem);
+                qinfo->_startItem = 0;                       // quest can't be done for this requirement
             }
-            else if (qinfo->SourceItemIdCount == 0)
+            else if (qinfo->_startItemCount == 0)
             {
-                TC_LOG_ERROR("sql.sql", "Quest %u has `SourceItemId` = %u but `SourceItemIdCount` = 0, set to 1 but need fix in DB.",
-                    qinfo->GetQuestId(), qinfo->SourceItemId);
-                qinfo->SourceItemIdCount = 1;                    // update to 1 for allow quest work for backward compatibility with DB
+                TC_LOG_ERROR("sql.sql", "Quest %u has `StartItem` = %u but `StartItemCount` = 0, set to 1 but need fix in DB.",
+                    qinfo->GetQuestId(), qinfo->_startItem);
+                qinfo->_startItemCount = 1;                    // update to 1 for allow quest work for backward compatibility with DB
             }
         }
-        else if (qinfo->SourceItemIdCount>0)
+        else if (qinfo->_startItemCount > 0)
         {
-            TC_LOG_ERROR("sql.sql", "Quest %u has `SourceItemId` = 0 but `SourceItemIdCount` = %u, useless value.",
-                qinfo->GetQuestId(), qinfo->SourceItemIdCount);
-            qinfo->SourceItemIdCount=0;                          // no quest work changes in fact
+            TC_LOG_ERROR("sql.sql", "Quest %u has `StartItem` = 0 but `StartItemCount` = %u, useless value.",
+                qinfo->GetQuestId(), qinfo->_startItemCount);
+            qinfo->_startItemCount = 0;                          // no quest work changes in fact
         }
 
-        if (qinfo->SourceSpellid)
+        if (qinfo->_sourceSpellid)
         {
-            SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(qinfo->SourceSpellid);
+            SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(qinfo->_sourceSpellid);
             if (!spellInfo)
             {
                 TC_LOG_ERROR("sql.sql", "Quest %u has `SourceSpellid` = %u but spell %u doesn't exist, quest can't be done.",
-                    qinfo->GetQuestId(), qinfo->SourceSpellid, qinfo->SourceSpellid);
-                qinfo->SourceSpellid = 0;                        // quest can't be done for this requirement
+                    qinfo->GetQuestId(), qinfo->_sourceSpellid, qinfo->_sourceSpellid);
+                qinfo->_sourceSpellid = 0;                        // quest can't be done for this requirement
             }
             else if (!SpellMgr::IsSpellValid(spellInfo))
             {
                 TC_LOG_ERROR("sql.sql", "Quest %u has `SourceSpellid` = %u but spell %u is broken, quest can't be done.",
-                    qinfo->GetQuestId(), qinfo->SourceSpellid, qinfo->SourceSpellid);
-                qinfo->SourceSpellid = 0;                        // quest can't be done for this requirement
+                    qinfo->GetQuestId(), qinfo->_sourceSpellid, qinfo->_sourceSpellid);
+                qinfo->_sourceSpellid = 0;                        // quest can't be done for this requirement
             }
         }
 
@@ -4242,22 +4560,22 @@ void ObjectMgr::LoadQuests()
 
         for (uint8 j = 0; j < QUEST_SOURCE_ITEM_IDS_COUNT; ++j)
         {
-            uint32 id = qinfo->RequiredSourceItemId[j];
+            uint32 id = qinfo->ItemDrop[j];
             if (id)
             {
                 if (!sObjectMgr->GetItemTemplate(id))
                 {
-                    TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredSourceItemId%d` = %u but item with entry %u does not exist, quest can't be done.",
+                    TC_LOG_ERROR("sql.sql", "Quest %u has `ItemDrop%d` = %u but item with entry %u does not exist, quest can't be done.",
                         qinfo->GetQuestId(), j+1, id, id);
                     // no changes, quest can't be done for this requirement
                 }
             }
             else
             {
-                if (qinfo->RequiredSourceItemCount[j]>0)
+                if (qinfo->ItemDropQuantity[j]>0)
                 {
-                    TC_LOG_ERROR("sql.sql", "Quest %u has `RequiredSourceItemId%d` = 0 but `RequiredSourceItemCount%d` = %u.",
-                        qinfo->GetQuestId(), j+1, j+1, qinfo->RequiredSourceItemCount[j]);
+                    TC_LOG_ERROR("sql.sql", "Quest %u has `ItemDrop%d` = 0 but `ItemDropQuantity%d` = %u.",
+                        qinfo->GetQuestId(), j+1, j+1, qinfo->ItemDropQuantity[j]);
                     // no changes, quest ignore this data
                 }
             }
@@ -4359,7 +4677,7 @@ void ObjectMgr::LoadQuests()
         {
             if (qinfo->RewardFactionId[j])
             {
-                if (abs(qinfo->RewardFactionValueId[j]) > 9)
+                if (std::abs(qinfo->RewardFactionValueId[j]) > 9)
                 {
                TC_LOG_ERROR("sql.sql", "Quest %u has RewardFactionValueId%d = %i. That is outside the range of valid values (-9 to 9).", qinfo->GetQuestId(), j+1, qinfo->RewardFactionValueId[j]);
                 }
@@ -4378,125 +4696,132 @@ void ObjectMgr::LoadQuests()
             }
         }
 
-        if (qinfo->RewardSpell)
+        if (qinfo->_rewardDisplaySpell)
         {
-            SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(qinfo->RewardSpell);
-
+            SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(qinfo->_rewardDisplaySpell);
             if (!spellInfo)
             {
-                TC_LOG_ERROR("sql.sql", "Quest %u has `RewardSpell` = %u but spell %u does not exist, spell removed as display reward.",
-                    qinfo->GetQuestId(), qinfo->RewardSpell, qinfo->RewardSpell);
-                qinfo->RewardSpell = 0;                        // no spell reward will display for this quest
+                TC_LOG_ERROR("sql.sql", "Quest %u has `RewardDisplaySpell` = %u but spell %u does not exist, spell removed as display reward.",
+                    qinfo->GetQuestId(), qinfo->_rewardDisplaySpell, qinfo->_rewardDisplaySpell);
+                qinfo->_rewardDisplaySpell = 0;                        // no spell reward will display for this quest
+            }
+
+            else if (!SpellMgr::IsSpellValid(spellInfo))
+            {
+                TC_LOG_ERROR("sql.sql", "Quest %u has `RewardDisplaySpell` = %u but spell %u is broken, quest will not have a spell reward.",
+                    qinfo->GetQuestId(), qinfo->_rewardDisplaySpell, qinfo->_rewardDisplaySpell);
+                qinfo->_rewardDisplaySpell = 0;                        // no spell reward will display for this quest
+            }
+
+            else if (GetTalentSpellCost(qinfo->_rewardDisplaySpell))
+            {
+                TC_LOG_ERROR("sql.sql", "Quest %u has `RewardDisplaySpell` = %u but spell %u is talent, quest will not have a spell reward.",
+                    qinfo->GetQuestId(), qinfo->_rewardDisplaySpell, qinfo->_rewardDisplaySpell);
+                qinfo->_rewardDisplaySpell = 0;                        // no spell reward will display for this quest
+            }
+        }
+
+        if (qinfo->_rewardSpell > 0)
+        {
+            SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(qinfo->_rewardSpell);
+            if (!spellInfo)
+            {
+                TC_LOG_ERROR("sql.sql", "Quest %u has `RewardSpell` = %u but spell %u does not exist, quest will not have a spell reward.",
+                    qinfo->GetQuestId(), qinfo->_rewardSpell, qinfo->_rewardSpell);
+                qinfo->_rewardSpell = 0;                    // no spell will be cast on player
             }
 
             else if (!SpellMgr::IsSpellValid(spellInfo))
             {
                 TC_LOG_ERROR("sql.sql", "Quest %u has `RewardSpell` = %u but spell %u is broken, quest will not have a spell reward.",
-                    qinfo->GetQuestId(), qinfo->RewardSpell, qinfo->RewardSpell);
-                qinfo->RewardSpell = 0;                        // no spell reward will display for this quest
+                    qinfo->GetQuestId(), qinfo->_rewardSpell, qinfo->_rewardSpell);
+                qinfo->_rewardSpell = 0;                    // no spell will be cast on player
             }
 
-            else if (GetTalentSpellCost(qinfo->RewardSpell))
+            else if (GetTalentSpellCost(qinfo->_rewardSpell))
             {
-                TC_LOG_ERROR("sql.sql", "Quest %u has `RewardSpell` = %u but spell %u is talent, quest will not have a spell reward.",
-                    qinfo->GetQuestId(), qinfo->RewardSpell, qinfo->RewardSpell);
-                qinfo->RewardSpell = 0;                        // no spell reward will display for this quest
+                TC_LOG_ERROR("sql.sql", "Quest %u has `RewardDisplaySpell` = %u but spell %u is talent, quest will not have a spell reward.",
+                    qinfo->GetQuestId(), qinfo->_rewardSpell, qinfo->_rewardSpell);
+                qinfo->_rewardSpell = 0;                    // no spell will be cast on player
             }
         }
 
-        if (qinfo->RewardSpellCast > 0)
+        if (qinfo->_rewardMailTemplateId)
         {
-            SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(qinfo->RewardSpellCast);
-
-            if (!spellInfo)
-            {
-                TC_LOG_ERROR("sql.sql", "Quest %u has `RewardSpellCast` = %u but spell %u does not exist, quest will not have a spell reward.",
-                    qinfo->GetQuestId(), qinfo->RewardSpellCast, qinfo->RewardSpellCast);
-                qinfo->RewardSpellCast = 0;                    // no spell will be cast on player
-            }
-
-            else if (!SpellMgr::IsSpellValid(spellInfo))
-            {
-                TC_LOG_ERROR("sql.sql", "Quest %u has `RewardSpellCast` = %u but spell %u is broken, quest will not have a spell reward.",
-                    qinfo->GetQuestId(), qinfo->RewardSpellCast, qinfo->RewardSpellCast);
-                qinfo->RewardSpellCast = 0;                    // no spell will be cast on player
-            }
-
-            else if (GetTalentSpellCost(qinfo->RewardSpellCast))
-            {
-                TC_LOG_ERROR("sql.sql", "Quest %u has `RewardSpell` = %u but spell %u is talent, quest will not have a spell reward.",
-                    qinfo->GetQuestId(), qinfo->RewardSpellCast, qinfo->RewardSpellCast);
-                qinfo->RewardSpellCast = 0;                    // no spell will be cast on player
-            }
-        }
-
-        if (qinfo->RewardMailTemplateId)
-        {
-            if (!sMailTemplateStore.LookupEntry(qinfo->RewardMailTemplateId))
+            if (!sMailTemplateStore.LookupEntry(qinfo->_rewardMailTemplateId))
             {
                 TC_LOG_ERROR("sql.sql", "Quest %u has `RewardMailTemplateId` = %u but mail template  %u does not exist, quest will not have a mail reward.",
-                    qinfo->GetQuestId(), qinfo->RewardMailTemplateId, qinfo->RewardMailTemplateId);
-                qinfo->RewardMailTemplateId = 0;               // no mail will send to player
-                qinfo->RewardMailDelay = 0;                // no mail will send to player
+                    qinfo->GetQuestId(), qinfo->_rewardMailTemplateId, qinfo->_rewardMailTemplateId);
+                qinfo->_rewardMailTemplateId = 0;               // no mail will send to player
+                qinfo->_rewardMailDelay = 0;                // no mail will send to player
+                qinfo->_rewardMailSenderEntry = 0;
             }
-            else if (usedMailTemplates.find(qinfo->RewardMailTemplateId) != usedMailTemplates.end())
+            else if (usedMailTemplates.find(qinfo->_rewardMailTemplateId) != usedMailTemplates.end())
             {
-                std::map<uint32, uint32>::const_iterator used_mt_itr = usedMailTemplates.find(qinfo->RewardMailTemplateId);
+                auto used_mt_itr = usedMailTemplates.find(qinfo->_rewardMailTemplateId);
                 TC_LOG_ERROR("sql.sql", "Quest %u has `RewardMailTemplateId` = %u but mail template  %u already used for quest %u, quest will not have a mail reward.",
-                    qinfo->GetQuestId(), qinfo->RewardMailTemplateId, qinfo->RewardMailTemplateId, used_mt_itr->second);
-                qinfo->RewardMailTemplateId = 0;               // no mail will send to player
-                qinfo->RewardMailDelay = 0;                // no mail will send to player
+                    qinfo->GetQuestId(), qinfo->_rewardMailTemplateId, qinfo->_rewardMailTemplateId, used_mt_itr->second);
+                qinfo->_rewardMailTemplateId = 0;               // no mail will send to player
+                qinfo->_rewardMailDelay = 0;                // no mail will send to player
+                qinfo->_rewardMailSenderEntry = 0;
             }
             else
-                usedMailTemplates[qinfo->RewardMailTemplateId] = qinfo->GetQuestId();
+                usedMailTemplates.emplace(qinfo->_rewardMailTemplateId, qinfo->GetQuestId());
         }
 
-        if (qinfo->NextQuestIdChain)
+        if (qinfo->_rewardNextQuest)
         {
-            QuestMap::iterator qNextItr = _questTemplates.find(qinfo->NextQuestIdChain);
+            auto qNextItr = _questTemplates.find(qinfo->_rewardNextQuest);
             if (qNextItr == _questTemplates.end())
             {
-                TC_LOG_ERROR("sql.sql", "Quest %u has `NextQuestIdChain` = %u but quest %u does not exist, quest chain will not work.",
-                    qinfo->GetQuestId(), qinfo->NextQuestIdChain, qinfo->NextQuestIdChain);
-                qinfo->NextQuestIdChain = 0;
+                TC_LOG_ERROR("sql.sql", "Quest %u has `RewardNextQuest` = %u but quest %u does not exist, quest chain will not work.",
+                    qinfo->GetQuestId(), qinfo->_rewardNextQuest, qinfo->_rewardNextQuest);
+                qinfo->_rewardNextQuest = 0;
             }
-            else
-                qNextItr->second->prevChainQuests.push_back(qinfo->GetQuestId());
         }
 
         // fill additional data stores
-        if (qinfo->PrevQuestId)
+        if (qinfo->_prevQuestId)
         {
-            if (_questTemplates.find(abs(qinfo->GetPrevQuestId())) == _questTemplates.end())
-            {
-                TC_LOG_ERROR("sql.sql", "Quest %d has PrevQuestId %i, but no such quest", qinfo->GetQuestId(), qinfo->GetPrevQuestId());
-            }
-            else
-            {
-                qinfo->prevQuests.push_back(qinfo->PrevQuestId);
-            }
+            if (_questTemplates.find(std::abs(qinfo->_prevQuestId)) == _questTemplates.end())
+                TC_LOG_ERROR("sql.sql", "Quest %u has PrevQuestId %i, but no such quest", qinfo->GetQuestId(), qinfo->_prevQuestId);
         }
 
-        if (qinfo->NextQuestId)
+        if (qinfo->_nextQuestId)
         {
-            QuestMap::iterator qNextItr = _questTemplates.find(abs(qinfo->GetNextQuestId()));
+            auto qNextItr = _questTemplates.find(qinfo->_nextQuestId);
             if (qNextItr == _questTemplates.end())
-            {
-                TC_LOG_ERROR("sql.sql", "Quest %d has NextQuestId %i, but no such quest", qinfo->GetQuestId(), qinfo->GetNextQuestId());
-            }
+                TC_LOG_ERROR("sql.sql", "Quest %u has NextQuestId %u, but no such quest", qinfo->GetQuestId(), qinfo->_nextQuestId);
             else
-            {
-                int32 signedQuestId = qinfo->NextQuestId < 0 ? -int32(qinfo->GetQuestId()) : int32(qinfo->GetQuestId());
-                qNextItr->second->prevQuests.push_back(signedQuestId);
-            }
+                qNextItr->second->DependentPreviousQuests.push_back(qinfo->GetQuestId());
         }
 
-        if (qinfo->ExclusiveGroup)
-            mExclusiveQuestGroups.insert(std::pair<int32, uint32>(qinfo->ExclusiveGroup, qinfo->GetQuestId()));
-        if (qinfo->LimitTime)
+        if (qinfo->_exclusiveGroup)
+            _exclusiveQuestGroups.emplace(qinfo->_exclusiveGroup, qinfo->GetQuestId());
+        if (qinfo->_timeAllowed)
             qinfo->SetSpecialFlag(QUEST_SPECIAL_FLAGS_TIMED);
-        if (qinfo->RequiredPlayerKills)
+        if (qinfo->_requiredPlayerKills)
             qinfo->SetSpecialFlag(QUEST_SPECIAL_FLAGS_PLAYER_KILL);
+
+        // Special flag to determine if quest is completed from the start, used to determine if we can fail timed quest if it is completed
+        if (!qinfo->HasSpecialFlag(QUEST_SPECIAL_FLAGS_KILL | QUEST_SPECIAL_FLAGS_CAST | QUEST_SPECIAL_FLAGS_SPEAKTO | QUEST_SPECIAL_FLAGS_EXPLORATION_OR_EVENT))
+        {
+            bool addFlag = true;
+            if (qinfo->HasSpecialFlag(QUEST_SPECIAL_FLAGS_DELIVER))
+            {
+                for (uint8 j = 0; j < QUEST_ITEM_OBJECTIVES_COUNT; ++j)
+                {
+                    if (qinfo->RequiredItemId[j] != 0 && (qinfo->RequiredItemId[j] != qinfo->GetSrcItemId() || qinfo->RequiredItemCount[j] > qinfo->GetSrcItemCount()))
+                    {
+                        addFlag = false;
+                        break;
+                    }
+                }
+            }
+
+            if (addFlag)
+                qinfo->SetSpecialFlag(QUEST_SPECIAL_FLAGS_COMPLETED_AT_START);
+        }
     }
 
     // check QUEST_SPECIAL_FLAGS_EXPLORATION_OR_EVENT for spell with SPELL_EFFECT_QUEST_COMPLETE
@@ -4532,23 +4857,26 @@ void ObjectMgr::LoadQuests()
     TC_LOG_INFO("server.loading", ">> Loaded %lu quests definitions in %u ms", (unsigned long)_questTemplates.size(), GetMSTimeDiffToNow(oldMSTime));
 }
 
+void ObjectMgr::LoadQuestStartersAndEnders()
+{
+    TC_LOG_INFO("server.loading", "Loading GO Start Quest Data...");
+    LoadGameobjectQuestStarters();
+    TC_LOG_INFO("server.loading", "Loading GO End Quest Data...");
+    LoadGameobjectQuestEnders();
+    TC_LOG_INFO("server.loading", "Loading Creature Start Quest Data...");
+    LoadCreatureQuestStarters();
+    TC_LOG_INFO("server.loading", "Loading Creature End Quest Data...");
+    LoadCreatureQuestEnders();
+}
+
 void ObjectMgr::LoadQuestLocales()
 {
     uint32 oldMSTime = getMSTime();
 
     _questLocaleStore.clear();                                // need for reload case
 
-    QueryResult result = WorldDatabase.Query("SELECT Id, "
-        "Title_loc1, Details_loc1, Objectives_loc1, OfferRewardText_loc1, RequestItemsText_loc1, EndText_loc1, CompletedText_loc1, ObjectiveText1_loc1, ObjectiveText2_loc1, ObjectiveText3_loc1, ObjectiveText4_loc1, "
-        "Title_loc2, Details_loc2, Objectives_loc2, OfferRewardText_loc2, RequestItemsText_loc2, EndText_loc2, CompletedText_loc2, ObjectiveText1_loc2, ObjectiveText2_loc2, ObjectiveText3_loc2, ObjectiveText4_loc2, "
-        "Title_loc3, Details_loc3, Objectives_loc3, OfferRewardText_loc3, RequestItemsText_loc3, EndText_loc3, CompletedText_loc3, ObjectiveText1_loc3, ObjectiveText2_loc3, ObjectiveText3_loc3, ObjectiveText4_loc3, "
-        "Title_loc4, Details_loc4, Objectives_loc4, OfferRewardText_loc4, RequestItemsText_loc4, EndText_loc4, CompletedText_loc4, ObjectiveText1_loc4, ObjectiveText2_loc4, ObjectiveText3_loc4, ObjectiveText4_loc4, "
-        "Title_loc5, Details_loc5, Objectives_loc5, OfferRewardText_loc5, RequestItemsText_loc5, EndText_loc5, CompletedText_loc5, ObjectiveText1_loc5, ObjectiveText2_loc5, ObjectiveText3_loc5, ObjectiveText4_loc5, "
-        "Title_loc6, Details_loc6, Objectives_loc6, OfferRewardText_loc6, RequestItemsText_loc6, EndText_loc6, CompletedText_loc6, ObjectiveText1_loc6, ObjectiveText2_loc6, ObjectiveText3_loc6, ObjectiveText4_loc6, "
-        "Title_loc7, Details_loc7, Objectives_loc7, OfferRewardText_loc7, RequestItemsText_loc7, EndText_loc7, CompletedText_loc7, ObjectiveText1_loc7, ObjectiveText2_loc7, ObjectiveText3_loc7, ObjectiveText4_loc7, "
-        "Title_loc8, Details_loc8, Objectives_loc8, OfferRewardText_loc8, RequestItemsText_loc8, EndText_loc8, CompletedText_loc8, ObjectiveText1_loc8, ObjectiveText2_loc8, ObjectiveText3_loc8, ObjectiveText4_loc8"
-        " FROM locales_quest");
-
+    //                                               0   1       2      3        4           5                6                 7        8              9               10              11              12
+    QueryResult result = WorldDatabase.Query("SELECT ID, locale, Title, Details, Objectives, OfferRewardText, RequestItemsText, EndText, CompletedText, ObjectiveText1, ObjectiveText2, ObjectiveText3, ObjectiveText4 FROM quest_template_locale");
     if (!result)
         return;
 
@@ -4556,25 +4884,25 @@ void ObjectMgr::LoadQuestLocales()
     {
         Field* fields = result->Fetch();
 
-        uint32 entry = fields[0].GetUInt32();
+        uint32 id               = fields[0].GetUInt32();
+        std::string localeName  = fields[1].GetString();
 
-        QuestLocale& data = _questLocaleStore[entry];
+        QuestLocale& data = _questLocaleStore[id];
 
-        for (uint8 i = TOTAL_LOCALES - 1; i > 0; --i)
-        {
-            LocaleConstant locale = (LocaleConstant) i;
+        LocaleConstant locale = GetLocaleByName(localeName);
+        if (locale == LOCALE_enUS)
+            continue;
 
-            AddLocaleString(fields[1 + 11 * (i - 1)].GetString(), locale, data.Title);
-            AddLocaleString(fields[1 + 11 * (i - 1) + 1].GetString(), locale, data.Details);
-            AddLocaleString(fields[1 + 11 * (i - 1) + 2].GetString(), locale, data.Objectives);
-            AddLocaleString(fields[1 + 11 * (i - 1) + 3].GetString(), locale, data.OfferRewardText);
-            AddLocaleString(fields[1 + 11 * (i - 1) + 4].GetString(), locale, data.RequestItemsText);
-            AddLocaleString(fields[1 + 11 * (i - 1) + 5].GetString(), locale, data.EndText);
-            AddLocaleString(fields[1 + 11 * (i - 1) + 6].GetString(), locale, data.CompletedText);
+        AddLocaleString(fields[2].GetString(), locale, data.Title);
+        AddLocaleString(fields[3].GetString(), locale, data.Details);
+        AddLocaleString(fields[4].GetString(), locale, data.Objectives);
+        AddLocaleString(fields[5].GetString(), locale, data.OfferRewardText);
+        AddLocaleString(fields[6].GetString(), locale, data.RequestItemsText);
+        AddLocaleString(fields[7].GetString(), locale, data.AreaDescription);
+        AddLocaleString(fields[8].GetString(), locale, data.CompletedText);
 
-            for (uint8 k = 0; k < 4; ++k)
-                AddLocaleString(fields[1 + 11 * (i - 1) + 7 + k].GetString(), locale, data.ObjectiveText[k]);
-        }
+        for (uint8 i = 0; i < 4; ++i)
+            AddLocaleString(fields[i + 9].GetString(), locale, data.ObjectiveText[i]);
     } while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded %u Quest locale strings in %u ms", uint32(_questLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
@@ -4592,7 +4920,7 @@ void ObjectMgr::LoadScripts(ScriptsType type)
     if (tableName.empty())
         return;
 
-    if (sScriptMgr->IsScriptScheduled())                    // function cannot be called when scripts are in use.
+    if (sMapMgr->IsScriptScheduled())                    // function cannot be called when scripts are in use.
         return;
 
     TC_LOG_INFO("server.loading", "Loading %s...", tableName.c_str());
@@ -4737,7 +5065,7 @@ void ObjectMgr::LoadScripts(ScriptsType type)
 
             case SCRIPT_COMMAND_RESPAWN_GAMEOBJECT:
             {
-                GameObjectData const* data = GetGOData(tmp.RespawnGameobject.GOGuid);
+                GameObjectData const* data = GetGameObjectData(tmp.RespawnGameobject.GOGuid);
                 if (!data)
                 {
                     TC_LOG_ERROR("sql.sql", "Table `%s` has invalid gameobject (GUID: %u) in SCRIPT_COMMAND_RESPAWN_GAMEOBJECT for script id %u",
@@ -4787,7 +5115,7 @@ void ObjectMgr::LoadScripts(ScriptsType type)
             case SCRIPT_COMMAND_OPEN_DOOR:
             case SCRIPT_COMMAND_CLOSE_DOOR:
             {
-                GameObjectData const* data = GetGOData(tmp.ToggleDoor.GOGuid);
+                GameObjectData const* data = GetGameObjectData(tmp.ToggleDoor.GOGuid);
                 if (!data)
                 {
                     TC_LOG_ERROR("sql.sql", "Table `%s` has invalid gameobject (GUID: %u) in %s for script id %u",
@@ -4939,13 +5267,13 @@ void ObjectMgr::LoadEventScripts()
     {
         for (size_t node_idx = 0; node_idx < sTaxiPathNodesByPath[path_idx].size(); ++node_idx)
         {
-            TaxiPathNodeEntry const& node = sTaxiPathNodesByPath[path_idx][node_idx];
+            TaxiPathNodeEntry const* node = sTaxiPathNodesByPath[path_idx][node_idx];
 
-            if (node.arrivalEventID)
-                evt_scripts.insert(node.arrivalEventID);
+            if (node->ArrivalEventID)
+                evt_scripts.insert(node->ArrivalEventID);
 
-            if (node.departureEventID)
-                evt_scripts.insert(node.departureEventID);
+            if (node->DepartureEventID)
+                evt_scripts.insert(node->DepartureEventID);
         }
     }
 
@@ -5009,8 +5337,8 @@ void ObjectMgr::LoadSpellScriptNames()
 
         Field* fields = result->Fetch();
 
-        int32 spellId          = fields[0].GetInt32();
-        char const* scriptName = fields[1].GetCString();
+        int32 spellId                = fields[0].GetInt32();
+        std::string const scriptName = fields[1].GetString();
 
         bool allRanks = false;
         if (spellId < 0)
@@ -5022,33 +5350,33 @@ void ObjectMgr::LoadSpellScriptNames()
         SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId);
         if (!spellInfo)
         {
-            TC_LOG_ERROR("sql.sql", "Scriptname: `%s` spell (Id: %d) does not exist.", scriptName, spellId);
+            TC_LOG_ERROR("sql.sql", "Scriptname: `%s` spell (Id: %d) does not exist.", scriptName.c_str(), spellId);
             continue;
         }
 
         if (allRanks)
         {
             if (!spellInfo->IsRanked())
-                TC_LOG_ERROR("sql.sql", "Scriptname: `%s` spell (Id: %d) has no ranks of spell.", scriptName, fields[0].GetInt32());
+                TC_LOG_ERROR("sql.sql", "Scriptname: `%s` spell (Id: %d) has no ranks of spell.", scriptName.c_str(), fields[0].GetInt32());
 
             if (spellInfo->GetFirstRankSpell()->Id != uint32(spellId))
             {
-                TC_LOG_ERROR("sql.sql", "Scriptname: `%s` spell (Id: %d) is not first rank of spell.", scriptName, fields[0].GetInt32());
+                TC_LOG_ERROR("sql.sql", "Scriptname: `%s` spell (Id: %d) is not first rank of spell.", scriptName.c_str(), fields[0].GetInt32());
                 continue;
             }
 
             while (spellInfo)
             {
-                _spellScriptsStore.insert(SpellScriptsContainer::value_type(spellInfo->Id, GetScriptId(scriptName)));
+                _spellScriptsStore.insert(SpellScriptsContainer::value_type(spellInfo->Id, std::make_pair(GetScriptId(scriptName), true)));
                 spellInfo = spellInfo->GetNextRankSpell();
             }
         }
         else
         {
             if (spellInfo->IsRanked())
-                TC_LOG_ERROR("sql.sql", "Scriptname: `%s` spell (Id: %d) is ranked spell. Perhaps not all ranks are assigned to this script.", scriptName, spellId);
+                TC_LOG_ERROR("sql.sql", "Scriptname: `%s` spell (Id: %d) is ranked spell. Perhaps not all ranks are assigned to this script.", scriptName.c_str(), spellId);
 
-            _spellScriptsStore.insert(SpellScriptsContainer::value_type(spellInfo->Id, GetScriptId(scriptName)));
+            _spellScriptsStore.insert(SpellScriptsContainer::value_type(spellInfo->Id, std::make_pair(GetScriptId(scriptName), true)));
         }
 
         ++count;
@@ -5070,45 +5398,59 @@ void ObjectMgr::ValidateSpellScripts()
 
     uint32 count = 0;
 
-    for (SpellScriptsContainer::iterator itr = _spellScriptsStore.begin(); itr != _spellScriptsStore.end();)
+    for (auto spell : _spellScriptsStore)
     {
-        SpellInfo const* spellEntry = sSpellMgr->GetSpellInfo(itr->first);
-        std::vector<std::pair<SpellScriptLoader *, SpellScriptsContainer::iterator> > SpellScriptLoaders;
-        sScriptMgr->CreateSpellScriptLoaders(itr->first, SpellScriptLoaders);
-        itr = _spellScriptsStore.upper_bound(itr->first);
+        SpellInfo const* spellEntry = sSpellMgr->GetSpellInfo(spell.first);
 
-        for (std::vector<std::pair<SpellScriptLoader *, SpellScriptsContainer::iterator> >::iterator sitr = SpellScriptLoaders.begin(); sitr != SpellScriptLoaders.end(); ++sitr)
+        auto const bounds = sObjectMgr->GetSpellScriptsBounds(spell.first);
+
+        for (auto itr = bounds.first; itr != bounds.second; ++itr)
         {
-            SpellScript* spellScript = sitr->first->GetSpellScript();
-            AuraScript* auraScript = sitr->first->GetAuraScript();
-            bool valid = true;
-            if (!spellScript && !auraScript)
+            if (SpellScriptLoader* spellScriptLoader = sScriptMgr->GetSpellScriptLoader(itr->second.first))
             {
-                TC_LOG_ERROR("scripts", "Functions GetSpellScript() and GetAuraScript() of script `%s` do not return objects - script skipped",  GetScriptName(sitr->second->second));
-                valid = false;
+                ++count;
+
+                std::unique_ptr<SpellScript> spellScript(spellScriptLoader->GetSpellScript());
+                std::unique_ptr<AuraScript> auraScript(spellScriptLoader->GetAuraScript());
+
+                if (!spellScript && !auraScript)
+                {
+                    TC_LOG_ERROR("scripts", "Functions GetSpellScript() and GetAuraScript() of script `%s` do not return objects - script skipped", GetScriptName(itr->second.first).c_str());
+
+                    itr->second.second = false;
+                    continue;
+                }
+
+                if (spellScript)
+                {
+                    spellScript->_Init(&spellScriptLoader->GetName(), spellEntry->Id);
+                    spellScript->_Register();
+
+                    if (!spellScript->_Validate(spellEntry))
+                    {
+                        itr->second.second = false;
+                        continue;
+                    }
+                }
+
+                if (auraScript)
+                {
+                    auraScript->_Init(&spellScriptLoader->GetName(), spellEntry->Id);
+                    auraScript->_Register();
+
+                    if (!auraScript->_Validate(spellEntry))
+                    {
+                        itr->second.second = false;
+                        continue;
+                    }
+                }
+
+                // Enable the script when all checks passed
+                itr->second.second = true;
             }
-            if (spellScript)
-            {
-                spellScript->_Init(&sitr->first->GetName(), spellEntry->Id);
-                spellScript->_Register();
-                if (!spellScript->_Validate(spellEntry))
-                    valid = false;
-                delete spellScript;
-            }
-            if (auraScript)
-            {
-                auraScript->_Init(&sitr->first->GetName(), spellEntry->Id);
-                auraScript->_Register();
-                if (!auraScript->_Validate(spellEntry))
-                    valid = false;
-                delete auraScript;
-            }
-            if (!valid)
-            {
-                _spellScriptsStore.erase(sitr->second);
-            }
+            else
+                itr->second.second = false;
         }
-        ++count;
     }
 
     TC_LOG_INFO("server.loading", ">> Validated %u scripts in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
@@ -5118,8 +5460,8 @@ void ObjectMgr::LoadPageTexts()
 {
     uint32 oldMSTime = getMSTime();
 
-    //                                                 0      1       2
-    QueryResult result = WorldDatabase.Query("SELECT entry, text, next_page FROM page_text");
+    //                                               0     1       2
+    QueryResult result = WorldDatabase.Query("SELECT ID, Text, NextPageID FROM page_text");
 
     if (!result)
     {
@@ -5132,10 +5474,10 @@ void ObjectMgr::LoadPageTexts()
     {
         Field* fields = result->Fetch();
 
-        PageText& pageText = _pageTextStore[fields[0].GetUInt32()];
+        PageText& pageText  = _pageTextStore[fields[0].GetUInt32()];
 
-        pageText.Text     = fields[1].GetString();
-        pageText.NextPage = fields[2].GetUInt32();
+        pageText.Text       = fields[1].GetString();
+        pageText.NextPageID = fields[2].GetUInt32();
 
         ++count;
     }
@@ -5143,11 +5485,11 @@ void ObjectMgr::LoadPageTexts()
 
     for (PageTextContainer::const_iterator itr = _pageTextStore.begin(); itr != _pageTextStore.end(); ++itr)
     {
-        if (itr->second.NextPage)
+        if (itr->second.NextPageID)
         {
-            PageTextContainer::const_iterator itr2 = _pageTextStore.find(itr->second.NextPage);
+            PageTextContainer::const_iterator itr2 = _pageTextStore.find(itr->second.NextPageID);
             if (itr2 == _pageTextStore.end())
-                TC_LOG_ERROR("sql.sql", "Page text (Id: %u) has not existing next page (Id: %u)", itr->first, itr->second.NextPage);
+                TC_LOG_ERROR("sql.sql", "Page text (ID: %u) has non-existing `NextPageID` (%u)", itr->first, itr->second.NextPageID);
 
         }
     }
@@ -5161,7 +5503,7 @@ PageText const* ObjectMgr::GetPageText(uint32 pageEntry)
     if (itr != _pageTextStore.end())
         return &(itr->second);
 
-    return NULL;
+    return nullptr;
 }
 
 void ObjectMgr::LoadPageTextLocales()
@@ -5170,7 +5512,8 @@ void ObjectMgr::LoadPageTextLocales()
 
     _pageTextLocaleStore.clear();                             // need for reload case
 
-    QueryResult result = WorldDatabase.Query("SELECT entry, text_loc1, text_loc2, text_loc3, text_loc4, text_loc5, text_loc6, text_loc7, text_loc8 FROM locales_page_text");
+    //                                               0   1       2
+    QueryResult result = WorldDatabase.Query("SELECT ID, locale, Text FROM page_text_locale");
 
     if (!result)
         return;
@@ -5179,12 +5522,14 @@ void ObjectMgr::LoadPageTextLocales()
     {
         Field* fields = result->Fetch();
 
-        uint32 entry = fields[0].GetUInt32();
+        uint32 id                   = fields[0].GetUInt32();
+        std::string localeName      = fields[1].GetString();
+        std::string text            = fields[2].GetString();
 
-        PageTextLocale& data = _pageTextLocaleStore[entry];
+        PageTextLocale& data = _pageTextLocaleStore[id];
+        LocaleConstant locale = GetLocaleByName(localeName);
 
-        for (uint8 i = TOTAL_LOCALES - 1; i > 0; --i)
-            AddLocaleString(fields[i].GetString(), LocaleConstant(i), data.Text);
+        AddLocaleString(text, locale, data.Text);
     } while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded %u PageText locale strings in %u ms", uint32(_pageTextLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
@@ -5220,7 +5565,7 @@ void ObjectMgr::LoadInstanceTemplate()
 
         instanceTemplate.AllowMount = fields[3].GetBool();
         instanceTemplate.Parent     = uint32(fields[1].GetUInt16());
-        instanceTemplate.ScriptId   = sObjectMgr->GetScriptId(fields[2].GetCString());
+        instanceTemplate.ScriptId   = sObjectMgr->GetScriptId(fields[2].GetString());
 
         _instanceTemplateStore[mapID] = instanceTemplate;
 
@@ -5231,13 +5576,13 @@ void ObjectMgr::LoadInstanceTemplate()
     TC_LOG_INFO("server.loading", ">> Loaded %u instance templates in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
-InstanceTemplate const* ObjectMgr::GetInstanceTemplate(uint32 mapID)
+InstanceTemplate const* ObjectMgr::GetInstanceTemplate(uint32 mapID) const
 {
     InstanceTemplateContainer::const_iterator itr = _instanceTemplateStore.find(uint16(mapID));
     if (itr != _instanceTemplateStore.end())
         return &(itr->second);
 
-    return NULL;
+    return nullptr;
 }
 
 void ObjectMgr::LoadInstanceEncounters()
@@ -5248,7 +5593,7 @@ void ObjectMgr::LoadInstanceEncounters()
     QueryResult result = WorldDatabase.Query("SELECT entry, creditType, creditEntry, lastEncounterDungeon FROM instance_encounters");
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 instance encounters, table is empty!");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 instance encounters, table is empty!");
         return;
     }
 
@@ -5297,6 +5642,14 @@ void ObjectMgr::LoadInstanceEncounters()
                     continue;
                 }
                 const_cast<CreatureTemplate*>(creatureInfo)->flags_extra |= CREATURE_FLAG_EXTRA_DUNGEON_BOSS;
+                for (uint8 diff = 1; diff < MAX_DIFFICULTY; ++diff)
+                {
+                    if (uint32 diffEntry = creatureInfo->DifficultyEntry[diff - 1])
+                    {
+                        if (CreatureTemplate const* diffInfo = GetCreatureTemplate(diffEntry))
+                            const_cast<CreatureTemplate*>(diffInfo)->flags_extra |= CREATURE_FLAG_EXTRA_DUNGEON_BOSS;
+                    }
+                }
                 break;
             }
             case ENCOUNTER_CREDIT_CAST_SPELL:
@@ -5324,7 +5677,7 @@ GossipText const* ObjectMgr::GetGossipText(uint32 Text_ID) const
     GossipTextContainer::const_iterator itr = _gossipTextStore.find(Text_ID);
     if (itr != _gossipTextStore.end())
         return &itr->second;
-    return NULL;
+    return nullptr;
 }
 
 void ObjectMgr::LoadGossipText()
@@ -5332,14 +5685,14 @@ void ObjectMgr::LoadGossipText()
     uint32 oldMSTime = getMSTime();
 
     QueryResult result = WorldDatabase.Query("SELECT ID, "
-        "text0_0, text0_1, BroadcastTextID0, lang0, prob0, em0_0, em0_1, em0_2, em0_3, em0_4, em0_5, "
-        "text1_0, text1_1, BroadcastTextID1, lang1, prob1, em1_0, em1_1, em1_2, em1_3, em1_4, em1_5, "
-        "text2_0, text2_1, BroadcastTextID2, lang2, prob2, em2_0, em2_1, em2_2, em2_3, em2_4, em2_5, "
-        "text3_0, text3_1, BroadcastTextID3, lang3, prob3, em3_0, em3_1, em3_2, em3_3, em3_4, em3_5, "
-        "text4_0, text4_1, BroadcastTextID4, lang4, prob4, em4_0, em4_1, em4_2, em4_3, em4_4, em4_5, "
-        "text5_0, text5_1, BroadcastTextID5, lang5, prob5, em5_0, em5_1, em5_2, em5_3, em5_4, em5_5, "
-        "text6_0, text6_1, BroadcastTextID6, lang6, prob6, em6_0, em6_1, em6_2, em6_3, em6_4, em6_5, "
-        "text7_0, text7_1, BroadcastTextID7, lang7, prob7, em7_0, em7_1, em7_2, em7_3, em7_4, em7_5 "
+        "text0_0, text0_1, BroadcastTextID0, lang0, Probability0, em0_0, em0_1, em0_2, em0_3, em0_4, em0_5, "
+        "text1_0, text1_1, BroadcastTextID1, lang1, Probability1, em1_0, em1_1, em1_2, em1_3, em1_4, em1_5, "
+        "text2_0, text2_1, BroadcastTextID2, lang2, Probability2, em2_0, em2_1, em2_2, em2_3, em2_4, em2_5, "
+        "text3_0, text3_1, BroadcastTextID3, lang3, Probability3, em3_0, em3_1, em3_2, em3_3, em3_4, em3_5, "
+        "text4_0, text4_1, BroadcastTextID4, lang4, Probability4, em4_0, em4_1, em4_2, em4_3, em4_4, em4_5, "
+        "text5_0, text5_1, BroadcastTextID5, lang5, Probability5, em5_0, em5_1, em5_2, em5_3, em5_4, em5_5, "
+        "text6_0, text6_1, BroadcastTextID6, lang6, Probability6, em6_0, em6_1, em6_2, em6_3, em6_4, em6_5, "
+        "text7_0, text7_1, BroadcastTextID7, lang7, Probability7, em7_0, em7_1, em7_2, em7_3, em7_4, em7_5 "
         "FROM npc_text");
 
 
@@ -5409,16 +5762,10 @@ void ObjectMgr::LoadNpcTextLocales()
 
     _npcTextLocaleStore.clear();                              // need for reload case
 
-    QueryResult result = WorldDatabase.Query("SELECT ID, "
-        "Text0_0_loc1, Text0_1_loc1, Text1_0_loc1, Text1_1_loc1, Text2_0_loc1, Text2_1_loc1, Text3_0_loc1, Text3_1_loc1, Text4_0_loc1, Text4_1_loc1, Text5_0_loc1, Text5_1_loc1, Text6_0_loc1, Text6_1_loc1, Text7_0_loc1, Text7_1_loc1, "
-        "Text0_0_loc2, Text0_1_loc2, Text1_0_loc2, Text1_1_loc2, Text2_0_loc2, Text2_1_loc2, Text3_0_loc2, Text3_1_loc1, Text4_0_loc2, Text4_1_loc2, Text5_0_loc2, Text5_1_loc2, Text6_0_loc2, Text6_1_loc2, Text7_0_loc2, Text7_1_loc2, "
-        "Text0_0_loc3, Text0_1_loc3, Text1_0_loc3, Text1_1_loc3, Text2_0_loc3, Text2_1_loc3, Text3_0_loc3, Text3_1_loc1, Text4_0_loc3, Text4_1_loc3, Text5_0_loc3, Text5_1_loc3, Text6_0_loc3, Text6_1_loc3, Text7_0_loc3, Text7_1_loc3, "
-        "Text0_0_loc4, Text0_1_loc4, Text1_0_loc4, Text1_1_loc4, Text2_0_loc4, Text2_1_loc4, Text3_0_loc4, Text3_1_loc1, Text4_0_loc4, Text4_1_loc4, Text5_0_loc4, Text5_1_loc4, Text6_0_loc4, Text6_1_loc4, Text7_0_loc4, Text7_1_loc4, "
-        "Text0_0_loc5, Text0_1_loc5, Text1_0_loc5, Text1_1_loc5, Text2_0_loc5, Text2_1_loc5, Text3_0_loc5, Text3_1_loc1, Text4_0_loc5, Text4_1_loc5, Text5_0_loc5, Text5_1_loc5, Text6_0_loc5, Text6_1_loc5, Text7_0_loc5, Text7_1_loc5, "
-        "Text0_0_loc6, Text0_1_loc6, Text1_0_loc6, Text1_1_loc6, Text2_0_loc6, Text2_1_loc6, Text3_0_loc6, Text3_1_loc1, Text4_0_loc6, Text4_1_loc6, Text5_0_loc6, Text5_1_loc6, Text6_0_loc6, Text6_1_loc6, Text7_0_loc6, Text7_1_loc6, "
-        "Text0_0_loc7, Text0_1_loc7, Text1_0_loc7, Text1_1_loc7, Text2_0_loc7, Text2_1_loc7, Text3_0_loc7, Text3_1_loc1, Text4_0_loc7, Text4_1_loc7, Text5_0_loc7, Text5_1_loc7, Text6_0_loc7, Text6_1_loc7, Text7_0_loc7, Text7_1_loc7, "
-        "Text0_0_loc8, Text0_1_loc8, Text1_0_loc8, Text1_1_loc8, Text2_0_loc8, Text2_1_loc8, Text3_0_loc8, Text3_1_loc1, Text4_0_loc8, Text4_1_loc8, Text5_0_loc8, Text5_1_loc8, Text6_0_loc8, Text6_1_loc8, Text7_0_loc8, Text7_1_loc8 "
-        " FROM locales_npc_text");
+    QueryResult result = WorldDatabase.Query("SELECT ID, Locale, "
+    //   2        3        4        5        6        7        8        9        10       11       12       13       14       15       16       17
+        "Text0_0, Text0_1, Text1_0, Text1_1, Text2_0, Text2_1, Text3_0, Text3_1, Text4_0, Text4_1, Text5_0, Text5_1, Text6_0, Text6_1, Text7_0, Text7_1 "
+        "FROM npc_text_locale");
 
     if (!result)
         return;
@@ -5427,18 +5774,18 @@ void ObjectMgr::LoadNpcTextLocales()
     {
         Field* fields = result->Fetch();
 
-        uint32 entry = fields[0].GetUInt32();
+        uint32 id               = fields[0].GetUInt32();
+        std::string localeName  = fields[1].GetString();
 
-        NpcTextLocale& data = _npcTextLocaleStore[entry];
+        NpcTextLocale& data     = _npcTextLocaleStore[id];
+        LocaleConstant locale   = GetLocaleByName(localeName);
+        if (locale == LOCALE_enUS)
+            continue;
 
-        for (uint8 i = TOTAL_LOCALES - 1; i > 0; --i)
+        for (uint8 i = 0; i < MAX_GOSSIP_TEXT_OPTIONS; ++i)
         {
-            LocaleConstant locale = (LocaleConstant) i;
-            for (uint8 j = 0; j < MAX_GOSSIP_TEXT_OPTIONS; ++j)
-            {
-                AddLocaleString(fields[1 + 8 * 2 * (i - 1) + 2 * j].GetString(), locale, data.Text_0[j]);
-                AddLocaleString(fields[1 + 8 * 2 * (i - 1) + 2 * j + 1].GetString(), locale, data.Text_1[j]);
-            }
+            AddLocaleString(fields[2 + i * 2].GetString(), locale, data.Text_0[i]);
+            AddLocaleString(fields[3 + i * 2].GetString(), locale, data.Text_1[i]);
         }
     } while (result->NextRow());
 
@@ -5450,7 +5797,7 @@ void ObjectMgr::ReturnOrDeleteOldMails(bool serverUp)
 {
     uint32 oldMSTime = getMSTime();
 
-    time_t curTime = time(NULL);
+    time_t curTime = time(nullptr);
     tm lt;
     localtime_r(&curTime, &lt);
     uint64 basetime(curTime);
@@ -5505,9 +5852,9 @@ void ObjectMgr::ReturnOrDeleteOldMails(bool serverUp)
         m->checked        = fields[7].GetUInt8();
         m->mailTemplateId = fields[8].GetInt16();
 
-        Player* player = NULL;
+        Player* player = nullptr;
         if (serverUp)
-            player = ObjectAccessor::FindConnectedPlayer(ObjectGuid(HIGHGUID_PLAYER, m->receiver));
+            player = ObjectAccessor::FindConnectedPlayer(ObjectGuid(HighGuid::Player, m->receiver));
 
         if (player && player->m_mailsLoaded)
         {                                                   // this code will run very improbably (the time is between 4 and 5 am, in game is online a player, who has old mail
@@ -5532,6 +5879,10 @@ void ObjectMgr::ReturnOrDeleteOldMails(bool serverUp)
                     stmt->setUInt32(0, itr2->item_guid);
                     CharacterDatabase.Execute(stmt);
                 }
+
+                stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_MAIL_ITEM_BY_ID);
+                stmt->setUInt32(0, m->messageID);
+                CharacterDatabase.Execute(stmt);
             }
             else
             {
@@ -5631,6 +5982,134 @@ void ObjectMgr::LoadQuestAreaTriggers()
     TC_LOG_INFO("server.loading", ">> Loaded %u quest trigger points in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
+QuestGreeting const* ObjectMgr::GetQuestGreeting(ObjectGuid guid) const
+{
+    auto itr = _questGreetingStore.find(guid.GetTypeId());
+    if (itr == _questGreetingStore.end())
+        return nullptr;
+
+    auto questItr = itr->second.find(guid.GetEntry());
+    if (questItr == itr->second.end())
+        return nullptr;
+
+    return questItr->second;
+}
+
+void ObjectMgr::LoadQuestGreetings()
+{
+    uint32 oldMSTime = getMSTime();
+
+    _questGreetingStore.clear(); // need for reload case
+
+    //                                                0   1          2                3             4
+    QueryResult result = WorldDatabase.Query("SELECT ID, Type, GreetEmoteType, GreetEmoteDelay, Greeting FROM quest_greeting");
+    if (!result)
+    {
+        TC_LOG_INFO("server.loading", ">> Loaded 0 quest greetings. DB table `quest_greeting` is empty.");
+        return;
+    }
+
+    _questGreetingStore.rehash(result->GetRowCount());
+
+    uint32 count = 0;
+
+    do
+    {
+        Field* fields = result->Fetch();
+
+        uint32 id                   = fields[0].GetUInt32();
+        uint8 type                  = fields[1].GetUInt8();
+        // overwrite
+        switch (type) 
+        {
+            case 0: // Creature
+                type = TYPEID_UNIT;
+                if (!sObjectMgr->GetCreatureTemplate(id))
+                {
+                    TC_LOG_ERROR("sql.sql", "Table `quest_greeting`: creature template (entry: %u) does not exist.", id);
+                    continue;
+                }
+                break;
+            case 1: // GameObject
+                type = TYPEID_GAMEOBJECT;
+                if (!sObjectMgr->GetGameObjectTemplate(id))
+                {
+                    TC_LOG_ERROR("sql.sql", "Table `quest_greeting`: gameobject template (entry: %u) does not exist.", id);
+                    continue;
+                }
+                break;
+            default:
+                TC_LOG_ERROR("sql.sql", "Table `quest_greeting`: unknown type = %u for entry = %u. Skipped.", type, id);
+                continue;
+        }
+
+        uint16 greetEmoteType       = fields[2].GetUInt16();
+
+        if (greetEmoteType > 0 && !sEmotesStore.LookupEntry(greetEmoteType))
+        {
+            TC_LOG_DEBUG("sql.sql", "Table `quest_greeting`: entry %u has greetEmoteType = %u but emote does not exist. Set to 0.", id, greetEmoteType);
+            greetEmoteType = 0;
+        }
+
+        uint32 greetEmoteDelay      = fields[3].GetUInt32();
+        std::string greeting        = fields[4].GetString();
+
+        _questGreetingStore[type][id] = new QuestGreeting(greetEmoteType, greetEmoteDelay, greeting);
+
+        ++count;
+    }
+    while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded %u quest_greeting in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+}
+
+void ObjectMgr::LoadQuestGreetingsLocales()
+{
+    uint32 oldMSTime = getMSTime();
+
+    _questGreetingLocaleStore.clear();                              // need for reload case
+
+    //                                               0     1      2       3
+    QueryResult result = WorldDatabase.Query("SELECT ID, Type, Locale, Greeting FROM quest_greeting_locale");
+    if (!result)
+    {
+        TC_LOG_INFO("server.loading", ">> Loaded 0 quest_greeting locales. DB table `quest_greeting_locale` is empty.");
+        return;
+    }
+
+    do
+    {
+        Field* fields = result->Fetch();
+
+        uint32 id                   = fields[0].GetUInt32();
+        uint8 type                  = fields[1].GetUInt8();
+        // overwrite
+        switch (type)
+        {
+            case 0: // Creature
+                type = TYPEID_UNIT;
+                break;
+            case 1: // GameObject
+                type = TYPEID_GAMEOBJECT;
+                break;
+            default:
+                break;
+        }
+
+        std::string localeName      = fields[2].GetString();
+        std::string greeting        = fields[3].GetString();
+
+        QuestGreetingLocale& data   = _questGreetingLocaleStore[MAKE_PAIR32(id, type)];
+        LocaleConstant locale       = GetLocaleByName(localeName);
+        if (locale == LOCALE_enUS)
+            continue;
+
+        AddLocaleString(greeting, locale, data.greeting);
+    } while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded %u quest greeting locale strings in %u ms", uint32(_questGreetingLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
+}
+
 void ObjectMgr::LoadTavernAreaTriggers()
 {
     uint32 oldMSTime = getMSTime();
@@ -5673,35 +6152,32 @@ void ObjectMgr::LoadAreaTriggerScripts()
     uint32 oldMSTime = getMSTime();
 
     _areaTriggerScriptStore.clear();                            // need for reload case
-    QueryResult result = WorldDatabase.Query("SELECT entry, ScriptName FROM areatrigger_scripts");
 
+    QueryResult result = WorldDatabase.Query("SELECT entry, ScriptName FROM areatrigger_scripts");
     if (!result)
     {
         TC_LOG_INFO("server.loading", ">> Loaded 0 areatrigger scripts. DB table `areatrigger_scripts` is empty.");
         return;
     }
 
-    uint32 count = 0;
-
     do
     {
-        ++count;
-
         Field* fields = result->Fetch();
 
-        uint32 Trigger_ID      = fields[0].GetUInt32();
-        const char *scriptName = fields[1].GetCString();
+        uint32 triggerId             = fields[0].GetUInt32();
+        std::string const scriptName = fields[1].GetString();
 
-        AreaTriggerEntry const* atEntry = sAreaTriggerStore.LookupEntry(Trigger_ID);
+        AreaTriggerEntry const* atEntry = sAreaTriggerStore.LookupEntry(triggerId);
         if (!atEntry)
         {
-            TC_LOG_ERROR("sql.sql", "Area trigger (ID:%u) does not exist in `AreaTrigger.dbc`.", Trigger_ID);
+            TC_LOG_ERROR("sql.sql", "AreaTrigger (ID: %u) does not exist in `AreaTrigger.dbc`.", triggerId);
             continue;
         }
-        _areaTriggerScriptStore[Trigger_ID] = GetScriptId(scriptName);
-    } while (result->NextRow());
+        _areaTriggerScriptStore[triggerId] = GetScriptId(scriptName);
+    }
+    while (result->NextRow());
 
-    TC_LOG_INFO("server.loading", ">> Loaded %u areatrigger scripts in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    TC_LOG_INFO("server.loading", ">> Loaded " SZFMTD " areatrigger scripts in %u ms", _areaTriggerScriptStore.size(), GetMSTimeDiffToNow(oldMSTime));
 }
 
 uint32 ObjectMgr::GetNearestTaxiNode(float x, float y, float z, uint32 mapid, uint32 team)
@@ -5812,14 +6288,14 @@ void ObjectMgr::LoadGraveyardZones()
 {
     uint32 oldMSTime = getMSTime();
 
-    GraveYardStore.clear();                                  // need for reload case
+    GraveyardStore.clear(); // need for reload case
 
-    //                                                0       1         2
-    QueryResult result = WorldDatabase.Query("SELECT id, ghost_zone, faction FROM game_graveyard_zone");
+    //                                               0   1          2
+    QueryResult result = WorldDatabase.Query("SELECT ID, GhostZone, Faction FROM graveyard_zone");
 
     if (!result)
     {
-        TC_LOG_INFO("server.loading", ">> Loaded 0 graveyard-zone links. DB table `game_graveyard_zone` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 graveyard-zone links. DB table `graveyard_zone` is empty.");
         return;
     }
 
@@ -5838,37 +6314,37 @@ void ObjectMgr::LoadGraveyardZones()
         WorldSafeLocsEntry const* entry = sWorldSafeLocsStore.LookupEntry(safeLocId);
         if (!entry)
         {
-            TC_LOG_ERROR("sql.sql", "Table `game_graveyard_zone` has a record for not existing graveyard (WorldSafeLocs.dbc id) %u, skipped.", safeLocId);
+            TC_LOG_ERROR("sql.sql", "Table `graveyard_zone` has a record for non-existing graveyard (WorldSafeLocsID: %u), skipped.", safeLocId);
             continue;
         }
 
-        AreaTableEntry const* areaEntry = GetAreaEntryByAreaID(zoneId);
+        AreaTableEntry const* areaEntry = sAreaTableStore.LookupEntry(zoneId);
         if (!areaEntry)
         {
-            TC_LOG_ERROR("sql.sql", "Table `game_graveyard_zone` has a record for not existing zone id (%u), skipped.", zoneId);
+            TC_LOG_ERROR("sql.sql", "Table `graveyard_zone` has a record for non-existing Zone (ID: %u), skipped.", zoneId);
             continue;
         }
 
         if (areaEntry->zone != 0)
         {
-            TC_LOG_ERROR("sql.sql", "Table `game_graveyard_zone` has a record for subzone id (%u) instead of zone, skipped.", zoneId);
+            TC_LOG_ERROR("sql.sql", "Table `graveyard_zone` has a record for SubZone (ID: %u) instead of zone, skipped.", zoneId);
             continue;
         }
 
         if (team != 0 && team != HORDE && team != ALLIANCE)
         {
-            TC_LOG_ERROR("sql.sql", "Table `game_graveyard_zone` has a record for non player faction (%u), skipped.", team);
+            TC_LOG_ERROR("sql.sql", "Table `graveyard_zone` has a record for non player faction (%u), skipped.", team);
             continue;
         }
 
-        if (!AddGraveYardLink(safeLocId, zoneId, team, false))
-            TC_LOG_ERROR("sql.sql", "Table `game_graveyard_zone` has a duplicate record for Graveyard (ID: %u) and Zone (ID: %u), skipped.", safeLocId, zoneId);
+        if (!AddGraveyardLink(safeLocId, zoneId, team, false))
+            TC_LOG_ERROR("sql.sql", "Table `graveyard_zone` has a duplicate record for Graveyard (ID: %u) and Zone (ID: %u), skipped.", safeLocId, zoneId);
     } while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded %u graveyard-zone links in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
-WorldSafeLocsEntry const* ObjectMgr::GetDefaultGraveYard(uint32 team)
+WorldSafeLocsEntry const* ObjectMgr::GetDefaultGraveyard(uint32 team) const
 {
     enum DefaultGraveyard
     {
@@ -5880,10 +6356,10 @@ WorldSafeLocsEntry const* ObjectMgr::GetDefaultGraveYard(uint32 team)
         return sWorldSafeLocsStore.LookupEntry(HORDE_GRAVEYARD);
     else if (team == ALLIANCE)
         return sWorldSafeLocsStore.LookupEntry(ALLIANCE_GRAVEYARD);
-    else return NULL;
+    else return nullptr;
 }
 
-WorldSafeLocsEntry const* ObjectMgr::GetClosestGraveYard(float x, float y, float z, uint32 MapId, uint32 team)
+WorldSafeLocsEntry const* ObjectMgr::GetClosestGraveyard(float x, float y, float z, uint32 MapId, uint32 team) const
 {
     // search for zone associated closest graveyard
     uint32 zoneId = sMapMgr->GetZoneId(MapId, x, y, z);
@@ -5893,7 +6369,7 @@ WorldSafeLocsEntry const* ObjectMgr::GetClosestGraveYard(float x, float y, float
         if (z > -500)
         {
             TC_LOG_ERROR("misc", "ZoneId not found for map %u coords (%f, %f, %f)", MapId, x, y, z);
-            return GetDefaultGraveYard(team);
+            return GetDefaultGraveyard(team);
         }
     }
 
@@ -5904,39 +6380,40 @@ WorldSafeLocsEntry const* ObjectMgr::GetClosestGraveYard(float x, float y, float
     //     then check faction
     //   if mapId != graveyard.mapId (ghost in instance) and search any graveyard associated
     //     then check faction
-    GraveYardMapBounds range = GraveYardStore.equal_range(zoneId);
+    GraveyardMapBounds range = GraveyardStore.equal_range(zoneId);
     MapEntry const* map = sMapStore.LookupEntry(MapId);
 
     // not need to check validity of map object; MapId _MUST_ be valid here
     if (range.first == range.second && !map->IsBattlegroundOrArena())
     {
-        TC_LOG_ERROR("sql.sql", "Table `game_graveyard_zone` incomplete: Zone %u Team %u does not have a linked graveyard.", zoneId, team);
-        return GetDefaultGraveYard(team);
+        if (zoneId != 0) // zone == 0 can't be fixed, used by bliz for bugged zones
+            TC_LOG_ERROR("sql.sql", "Table `graveyard_zone` incomplete: Zone %u Team %u does not have a linked graveyard.", zoneId, team);
+        return GetDefaultGraveyard(team);
     }
 
     // at corpse map
     bool foundNear = false;
     float distNear = 10000;
-    WorldSafeLocsEntry const* entryNear = NULL;
+    WorldSafeLocsEntry const* entryNear = nullptr;
 
     // at entrance map for corpse map
     bool foundEntr = false;
     float distEntr = 10000;
-    WorldSafeLocsEntry const* entryEntr = NULL;
+    WorldSafeLocsEntry const* entryEntr = nullptr;
 
     // some where other
-    WorldSafeLocsEntry const* entryFar = NULL;
+    WorldSafeLocsEntry const* entryFar = nullptr;
 
     MapEntry const* mapEntry = sMapStore.LookupEntry(MapId);
 
     for (; range.first != range.second; ++range.first)
     {
-        GraveYardData const& data = range.first->second;
+        GraveyardData const& data = range.first->second;
 
         WorldSafeLocsEntry const* entry = sWorldSafeLocsStore.LookupEntry(data.safeLocId);
         if (!entry)
         {
-            TC_LOG_ERROR("sql.sql", "Table `game_graveyard_zone` has record for not existing graveyard (WorldSafeLocs.dbc id) %u, skipped.", data.safeLocId);
+            TC_LOG_ERROR("sql.sql", "Table `graveyard_zone` has record for not existing graveyard (WorldSafeLocsID %u), skipped.", data.safeLocId);
             continue;
         }
 
@@ -6007,29 +6484,45 @@ WorldSafeLocsEntry const* ObjectMgr::GetClosestGraveYard(float x, float y, float
     return entryFar;
 }
 
-GraveYardData const* ObjectMgr::FindGraveYardData(uint32 id, uint32 zoneId)
+GraveyardData const* ObjectMgr::FindGraveyardData(uint32 id, uint32 zoneId) const
 {
-    GraveYardMapBounds range = GraveYardStore.equal_range(zoneId);
+    GraveyardMapBounds range = GraveyardStore.equal_range(zoneId);
     for (; range.first != range.second; ++range.first)
     {
-        GraveYardData const& data = range.first->second;
+        GraveyardData const& data = range.first->second;
         if (data.safeLocId == id)
             return &data;
     }
-    return NULL;
+    return nullptr;
 }
 
-bool ObjectMgr::AddGraveYardLink(uint32 id, uint32 zoneId, uint32 team, bool persist /*= true*/)
+AreaTrigger const* ObjectMgr::GetAreaTrigger(uint32 trigger) const
 {
-    if (FindGraveYardData(id, zoneId))
+    AreaTriggerContainer::const_iterator itr = _areaTriggerStore.find(trigger);
+    if (itr != _areaTriggerStore.end())
+        return &itr->second;
+    return nullptr;
+}
+
+AccessRequirement const* ObjectMgr::GetAccessRequirement(uint32 mapid, Difficulty difficulty) const
+{
+    AccessRequirementContainer::const_iterator itr = _accessRequirementStore.find(MAKE_PAIR32(mapid, difficulty));
+    if (itr != _accessRequirementStore.end())
+        return itr->second;
+    return nullptr;
+}
+
+bool ObjectMgr::AddGraveyardLink(uint32 id, uint32 zoneId, uint32 team, bool persist /*= true*/)
+{
+    if (FindGraveyardData(id, zoneId))
         return false;
 
     // add link to loaded data
-    GraveYardData data;
+    GraveyardData data;
     data.safeLocId = id;
     data.team = team;
 
-    GraveYardStore.insert(GraveYardContainer::value_type(zoneId, data));
+    GraveyardStore.insert(GraveyardContainer::value_type(zoneId, data));
 
     // add link to DB
     if (persist)
@@ -6046,12 +6539,12 @@ bool ObjectMgr::AddGraveYardLink(uint32 id, uint32 zoneId, uint32 team, bool per
     return true;
 }
 
-void ObjectMgr::RemoveGraveYardLink(uint32 id, uint32 zoneId, uint32 team, bool persist /*= false*/)
+void ObjectMgr::RemoveGraveyardLink(uint32 id, uint32 zoneId, uint32 team, bool persist /*= false*/)
 {
-    GraveYardMapBoundsNonConst range = GraveYardStore.equal_range(zoneId);
+    GraveyardMapBoundsNonConst range = GraveyardStore.equal_range(zoneId);
     if (range.first == range.second)
     {
-        //TC_LOG_ERROR("sql.sql", "Table `game_graveyard_zone` incomplete: Zone %u Team %u does not have a linked graveyard.", zoneId, team);
+        //TC_LOG_ERROR("sql.sql", "Table `graveyard_zone` incomplete: Zone %u Team %u does not have a linked graveyard.", zoneId, team);
         return;
     }
 
@@ -6060,7 +6553,7 @@ void ObjectMgr::RemoveGraveYardLink(uint32 id, uint32 zoneId, uint32 team, bool 
 
     for (; range.first != range.second; ++range.first)
     {
-        GraveYardData & data = range.first->second;
+        GraveyardData & data = range.first->second;
 
         // skip not matching safezone id
         if (data.safeLocId != id)
@@ -6080,7 +6573,7 @@ void ObjectMgr::RemoveGraveYardLink(uint32 id, uint32 zoneId, uint32 team, bool 
         return;
 
     // remove from links
-    GraveYardStore.erase(range.first);
+    GraveyardStore.erase(range.first);
 
     // remove link from DB
     if (persist)
@@ -6101,8 +6594,8 @@ void ObjectMgr::LoadAreaTriggerTeleports()
 
     _areaTriggerStore.clear();                                  // need for reload case
 
-    //                                                        0            1                  2                  3                  4                   5
-    QueryResult result = WorldDatabase.Query("SELECT id,  target_map, target_position_x, target_position_y, target_position_z, target_orientation FROM areatrigger_teleport");
+    //                                               0        1              2                  3                  4                   5
+    QueryResult result = WorldDatabase.Query("SELECT ID,  target_map, target_position_x, target_position_y, target_position_z, target_orientation FROM areatrigger_teleport");
     if (!result)
     {
         TC_LOG_INFO("server.loading", ">> Loaded 0 area trigger teleport definitions. DB table `areatrigger_teleport` is empty.");
@@ -6259,16 +6752,16 @@ AreaTrigger const* ObjectMgr::GetGoBackTrigger(uint32 Map) const
 {
     bool useParentDbValue = false;
     uint32 parentId = 0;
-    const MapEntry* mapEntry = sMapStore.LookupEntry(Map);
+    MapEntry const* mapEntry = sMapStore.LookupEntry(Map);
     if (!mapEntry || mapEntry->entrance_map < 0)
-        return NULL;
+        return nullptr;
 
     if (mapEntry->IsDungeon())
     {
-        const InstanceTemplate* iTemplate = sObjectMgr->GetInstanceTemplate(Map);
+        InstanceTemplate const* iTemplate = sObjectMgr->GetInstanceTemplate(Map);
 
         if (!iTemplate)
-            return NULL;
+            return nullptr;
 
         parentId = iTemplate->Parent;
         useParentDbValue = true;
@@ -6282,7 +6775,7 @@ AreaTrigger const* ObjectMgr::GetGoBackTrigger(uint32 Map) const
             if (atEntry && atEntry->mapid == Map)
                 return &itr->second;
         }
-    return NULL;
+    return nullptr;
 }
 
 /**
@@ -6299,36 +6792,28 @@ AreaTrigger const* ObjectMgr::GetMapEntranceTrigger(uint32 Map) const
                 return &itr->second;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 void ObjectMgr::SetHighestGuids()
 {
     QueryResult result = CharacterDatabase.Query("SELECT MAX(guid) FROM characters");
     if (result)
-        _hiCharGuid = (*result)[0].GetUInt32()+1;
-
-    result = WorldDatabase.Query("SELECT MAX(guid) FROM creature");
-    if (result)
-        _hiCreatureGuid = (*result)[0].GetUInt32()+1;
+        GetGuidSequenceGenerator<HighGuid::Player>().Set((*result)[0].GetUInt32()+1);
 
     result = CharacterDatabase.Query("SELECT MAX(guid) FROM item_instance");
     if (result)
-        _hiItemGuid = (*result)[0].GetUInt32()+1;
+        GetGuidSequenceGenerator<HighGuid::Item>().Set((*result)[0].GetUInt32()+1);
 
     // Cleanup other tables from nonexistent guids ( >= _hiItemGuid)
-    CharacterDatabase.PExecute("DELETE FROM character_inventory WHERE item >= '%u'", _hiItemGuid);      // One-time query
-    CharacterDatabase.PExecute("DELETE FROM mail_items WHERE item_guid >= '%u'", _hiItemGuid);          // One-time query
-    CharacterDatabase.PExecute("DELETE FROM auctionhouse WHERE itemguid >= '%u'", _hiItemGuid);         // One-time query
-    CharacterDatabase.PExecute("DELETE FROM guild_bank_item WHERE item_guid >= '%u'", _hiItemGuid);     // One-time query
-
-    result = WorldDatabase.Query("SELECT MAX(guid) FROM gameobject");
-    if (result)
-        _hiGoGuid = (*result)[0].GetUInt32()+1;
+    CharacterDatabase.PExecute("DELETE FROM character_inventory WHERE item >= '%u'", GetGuidSequenceGenerator<HighGuid::Item>().GetNextAfterMaxUsed());      // One-time query
+    CharacterDatabase.PExecute("DELETE FROM mail_items WHERE item_guid >= '%u'", GetGuidSequenceGenerator<HighGuid::Item>().GetNextAfterMaxUsed());          // One-time query
+    CharacterDatabase.PExecute("DELETE FROM auctionhouse WHERE itemguid >= '%u'", GetGuidSequenceGenerator<HighGuid::Item>().GetNextAfterMaxUsed());         // One-time query
+    CharacterDatabase.PExecute("DELETE FROM guild_bank_item WHERE item_guid >= '%u'", GetGuidSequenceGenerator<HighGuid::Item>().GetNextAfterMaxUsed());     // One-time query
 
     result = WorldDatabase.Query("SELECT MAX(guid) FROM transports");
     if (result)
-        _hiMoTransGuid = (*result)[0].GetUInt32()+1;
+        GetGuidSequenceGenerator<HighGuid::Mo_Transport>().Set((*result)[0].GetUInt32()+1);
 
     result = CharacterDatabase.Query("SELECT MAX(id) FROM auctionhouse");
     if (result)
@@ -6337,10 +6822,6 @@ void ObjectMgr::SetHighestGuids()
     result = CharacterDatabase.Query("SELECT MAX(id) FROM mail");
     if (result)
         _mailId = (*result)[0].GetUInt32()+1;
-
-    result = CharacterDatabase.Query("SELECT MAX(corpseGuid) FROM corpse");
-    if (result)
-        _hiCorpseGuid = (*result)[0].GetUInt32()+1;
 
     result = CharacterDatabase.Query("SELECT MAX(arenateamid) FROM arena_team");
     if (result)
@@ -6357,13 +6838,21 @@ void ObjectMgr::SetHighestGuids()
     result = CharacterDatabase.Query("SELECT MAX(guid) FROM groups");
     if (result)
         sGroupMgr->SetGroupDbStoreSize((*result)[0].GetUInt32()+1);
+
+    result = WorldDatabase.Query("SELECT MAX(guid) FROM creature");
+    if (result)
+        _creatureSpawnId = (*result)[0].GetUInt32() + 1;
+
+    result = WorldDatabase.Query("SELECT MAX(guid) FROM gameobject");
+    if (result)
+        _gameObjectSpawnId = (*result)[0].GetUInt32() + 1;
 }
 
 uint32 ObjectMgr::GenerateAuctionID()
 {
     if (_auctionId >= 0xFFFFFFFE)
     {
-        TC_LOG_ERROR("misc", "Auctions ids overflow!! Can't continue, shutting down server. ");
+        TC_LOG_ERROR("misc", "Auctions ids overflow!! Can't continue, shutting down server. Search on forum for TCE00007 for more info. ");
         World::StopNow(ERROR_EXIT_CODE);
     }
     return _auctionId++;
@@ -6373,7 +6862,7 @@ uint64 ObjectMgr::GenerateEquipmentSetGuid()
 {
     if (_equipmentSetGuid >= uint64(0xFFFFFFFFFFFFFFFELL))
     {
-        TC_LOG_ERROR("misc", "EquipmentSet guid overflow!! Can't continue, shutting down server. ");
+        TC_LOG_ERROR("misc", "EquipmentSet guid overflow!! Can't continue, shutting down server. Search on forum for TCE00007 for more info. ");
         World::StopNow(ERROR_EXIT_CODE);
     }
     return _equipmentSetGuid++;
@@ -6383,78 +6872,50 @@ uint32 ObjectMgr::GenerateMailID()
 {
     if (_mailId >= 0xFFFFFFFE)
     {
-        TC_LOG_ERROR("misc", "Mail ids overflow!! Can't continue, shutting down server. ");
+        TC_LOG_ERROR("misc", "Mail ids overflow!! Can't continue, shutting down server. Search on forum for TCE00007 for more info. ");
         World::StopNow(ERROR_EXIT_CODE);
     }
     return _mailId++;
 }
 
-uint32 ObjectMgr::GenerateLowGuid(HighGuid guidhigh)
+uint32 ObjectMgr::GeneratePetNumber()
 {
-    switch (guidhigh)
+    if (_hiPetNumber >= 0xFFFFFFFE)
     {
-        case HIGHGUID_ITEM:
-        {
-            ASSERT(_hiItemGuid < 0xFFFFFFFE && "Item guid overflow!");
-            return _hiItemGuid++;
-        }
-        case HIGHGUID_UNIT:
-        {
-            ASSERT(_hiCreatureGuid < 0x00FFFFFE && "Creature guid overflow!");
-            return _hiCreatureGuid++;
-        }
-        case HIGHGUID_PET:
-        {
-            ASSERT(_hiPetGuid < 0x00FFFFFE && "Pet guid overflow!");
-            return _hiPetGuid++;
-        }
-        case HIGHGUID_VEHICLE:
-        {
-            ASSERT(_hiVehicleGuid < 0x00FFFFFF && "Vehicle guid overflow!");
-            return _hiVehicleGuid++;
-        }
-        case HIGHGUID_PLAYER:
-        {
-            ASSERT(_hiCharGuid < 0xFFFFFFFE && "Player guid overflow!");
-            return _hiCharGuid++;
-        }
-        case HIGHGUID_GAMEOBJECT:
-        {
-            ASSERT(_hiGoGuid < 0x00FFFFFE && "Gameobject guid overflow!");
-            return _hiGoGuid++;
-        }
-        case HIGHGUID_CORPSE:
-        {
-            ASSERT(_hiCorpseGuid < 0xFFFFFFFE && "Corpse guid overflow!");
-            return _hiCorpseGuid++;
-        }
-        case HIGHGUID_DYNAMICOBJECT:
-        {
-            ASSERT(_hiDoGuid < 0xFFFFFFFE && "DynamicObject guid overflow!");
-            return _hiDoGuid++;
-        }
-        case HIGHGUID_MO_TRANSPORT:
-        {
-            ASSERT(_hiMoTransGuid < 0xFFFFFFFE && "MO Transport guid overflow!");
-            return _hiMoTransGuid++;
-        }
-        default:
-            ASSERT(false && "ObjectMgr::GenerateLowGuid - Unknown HIGHGUID type");
-            return 0;
+        TC_LOG_ERROR("misc", "_hiPetNumber Id overflow!! Can't continue, shutting down server. Search on forum for TCE00007 for more info.");
+        World::StopNow(ERROR_EXIT_CODE);
     }
+    return _hiPetNumber++;
+}
+
+uint32 ObjectMgr::GenerateCreatureSpawnId()
+{
+    if (_creatureSpawnId >= uint32(0xFFFFFF))
+    {
+        TC_LOG_ERROR("misc", "Creature spawn id overflow!! Can't continue, shutting down server. Search on forum for TCE00007 for more info.");
+        World::StopNow(ERROR_EXIT_CODE);
+    }
+    return _creatureSpawnId++;
+}
+
+uint32 ObjectMgr::GenerateGameObjectSpawnId()
+{
+    if (_gameObjectSpawnId >= uint32(0xFFFFFF))
+    {
+        TC_LOG_ERROR("misc", "GameObject spawn id overflow!! Can't continue, shutting down server. Search on forum for TCE00007 for more info. ");
+        World::StopNow(ERROR_EXIT_CODE);
+    }
+    return _gameObjectSpawnId++;
 }
 
 void ObjectMgr::LoadGameObjectLocales()
 {
     uint32 oldMSTime = getMSTime();
 
-    _gameObjectLocaleStore.clear();                           // need for reload case
+    _gameObjectLocaleStore.clear(); // need for reload case
 
-    QueryResult result = WorldDatabase.Query("SELECT entry, "
-        "name_loc1, name_loc2, name_loc3, name_loc4, name_loc5, name_loc6, name_loc7, name_loc8, "
-        "castbarcaption_loc1, castbarcaption_loc2, castbarcaption_loc3, castbarcaption_loc4, "
-        "castbarcaption_loc5, castbarcaption_loc6, castbarcaption_loc7, castbarcaption_loc8 FROM locales_gameobject");
-
+    //                                               0      1       2     3
+    QueryResult result = WorldDatabase.Query("SELECT entry, locale, name, castBarCaption FROM gameobject_template_locale");
     if (!result)
         return;
 
@@ -6462,18 +6923,23 @@ void ObjectMgr::LoadGameObjectLocales()
     {
         Field* fields = result->Fetch();
 
-        uint32 entry = fields[0].GetUInt32();
+        uint32 id                   = fields[0].GetUInt32();
+        std::string localeName      = fields[1].GetString();
 
-        GameObjectLocale& data = _gameObjectLocaleStore[entry];
+        std::string name            = fields[2].GetString();
+        std::string castBarCaption  = fields[3].GetString();
 
-        for (uint8 i = TOTAL_LOCALES - 1; i > 0; --i)
-        {
-            AddLocaleString(fields[i].GetString(), LocaleConstant(i), data.Name);
-            AddLocaleString(fields[i + (TOTAL_LOCALES - 1)].GetString(), LocaleConstant(i), data.CastBarCaption);
-        }
+        GameObjectLocale& data = _gameObjectLocaleStore[id];
+        LocaleConstant locale = GetLocaleByName(localeName);
+        if (locale == LOCALE_enUS)
+            continue;
+
+        AddLocaleString(name, locale, data.Name);
+        AddLocaleString(castBarCaption, locale, data.CastBarCaption);
+
     } while (result->NextRow());
 
-    TC_LOG_INFO("server.loading", ">> Loaded %u gameobject locale strings in %u ms", uint32(_gameObjectLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
+    TC_LOG_INFO("server.loading", ">> Loaded %u gameobject_template_locale strings in %u ms", uint32(_gameObjectLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
 }
 
 inline void CheckGOLockId(GameObjectTemplate const* goInfo, uint32 dataN, uint32 N)
@@ -6539,12 +7005,12 @@ void ObjectMgr::LoadGameObjectTemplate()
 {
     uint32 oldMSTime = getMSTime();
 
-    //                                                 0      1      2        3       4             5          6      7       8     9        10         11          12
-    QueryResult result = WorldDatabase.Query("SELECT entry, type, displayId, name, IconName, castBarCaption, unk1, faction, flags, size, questItem1, questItem2, questItem3, "
-    //                                            13          14          15       16     17     18     19     20     21     22     23     24     25      26      27      28
-                                             "questItem4, questItem5, questItem6, data0, data1, data2, data3, data4, data5, data6, data7, data8, data9, data10, data11, data12, "
-    //                                          29      30      31      32      33      34      35      36      37      38      39      40        41
-                                             "data13, data14, data15, data16, data17, data18, data19, data20, data21, data22, data23, AIName, ScriptName "
+    //                                                 0      1      2        3       4             5          6     7
+    QueryResult result = WorldDatabase.Query("SELECT entry, type, displayId, name, IconName, castBarCaption, unk1, size, "
+    //                                         8      9      10     11     12     13     14     15     16     17     18      19      20
+                                             "Data0, Data1, Data2, Data3, Data4, Data5, Data6, Data7, Data8, Data9, Data10, Data11, Data12, "
+    //                                         21      22      23      24      25      26      27      28      29      30      31      32      33
+                                             "Data13, Data14, Data15, Data16, Data17, Data18, Data19, Data20, Data21, Data22, Data23, AIName, ScriptName "
                                              "FROM gameobject_template");
 
     if (!result)
@@ -6562,7 +7028,6 @@ void ObjectMgr::LoadGameObjectTemplate()
         uint32 entry = fields[0].GetUInt32();
 
         GameObjectTemplate& got = _gameObjectTemplateStore[entry];
-
         got.entry          = entry;
         got.type           = uint32(fields[1].GetUInt8());
         got.displayId      = fields[2].GetUInt32();
@@ -6570,20 +7035,20 @@ void ObjectMgr::LoadGameObjectTemplate()
         got.IconName       = fields[4].GetString();
         got.castBarCaption = fields[5].GetString();
         got.unk1           = fields[6].GetString();
-        got.faction        = uint32(fields[7].GetUInt16());
-        got.flags          = fields[8].GetUInt32();
-        got.size           = fields[9].GetFloat();
-
-        for (uint8 i = 0; i < MAX_GAMEOBJECT_QUEST_ITEMS; ++i)
-            got.questItems[i] = fields[10 + i].GetUInt32();
+        got.size           = fields[7].GetFloat();
 
         for (uint8 i = 0; i < MAX_GAMEOBJECT_DATA; ++i)
-            got.raw.data[i] = fields[16 + i].GetInt32(); // data1 and data6 can be -1
+            got.raw.data[i] = fields[8 + i].GetInt32(); // data1 and data6 can be -1
 
-        got.AIName = fields[40].GetString();
-        got.ScriptId = GetScriptId(fields[41].GetCString());
+        got.AIName = fields[32].GetString();
+        got.ScriptId = GetScriptId(fields[33].GetString());
 
         // Checks
+        if (!got.AIName.empty() && !sGameObjectAIRegistry->HasItem(got.AIName))
+        {
+            TC_LOG_ERROR("sql.sql", "GameObject (Entry: %u) has non-registered `AIName` '%s' set, removing", got.entry, got.AIName.c_str());
+            got.AIName.clear();
+        }
 
         switch (got.type)
         {
@@ -6677,7 +7142,7 @@ void ObjectMgr::LoadGameObjectTemplate()
                 {
                     if (got.moTransport.taxiPathId >= sTaxiPathNodesByPath.size() || sTaxiPathNodesByPath[got.moTransport.taxiPathId].empty())
                         TC_LOG_ERROR("sql.sql", "GameObject (Entry: %u GoType: %u) have data0=%u but TaxiPath (Id: %u) not exist.",
-                        entry, got.type, got.moTransport.taxiPathId, got.moTransport.taxiPathId);
+                            entry, got.type, got.moTransport.taxiPathId, got.moTransport.taxiPathId);
                 }
                 if (uint32 transportMap = got.moTransport.mapID)
                     _transportMaps.insert(transportMap);
@@ -6723,6 +7188,63 @@ void ObjectMgr::LoadGameObjectTemplate()
     TC_LOG_INFO("server.loading", ">> Loaded %u game object templates in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
+void ObjectMgr::LoadGameObjectTemplateAddons()
+{
+    uint32 oldMSTime = getMSTime();
+
+    //                                                0       1       2      3        4
+    QueryResult result = WorldDatabase.Query("SELECT entry, faction, flags, mingold, maxgold FROM gameobject_template_addon");
+
+    if (!result)
+    {
+        TC_LOG_INFO("server.loading", ">> Loaded 0 gameobject template addon definitions. DB table `gameobject_template_addon` is empty.");
+        return;
+    }
+
+    uint32 count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+
+        uint32 entry = fields[0].GetUInt32();
+
+        GameObjectTemplate const* got = sObjectMgr->GetGameObjectTemplate(entry);
+        if (!got)
+        {
+            TC_LOG_ERROR("sql.sql", "GameObject template (Entry: %u) does not exist but has a record in `gameobject_template_addon`", entry);
+            continue;
+        }
+
+        GameObjectTemplateAddon& gameObjectAddon = _gameObjectTemplateAddonStore[entry];
+        gameObjectAddon.faction = uint32(fields[1].GetUInt16());
+        gameObjectAddon.flags   = fields[2].GetUInt32();
+        gameObjectAddon.mingold = fields[3].GetUInt32();
+        gameObjectAddon.maxgold = fields[4].GetUInt32();
+
+        // checks
+        if (gameObjectAddon.faction && !sFactionTemplateStore.LookupEntry(gameObjectAddon.faction))
+            TC_LOG_ERROR("sql.sql", "GameObject (Entry: %u) has invalid faction (%u) defined in `gameobject_template_addon`.", entry, gameObjectAddon.faction);
+
+        if (gameObjectAddon.maxgold > 0)
+        {
+            switch (got->type)
+            {
+                case GAMEOBJECT_TYPE_CHEST:
+                case GAMEOBJECT_TYPE_FISHINGHOLE:
+                    break;
+                default:
+                    TC_LOG_ERROR("sql.sql", "GameObject (Entry %u GoType: %u) cannot be looted but has maxgold set in `gameobject_template_addon`.", entry, got->type);
+                    break;
+            }
+        }
+
+        ++count;
+    }
+    while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded %u game object template addons in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+}
+
 void ObjectMgr::LoadExplorationBaseXP()
 {
     uint32 oldMSTime = getMSTime();
@@ -6731,7 +7253,7 @@ void ObjectMgr::LoadExplorationBaseXP()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 BaseXP definitions. DB table `exploration_basexp` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 BaseXP definitions. DB table `exploration_basexp` is empty.");
         return;
     }
 
@@ -6809,8 +7331,8 @@ void ObjectMgr::LoadPetNumber()
 
 std::string ObjectMgr::GeneratePetName(uint32 entry)
 {
-    StringVector& list0 = _petHalfName0[entry];
-    StringVector& list1 = _petHalfName1[entry];
+    std::vector<std::string>& list0 = _petHalfName0[entry];
+    std::vector<std::string>& list1 = _petHalfName1[entry];
 
     if (list0.empty() || list1.empty())
     {
@@ -6828,49 +7350,6 @@ std::string ObjectMgr::GeneratePetName(uint32 entry)
     return *(list0.begin()+urand(0, list0.size()-1)) + *(list1.begin()+urand(0, list1.size()-1));
 }
 
-uint32 ObjectMgr::GeneratePetNumber()
-{
-    return ++_hiPetNumber;
-}
-
-void ObjectMgr::LoadCorpses()
-{
-    uint32 oldMSTime = getMSTime();
-
-    PreparedQueryResult result = CharacterDatabase.Query(CharacterDatabase.GetPreparedStatement(CHAR_SEL_CORPSES));
-    if (!result)
-    {
-        TC_LOG_INFO("server.loading", ">> Loaded 0 corpses. DB table `corpse` is empty.");
-        return;
-    }
-
-    uint32 count = 0;
-    do
-    {
-        Field* fields = result->Fetch();
-        uint32 guid = fields[16].GetUInt32();
-        CorpseType type = CorpseType(fields[13].GetUInt8());
-        if (type >= MAX_CORPSE_TYPE)
-        {
-            TC_LOG_ERROR("misc", "Corpse (guid: %u) have wrong corpse type (%u), not loading.", guid, type);
-            continue;
-        }
-
-        Corpse* corpse = new Corpse(type);
-        if (!corpse->LoadCorpseFromDB(guid, fields))
-        {
-            delete corpse;
-            continue;
-        }
-
-        sObjectAccessor->AddCorpse(corpse);
-        ++count;
-    }
-    while (result->NextRow());
-
-    TC_LOG_INFO("server.loading", ">> Loaded %u corpses in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
-}
-
 void ObjectMgr::LoadReputationRewardRate()
 {
     uint32 oldMSTime = getMSTime();
@@ -6881,7 +7360,7 @@ void ObjectMgr::LoadReputationRewardRate()
     QueryResult result = WorldDatabase.Query("SELECT faction, quest_rate, quest_daily_rate, quest_weekly_rate, quest_monthly_rate, quest_repeatable_rate, creature_rate, spell_rate FROM reputation_reward_rate");
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded `reputation_reward_rate`, table is empty!");
+        TC_LOG_INFO("server.loading", ">> Loaded `reputation_reward_rate`, table is empty!");
         return;
     }
 
@@ -6976,7 +7455,7 @@ void ObjectMgr::LoadReputationOnKill()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 creature award reputation definitions. DB table `creature_onkill_reputation` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 creature award reputation definitions. DB table `creature_onkill_reputation` is empty.");
         return;
     }
 
@@ -7081,6 +7560,7 @@ void ObjectMgr::LoadReputationSpilloverTemplate()
             continue;
         }
 
+        bool invalidSpilloverFaction = false;
         for (uint32 i = 0; i < MAX_SPILLOVER_FACTIONS; ++i)
         {
             if (repTemplate.faction[i])
@@ -7090,47 +7570,28 @@ void ObjectMgr::LoadReputationSpilloverTemplate()
                 if (!factionSpillover)
                 {
                     TC_LOG_ERROR("sql.sql", "Spillover faction (faction.dbc) %u does not exist but is used in `reputation_spillover_template` for faction %u, skipping", repTemplate.faction[i], factionId);
-                    continue;
+                    invalidSpilloverFaction = true;
+                    break;
                 }
 
                 if (factionSpillover->reputationListID < 0)
                 {
                     TC_LOG_ERROR("sql.sql", "Spillover faction (faction.dbc) %u for faction %u in `reputation_spillover_template` can not be listed for client, and then useless, skipping", repTemplate.faction[i], factionId);
-                    continue;
+                    invalidSpilloverFaction = true;
+                    break;
                 }
 
                 if (repTemplate.faction_rank[i] >= MAX_REPUTATION_RANK)
                 {
                     TC_LOG_ERROR("sql.sql", "Rank %u used in `reputation_spillover_template` for spillover faction %u is not valid, skipping", repTemplate.faction_rank[i], repTemplate.faction[i]);
-                    continue;
+                    invalidSpilloverFaction = true;
+                    break;
                 }
             }
         }
 
-        FactionEntry const* factionEntry0 = sFactionStore.LookupEntry(repTemplate.faction[0]);
-        if (repTemplate.faction[0] && !factionEntry0)
-        {
-            TC_LOG_ERROR("sql.sql", "Faction (faction.dbc) %u does not exist but is used in `reputation_spillover_template`", repTemplate.faction[0]);
+        if (invalidSpilloverFaction)
             continue;
-        }
-        FactionEntry const* factionEntry1 = sFactionStore.LookupEntry(repTemplate.faction[1]);
-        if (repTemplate.faction[1] && !factionEntry1)
-        {
-            TC_LOG_ERROR("sql.sql", "Faction (faction.dbc) %u does not exist but is used in `reputation_spillover_template`", repTemplate.faction[1]);
-            continue;
-        }
-        FactionEntry const* factionEntry2 = sFactionStore.LookupEntry(repTemplate.faction[2]);
-        if (repTemplate.faction[2] && !factionEntry2)
-        {
-            TC_LOG_ERROR("sql.sql", "Faction (faction.dbc) %u does not exist but is used in `reputation_spillover_template`", repTemplate.faction[2]);
-            continue;
-        }
-        FactionEntry const* factionEntry3 = sFactionStore.LookupEntry(repTemplate.faction[3]);
-        if (repTemplate.faction[3] && !factionEntry3)
-        {
-            TC_LOG_ERROR("sql.sql", "Faction (faction.dbc) %u does not exist but is used in `reputation_spillover_template`", repTemplate.faction[3]);
-            continue;
-        }
 
         _repSpilloverTemplateStore[factionId] = repTemplate;
 
@@ -7149,12 +7610,12 @@ void ObjectMgr::LoadPointsOfInterest()
 
     uint32 count = 0;
 
-    //                                                  0   1  2   3      4     5       6
-    QueryResult result = WorldDatabase.Query("SELECT entry, x, y, icon, flags, data, icon_name FROM points_of_interest");
+    //                                               0       1          2        3     4      5    6
+    QueryResult result = WorldDatabase.Query("SELECT ID, PositionX, PositionY, Icon, Flags, Importance, Name FROM points_of_interest");
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 Points of Interest definitions. DB table `points_of_interest` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 Points of Interest definitions. DB table `points_of_interest` is empty.");
         return;
     }
 
@@ -7162,24 +7623,24 @@ void ObjectMgr::LoadPointsOfInterest()
     {
         Field* fields = result->Fetch();
 
-        uint32 point_id = fields[0].GetUInt32();
+        uint32 id = fields[0].GetUInt32();
 
-        PointOfInterest POI;
-        POI.entry = point_id;
-        POI.x = fields[1].GetFloat();
-        POI.y = fields[2].GetFloat();
-        POI.icon = fields[3].GetUInt32();
-        POI.flags = fields[4].GetUInt32();
-        POI.data = fields[5].GetUInt32();
-        POI.icon_name = fields[6].GetString();
+        PointOfInterest pointOfInterest;
+        pointOfInterest.ID         = id;
+        pointOfInterest.PositionX  = fields[1].GetFloat();
+        pointOfInterest.PositionY  = fields[2].GetFloat();
+        pointOfInterest.Icon       = fields[3].GetUInt32();
+        pointOfInterest.Flags      = fields[4].GetUInt32();
+        pointOfInterest.Importance = fields[5].GetUInt32();
+        pointOfInterest.Name       = fields[6].GetString();
 
-        if (!Trinity::IsValidMapCoord(POI.x, POI.y))
+        if (!Trinity::IsValidMapCoord(pointOfInterest.PositionX, pointOfInterest.PositionY))
         {
-            TC_LOG_ERROR("sql.sql", "Table `points_of_interest` (Entry: %u) have invalid coordinates (X: %f Y: %f), ignored.", point_id, POI.x, POI.y);
+            TC_LOG_ERROR("sql.sql", "Table `points_of_interest` (ID: %u) have invalid coordinates (X: %f Y: %f), ignored.", id, pointOfInterest.PositionX, pointOfInterest.PositionY);
             continue;
         }
 
-        _pointsOfInterestStore[point_id] = POI;
+        _pointsOfInterestStore[id] = pointOfInterest;
 
         ++count;
     } while (result->NextRow());
@@ -7195,20 +7656,18 @@ void ObjectMgr::LoadQuestPOI()
 
     uint32 count = 0;
 
-    //                                               0        1   2         3      4               5        6     7
-    QueryResult result = WorldDatabase.Query("SELECT questId, id, objIndex, mapid, WorldMapAreaId, FloorId, unk3, unk4 FROM quest_poi order by questId");
-
+    //                                               0        1          2          3           4          5       6        7
+    QueryResult result = WorldDatabase.Query("SELECT QuestID, id, ObjectiveIndex, MapID, WorldMapAreaId, Floor, Priority, Flags FROM quest_poi order by QuestID");
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 quest POI definitions. DB table `quest_poi` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 quest POI definitions. DB table `quest_poi` is empty.");
         return;
     }
 
-    //                                                0       1   2  3
-    QueryResult points = WorldDatabase.Query("SELECT questId, id, x, y FROM quest_poi_points ORDER BY questId DESC, idx");
+    //                                                  0       1   2  3
+    QueryResult points = WorldDatabase.Query("SELECT QuestID, Idx1, X, Y FROM quest_poi_points ORDER BY QuestID DESC, Idx2");
 
-    std::vector<std::vector<std::vector<QuestPOIPoint> > > POIs;
-
+    std::vector<std::vector<std::vector<QuestPOIBlobPoint>>> POIs;
     if (points)
     {
         // The first result should have the highest questId
@@ -7228,7 +7687,10 @@ void ObjectMgr::LoadQuestPOI()
             if (POIs[questId].size() <= id + 1)
                 POIs[questId].resize(id + 10);
 
-            QuestPOIPoint point(x, y);
+            QuestPOIBlobPoint point;
+            point.X = x;
+            point.Y = y;
+
             POIs[questId][id].push_back(point);
         } while (points->NextRow());
     }
@@ -7246,11 +7708,30 @@ void ObjectMgr::LoadQuestPOI()
         uint32 unk3               = fields[6].GetUInt32();
         uint32 unk4               = fields[7].GetUInt32();
 
-        QuestPOI POI(id, objIndex, mapId, WorldMapAreaId, FloorId, unk3, unk4);
+        QuestPOIBlobData POI;
+        POI.BlobIndex = id;
+        POI.ObjectiveIndex = objIndex;
+        POI.MapID = mapId;
+        POI.WorldMapAreaID = WorldMapAreaId;
+        POI.Floor = FloorId;
+        POI.Unk3 = unk3;
+        POI.Unk4 = unk4;
+
         if (questId < POIs.size() && id < POIs[questId].size())
         {
-            POI.points = POIs[questId][id];
-            _questPOIStore[questId].push_back(POI);
+            POI.QuestPOIBlobPointStats = POIs[questId][id];
+            auto itr = _questPOIStore.find(questId);
+            if (itr == _questPOIStore.end())
+            {
+                QuestPOIWrapper wrapper;
+                QuestPOIData data;
+                data.QuestID = questId;
+                wrapper.POIData = data;
+
+                _questPOIStore.emplace(questId, std::move(wrapper));
+            }
+
+            _questPOIStore.at(questId).POIData.QuestPOIBlobDataStats.push_back(POI);
         }
         else
             TC_LOG_ERROR("server.loading", "Table quest_poi references unknown quest points for quest %u POI id %u", questId, id);
@@ -7271,7 +7752,7 @@ void ObjectMgr::LoadNPCSpellClickSpells()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 spellclick spells. DB table `npc_spellclick_spells` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 spellclick spells. DB table `npc_spellclick_spells` is empty.");
         return;
     }
 
@@ -7327,38 +7808,30 @@ void ObjectMgr::LoadNPCSpellClickSpells()
     TC_LOG_INFO("server.loading", ">> Loaded %u spellclick definitions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
-void ObjectMgr::DeleteCreatureData(uint32 guid)
+void ObjectMgr::DeleteCreatureData(ObjectGuid::LowType guid)
 {
     // remove mapid*cellid -> guid_set map
     CreatureData const* data = GetCreatureData(guid);
     if (data)
+    {
         RemoveCreatureFromGrid(guid, data);
+        OnDeleteSpawnData(data);
+    }
 
     _creatureDataStore.erase(guid);
 }
 
-void ObjectMgr::DeleteGOData(uint32 guid)
+void ObjectMgr::DeleteGameObjectData(ObjectGuid::LowType guid)
 {
     // remove mapid*cellid -> guid_set map
-    GameObjectData const* data = GetGOData(guid);
+    GameObjectData const* data = GetGameObjectData(guid);
     if (data)
+    {
         RemoveGameobjectFromGrid(guid, data);
+        OnDeleteSpawnData(data);
+    }
 
     _gameObjectDataStore.erase(guid);
-}
-
-void ObjectMgr::AddCorpseCellData(uint32 mapid, uint32 cellid, uint32 player_guid, uint32 instance)
-{
-    // corpses are always added to spawn mode 0 and they are spawned by their instance id
-    CellObjectGuids& cell_guids = _mapObjectGuidsStore[MAKE_PAIR32(mapid, 0)][cellid];
-    cell_guids.corpses[player_guid] = instance;
-}
-
-void ObjectMgr::DeleteCorpseCellData(uint32 mapid, uint32 cellid, uint32 player_guid)
-{
-    // corpses are always added to spawn mode 0 and they are spawned by their instance id
-    CellObjectGuids& cell_guids = _mapObjectGuidsStore[MAKE_PAIR32(mapid, 0)][cellid];
-    cell_guids.corpses.erase(player_guid);
 }
 
 void ObjectMgr::LoadQuestRelationsHelper(QuestRelations& map, QuestRelationsReverse* reverseMap, std::string const& table, bool starter, bool go)
@@ -7373,7 +7846,7 @@ void ObjectMgr::LoadQuestRelationsHelper(QuestRelations& map, QuestRelationsReve
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 quest relations from `%s`, table is empty.", table.c_str());
+        TC_LOG_INFO("server.loading", ">> Loaded 0 quest relations from `%s`, table is empty.", table.c_str());
         return;
     }
 
@@ -7399,7 +7872,7 @@ void ObjectMgr::LoadQuestRelationsHelper(QuestRelations& map, QuestRelationsReve
             if (reverseMap)
                 reverseMap->insert(QuestRelationsReverse::value_type(quest, id));
         }
-        else if (starter)
+        else
             poolRelationMap->insert(PooledQuestRelation::value_type(quest, id));
 
         ++count;
@@ -7587,7 +8060,7 @@ bool isValidString(const std::wstring& wstr, uint32 strictMask, bool numericOrSp
     return false;
 }
 
-ResponseCodes ObjectMgr::CheckPlayerName(const std::string& name, bool create)
+ResponseCodes ObjectMgr::CheckPlayerName(std::string const& name, LocaleConstant locale, bool create /*= false*/)
 {
     std::wstring wname;
     if (!Utf8toWStr(name, wname))
@@ -7609,7 +8082,7 @@ ResponseCodes ObjectMgr::CheckPlayerName(const std::string& name, bool create)
         if (wname[i] == wname[i-1] && wname[i] == wname[i-2])
             return CHAR_NAME_THREE_CONSECUTIVE;
 
-    return CHAR_NAME_SUCCESS;
+    return ValidateName(wname, locale);
 }
 
 bool ObjectMgr::IsValidCharterName(const std::string& name)
@@ -7630,7 +8103,7 @@ bool ObjectMgr::IsValidCharterName(const std::string& name)
     return isValidString(wname, strictMask, true);
 }
 
-PetNameInvalidReason ObjectMgr::CheckPetName(const std::string& name)
+PetNameInvalidReason ObjectMgr::CheckPetName(const std::string& name, LocaleConstant locale)
 {
     std::wstring wname;
     if (!Utf8toWStr(name, wname))
@@ -7647,6 +8120,17 @@ PetNameInvalidReason ObjectMgr::CheckPetName(const std::string& name)
     if (!isValidString(wname, strictMask, false))
         return PET_NAME_MIXED_LANGUAGES;
 
+    switch (ValidateName(wname, locale))
+    {
+        case CHAR_NAME_PROFANE:
+            return PET_NAME_PROFANE;
+        case CHAR_NAME_RESERVED:
+            return PET_NAME_RESERVED;
+        case RESPONSE_FAILURE:
+            return PET_NAME_INVALID;
+        default:
+            break;
+    }
     return PET_NAME_SUCCESS;
 }
 
@@ -7722,7 +8206,7 @@ bool ObjectMgr::LoadTrinityStrings()
     QueryResult result = WorldDatabase.Query("SELECT entry, content_default, content_loc1, content_loc2, content_loc3, content_loc4, content_loc5, content_loc6, content_loc7, content_loc8 FROM trinity_string");
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 trinity strings. DB table `trinity_string` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 trinity strings. DB table `trinity_string` is empty. You have imported an incorrect database for more info search for TCE00003 on forum.");
         return false;
     }
 
@@ -7768,7 +8252,7 @@ void ObjectMgr::LoadFishingBaseSkillLevel()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 areas for fishing base skill level. DB table `skill_fishing_base_level` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 areas for fishing base skill level. DB table `skill_fishing_base_level` is empty.");
         return;
     }
 
@@ -7780,7 +8264,7 @@ void ObjectMgr::LoadFishingBaseSkillLevel()
         uint32 entry  = fields[0].GetUInt32();
         int32 skill   = fields[1].GetInt16();
 
-        AreaTableEntry const* fArea = GetAreaEntryByAreaID(entry);
+        AreaTableEntry const* fArea = sAreaTableStore.LookupEntry(entry);
         if (!fArea)
         {
             TC_LOG_ERROR("sql.sql", "AreaId %u defined in `skill_fishing_base_level` does not exist", entry);
@@ -7819,7 +8303,7 @@ bool ObjectMgr::CheckDeclinedNames(const std::wstring& w_ownname, DeclinedName c
     return (x || y);
 }
 
-uint32 ObjectMgr::GetAreaTriggerScriptId(uint32 trigger_id)
+uint32 ObjectMgr::GetAreaTriggerScriptId(uint32 trigger_id) const
 {
     AreaTriggerScriptContainer::const_iterator i = _areaTriggerScriptStore.find(trigger_id);
     if (i!= _areaTriggerScriptStore.end())
@@ -7829,11 +8313,11 @@ uint32 ObjectMgr::GetAreaTriggerScriptId(uint32 trigger_id)
 
 SpellScriptsBounds ObjectMgr::GetSpellScriptsBounds(uint32 spellId)
 {
-    return SpellScriptsBounds(_spellScriptsStore.equal_range(spellId));
+    return _spellScriptsStore.equal_range(spellId);
 }
 
 // this allows calculating base reputations to offline players, just by race and class
-int32 ObjectMgr::GetBaseReputationOf(FactionEntry const* factionEntry, uint8 race, uint8 playerClass)
+int32 ObjectMgr::GetBaseReputationOf(FactionEntry const* factionEntry, uint8 race, uint8 playerClass) const
 {
     if (!factionEntry)
         return 0;
@@ -7887,7 +8371,7 @@ void ObjectMgr::LoadGameTele()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 GameTeleports. DB table `game_tele` is empty!");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 GameTeleports. DB table `game_tele` is empty!");
         return;
     }
 
@@ -7936,18 +8420,18 @@ GameTele const* ObjectMgr::GetGameTele(const std::string& name) const
     // explicit name case
     std::wstring wname;
     if (!Utf8toWStr(name, wname))
-        return NULL;
+        return nullptr;
 
     // converting string that we try to find to lower case
     wstrToLower(wname);
 
     // Alternative first GameTele what contains wnameLow as substring in case no GameTele location found
-    const GameTele* alt = NULL;
+    GameTele const* alt = nullptr;
     for (GameTeleContainer::const_iterator itr = _gameTeleStore.begin(); itr != _gameTeleStore.end(); ++itr)
     {
         if (itr->second.wnameLow == wname)
             return &itr->second;
-        else if (alt == NULL && itr->second.wnameLow.find(wname) != std::wstring::npos)
+        else if (!alt && itr->second.wnameLow.find(wname) != std::wstring::npos)
             alt = &itr->second;
     }
 
@@ -7959,7 +8443,7 @@ GameTele const* ObjectMgr::GetGameTeleExactName(const std::string& name) const
     // explicit name case
     std::wstring wname;
     if (!Utf8toWStr(name, wname))
-        return NULL;
+        return nullptr;
 
     // converting string that we try to find to lower case
     wstrToLower(wname);
@@ -7970,7 +8454,7 @@ GameTele const* ObjectMgr::GetGameTeleExactName(const std::string& name) const
             return &itr->second;
     }
 
-    return NULL;
+    return nullptr;
 }
 
 bool ObjectMgr::AddGameTele(GameTele& tele)
@@ -8045,7 +8529,7 @@ void ObjectMgr::LoadMailLevelRewards()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 level dependent mail rewards. DB table `mail_level_reward` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 level dependent mail rewards. DB table `mail_level_reward` is empty.");
         return;
     }
 
@@ -8093,76 +8577,76 @@ void ObjectMgr::LoadMailLevelRewards()
     TC_LOG_INFO("server.loading", ">> Loaded %u level dependent mail rewards in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
-void ObjectMgr::AddSpellToTrainer(uint32 entry, uint32 spell, uint32 spellCost, uint32 reqSkill, uint32 reqSkillValue, uint32 reqLevel)
+void ObjectMgr::AddSpellToTrainer(uint32 ID, uint32 SpellID, uint32 MoneyCost, uint32 ReqSkillLine, uint32 ReqSkillRank, uint32 ReqLevel)
 {
-    if (entry >= TRINITY_TRAINER_START_REF)
+    if (ID >= TRINITY_TRAINER_START_REF)
         return;
 
-    CreatureTemplate const* cInfo = GetCreatureTemplate(entry);
+    CreatureTemplate const* cInfo = GetCreatureTemplate(ID);
     if (!cInfo)
     {
-        TC_LOG_ERROR("sql.sql", "Table `npc_trainer` contains entries for a non-existing creature template (Entry: %u), ignoring", entry);
+        TC_LOG_ERROR("sql.sql", "Table `npc_trainer` contains entries for a non-existing creature template (ID: %u), ignoring", ID);
         return;
     }
 
     if (!(cInfo->npcflag & UNIT_NPC_FLAG_TRAINER))
     {
-        TC_LOG_ERROR("sql.sql", "Table `npc_trainer` contains entries for a creature template (Entry: %u) without trainer flag, ignoring", entry);
+        TC_LOG_ERROR("sql.sql", "Table `npc_trainer` contains entries for a creature template (ID: %u) without trainer flag, ignoring", ID);
         return;
     }
 
-    SpellInfo const* spellinfo = sSpellMgr->GetSpellInfo(spell);
+    SpellInfo const* spellinfo = sSpellMgr->GetSpellInfo(SpellID);
     if (!spellinfo)
     {
-        TC_LOG_ERROR("sql.sql", "Table `npc_trainer` contains an entry (Entry: %u) for a non-existing spell (Spell: %u), ignoring", entry, spell);
+        TC_LOG_ERROR("sql.sql", "Table `npc_trainer` contains an ID (%u) for a non-existing SpellID (%u), ignoring", ID, SpellID);
         return;
     }
 
     if (!SpellMgr::IsSpellValid(spellinfo))
     {
-        TC_LOG_ERROR("sql.sql", "Table `npc_trainer` contains an entry (Entry: %u) for a broken spell (Spell: %u), ignoring", entry, spell);
+        TC_LOG_ERROR("sql.sql", "Table `npc_trainer` contains an ID (%u) for a broken SpellID (%u), ignoring", ID, SpellID);
         return;
     }
 
-    if (GetTalentSpellCost(spell))
+    if (GetTalentSpellCost(SpellID))
     {
-        TC_LOG_ERROR("sql.sql", "Table `npc_trainer` contains an entry (Entry: %u) for a non-existing spell (Spell: %u) which is a talent, ignoring", entry, spell);
+        TC_LOG_ERROR("sql.sql", "Table `npc_trainer` contains an ID (%u) for a non-existing SpellID (%u) which is a talent, ignoring", ID, SpellID);
         return;
     }
 
-    TrainerSpellData& data = _cacheTrainerSpellStore[entry];
+    TrainerSpellData& data = _cacheTrainerSpellStore[ID];
 
-    TrainerSpell& trainerSpell = data.spellList[spell];
-    trainerSpell.spell         = spell;
-    trainerSpell.spellCost     = spellCost;
-    trainerSpell.reqSkill      = reqSkill;
-    trainerSpell.reqSkillValue = reqSkillValue;
-    trainerSpell.reqLevel      = reqLevel;
+    TrainerSpell& trainerSpell = data.spellList[SpellID];
+    trainerSpell.SpellID       = SpellID;
+    trainerSpell.MoneyCost     = MoneyCost;
+    trainerSpell.ReqSkillLine  = ReqSkillLine;
+    trainerSpell.ReqSkillRank = ReqSkillRank;
+    trainerSpell.ReqLevel      = ReqLevel;
 
-    if (!trainerSpell.reqLevel)
-        trainerSpell.reqLevel = spellinfo->SpellLevel;
+    if (!trainerSpell.ReqLevel)
+        trainerSpell.ReqLevel = spellinfo->SpellLevel;
 
     // calculate learned spell for profession case when stored cast-spell
-    trainerSpell.learnedSpell[0] = spell;
+    trainerSpell.ReqAbility[0] = SpellID;
     for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
     {
         if (spellinfo->Effects[i].Effect != SPELL_EFFECT_LEARN_SPELL)
             continue;
-        if (trainerSpell.learnedSpell[0] == spell)
-            trainerSpell.learnedSpell[0] = 0;
+        if (trainerSpell.ReqAbility[0] == SpellID)
+            trainerSpell.ReqAbility[0] = 0;
         // player must be able to cast spell on himself
         if (spellinfo->Effects[i].TargetA.GetTarget() != 0 && spellinfo->Effects[i].TargetA.GetTarget() != TARGET_UNIT_TARGET_ALLY
             && spellinfo->Effects[i].TargetA.GetTarget() != TARGET_UNIT_TARGET_ANY && spellinfo->Effects[i].TargetA.GetTarget() != TARGET_UNIT_CASTER)
         {
-            TC_LOG_ERROR("sql.sql", "Table `npc_trainer` has spell %u for trainer entry %u with learn effect which has incorrect target type, ignoring learn effect!", spell, entry);
+            TC_LOG_ERROR("sql.sql", "Table `npc_trainer` has spell %u for trainer entry %u with learn effect which has incorrect target type, ignoring learn effect!", SpellID, ID);
             continue;
         }
 
-        trainerSpell.learnedSpell[i] = spellinfo->Effects[i].TriggerSpell;
+        trainerSpell.ReqAbility[i] = spellinfo->Effects[i].TriggerSpell;
 
-        if (trainerSpell.learnedSpell[i])
+        if (trainerSpell.ReqAbility[i])
         {
-            SpellInfo const* learnedSpellInfo = sSpellMgr->GetSpellInfo(trainerSpell.learnedSpell[i]);
+            SpellInfo const* learnedSpellInfo = sSpellMgr->GetSpellInfo(trainerSpell.ReqAbility[i]);
             if (learnedSpellInfo && learnedSpellInfo->IsProfession())
                 data.trainerType = 2;
         }
@@ -8178,9 +8662,9 @@ void ObjectMgr::LoadTrainerSpell()
     // For reload case
     _cacheTrainerSpellStore.clear();
 
-    QueryResult result = WorldDatabase.Query("SELECT b.entry, a.spell, a.spellcost, a.reqskill, a.reqskillvalue, a.reqlevel FROM npc_trainer AS a "
-                                             "INNER JOIN npc_trainer AS b ON a.entry = -(b.spell) "
-                                             "UNION SELECT * FROM npc_trainer WHERE spell > 0");
+    QueryResult result = WorldDatabase.Query("SELECT b.ID, a.SpellID, a.MoneyCost, a.ReqSkillLine, a.ReqSkillRank, a.ReqLevel FROM npc_trainer AS a "
+                                             "INNER JOIN npc_trainer AS b ON a.ID = -(b.SpellID) "
+                                             "UNION SELECT * FROM npc_trainer WHERE SpellID > 0");
 
     if (!result)
     {
@@ -8195,14 +8679,14 @@ void ObjectMgr::LoadTrainerSpell()
     {
         Field* fields = result->Fetch();
 
-        uint32 entry         = fields[0].GetUInt32();
-        uint32 spell         = fields[1].GetUInt32();
-        uint32 spellCost     = fields[2].GetUInt32();
-        uint32 reqSkill      = fields[3].GetUInt16();
-        uint32 reqSkillValue = fields[4].GetUInt16();
-        uint32 reqLevel      = fields[5].GetUInt8();
+        uint32 ID           = fields[0].GetUInt32();
+        uint32 SpellID      = fields[1].GetUInt32();
+        uint32 MoneyCost    = fields[2].GetUInt32();
+        uint32 ReqSkillLine = fields[3].GetUInt16();
+        uint32 ReqSkillRank = fields[4].GetUInt16();
+        uint32 ReqLevel     = fields[5].GetUInt8();
 
-        AddSpellToTrainer(entry, spell, spellCost, reqSkill, reqSkillValue, reqLevel);
+        AddSpellToTrainer(ID, SpellID, MoneyCost, ReqSkillLine, ReqSkillRank, ReqLevel);
 
         ++count;
     }
@@ -8237,7 +8721,7 @@ int ObjectMgr::LoadReferenceVendor(int32 vendor, int32 item, std::set<uint32> *s
             uint32 incrtime     = fields[2].GetUInt32();
             uint32 ExtendedCost = fields[3].GetUInt32();
 
-            if (!IsVendorItemValid(vendor, item_id, maxcount, incrtime, ExtendedCost, NULL, skip_vendors))
+            if (!IsVendorItemValid(vendor, item_id, maxcount, incrtime, ExtendedCost, nullptr, skip_vendors))
                 continue;
 
             VendorItemData& vList = _cacheVendorItemStore[vendor];
@@ -8287,7 +8771,7 @@ void ObjectMgr::LoadVendors()
             uint32 incrtime     = fields[3].GetUInt32();
             uint32 ExtendedCost = fields[4].GetUInt32();
 
-            if (!IsVendorItemValid(entry, item_id, maxcount, incrtime, ExtendedCost, NULL, &skip_vendors))
+            if (!IsVendorItemValid(entry, item_id, maxcount, incrtime, ExtendedCost, nullptr, &skip_vendors))
                 continue;
 
             VendorItemData& vList = _cacheVendorItemStore[entry];
@@ -8307,15 +8791,14 @@ void ObjectMgr::LoadGossipMenu()
 
     _gossipMenusStore.clear();
 
-    QueryResult result = WorldDatabase.Query("SELECT entry, text_id FROM gossip_menu");
+    //                                               0       1
+    QueryResult result = WorldDatabase.Query("SELECT MenuID, TextID FROM gossip_menu");
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0  gossip_menu entries. DB table `gossip_menu` is empty!");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 gossip_menu IDs. DB table `gossip_menu` is empty!");
         return;
     }
-
-    uint32 count = 0;
 
     do
     {
@@ -8323,22 +8806,19 @@ void ObjectMgr::LoadGossipMenu()
 
         GossipMenus gMenu;
 
-        gMenu.entry             = fields[0].GetUInt16();
-        gMenu.text_id           = fields[1].GetUInt32();
+        gMenu.MenuID = fields[0].GetUInt16();
+        gMenu.TextID = fields[1].GetUInt32();
 
-        if (!GetGossipText(gMenu.text_id))
+        if (!GetGossipText(gMenu.TextID))
         {
-            TC_LOG_ERROR("sql.sql", "Table gossip_menu entry %u are using non-existing text_id %u", gMenu.entry, gMenu.text_id);
+            TC_LOG_ERROR("sql.sql", "Table gossip_menu: ID %u is using non-existing TextID %u", gMenu.MenuID, gMenu.TextID);
             continue;
         }
 
-        _gossipMenusStore.insert(GossipMenusContainer::value_type(gMenu.entry, gMenu));
+        _gossipMenusStore.insert(GossipMenusContainer::value_type(gMenu.MenuID, gMenu));
+    } while (result->NextRow());
 
-        ++count;
-    }
-    while (result->NextRow());
-
-    TC_LOG_INFO("server.loading", ">> Loaded %u gossip_menu entries in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    TC_LOG_INFO("server.loading", ">> Loaded %u gossip_menu IDs in %u ms", uint32(_gossipMenusStore.size()), GetMSTimeDiffToNow(oldMSTime));
 }
 
 void ObjectMgr::LoadGossipMenuItems()
@@ -8348,17 +8828,15 @@ void ObjectMgr::LoadGossipMenuItems()
     _gossipMenuItemsStore.clear();
 
     QueryResult result = WorldDatabase.Query(
-        //      0        1   2            3            4                      5          6                   7               8              9          10         11        12
-        "SELECT menu_id, id, option_icon, option_text, OptionBroadcastTextID, option_id, npc_option_npcflag, action_menu_id, action_poi_id, box_coded, box_money, box_text, BoxBroadcastTextID "
-        "FROM gossip_menu_option ORDER BY menu_id, id");
+        //      0       1       2           3           4                      5           6              7             8            9         10        11       12
+        "SELECT MenuID, OptionID, OptionIcon, OptionText, OptionBroadcastTextID, OptionType, OptionNpcFlag, ActionMenuID, ActionPoiID, BoxCoded, BoxMoney, BoxText, BoxBroadcastTextID "
+        "FROM gossip_menu_option ORDER BY MenuID, OptionID");
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 gossip_menu_option entries. DB table `gossip_menu_option` is empty!");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 gossip_menu_option IDs. DB table `gossip_menu_option` is empty!");
         return;
     }
-
-    uint32 count = 0;
 
     do
     {
@@ -8366,59 +8844,57 @@ void ObjectMgr::LoadGossipMenuItems()
 
         GossipMenuItems gMenuItem;
 
-        gMenuItem.MenuId                = fields[0].GetUInt16();
-        gMenuItem.OptionIndex           = fields[1].GetUInt16();
+        gMenuItem.MenuID                = fields[0].GetUInt16();
+        gMenuItem.OptionID              = fields[1].GetUInt16();
         gMenuItem.OptionIcon            = fields[2].GetUInt32();
         gMenuItem.OptionText            = fields[3].GetString();
-        gMenuItem.OptionBroadcastTextId = fields[4].GetUInt32();
+        gMenuItem.OptionBroadcastTextID = fields[4].GetUInt32();
         gMenuItem.OptionType            = fields[5].GetUInt8();
-        gMenuItem.OptionNpcflag         = fields[6].GetUInt32();
-        gMenuItem.ActionMenuId          = fields[7].GetUInt32();
-        gMenuItem.ActionPoiId           = fields[8].GetUInt32();
+        gMenuItem.OptionNpcFlag         = fields[6].GetUInt32();
+        gMenuItem.ActionMenuID          = fields[7].GetUInt32();
+        gMenuItem.ActionPoiID           = fields[8].GetUInt32();
         gMenuItem.BoxCoded              = fields[9].GetBool();
         gMenuItem.BoxMoney              = fields[10].GetUInt32();
         gMenuItem.BoxText               = fields[11].GetString();
-        gMenuItem.BoxBroadcastTextId    = fields[12].GetUInt32();
+        gMenuItem.BoxBroadcastTextID    = fields[12].GetUInt32();
 
         if (gMenuItem.OptionIcon >= GOSSIP_ICON_MAX)
         {
-            TC_LOG_ERROR("sql.sql", "Table `gossip_menu_option` for menu %u, id %u has unknown icon id %u. Replacing with GOSSIP_ICON_CHAT", gMenuItem.MenuId, gMenuItem.OptionIndex, gMenuItem.OptionIcon);
+            TC_LOG_ERROR("sql.sql", "Table `gossip_menu_option` for menu %u, id %u has unknown icon id %u. Replacing with GOSSIP_ICON_CHAT", gMenuItem.MenuID, gMenuItem.OptionID, gMenuItem.OptionIcon);
             gMenuItem.OptionIcon = GOSSIP_ICON_CHAT;
         }
 
-        if (gMenuItem.OptionBroadcastTextId)
+        if (gMenuItem.OptionBroadcastTextID)
         {
-            if (!GetBroadcastText(gMenuItem.OptionBroadcastTextId))
+            if (!GetBroadcastText(gMenuItem.OptionBroadcastTextID))
             {
-                TC_LOG_ERROR("sql.sql", "Table `gossip_menu_option` for menu %u, id %u has non-existing or incompatible OptionBroadcastTextId %u, ignoring.", gMenuItem.MenuId, gMenuItem.OptionIndex, gMenuItem.OptionBroadcastTextId);
-                gMenuItem.OptionBroadcastTextId = 0;
+                TC_LOG_ERROR("sql.sql", "Table `gossip_menu_option` for menu %u, id %u has non-existing or incompatible OptionBroadcastTextID %u, ignoring.", gMenuItem.MenuID, gMenuItem.OptionID, gMenuItem.OptionBroadcastTextID);
+                gMenuItem.OptionBroadcastTextID = 0;
             }
         }
 
         if (gMenuItem.OptionType >= GOSSIP_OPTION_MAX)
-            TC_LOG_ERROR("sql.sql", "Table `gossip_menu_option` for menu %u, id %u has unknown option id %u. Option will not be used", gMenuItem.MenuId, gMenuItem.OptionIndex, gMenuItem.OptionType);
+            TC_LOG_ERROR("sql.sql", "Table `gossip_menu_option` for menu %u, id %u has unknown option id %u. Option will not be used", gMenuItem.MenuID, gMenuItem.OptionID, gMenuItem.OptionType);
 
-        if (gMenuItem.ActionPoiId && !GetPointOfInterest(gMenuItem.ActionPoiId))
+        if (gMenuItem.ActionPoiID && !GetPointOfInterest(gMenuItem.ActionPoiID))
         {
-            TC_LOG_ERROR("sql.sql", "Table `gossip_menu_option` for menu %u, id %u use non-existing action_poi_id %u, ignoring", gMenuItem.MenuId, gMenuItem.OptionIndex, gMenuItem.ActionPoiId);
-            gMenuItem.ActionPoiId = 0;
+            TC_LOG_ERROR("sql.sql", "Table `gossip_menu_option` for menu %u, id %u use non-existing ActionPoiID %u, ignoring", gMenuItem.MenuID, gMenuItem.OptionID, gMenuItem.ActionPoiID);
+            gMenuItem.ActionPoiID = 0;
         }
 
-        if (gMenuItem.BoxBroadcastTextId)
+        if (gMenuItem.BoxBroadcastTextID)
         {
-            if (!GetBroadcastText(gMenuItem.BoxBroadcastTextId))
+            if (!GetBroadcastText(gMenuItem.BoxBroadcastTextID))
             {
-                TC_LOG_ERROR("sql.sql", "Table `gossip_menu_option` for menu %u, id %u has non-existing or incompatible BoxBroadcastTextId %u, ignoring.", gMenuItem.MenuId, gMenuItem.OptionIndex, gMenuItem.BoxBroadcastTextId);
-                gMenuItem.BoxBroadcastTextId = 0;
+                TC_LOG_ERROR("sql.sql", "Table `gossip_menu_option` for menu %u, id %u has non-existing or incompatible BoxBroadcastTextID %u, ignoring.", gMenuItem.MenuID, gMenuItem.OptionID, gMenuItem.BoxBroadcastTextID);
+                gMenuItem.BoxBroadcastTextID = 0;
             }
         }
 
-        _gossipMenuItemsStore.insert(GossipMenuItemsContainer::value_type(gMenuItem.MenuId, gMenuItem));
-        ++count;
-    }
-    while (result->NextRow());
+        _gossipMenuItemsStore.insert(GossipMenuItemsContainer::value_type(gMenuItem.MenuID, gMenuItem));
+    } while (result->NextRow());
 
-    TC_LOG_INFO("server.loading", ">> Loaded %u gossip_menu_option entries in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    TC_LOG_INFO("server.loading", ">> Loaded %u gossip_menu_option entries in %u ms", uint32(_gossipMenuItemsStore.size()), GetMSTimeDiffToNow(oldMSTime));
 }
 
 void ObjectMgr::AddVendorItem(uint32 entry, uint32 item, int32 maxcount, uint32 incrtime, uint32 extendedCost, bool persist /*= true*/)
@@ -8544,56 +9020,75 @@ void ObjectMgr::LoadScriptNames()
 {
     uint32 oldMSTime = getMSTime();
 
-    _scriptNamesStore.push_back("");
+    // We insert an empty placeholder here so we can use the
+    // script id 0 as dummy for "no script found".
+    _scriptNamesStore.emplace_back("");
+
     QueryResult result = WorldDatabase.Query(
-      "SELECT DISTINCT(ScriptName) FROM achievement_criteria_data WHERE ScriptName <> '' AND type = 11 "
-      "UNION "
-      "SELECT DISTINCT(ScriptName) FROM battleground_template WHERE ScriptName <> '' "
-      "UNION "
-      "SELECT DISTINCT(ScriptName) FROM creature_template WHERE ScriptName <> '' "
-      "UNION "
-      "SELECT DISTINCT(ScriptName) FROM gameobject_template WHERE ScriptName <> '' "
-      "UNION "
-      "SELECT DISTINCT(ScriptName) FROM item_template WHERE ScriptName <> '' "
-      "UNION "
-      "SELECT DISTINCT(ScriptName) FROM areatrigger_scripts WHERE ScriptName <> '' "
-      "UNION "
-      "SELECT DISTINCT(ScriptName) FROM spell_script_names WHERE ScriptName <> '' "
-      "UNION "
-      "SELECT DISTINCT(ScriptName) FROM transports WHERE ScriptName <> '' "
-      "UNION "
-      "SELECT DISTINCT(ScriptName) FROM game_weather WHERE ScriptName <> '' "
-      "UNION "
-      "SELECT DISTINCT(ScriptName) FROM conditions WHERE ScriptName <> '' "
-      "UNION "
-      "SELECT DISTINCT(ScriptName) FROM outdoorpvp_template WHERE ScriptName <> '' "
-      "UNION "
-      "SELECT DISTINCT(script) FROM instance_template WHERE script <> ''");
+        "SELECT DISTINCT(ScriptName) FROM achievement_criteria_data WHERE ScriptName <> '' AND type = 11 "
+        "UNION "
+        "SELECT DISTINCT(ScriptName) FROM battleground_template WHERE ScriptName <> '' "
+        "UNION "
+        "SELECT DISTINCT(ScriptName) FROM creature WHERE ScriptName <> '' "
+        "UNION "
+        "SELECT DISTINCT(ScriptName) FROM creature_template WHERE ScriptName <> '' "
+        "UNION "
+        "SELECT DISTINCT(ScriptName) FROM gameobject WHERE ScriptName <> '' "
+        "UNION "
+        "SELECT DISTINCT(ScriptName) FROM gameobject_template WHERE ScriptName <> '' "
+        "UNION "
+        "SELECT DISTINCT(ScriptName) FROM item_template WHERE ScriptName <> '' "
+        "UNION "
+        "SELECT DISTINCT(ScriptName) FROM areatrigger_scripts WHERE ScriptName <> '' "
+        "UNION "
+        "SELECT DISTINCT(ScriptName) FROM spell_script_names WHERE ScriptName <> '' "
+        "UNION "
+        "SELECT DISTINCT(ScriptName) FROM transports WHERE ScriptName <> '' "
+        "UNION "
+        "SELECT DISTINCT(ScriptName) FROM game_weather WHERE ScriptName <> '' "
+        "UNION "
+        "SELECT DISTINCT(ScriptName) FROM conditions WHERE ScriptName <> '' "
+        "UNION "
+        "SELECT DISTINCT(ScriptName) FROM outdoorpvp_template WHERE ScriptName <> '' "
+        "UNION "
+        "SELECT DISTINCT(script) FROM instance_template WHERE script <> ''");
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded empty set of Script Names!");
+        TC_LOG_INFO("server.loading", ">> Loaded empty set of Script Names!");
         return;
     }
 
-    uint32 count = 1;
+    _scriptNamesStore.reserve(result->GetRowCount() + 1);
 
     do
     {
         _scriptNamesStore.push_back((*result)[0].GetString());
-        ++count;
     }
     while (result->NextRow());
 
     std::sort(_scriptNamesStore.begin(), _scriptNamesStore.end());
-    TC_LOG_INFO("server.loading", ">> Loaded %d Script Names in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+
+    TC_LOG_INFO("server.loading", ">> Loaded " SZFMTD " ScriptNames in %u ms", _scriptNamesStore.size(), GetMSTimeDiffToNow(oldMSTime));
 }
 
-uint32 ObjectMgr::GetScriptId(const char *name)
+ObjectMgr::ScriptNameContainer const& ObjectMgr::GetAllScriptNames() const
+{
+    return _scriptNamesStore;
+}
+
+std::string const& ObjectMgr::GetScriptName(uint32 id) const
+{
+    static std::string const empty = "";
+    return (id < _scriptNamesStore.size()) ? _scriptNamesStore[id] : empty;
+}
+
+
+uint32 ObjectMgr::GetScriptId(std::string const& name)
 {
     // use binary search to find the script name in the sorted vector
     // assume "" is the first element
-    if (!name)
+    if (name.empty())
         return 0;
 
     ScriptNameContainer::const_iterator itr = std::lower_bound(_scriptNamesStore.begin(), _scriptNamesStore.end(), name);
@@ -8618,7 +9113,6 @@ void ObjectMgr::LoadBroadcastTexts()
     }
 
     _broadcastTextStore.rehash(result->GetRowCount());
-    uint32 count = 0;
 
     do
     {
@@ -8644,26 +9138,23 @@ void ObjectMgr::LoadBroadcastTexts()
         {
             if (!sSoundEntriesStore.LookupEntry(bct.SoundId))
             {
-                TC_LOG_INFO("sql.sql", "BroadcastText (Id: %u) in table `broadcast_text` has SoundId %u but sound does not exist. Skipped.", bct.Id, bct.SoundId);
-                // don't load bct of higher expansions
-                continue;
+                TC_LOG_DEBUG("broadcasttext", "BroadcastText (Id: %u) in table `broadcast_text` has SoundId %u but sound does not exist.", bct.Id, bct.SoundId);
+                bct.SoundId = 0;
             }
         }
 
         if (!GetLanguageDescByID(bct.Language))
         {
-            TC_LOG_INFO("sql.sql", "BroadcastText (Id: %u) in table `broadcast_text` using Language %u but Language does not exist. Skipped.", bct.Id, bct.Language);
-            // don't load bct of higher expansions
-            continue;
+            TC_LOG_DEBUG("broadcasttext", "BroadcastText (Id: %u) in table `broadcast_text` using Language %u but Language does not exist.", bct.Id, bct.Language);
+            bct.Language = LANG_UNIVERSAL;
         }
 
         if (bct.EmoteId0)
         {
             if (!sEmotesStore.LookupEntry(bct.EmoteId0))
             {
-                TC_LOG_INFO("sql.sql", "BroadcastText (Id: %u) in table `broadcast_text` has EmoteId0 %u but emote does not exist. Skipped.", bct.Id, bct.EmoteId0);
-                // don't load bct of higher expansions
-                continue;
+                TC_LOG_DEBUG("broadcasttext", "BroadcastText (Id: %u) in table `broadcast_text` has EmoteId0 %u but emote does not exist.", bct.Id, bct.EmoteId0);
+                bct.EmoteId0 = 0;
             }
         }
 
@@ -8671,9 +9162,8 @@ void ObjectMgr::LoadBroadcastTexts()
         {
             if (!sEmotesStore.LookupEntry(bct.EmoteId1))
             {
-                TC_LOG_INFO("sql.sql", "BroadcastText (Id: %u) in table `broadcast_text` has EmoteId1 %u but emote does not exist. Skipped.", bct.Id, bct.EmoteId1);
-                // don't load bct of higher expansions
-                continue;
+                TC_LOG_DEBUG("broadcasttext", "BroadcastText (Id: %u) in table `broadcast_text` has EmoteId1 %u but emote does not exist.", bct.Id, bct.EmoteId1);
+                bct.EmoteId1 = 0;
             }
         }
 
@@ -8681,61 +9171,55 @@ void ObjectMgr::LoadBroadcastTexts()
         {
             if (!sEmotesStore.LookupEntry(bct.EmoteId2))
             {
-                TC_LOG_INFO("sql.sql", "BroadcastText (Id: %u) in table `broadcast_text` has EmoteId2 %u but emote does not exist. Skipped.", bct.Id, bct.EmoteId2);
-                // don't load bct of higher expansions
-                continue;
+                TC_LOG_DEBUG("broadcasttext", "BroadcastText (Id: %u) in table `broadcast_text` has EmoteId2 %u but emote does not exist.", bct.Id, bct.EmoteId2);
+                bct.EmoteId2 = 0;
             }
         }
 
         _broadcastTextStore[bct.Id] = bct;
-
-        ++count;
     }
     while (result->NextRow());
 
-    TC_LOG_INFO("server.loading", ">> Loaded %u broadcast texts in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    TC_LOG_INFO("server.loading", ">> Loaded " SZFMTD " broadcast texts in %u ms", _broadcastTextStore.size(), GetMSTimeDiffToNow(oldMSTime));
 }
 
 void ObjectMgr::LoadBroadcastTextLocales()
 {
     uint32 oldMSTime = getMSTime();
 
-    //                                               0   1              2              3              4              5              6              7              8              9                10               11               12               13               14               15               16
-    QueryResult result = WorldDatabase.Query("SELECT Id, MaleText_loc1, MaleText_loc2, MaleText_loc3, MaleText_loc4, MaleText_loc5, MaleText_loc6, MaleText_loc7, MaleText_loc8, FemaleText_loc1, FemaleText_loc2, FemaleText_loc3, FemaleText_loc4, FemaleText_loc5, FemaleText_loc6, FemaleText_loc7, FemaleText_loc8 FROM locales_broadcast_text");
-
+    //                                               0   1       2         3
+    QueryResult result = WorldDatabase.Query("SELECT ID, locale, MaleText, FemaleText FROM broadcast_text_locale");
     if (!result)
     {
-        TC_LOG_INFO("server.loading", ">> Loaded 0 broadcast text locales. DB table `locales_broadcast_text` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 broadcast text locales. DB table `broadcast_text_locale` is empty.");
         return;
     }
-
-    uint32 count = 0;
 
     do
     {
         Field* fields = result->Fetch();
 
-        uint32 id = fields[0].GetUInt32();
+        uint32 id               = fields[0].GetUInt32();
+        std::string localeName  = fields[1].GetString();
+        std::string MaleText    = fields[2].GetString();
+        std::string FemaleText  = fields[3].GetString();
+
         BroadcastTextContainer::iterator bct = _broadcastTextStore.find(id);
         if (bct == _broadcastTextStore.end())
         {
-            TC_LOG_INFO("sql.sql", "BroadcastText (Id: %u) in table `locales_broadcast_text` does not exist or is incompatible. Skipped!", id);
-            // don't load bct of higher expansions
+            TC_LOG_ERROR("sql.sql", "BroadcastText (Id: %u) in table `broadcast_text_locale` does not exist. Skipped!", id);
             continue;
         }
 
-        for (uint8 i = TOTAL_LOCALES - 1; i > 0; --i)
-        {
-            LocaleConstant locale = LocaleConstant(i);
-            AddLocaleString(fields[1 + (i - 1)].GetString(), locale, bct->second.MaleText);
-            AddLocaleString(fields[9 + (i - 1)].GetString(), locale, bct->second.FemaleText);
-        }
+        LocaleConstant locale = GetLocaleByName(localeName);
+        if (locale == LOCALE_enUS)
+            continue;
 
-        ++count;
-    }
-    while (result->NextRow());
+        AddLocaleString(MaleText, locale, bct->second.MaleText);
+        AddLocaleString(FemaleText, locale, bct->second.FemaleText);
+    } while (result->NextRow());
 
-    TC_LOG_INFO("server.loading", ">> Loaded %u broadcast text locales in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    TC_LOG_INFO("server.loading", ">> Loaded %u broadcast text locales in %u ms", uint32(_broadcastTextStore.size()), GetMSTimeDiffToNow(oldMSTime));
 }
 
 CreatureBaseStats const* ObjectMgr::GetCreatureBaseStats(uint8 level, uint8 unitClass)
@@ -8840,7 +9324,7 @@ void ObjectMgr::LoadFactionChangeAchievements()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 faction change achievement pairs. DB table `player_factionchange_achievement` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 faction change achievement pairs. DB table `player_factionchange_achievement` is empty.");
         return;
     }
 
@@ -8910,7 +9394,7 @@ void ObjectMgr::LoadFactionChangeQuests()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 faction change quest pairs. DB table `player_factionchange_quests` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 faction change quest pairs. DB table `player_factionchange_quests` is empty.");
         return;
     }
 
@@ -8980,7 +9464,7 @@ void ObjectMgr::LoadFactionChangeSpells()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 faction change spell pairs. DB table `player_factionchange_spells` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 faction change spell pairs. DB table `player_factionchange_spells` is empty.");
         return;
     }
 
@@ -9042,22 +9526,31 @@ void ObjectMgr::LoadFactionChangeTitles()
     TC_LOG_INFO("server.loading", ">> Loaded %u faction change title pairs in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
-GameObjectTemplate const* ObjectMgr::GetGameObjectTemplate(uint32 entry)
+GameObjectTemplate const* ObjectMgr::GetGameObjectTemplate(uint32 entry) const
 {
     GameObjectTemplateContainer::const_iterator itr = _gameObjectTemplateStore.find(entry);
     if (itr != _gameObjectTemplateStore.end())
         return &(itr->second);
 
-    return NULL;
+    return nullptr;
 }
 
-CreatureTemplate const* ObjectMgr::GetCreatureTemplate(uint32 entry)
+GameObjectTemplateAddon const* ObjectMgr::GetGameObjectTemplateAddon(uint32 entry) const
+{
+    auto itr = _gameObjectTemplateAddonStore.find(entry);
+    if (itr != _gameObjectTemplateAddonStore.end())
+        return &itr->second;
+
+    return nullptr;
+}
+
+CreatureTemplate const* ObjectMgr::GetCreatureTemplate(uint32 entry) const
 {
     CreatureTemplateContainer::const_iterator itr = _creatureTemplateStore.find(entry);
     if (itr != _creatureTemplateStore.end())
         return &(itr->second);
 
-    return NULL;
+    return nullptr;
 }
 
 VehicleAccessoryList const* ObjectMgr::GetVehicleAccessoryList(Vehicle* veh) const
@@ -9065,7 +9558,7 @@ VehicleAccessoryList const* ObjectMgr::GetVehicleAccessoryList(Vehicle* veh) con
     if (Creature* cre = veh->GetBase()->ToCreature())
     {
         // Give preference to GUID-based accessories
-        VehicleAccessoryContainer::const_iterator itr = _vehicleAccessoryStore.find(cre->GetDBTableGUIDLow());
+        VehicleAccessoryContainer::const_iterator itr = _vehicleAccessoryStore.find(cre->GetSpawnId());
         if (itr != _vehicleAccessoryStore.end())
             return &itr->second;
     }
@@ -9074,17 +9567,179 @@ VehicleAccessoryList const* ObjectMgr::GetVehicleAccessoryList(Vehicle* veh) con
     VehicleAccessoryContainer::const_iterator itr = _vehicleTemplateAccessoryStore.find(veh->GetCreatureEntry());
     if (itr != _vehicleTemplateAccessoryStore.end())
         return &itr->second;
-    return NULL;
+    return nullptr;
+}
+
+DungeonEncounterList const* ObjectMgr::GetDungeonEncounterList(uint32 mapId, Difficulty difficulty) const
+{
+    std::unordered_map<uint32, DungeonEncounterList>::const_iterator itr = _dungeonEncounterStore.find(MAKE_PAIR32(mapId, difficulty));
+    if (itr != _dungeonEncounterStore.end())
+        return &itr->second;
+    return nullptr;
 }
 
 PlayerInfo const* ObjectMgr::GetPlayerInfo(uint32 race, uint32 class_) const
 {
     if (race >= MAX_RACES)
-        return NULL;
+        return nullptr;
     if (class_ >= MAX_CLASSES)
-        return NULL;
+        return nullptr;
     PlayerInfo const* info = _playerInfo[race][class_];
     if (!info)
-        return NULL;
+        return nullptr;
     return info;
+}
+
+void ObjectMgr::LoadGameObjectQuestItems()
+{
+    uint32 oldMSTime = getMSTime();
+
+    //                                               0                1       2
+    QueryResult result = WorldDatabase.Query("SELECT GameObjectEntry, ItemId, Idx FROM gameobject_questitem ORDER BY Idx ASC");
+
+    if (!result)
+    {
+        TC_LOG_INFO("server.loading", ">> Loaded 0 gameobject quest items. DB table `gameobject_questitem` is empty.");
+        return;
+    }
+
+    uint32 count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+
+        uint32 entry = fields[0].GetUInt32();
+        uint32 item  = fields[1].GetUInt32();
+        uint32 idx   = fields[2].GetUInt32();
+
+        GameObjectTemplate const* goInfo = GetGameObjectTemplate(entry);
+        if (!goInfo)
+        {
+            TC_LOG_ERROR("sql.sql", "Table `gameobject_questitem` has data for nonexistent gameobject (entry: %u, idx: %u), skipped", entry, idx);
+            continue;
+        };
+
+        ItemEntry const* db2Data = sItemStore.LookupEntry(item);
+        if (!db2Data)
+        {
+            TC_LOG_ERROR("sql.sql", "Table `gameobject_questitem` has nonexistent item (ID: %u) in gameobject (entry: %u, idx: %u), skipped", item, entry, idx);
+            continue;
+        };
+
+        _gameObjectQuestItemStore[entry].push_back(item);
+
+        ++count;
+    }
+    while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded %u gameobject quest items in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+}
+
+void ObjectMgr::LoadCreatureQuestItems()
+{
+    uint32 oldMSTime = getMSTime();
+
+    //                                               0              1       2
+    QueryResult result = WorldDatabase.Query("SELECT CreatureEntry, ItemId, Idx FROM creature_questitem ORDER BY Idx ASC");
+
+    if (!result)
+    {
+        TC_LOG_INFO("server.loading", ">> Loaded 0 creature quest items. DB table `creature_questitem` is empty.");
+        return;
+    }
+
+    uint32 count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+
+        uint32 entry = fields[0].GetUInt32();
+        uint32 item  = fields[1].GetUInt32();
+        uint32 idx   = fields[2].GetUInt32();
+
+        CreatureTemplate const* creatureInfo = GetCreatureTemplate(entry);
+        if (!creatureInfo)
+        {
+            TC_LOG_ERROR("sql.sql", "Table `creature_questitem` has data for nonexistent creature (entry: %u, idx: %u), skipped", entry, idx);
+            continue;
+        };
+
+        ItemEntry const* db2Data = sItemStore.LookupEntry(item);
+        if (!db2Data)
+        {
+            TC_LOG_ERROR("sql.sql", "Table `creature_questitem` has nonexistent item (ID: %u) in creature (entry: %u, idx: %u), skipped", item, entry, idx);
+            continue;
+        };
+
+        _creatureQuestItemStore[entry].push_back(item);
+
+        ++count;
+    }
+    while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded %u creature quest items in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+}
+
+void ObjectMgr::InitializeQueriesData(QueryDataGroup mask)
+{
+    // cache disabled
+    if (!sWorld->getBoolConfig(CONFIG_CACHE_DATA_QUERIES))
+        return;
+
+    // Initialize Query data for creatures
+    if (mask & QUERY_DATA_CREATURES)
+        for (auto& creaturePair : _creatureTemplateStore)
+            creaturePair.second.InitializeQueryData();
+
+    // Initialize Query Data for gameobjects
+    if (mask & QUERY_DATA_GAMEOBJECTS)
+        for (auto& gameobjectPair : _gameObjectTemplateStore)
+            gameobjectPair.second.InitializeQueryData();
+
+    // Initialize Query Data for items
+    if (mask & QUERY_DATA_ITEMS)
+        for (auto& itemPair : _itemTemplateStore)
+            itemPair.second.InitializeQueryData();
+
+    // Initialize Query Data for quests
+    if (mask & QUERY_DATA_QUESTS)
+        for (auto& questPair : _questTemplates)
+            questPair.second->InitializeQueryData();
+
+    // Initialize Quest POI data
+    if (mask & QUERY_DATA_POIS)
+        for (auto& poiPair : _questPOIStore)
+            poiPair.second.InitializeQueryData();
+}
+
+void QuestPOIWrapper::InitializeQueryData()
+{
+    QueryDataBuffer = BuildQueryData();
+}
+
+ByteBuffer QuestPOIWrapper::BuildQueryData() const
+{
+    ByteBuffer tempBuffer;
+    tempBuffer << uint32(POIData.QuestID);                                      // quest ID
+    tempBuffer << uint32(POIData.QuestPOIBlobDataStats.size());                 // POI count
+
+    for (QuestPOIBlobData const& questPOIBlobData : POIData.QuestPOIBlobDataStats)
+    {
+        tempBuffer << uint32(questPOIBlobData.BlobIndex);                       // POI index
+        tempBuffer << int32(questPOIBlobData.ObjectiveIndex);                   // objective index
+        tempBuffer << uint32(questPOIBlobData.MapID);                           // mapid
+        tempBuffer << uint32(questPOIBlobData.WorldMapAreaID);                  // areaid
+        tempBuffer << uint32(questPOIBlobData.Floor);                           // floorid
+        tempBuffer << uint32(questPOIBlobData.Unk3);                            // unknown
+        tempBuffer << uint32(questPOIBlobData.Unk4);                            // unknown
+        tempBuffer << uint32(questPOIBlobData.QuestPOIBlobPointStats.size());   // POI points count
+
+        for (QuestPOIBlobPoint const& questPOIBlobPoint : questPOIBlobData.QuestPOIBlobPointStats)
+        {
+            tempBuffer << int32(questPOIBlobPoint.X); // POI point x
+            tempBuffer << int32(questPOIBlobPoint.Y); // POI point y
+        }
+    }
+
+    return tempBuffer;
 }

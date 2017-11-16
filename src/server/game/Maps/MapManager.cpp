@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -27,7 +27,6 @@
 #include "InstanceScript.h"
 #include "Config.h"
 #include "World.h"
-#include "CellImpl.h"
 #include "Corpse.h"
 #include "ObjectMgr.h"
 #include "Language.h"
@@ -36,13 +35,12 @@
 #include "Player.h"
 #include "WorldSession.h"
 #include "Opcodes.h"
-#include "AchievementMgr.h"
 
 MapManager::MapManager()
+    : _nextInstanceId(0), _scheduledScripts(0)
 {
     i_gridCleanUpDelay = sWorld->getIntConfig(CONFIG_INTERVAL_GRIDCLEAN);
     i_timer.SetInterval(sWorld->getIntConfig(CONFIG_INTERVAL_MAPUPDATE));
-    _nextInstanceId = 0;
 }
 
 MapManager::~MapManager() { }
@@ -59,15 +57,21 @@ void MapManager::Initialize()
 
 void MapManager::InitializeVisibilityDistanceInfo()
 {
-    for (MapMapType::iterator iter=i_maps.begin(); iter != i_maps.end(); ++iter)
+    for (MapMapType::iterator iter = i_maps.begin(); iter != i_maps.end(); ++iter)
         (*iter).second->InitVisibilityDistance();
+}
+
+MapManager* MapManager::instance()
+{
+    static MapManager instance;
+    return &instance;
 }
 
 Map* MapManager::CreateBaseMap(uint32 id)
 {
     Map* map = FindBaseMap(id);
 
-    if (map == NULL)
+    if (map == nullptr)
     {
         std::lock_guard<std::mutex> lock(_mapsLock);
 
@@ -80,6 +84,7 @@ Map* MapManager::CreateBaseMap(uint32 id)
         {
             map = new Map(id, i_gridCleanUpDelay, 0, REGULAR_DIFFICULTY);
             map->LoadRespawnTimes();
+            map->LoadCorpseData();
         }
 
         i_maps[id] = map;
@@ -93,16 +98,16 @@ Map* MapManager::FindBaseNonInstanceMap(uint32 mapId) const
 {
     Map* map = FindBaseMap(mapId);
     if (map && map->Instanceable())
-        return NULL;
+        return nullptr;
     return map;
 }
 
-Map* MapManager::CreateMap(uint32 id, Player* player)
+Map* MapManager::CreateMap(uint32 id, Player* player, uint32 loginInstanceId)
 {
     Map* m = CreateBaseMap(id);
 
     if (m && m->Instanceable())
-        m = ((MapInstanced*)m)->CreateInstanceForPlayer(id, player);
+        m = ((MapInstanced*)m)->CreateInstanceForPlayer(id, player, loginInstanceId);
 
     return m;
 }
@@ -111,63 +116,51 @@ Map* MapManager::FindMap(uint32 mapid, uint32 instanceId) const
 {
     Map* map = FindBaseMap(mapid);
     if (!map)
-        return NULL;
+        return nullptr;
 
     if (!map->Instanceable())
-        return instanceId == 0 ? map : NULL;
+        return instanceId == 0 ? map : nullptr;
 
     return ((MapInstanced*)map)->FindInstanceMap(instanceId);
 }
 
-bool MapManager::CanPlayerEnter(uint32 mapid, Player* player, bool loginCheck)
+Map::EnterState MapManager::PlayerCannotEnter(uint32 mapid, Player* player, bool loginCheck)
 {
     MapEntry const* entry = sMapStore.LookupEntry(mapid);
     if (!entry)
-        return false;
+        return Map::CANNOT_ENTER_NO_ENTRY;
 
     if (!entry->IsDungeon())
-        return true;
+        return Map::CAN_ENTER;
 
     InstanceTemplate const* instance = sObjectMgr->GetInstanceTemplate(mapid);
     if (!instance)
-        return false;
+        return Map::CANNOT_ENTER_UNINSTANCED_DUNGEON;
 
     Difficulty targetDifficulty, requestedDifficulty;
     targetDifficulty = requestedDifficulty = player->GetDifficulty(entry->IsRaid());
     // Get the highest available difficulty if current setting is higher than the instance allows
     MapDifficulty const* mapDiff = GetDownscaledMapDifficultyData(entry->MapID, targetDifficulty);
     if (!mapDiff)
-    {
-        player->SendTransferAborted(mapid, TRANSFER_ABORT_DIFFICULTY, requestedDifficulty);
-        return false;
-    }
+        return Map::CANNOT_ENTER_DIFFICULTY_UNAVAILABLE;
 
     //Bypass checks for GMs
     if (player->IsGameMaster())
-        return true;
+        return Map::CAN_ENTER;
 
     char const* mapName = entry->name[player->GetSession()->GetSessionDbcLocale()];
 
     Group* group = player->GetGroup();
-    if (entry->IsRaid())
-    {
-        // can only enter in a raid group
+    if (entry->IsRaid()) // can only enter in a raid group
         if ((!group || !group->isRaidGroup()) && !sWorld->getBoolConfig(CONFIG_INSTANCE_IGNORE_RAID))
-        {
-            // probably there must be special opcode, because client has this string constant in GlobalStrings.lua
-            /// @todo this is not a good place to send the message
-            player->GetSession()->SendAreaTriggerMessage(player->GetSession()->GetTrinityString(LANG_INSTANCE_RAID_GROUP_ONLY), mapName);
-            TC_LOG_DEBUG("maps", "MAP: Player '%s' must be in a raid group to enter instance '%s'", player->GetName().c_str(), mapName);
-            return false;
-        }
-    }
+            return Map::CANNOT_ENTER_NOT_IN_RAID;
 
     if (!player->IsAlive())
     {
-        if (Corpse* corpse = player->GetCorpse())
+        if (player->HasCorpse())
         {
             // let enter in ghost mode in instance that connected to inner instance with corpse
-            uint32 corpseMap = corpse->GetMapId();
+            uint32 corpseMap = player->GetCorpseLocation().GetMapId();
             do
             {
                 if (corpseMap == mapid)
@@ -178,38 +171,22 @@ bool MapManager::CanPlayerEnter(uint32 mapid, Player* player, bool loginCheck)
             } while (corpseMap);
 
             if (!corpseMap)
-            {
-                WorldPacket data(SMSG_CORPSE_NOT_IN_INSTANCE);
-                player->GetSession()->SendPacket(&data);
-                TC_LOG_DEBUG("maps", "MAP: Player '%s' does not have a corpse in instance '%s' and cannot enter.", player->GetName().c_str(), mapName);
-                return false;
-            }
+                return Map::CANNOT_ENTER_CORPSE_IN_DIFFERENT_INSTANCE;
+
             TC_LOG_DEBUG("maps", "MAP: Player '%s' has corpse in instance '%s' and can enter.", player->GetName().c_str(), mapName);
-            player->ResurrectPlayer(0.5f, false);
-            player->SpawnCorpseBones();
         }
         else
             TC_LOG_DEBUG("maps", "Map::CanPlayerEnter - player '%s' is dead but does not have a corpse!", player->GetName().c_str());
     }
 
     //Get instance where player's group is bound & its map
-    if (group)
+    if (!loginCheck && group)
     {
         InstanceGroupBind* boundInstance = group->GetBoundInstance(entry);
         if (boundInstance && boundInstance->save)
             if (Map* boundMap = sMapMgr->FindMap(mapid, boundInstance->save->GetInstanceId()))
-                if (!loginCheck && !boundMap->CanEnter(player))
-                    return false;
-            /*
-                This check has to be moved to InstanceMap::CanEnter()
-                // Player permanently bounded to different instance than groups one
-                InstancePlayerBind* playerBoundedInstance = player->GetBoundInstance(mapid, player->GetDifficulty(entry->IsRaid()));
-                if (playerBoundedInstance && playerBoundedInstance->perm && playerBoundedInstance->save &&
-                    boundedInstance->save->GetInstanceId() != playerBoundedInstance->save->GetInstanceId())
-                {
-                    /// @todo send some kind of error message to the player
-                    return false;
-                }*/
+                if (Map::EnterState denyReason = boundMap->CannotEnter(player))
+                    return denyReason;
     }
 
     // players are only allowed to enter 5 instances per hour
@@ -221,14 +198,14 @@ bool MapManager::CanPlayerEnter(uint32 mapid, Player* player, bool loginCheck)
 
         // instanceId can never be 0 - will not be found
         if (!player->CheckInstanceCount(instanceIdToCheck) && !player->isDead())
-        {
-            player->SendTransferAborted(mapid, TRANSFER_ABORT_TOO_MANY_INSTANCES);
-            return false;
-        }
+            return Map::CANNOT_ENTER_TOO_MANY_INSTANCES;
     }
 
     //Other requirements
-    return player->Satisfy(sObjectMgr->GetAccessRequirement(mapid, targetDifficulty), mapid, true);
+    if (player->Satisfy(sObjectMgr->GetAccessRequirement(mapid, targetDifficulty), mapid, true))
+        return Map::CAN_ENTER;
+    else
+        return Map::CANNOT_ENTER_UNSPECIFIED_REASON;
 }
 
 void MapManager::Update(uint32 diff)
@@ -250,8 +227,6 @@ void MapManager::Update(uint32 diff)
 
     for (iter = i_maps.begin(); iter != i_maps.end(); ++iter)
         iter->second->DelayedUpdate(uint32(i_timer.GetCurrent()));
-
-    sObjectAccessor->Update(uint32(i_timer.GetCurrent()));
 
     i_timer.SetCurrent(0);
 }
@@ -334,55 +309,48 @@ void MapManager::InitInstanceIds()
 {
     _nextInstanceId = 1;
 
-    QueryResult result = CharacterDatabase.Query("SELECT MAX(id) FROM instance");
-    if (result)
-    {
-        uint32 maxId = (*result)[0].GetUInt32();
+    if (QueryResult result = CharacterDatabase.Query("SELECT IFNULL(MAX(id), 0) FROM instance"))
+        _freeInstanceIds.resize((*result)[0].GetUInt64() + 2, true); // make space for one extra to be able to access [_nextInstanceId] index in case all slots are taken
+    else
+        _freeInstanceIds.resize(_nextInstanceId + 1, true);
 
-        // Resize to multiples of 32 (vector<bool> allocates memory the same way)
-        _instanceIds.resize((maxId / 32) * 32 + (maxId % 32 > 0 ? 32 : 0));
-    }
+    // never allow 0 id
+    _freeInstanceIds[0] = false;
 }
 
 void MapManager::RegisterInstanceId(uint32 instanceId)
 {
     // Allocation and sizing was done in InitInstanceIds()
-    _instanceIds[instanceId] = true;
+    _freeInstanceIds[instanceId] = false;
+
+    // Instances are pulled in ascending order from db and nextInstanceId is initialized with 1,
+    // so if the instance id is used, increment until we find the first unused one for a potential new instance
+    if (_nextInstanceId == instanceId)
+        ++_nextInstanceId;
 }
 
 uint32 MapManager::GenerateInstanceId()
 {
-    uint32 newInstanceId = _nextInstanceId;
-
-    // Find the lowest available id starting from the current NextInstanceId (which should be the lowest according to the logic in FreeInstanceId()
-    for (uint32 i = ++_nextInstanceId; i < 0xFFFFFFFF; ++i)
-    {
-        if ((i < _instanceIds.size() && !_instanceIds[i]) || i >= _instanceIds.size())
-        {
-            _nextInstanceId = i;
-            break;
-        }
-    }
-
-    if (newInstanceId == _nextInstanceId)
+    if (_nextInstanceId == 0xFFFFFFFF)
     {
         TC_LOG_ERROR("maps", "Instance ID overflow!! Can't continue, shutting down server. ");
         World::StopNow(ERROR_EXIT_CODE);
+        return _nextInstanceId;
     }
 
-    // Allocate space if necessary
-    if (newInstanceId >= uint32(_instanceIds.size()))
+    uint32 newInstanceId = _nextInstanceId;
+    ASSERT(newInstanceId < _freeInstanceIds.size());
+    _freeInstanceIds[newInstanceId] = false;
+
+    // Find the lowest available id starting from the current NextInstanceId (which should be the lowest according to the logic in FreeInstanceId()
+    size_t nextFreedId = _freeInstanceIds.find_next(_nextInstanceId++);
+    if (nextFreedId == InstanceIds::npos)
     {
-        // Due to the odd memory allocation behavior of vector<bool> we match size to capacity before triggering a new allocation
-        if (_instanceIds.size() < _instanceIds.capacity())
-        {
-            _instanceIds.resize(_instanceIds.capacity());
-        }
-        else
-            _instanceIds.resize((newInstanceId / 32) * 32 + (newInstanceId % 32 > 0 ? 32 : 0));
+        _nextInstanceId = uint32(_freeInstanceIds.size());
+        _freeInstanceIds.push_back(true);
     }
-
-    _instanceIds[newInstanceId] = true;
+    else
+        _nextInstanceId = uint32(nextFreedId);
 
     return newInstanceId;
 }
@@ -390,9 +358,6 @@ uint32 MapManager::GenerateInstanceId()
 void MapManager::FreeInstanceId(uint32 instanceId)
 {
     // If freed instance id is lower than the next id available for new instances, use the freed one instead
-    if (instanceId < _nextInstanceId)
-        SetNextInstanceId(instanceId);
-
-    _instanceIds[instanceId] = false;
-    sAchievementMgr->OnInstanceDestroyed(instanceId);
+    _nextInstanceId = std::min(instanceId, _nextInstanceId);
+    _freeInstanceIds[instanceId] = true;
 }

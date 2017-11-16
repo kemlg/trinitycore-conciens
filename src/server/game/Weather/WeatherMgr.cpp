@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -21,11 +21,11 @@
 */
 
 #include "WeatherMgr.h"
-#include "Weather.h"
+#include "DatabaseEnv.h"
 #include "Log.h"
 #include "ObjectMgr.h"
 #include "Player.h"
-#include "WorldPacket.h"
+#include "Weather.h"
 #include "WorldSession.h"
 
 namespace WeatherMgr
@@ -42,7 +42,7 @@ namespace
     WeatherData const* GetWeatherData(uint32 zone_id)
     {
         WeatherZoneMap::const_iterator itr = mWeatherZoneMap.find(zone_id);
-        return (itr != mWeatherZoneMap.end()) ? &itr->second : NULL;
+        return (itr != mWeatherZoneMap.end()) ? &itr->second : nullptr;
     }
 }
 
@@ -70,7 +70,7 @@ Weather* AddWeather(uint32 zone_id)
 
     // zone does not have weather, ignore
     if (!weatherChances)
-        return NULL;
+        return nullptr;
 
     Weather* w = new Weather(zone_id, weatherChances);
     m_weathers[w->GetZone()].reset(w);
@@ -95,7 +95,7 @@ void LoadWeatherData()
 
     if (!result)
     {
-        TC_LOG_ERROR("server.loading", ">> Loaded 0 weather definitions. DB table `game_weather` is empty.");
+        TC_LOG_INFO("server.loading", ">> Loaded 0 weather definitions. DB table `game_weather` is empty.");
         return;
     }
 
@@ -132,7 +132,7 @@ void LoadWeatherData()
             }
         }
 
-        wzc.ScriptId = sObjectMgr->GetScriptId(fields[13].GetCString());
+        wzc.ScriptId = sObjectMgr->GetScriptId(fields[13].GetString());
 
         ++count;
     }
@@ -143,9 +143,11 @@ void LoadWeatherData()
 
 void SendFineWeatherUpdateToPlayer(Player* player)
 {
-    WorldPacket data(SMSG_WEATHER, (4+4+4));
-    data << (uint32)WEATHER_STATE_FINE << (float)0.0f << uint8(0);
-    player->GetSession()->SendPacket(&data);
+    WorldPacket data(SMSG_WEATHER, (4 + 4 + 1));
+    data << (uint32)WEATHER_STATE_FINE;
+    data << (float)0.0f;
+    data << uint8(0);
+    player->SendDirectMessage(&data);
 }
 
 void Update(uint32 diff)

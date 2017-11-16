@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,35 +23,38 @@ Category: commandscripts
 EndScriptData */
 
 #include "ScriptMgr.h"
-#include "ObjectMgr.h"
-#include "Chat.h"
 #include "AccountMgr.h"
+#include "Chat.h"
+#include "DatabaseEnv.h"
 #include "Language.h"
-#include "World.h"
-#include "Player.h"
+#include "ObjectAccessor.h"
 #include "Opcodes.h"
+#include "Player.h"
+#include "Realm.h"
+#include "World.h"
+#include "WorldSession.h"
+#include <boost/thread/locks.hpp>
+#include <boost/thread/shared_mutex.hpp>
 
 class gm_commandscript : public CommandScript
 {
 public:
     gm_commandscript() : CommandScript("gm_commandscript") { }
 
-    ChatCommand* GetCommands() const override
+    std::vector<ChatCommand> GetCommands() const override
     {
-        static ChatCommand gmCommandTable[] =
+        static std::vector<ChatCommand> gmCommandTable =
         {
-            { "chat",    rbac::RBAC_PERM_COMMAND_GM_CHAT,    false, &HandleGMChatCommand,       "", NULL },
-            { "fly",     rbac::RBAC_PERM_COMMAND_GM_FLY,     false, &HandleGMFlyCommand,        "", NULL },
-            { "ingame",  rbac::RBAC_PERM_COMMAND_GM_INGAME,   true, &HandleGMListIngameCommand, "", NULL },
-            { "list",    rbac::RBAC_PERM_COMMAND_GM_LIST,     true, &HandleGMListFullCommand,   "", NULL },
-            { "visible", rbac::RBAC_PERM_COMMAND_GM_VISIBLE, false, &HandleGMVisibleCommand,    "", NULL },
-            { "",        rbac::RBAC_PERM_COMMAND_GM,         false, &HandleGMCommand,           "", NULL },
-            { NULL,      0,                            false, NULL,                       "", NULL }
+            { "chat",    rbac::RBAC_PERM_COMMAND_GM_CHAT,    false, &HandleGMChatCommand,       "" },
+            { "fly",     rbac::RBAC_PERM_COMMAND_GM_FLY,     false, &HandleGMFlyCommand,        "" },
+            { "ingame",  rbac::RBAC_PERM_COMMAND_GM_INGAME,   true, &HandleGMListIngameCommand, "" },
+            { "list",    rbac::RBAC_PERM_COMMAND_GM_LIST,     true, &HandleGMListFullCommand,   "" },
+            { "visible", rbac::RBAC_PERM_COMMAND_GM_VISIBLE, false, &HandleGMVisibleCommand,    "" },
+            { "",        rbac::RBAC_PERM_COMMAND_GM,         false, &HandleGMCommand,           "" },
         };
-        static ChatCommand commandTable[] =
+        static std::vector<ChatCommand> commandTable =
         {
-            { "gm", rbac::RBAC_PERM_COMMAND_GM, false, NULL, "", gmCommandTable },
-            { NULL, 0,                    false, NULL, "", NULL }
+            { "gm", rbac::RBAC_PERM_COMMAND_GM, false, nullptr, "", gmCommandTable },
         };
         return commandTable;
     }
@@ -166,7 +169,7 @@ public:
         ///- Get the accounts with GM Level >0
         PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_SEL_GM_ACCOUNTS);
         stmt->setUInt8(0, uint8(SEC_MODERATOR));
-        stmt->setInt32(1, int32(realmID));
+        stmt->setInt32(1, int32(realm.Id.Realm));
         PreparedQueryResult result = LoginDatabase.Query(stmt);
 
         if (result)

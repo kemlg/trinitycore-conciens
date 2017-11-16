@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -24,19 +24,20 @@ SDCategory: Hellfire Ramparts
 EndScriptData */
 
 #include "ScriptMgr.h"
-#include "InstanceScript.h"
+#include "GameObject.h"
 #include "hellfire_ramparts.h"
+#include "InstanceScript.h"
+#include "Map.h"
 
 class instance_ramparts : public InstanceMapScript
 {
     public:
-        instance_ramparts() : InstanceMapScript("instance_ramparts", 543) { }
+        instance_ramparts() : InstanceMapScript(HRScriptName, 543) { }
 
         struct instance_ramparts_InstanceMapScript : public InstanceScript
         {
             instance_ramparts_InstanceMapScript(Map* map) : InstanceScript(map)
             {
-                spawned = false;
                 SetHeaders(DataHeader);
                 SetBossNumber(EncounterCount);
             }
@@ -46,7 +47,7 @@ class instance_ramparts : public InstanceMapScript
                 switch (go->GetEntry())
                 {
                     case GO_FEL_IRON_CHEST_NORMAL:
-                    case GO_FEL_IRON_CHECT_HEROIC:
+                    case GO_FEL_IRON_CHEST_HEROIC:
                         felIronChestGUID = go->GetGUID();
                         break;
                 }
@@ -61,11 +62,11 @@ class instance_ramparts : public InstanceMapScript
                 {
                     case DATA_VAZRUDEN:
                     case DATA_NAZAN:
-                        if (GetBossState(DATA_VAZRUDEN) == DONE && GetBossState(DATA_NAZAN) == DONE && !spawned)
-                        {
-                            DoRespawnGameObject(felIronChestGUID, HOUR*IN_MILLISECONDS);
-                            spawned = true;
-                        }
+                        if (GetBossState(DATA_VAZRUDEN) == DONE && GetBossState(DATA_NAZAN) == DONE)
+                            if (GameObject* chest = instance->GetGameObject(felIronChestGUID))
+                                chest->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+                        break;
+                    default:
                         break;
                 }
                 return true;
@@ -73,7 +74,6 @@ class instance_ramparts : public InstanceMapScript
 
         protected:
             ObjectGuid felIronChestGUID;
-            bool spawned;
         };
 
         InstanceScript* GetInstanceScript(InstanceMap* map) const override

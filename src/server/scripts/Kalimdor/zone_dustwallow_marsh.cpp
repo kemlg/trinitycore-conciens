@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -19,161 +19,24 @@
 /* ScriptData
 SDName: Dustwallow_Marsh
 SD%Complete: 95
-SDComment: Quest support: 11180, 558, 11126, 11142, 11174, Vendor Nat Pagle
+SDComment: Quest support: 558, 11126, 11142, 11174, Vendor Nat Pagle
 SDCategory: Dustwallow Marsh
 EndScriptData */
 
 /* ContentData
-npc_risen_husk_spirit
-npc_lady_jaina_proudmoore
 npc_nat_pagle
 npc_private_hendel
 npc_cassa_crimsonwing - handled by npc_taxi
 EndContentData */
 
 #include "ScriptMgr.h"
-#include "ScriptedCreature.h"
-#include "ScriptedEscortAI.h"
-#include "ScriptedGossip.h"
-#include "SpellScript.h"
+#include "MotionMaster.h"
 #include "Player.h"
+#include "ScriptedCreature.h"
+#include "ScriptedGossip.h"
+#include "SpellInfo.h"
+#include "SpellScript.h"
 #include "WorldSession.h"
-
-/*######
-## npc_risen_husk_spirit
-######*/
-
-enum HauntingWitchHill
-{
-    // Quest
-    QUEST_WHATS_HAUNTING_WITCH_HILL     = 11180,
-
-    // General spells
-    SPELL_SUMMON_RESTLESS_APPARITION    = 42511,
-    SPELL_WITCH_HILL_INFORMATION_CREDIT = 42512,
-
-    // Risen Husk specific
-    SPELL_CONSUME_FLESH                 = 37933,
-    NPC_RISEN_HUSK                      = 23555,
-
-    // Risen Spirit specific
-    SPELL_INTANGIBLE_PRESENCE           = 43127,
-    NPC_RISEN_SPIRIT                    = 23554,
-
-    // Events
-    EVENT_CONSUME_FLESH                 = 1,
-    EVENT_INTANGIBLE_PRESENCE           = 2,
-};
-
-class npc_risen_husk_spirit : public CreatureScript
-{
-    public:
-        npc_risen_husk_spirit() : CreatureScript("npc_risen_husk_spirit") { }
-
-        struct npc_risen_husk_spiritAI : public ScriptedAI
-        {
-            npc_risen_husk_spiritAI(Creature* creature) : ScriptedAI(creature) { }
-
-            void Reset() override
-            {
-                events.Reset();
-                if (me->GetEntry() == NPC_RISEN_HUSK)
-                    events.ScheduleEvent(EVENT_CONSUME_FLESH, 5000);
-                else if (me->GetEntry() == NPC_RISEN_SPIRIT)
-                    events.ScheduleEvent(EVENT_INTANGIBLE_PRESENCE, 5000);
-            }
-
-            void JustDied(Unit* killer) override
-            {
-                if (killer->GetTypeId() == TYPEID_PLAYER)
-                {
-                    if (killer->ToPlayer()->GetQuestStatus(QUEST_WHATS_HAUNTING_WITCH_HILL) == QUEST_STATUS_INCOMPLETE)
-                    {
-                        DoCast(me, SPELL_SUMMON_RESTLESS_APPARITION, true);
-                        DoCast(killer, SPELL_WITCH_HILL_INFORMATION_CREDIT, true);
-                    }
-                }
-            }
-
-            void UpdateAI(uint32 diff) override
-            {
-                if (!UpdateVictim())
-                    return;
-
-                events.Update(diff);
-
-                while (uint32 eventId = events.ExecuteEvent())
-                {
-                    switch (eventId)
-                    {
-                        case EVENT_CONSUME_FLESH:
-                            DoCastVictim(SPELL_CONSUME_FLESH);
-                            events.ScheduleEvent(EVENT_CONSUME_FLESH, 15000);
-                            break;
-                        case EVENT_INTANGIBLE_PRESENCE:
-                            DoCastVictim(SPELL_INTANGIBLE_PRESENCE);
-                            events.ScheduleEvent(EVENT_INTANGIBLE_PRESENCE, 15000);
-                            break;
-                        default:
-                            break;
-                    }
-                }
-
-                DoMeleeAttackIfReady();
-            }
-
-        private:
-            EventMap events;
-        };
-
-        CreatureAI* GetAI(Creature* creature) const override
-        {
-            return new npc_risen_husk_spiritAI(creature);
-        }
-};
-
-/*######
-## npc_lady_jaina_proudmoore
-######*/
-
-enum LadyJaina
-{
-    QUEST_JAINAS_AUTOGRAPH = 558,
-    SPELL_JAINAS_AUTOGRAPH = 23122
-};
-
-#define GOSSIP_ITEM_JAINA "I know this is rather silly but i have a young ward who is a bit shy and would like your autograph."
-
-class npc_lady_jaina_proudmoore : public CreatureScript
-{
-public:
-    npc_lady_jaina_proudmoore() : CreatureScript("npc_lady_jaina_proudmoore") { }
-
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
-    {
-        player->PlayerTalkClass->ClearMenus();
-        if (action == GOSSIP_SENDER_INFO)
-        {
-            player->SEND_GOSSIP_MENU(7012, creature->GetGUID());
-            player->CastSpell(player, SPELL_JAINAS_AUTOGRAPH, false);
-        }
-        return true;
-    }
-
-    bool OnGossipHello(Player* player, Creature* creature) override
-    {
-        if (creature->IsQuestGiver())
-            player->PrepareQuestMenu(creature->GetGUID());
-
-        if (player->GetQuestStatus(QUEST_JAINAS_AUTOGRAPH) == QUEST_STATUS_INCOMPLETE)
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_JAINA, GOSSIP_SENDER_MAIN, GOSSIP_SENDER_INFO);
-
-        player->SEND_GOSSIP_MENU(player->GetGossipTextId(creature), creature->GetGUID());
-
-        return true;
-    }
-
-};
 
 /*######
 ## npc_nat_pagle
@@ -189,31 +52,41 @@ class npc_nat_pagle : public CreatureScript
 public:
     npc_nat_pagle() : CreatureScript("npc_nat_pagle") { }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    struct npc_nat_pagleAI : public ScriptedAI
     {
-        player->PlayerTalkClass->ClearMenus();
-        if (action == GOSSIP_ACTION_TRADE)
-            player->GetSession()->SendListInventory(creature->GetGUID());
+        npc_nat_pagleAI(Creature* creature) : ScriptedAI(creature) { }
 
-        return true;
-    }
-
-    bool OnGossipHello(Player* player, Creature* creature) override
-    {
-        if (creature->IsQuestGiver())
-            player->PrepareQuestMenu(creature->GetGUID());
-
-        if (creature->IsVendor() && player->GetQuestRewardStatus(QUEST_NATS_MEASURING_TAPE))
+        bool GossipSelect(Player* player, uint32 /*menuId*/, uint32 gossipListId) override
         {
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_VENDOR, GOSSIP_TEXT_BROWSE_GOODS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
-            player->SEND_GOSSIP_MENU(7640, creature->GetGUID());
+            uint32 const action = player->PlayerTalkClass->GetGossipOptionAction(gossipListId);
+            ClearGossipMenuFor(player);
+            if (action == GOSSIP_ACTION_TRADE)
+                player->GetSession()->SendListInventory(me->GetGUID());
+
+            return true;
         }
-        else
-            player->SEND_GOSSIP_MENU(7638, creature->GetGUID());
 
-        return true;
+        bool GossipHello(Player* player) override
+        {
+            if (me->IsQuestGiver())
+                player->PrepareQuestMenu(me->GetGUID());
+
+            if (me->IsVendor() && player->GetQuestRewardStatus(QUEST_NATS_MEASURING_TAPE))
+            {
+                AddGossipItemFor(player, GOSSIP_ICON_VENDOR, GOSSIP_TEXT_BROWSE_GOODS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
+                SendGossipMenuFor(player, 7640, me->GetGUID());
+            }
+            else
+                SendGossipMenuFor(player, 7638, me->GetGUID());
+
+            return true;
+        }
+    };
+
+    CreatureAI* GetAI(Creature* creature) const override
+    {
+        return new npc_nat_pagleAI(creature);
     }
-
 };
 
 /*######
@@ -229,7 +102,6 @@ enum Hendel
     EMOTE_SURRENDER             = 4,
 
     QUEST_MISSING_DIPLO_PT16    = 1324,
-    FACTION_HOSTILE             = 168,                      //guessed, may be different
 
     NPC_SENTRY                  = 5184,                     //helps hendel
     NPC_JAINA                   = 4968,                     //appears once hendel gives up
@@ -242,19 +114,6 @@ class npc_private_hendel : public CreatureScript
 public:
     npc_private_hendel() : CreatureScript("npc_private_hendel") { }
 
-    bool OnQuestAccept(Player* /*player*/, Creature* creature, const Quest* quest) override
-    {
-        if (quest->GetQuestId() == QUEST_MISSING_DIPLO_PT16)
-            creature->setFaction(FACTION_HOSTILE);
-
-        return true;
-    }
-
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return new npc_private_hendelAI(creature);
-    }
-
     struct npc_private_hendelAI : public ScriptedAI
     {
         npc_private_hendelAI(Creature* creature) : ScriptedAI(creature) { }
@@ -262,17 +121,6 @@ public:
         void Reset() override
         {
             me->RestoreFaction();
-        }
-
-        void AttackedBy(Unit* pAttacker) override
-        {
-            if (me->GetVictim())
-                return;
-
-            if (me->IsFriendlyTo(pAttacker))
-                return;
-
-            AttackStart(pAttacker);
         }
 
         void DamageTaken(Unit* pDoneBy, uint32 &Damage) override
@@ -288,8 +136,18 @@ public:
                 EnterEvadeMode();
             }
         }
+
+        void QuestAccept(Player* /*player*/, Quest const* quest) override
+        {
+            if (quest->GetQuestId() == QUEST_MISSING_DIPLO_PT16)
+                me->SetFaction(FACTION_ENEMY);
+        }
     };
 
+    CreatureAI* GetAI(Creature* creature) const override
+    {
+        return new npc_private_hendelAI(creature);
+    }
 };
 
 /*######
@@ -342,7 +200,7 @@ public:
                 return;
 
             me->SetHomePosition(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), me->GetOrientation());
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
+            me->SetImmuneToPC(false);
             SetCombatMovement(true);
 
             if (me->IsInCombat())
@@ -369,132 +227,6 @@ public:
 
 };
 
-/*######
-## npc_stinky
-######*/
-
-enum Stinky
-{
-    QUEST_STINKYS_ESCAPE_H                       = 1270,
-    QUEST_STINKYS_ESCAPE_A                       = 1222,
-    SAY_QUEST_ACCEPTED                           = 0,
-    SAY_STAY_1                                   = 1,
-    SAY_STAY_2                                   = 2,
-    SAY_STAY_3                                   = 3,
-    SAY_STAY_4                                   = 4,
-    SAY_STAY_5                                   = 5,
-    SAY_STAY_6                                   = 6,
-    SAY_QUEST_COMPLETE                           = 7,
-    SAY_ATTACKED_1                               = 8,
-    EMOTE_DISAPPEAR                              = 9
-};
-
-class npc_stinky : public CreatureScript
-{
-public:
-   npc_stinky() : CreatureScript("npc_stinky") { }
-
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return new npc_stinkyAI(creature);
-    }
-
-    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) override
-    {
-         if (quest->GetQuestId() == QUEST_STINKYS_ESCAPE_H || quest->GetQuestId() == QUEST_STINKYS_ESCAPE_A)
-         {
-             if (npc_stinkyAI* pEscortAI = CAST_AI(npc_stinky::npc_stinkyAI, creature->AI()))
-             {
-                 creature->setFaction(FACTION_ESCORT_N_NEUTRAL_ACTIVE);
-                 creature->SetStandState(UNIT_STAND_STATE_STAND);
-                 creature->AI()->Talk(SAY_QUEST_ACCEPTED);
-                 pEscortAI->Start(false, false, player->GetGUID());
-             }
-         }
-         return true;
-    }
-
-    struct npc_stinkyAI : public npc_escortAI
-    {
-       npc_stinkyAI(Creature* creature) : npc_escortAI(creature) { }
-
-        void WaypointReached(uint32 waypointId) override
-        {
-            Player* player = GetPlayerForEscort();
-            if (!player)
-                return;
-
-            switch (waypointId)
-            {
-                case 7:
-                    Talk(SAY_STAY_1, player);
-                    break;
-                case 11:
-                    Talk(SAY_STAY_2, player);
-                    break;
-                case 25:
-                    Talk(SAY_STAY_3, player);
-                    break;
-                case 26:
-                    Talk(SAY_STAY_4, player);
-                    break;
-                case 27:
-                    Talk(SAY_STAY_5, player);
-                    break;
-                case 28:
-                    Talk(SAY_STAY_6, player);
-                    me->SetStandState(UNIT_STAND_STATE_KNEEL);
-                    break;
-                case 29:
-                    me->SetStandState(UNIT_STAND_STATE_STAND);
-                    break;
-                case 37:
-                    Talk(SAY_QUEST_COMPLETE, player);
-                    me->SetSpeed(MOVE_RUN, 1.2f, true);
-                    me->SetWalk(false);
-                    if (player->GetQuestStatus(QUEST_STINKYS_ESCAPE_H))
-                        player->GroupEventHappens(QUEST_STINKYS_ESCAPE_H, me);
-                    if (player->GetQuestStatus(QUEST_STINKYS_ESCAPE_A))
-                        player->GroupEventHappens(QUEST_STINKYS_ESCAPE_A, me);
-                    break;
-                case 39:
-                    Talk(EMOTE_DISAPPEAR);
-                    break;
-            }
-        }
-
-        void EnterCombat(Unit* who) override
-        {
-            Talk(SAY_ATTACKED_1, who);
-        }
-
-        void Reset() override { }
-
-        void JustDied(Unit* /*killer*/) override
-        {
-            Player* player = GetPlayerForEscort();
-            if (player && HasEscortState(STATE_ESCORT_ESCORTING))
-            {
-                if (player->GetQuestStatus(QUEST_STINKYS_ESCAPE_H))
-                    player->FailQuest(QUEST_STINKYS_ESCAPE_H);
-
-                if (player->GetQuestStatus(QUEST_STINKYS_ESCAPE_A))
-                    player->FailQuest(QUEST_STINKYS_ESCAPE_A);
-            }
-        }
-
-       void UpdateAI(uint32 uiDiff) override
-        {
-            npc_escortAI::UpdateAI(uiDiff);
-
-            if (!UpdateVictim())
-                return;
-
-            DoMeleeAttackIfReady();
-        }
-    };
-};
-
 enum SpellScripts
 {
     SPELL_OOZE_ZAP              = 42489,
@@ -514,9 +246,7 @@ class spell_ooze_zap : public SpellScriptLoader
 
             bool Validate(SpellInfo const* /*spellInfo*/) override
             {
-                if (!sSpellMgr->GetSpellInfo(SPELL_OOZE_ZAP))
-                    return false;
-                return true;
+                return ValidateSpellInfo({ SPELL_OOZE_ZAP });
             }
 
             SpellCastResult CheckRequirement()
@@ -561,9 +291,7 @@ class spell_ooze_zap_channel_end : public SpellScriptLoader
 
             bool Validate(SpellInfo const* /*spellInfo*/) override
             {
-                if (!sSpellMgr->GetSpellInfo(SPELL_OOZE_ZAP_CHANNEL_END))
-                    return false;
-                return true;
+                return ValidateSpellInfo({ SPELL_OOZE_ZAP_CHANNEL_END });
             }
 
             void HandleDummy(SpellEffIndex effIndex)
@@ -571,7 +299,7 @@ class spell_ooze_zap_channel_end : public SpellScriptLoader
                 PreventHitDefaultEffect(effIndex);
                 if (Player* player = GetCaster()->ToPlayer())
                     player->CastSpell(player, SPELL_OOZE_CHANNEL_CREDIT, true);
-                GetHitUnit()->Kill(GetHitUnit());
+                GetHitUnit()->KillSelf();
             }
 
             void Register() override
@@ -597,9 +325,7 @@ class spell_energize_aoe : public SpellScriptLoader
 
             bool Validate(SpellInfo const* /*spellInfo*/) override
             {
-                if (!sSpellMgr->GetSpellInfo(SPELL_ENERGIZED))
-                    return false;
-                return true;
+                return ValidateSpellInfo({ SPELL_ENERGIZED });
             }
 
             void FilterTargets(std::list<WorldObject*>& targets)
@@ -634,46 +360,12 @@ class spell_energize_aoe : public SpellScriptLoader
         }
 };
 
-/*######
-## go_blackhoof_cage
-######*/
-
-enum PrisonersOfTheGrimTotems
-{
-    NPC_THERAMORE_PRISONER                          = 23720,
-    SAY_FREE                                        = 0,
-};
-
-class go_blackhoof_cage : public GameObjectScript
-{
-public:
-    go_blackhoof_cage() : GameObjectScript("go_blackhoof_cage") { }
-
-    bool OnGossipHello(Player* player, GameObject* go) override
-    {
-        go->UseDoorOrButton();
-        if (Creature* prisoner = go->FindNearestCreature(NPC_THERAMORE_PRISONER, 1.0f))
-        {
-            if (player)
-                player->KilledMonsterCredit(NPC_THERAMORE_PRISONER);
-
-            prisoner->AI()->Talk(SAY_FREE); // We also emote cry here (handled in creature_text.emote)
-            prisoner->DespawnOrUnsummon(6000);
-        }
-        return true;
-    }
-};
-
 void AddSC_dustwallow_marsh()
 {
-    new npc_risen_husk_spirit();
-    new npc_lady_jaina_proudmoore();
     new npc_nat_pagle();
     new npc_private_hendel();
     new npc_zelfrax();
-    new npc_stinky();
     new spell_ooze_zap();
     new spell_ooze_zap_channel_end();
     new spell_energize_aoe();
-    new go_blackhoof_cage();
 }

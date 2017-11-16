@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -25,9 +25,9 @@
 
 struct CreatureData;
 
-class Transport : public GameObject, public TransportBase
+class TC_GAME_API Transport : public GameObject, public TransportBase
 {
-        friend Transport* TransportMgr::CreateTransport(uint32, uint32, Map*);
+        friend Transport* TransportMgr::CreateTransport(uint32, ObjectGuid::LowType, Map*);
 
         Transport();
     public:
@@ -35,10 +35,11 @@ class Transport : public GameObject, public TransportBase
 
         ~Transport();
 
-        bool Create(uint32 guidlow, uint32 entry, uint32 mapid, float x, float y, float z, float ang, uint32 animprogress);
+        bool Create(ObjectGuid::LowType guidlow, uint32 entry, uint32 mapid, float x, float y, float z, float ang, uint32 animprogress);
         void CleanupsBeforeDelete(bool finalCleanup = true) override;
 
         void Update(uint32 diff) override;
+        void DelayedUpdate(uint32 diff);
 
         void BuildUpdate(UpdateDataMapType& data_map) override;
 
@@ -46,8 +47,8 @@ class Transport : public GameObject, public TransportBase
         void RemovePassenger(WorldObject* passenger);
         PassengerSet const& GetPassengers() const { return _passengers; }
 
-        Creature* CreateNPCPassenger(uint32 guid, CreatureData const* data);
-        GameObject* CreateGOPassenger(uint32 guid, GameObjectData const* data);
+        Creature* CreateNPCPassenger(ObjectGuid::LowType guid, CreatureData const* data);
+        GameObject* CreateGOPassenger(ObjectGuid::LowType guid, GameObjectData const* data);
 
         /**
         * @fn bool Transport::SummonPassenger(uint64, Position const&, TempSummonType, SummonPropertiesEntry const*, uint32, Unit*, uint32, uint32)
@@ -65,21 +66,21 @@ class Transport : public GameObject, public TransportBase
         *
         * @return Summoned creature.
         */
-        TempSummon* SummonPassenger(uint32 entry, Position const& pos, TempSummonType summonType, SummonPropertiesEntry const* properties = NULL, uint32 duration = 0, Unit* summoner = NULL, uint32 spellId = 0, uint32 vehId = 0);
+        TempSummon* SummonPassenger(uint32 entry, Position const& pos, TempSummonType summonType, SummonPropertiesEntry const* properties = nullptr, uint32 duration = 0, Unit* summoner = nullptr, uint32 spellId = 0, uint32 vehId = 0);
 
         /// This method transforms supplied transport offsets into global coordinates
-        void CalculatePassengerPosition(float& x, float& y, float& z, float* o = NULL) const override
+        void CalculatePassengerPosition(float& x, float& y, float& z, float* o = nullptr) const override
         {
             TransportBase::CalculatePassengerPosition(x, y, z, o, GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation());
         }
 
         /// This method transforms supplied global coordinates into local offsets
-        void CalculatePassengerOffset(float& x, float& y, float& z, float* o = NULL) const override
+        void CalculatePassengerOffset(float& x, float& y, float& z, float* o = nullptr) const override
         {
             TransportBase::CalculatePassengerOffset(x, y, z, o, GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation());
         }
 
-        uint32 GetPeriod() const { return GetUInt32Value(GAMEOBJECT_LEVEL); }
+        uint32 GetTransportPeriod() const override { return GetUInt32Value(GAMEOBJECT_LEVEL); }
         void SetPeriod(uint32 period) { SetUInt32Value(GAMEOBJECT_LEVEL, period); }
         uint32 GetTimer() const { return GetGOValue()->Transport.PathProgress; }
 
@@ -103,6 +104,7 @@ class Transport : public GameObject, public TransportBase
         void MoveToNextWaypoint();
         float CalculateSegmentPos(float perc);
         bool TeleportTransport(uint32 newMapid, float x, float y, float z, float o);
+        void DelayedTeleportTransport();
         void UpdatePassengerPositions(PassengerSet& passengers);
         void DoEventIfAny(KeyFrame const& node, bool departure);
 
@@ -127,6 +129,7 @@ class Transport : public GameObject, public TransportBase
         PassengerSet _staticPassengers;
 
         bool _delayedAddModel;
+        bool _delayedTeleport;
 };
 
 #endif

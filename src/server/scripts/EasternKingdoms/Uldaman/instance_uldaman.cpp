@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2007 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -18,19 +18,28 @@
 
 /* ScriptData
 SDName: instance_uldaman
-SD%Complete: 99
+SD%Complete: 80%
 SDComment: Need some cosmetics updates when archeadas door are closing (Guardians Waypoints).
 SDCategory: Uldaman
 EndScriptData */
 
 #include "ScriptMgr.h"
+#include "Creature.h"
+#include "CreatureAI.h"
+#include "GameObject.h"
 #include "InstanceScript.h"
+#include "Log.h"
+#include "Map.h"
+#include "MotionMaster.h"
+#include "ObjectAccessor.h"
 #include "uldaman.h"
 
 enum Spells
 {
     SPELL_ARCHAEDAS_AWAKEN      = 10347,
     SPELL_AWAKEN_VAULT_WALKER   = 10258,
+    SPELL_FREEZE_ANIM           = 16245,
+    SPELL_MINION_FREEZE_ANIM    = 10255
 };
 
 enum Events
@@ -38,10 +47,17 @@ enum Events
     EVENT_SUB_BOSS_AGGRO        = 2228
 };
 
+enum IronayaTalk
+{
+    SAY_AGGRO = 0
+};
+
+const Position IronayaPoint = { -231.228f, 246.6135f, -49.01617f, 0.0f };
+
 class instance_uldaman : public InstanceMapScript
 {
     public:
-        instance_uldaman() : InstanceMapScript("instance_uldaman", 70) { }
+        instance_uldaman() : InstanceMapScript(UldamanScriptName, 70) { }
 
         struct instance_uldaman_InstanceMapScript : public InstanceScript
         {
@@ -134,11 +150,11 @@ class instance_uldaman : public InstanceMapScript
 
             void SetFrozenState(Creature* creature)
             {
-                creature->setFaction(35);
+                creature->SetFaction(FACTION_FRIENDLY);
                 creature->RemoveAllAuras();
-                //creature->RemoveFlag (UNIT_FIELD_FLAGS, UNIT_FLAG_ANIMATION_FROZEN);
                 creature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                creature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);
+                creature->SetControlled(true, UNIT_STATE_ROOT);
+                creature->AddAura(SPELL_MINION_FREEZE_ANIM, creature);
             }
 
             void SetDoor(ObjectGuid guid, bool open)
@@ -168,9 +184,11 @@ class instance_uldaman : public InstanceMapScript
                         Creature* target = instance->GetCreature(*i);
                         if (!target || !target->IsAlive())
                             continue;
-                        target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);
-                        target->setFaction(14);
+                        target->SetControlled(false, UNIT_STATE_ROOT);
+                        target->SetFaction(FACTION_MONSTER);
                         target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                        target->RemoveAura(SPELL_MINION_FREEZE_ANIM);
+
                         return;        // only want the first one we find
                     }
                     // if we get this far than all four are dead so open the door
@@ -188,13 +206,15 @@ class instance_uldaman : public InstanceMapScript
                 for (GuidVector::const_iterator i = archaedasWallMinions.begin(); i != archaedasWallMinions.end(); ++i)
                 {
                     Creature* target = instance->GetCreature(*i);
-                    if (!target || !target->IsAlive() || target->getFaction() == 14)
+                    if (!target || !target->IsAlive() || target->GetFaction() == FACTION_MONSTER)
                         continue;
+                    target->SetControlled(false, UNIT_STATE_ROOT);
+                    target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                    target->SetFaction(FACTION_MONSTER);
+                    target->RemoveAura(SPELL_MINION_FREEZE_ANIM);
                     archaedas->CastSpell(target, SPELL_AWAKEN_VAULT_WALKER, true);
                     target->CastSpell(target, SPELL_ARCHAEDAS_AWAKEN, true);
-                    target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);
-                    target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                    target->setFaction(14);
+
                     return;        // only want the first one we find
                 }
             }
@@ -206,30 +226,30 @@ class instance_uldaman : public InstanceMapScript
                 for (GuidVector::const_iterator i = archaedasWallMinions.begin(); i != archaedasWallMinions.end(); ++i)
                 {
                     Creature* target = instance->GetCreature(*i);
-                    if (!target || target->isDead() || target->getFaction() != 14)
+                    if (!target || target->isDead() || target->GetFaction() != 14)
                         continue;
-                    target->setDeathState(JUST_DIED);
-                    target->RemoveCorpse();
+
+                    target->DespawnOrUnsummon();
                 }
 
                 // Vault Walkers
                 for (GuidVector::const_iterator i = vaultWalkers.begin(); i != vaultWalkers.end(); ++i)
                 {
                     Creature* target = instance->GetCreature(*i);
-                    if (!target || target->isDead() || target->getFaction() != 14)
+                    if (!target || target->isDead() || target->GetFaction() != 14)
                         continue;
-                    target->setDeathState(JUST_DIED);
-                    target->RemoveCorpse();
+
+                    target->DespawnOrUnsummon();
                 }
 
                 // Earthen Guardians
                 for (GuidVector::const_iterator i = earthenGuardians.begin(); i != earthenGuardians.end(); ++i)
                 {
                     Creature* target = instance->GetCreature(*i);
-                    if (!target || target->isDead() || target->getFaction() != 14)
+                    if (!target || target->isDead() || target->GetFaction() != 14)
                         continue;
-                    target->setDeathState(JUST_DIED);
-                    target->RemoveCorpse();
+
+                    target->DespawnOrUnsummon();
                 }
             }
 
@@ -241,6 +261,7 @@ class instance_uldaman : public InstanceMapScript
 
                 if (ObjectAccessor::GetUnit(*archaedas, target))
                 {
+                    archaedas->RemoveAura(SPELL_FREEZE_ANIM);
                     archaedas->CastSpell(archaedas, SPELL_ARCHAEDAS_AWAKEN, false);
                     whoWokeuiArchaedasGUID = target;
                 }
@@ -252,9 +273,15 @@ class instance_uldaman : public InstanceMapScript
                 if (!ironaya)
                     return;
 
-                ironaya->setFaction(415);
-                ironaya->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE);
+                ironaya->SetFaction(FACTION_TITAN);
+                ironaya->SetControlled(false, UNIT_STATE_ROOT);
                 ironaya->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+
+                ironaya->GetMotionMaster()->Clear();
+                ironaya->GetMotionMaster()->MovePoint(0, IronayaPoint);
+                ironaya->SetHomePosition(IronayaPoint);
+
+                ironaya->AI()->Talk(SAY_AGGRO);
             }
 
             void RespawnMinions()
@@ -395,7 +422,7 @@ class instance_uldaman : public InstanceMapScript
                 return str_data;
             }
 
-            void Load(const char* in) override
+            void Load(char const* in) override
             {
                 if (!in)
                 {

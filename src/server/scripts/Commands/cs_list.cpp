@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,34 +23,42 @@ Category: commandscripts
 EndScriptData */
 
 #include "ScriptMgr.h"
+#include "CharacterCache.h"
 #include "Chat.h"
-#include "SpellAuraEffects.h"
+#include "Creature.h"
+#include "DatabaseEnv.h"
+#include "DBCStores.h"
+#include "GameObject.h"
 #include "Language.h"
+#include "MapManager.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "Player.h"
-#include <iostream>
+#include "Random.h"
+#include "RBAC.h"
+#include "SpellAuraEffects.h"
+#include "WorldSession.h"
 
 class list_commandscript : public CommandScript
 {
 public:
     list_commandscript() : CommandScript("list_commandscript") { }
 
-    ChatCommand* GetCommands() const override
+    std::vector<ChatCommand> GetCommands() const override
     {
-        static ChatCommand listCommandTable[] =
+        static std::vector<ChatCommand> listCommandTable =
         {
-            { "creature", rbac::RBAC_PERM_COMMAND_LIST_CREATURE, true, &HandleListCreatureCommand, "", NULL },
-            { "item",     rbac::RBAC_PERM_COMMAND_LIST_ITEM,     true, &HandleListItemCommand,     "", NULL },
-            { "object",   rbac::RBAC_PERM_COMMAND_LIST_OBJECT,   true, &HandleListObjectCommand,   "", NULL },
-            { "auras",    rbac::RBAC_PERM_COMMAND_LIST_AURAS,   false, &HandleListAurasCommand,    "", NULL },
-            { "mail",     rbac::RBAC_PERM_COMMAND_LIST_MAIL,     true, &HandleListMailCommand,     "", NULL },
-            { NULL,       0,                              false, NULL,                       "", NULL }
+            { "creature",    rbac::RBAC_PERM_COMMAND_LIST_CREATURE,    true,  &HandleListCreatureCommand,    "" },
+            { "item",        rbac::RBAC_PERM_COMMAND_LIST_ITEM,        true,  &HandleListItemCommand,        "" },
+            { "object",      rbac::RBAC_PERM_COMMAND_LIST_OBJECT,      true,  &HandleListObjectCommand,      "" },
+            { "auras",       rbac::RBAC_PERM_COMMAND_LIST_AURAS,       false, &HandleListAurasCommand,       "" },
+            { "mail",        rbac::RBAC_PERM_COMMAND_LIST_MAIL,        true,  &HandleListMailCommand,        "" },
+            { "spawnpoints", rbac::RBAC_PERM_COMMAND_LIST_SPAWNPOINTS, false, &HandleListSpawnPointsCommand, "" },
+            { "respawns",    rbac::RBAC_PERM_COMMAND_LIST_RESPAWNS,    false, &HandleListRespawnsCommand,    "" },
         };
-        static ChatCommand commandTable[] =
+        static std::vector<ChatCommand> commandTable =
         {
-            { "list", rbac::RBAC_PERM_COMMAND_LIST,true, NULL, "", listCommandTable },
-            { NULL,   0,                    false, NULL, "", NULL }
+            { "list", rbac::RBAC_PERM_COMMAND_LIST,true, nullptr, "", listCommandTable },
         };
         return commandTable;
     }
@@ -65,7 +73,7 @@ public:
         if (!id)
             return false;
 
-        uint32 creatureId = atol(id);
+        uint32 creatureId = atoul(id);
         if (!creatureId)
         {
             handler->PSendSysMessage(LANG_COMMAND_INVALIDCREATUREID, creatureId);
@@ -81,8 +89,8 @@ public:
             return false;
         }
 
-        char* countStr = strtok(NULL, " ");
-        uint32 count = countStr ? atol(countStr) : 10;
+        char* countStr = strtok(nullptr, " ");
+        uint32 count = countStr ? atoul(countStr) : 10;
 
         if (count == 0)
             return false;
@@ -109,16 +117,45 @@ public:
             do
             {
                 Field* fields   = result->Fetch();
-                uint32 guid     = fields[0].GetUInt32();
+                ObjectGuid::LowType guid = fields[0].GetUInt32();
                 float x         = fields[1].GetFloat();
                 float y         = fields[2].GetFloat();
                 float z         = fields[3].GetFloat();
                 uint16 mapId    = fields[4].GetUInt16();
+                bool liveFound = false;
 
+                // Get map (only support base map from console)
+                Map* thisMap;
                 if (handler->GetSession())
-                    handler->PSendSysMessage(LANG_CREATURE_LIST_CHAT, guid, guid, cInfo->Name.c_str(), x, y, z, mapId);
+                    thisMap = handler->GetSession()->GetPlayer()->GetMap();
                 else
-                    handler->PSendSysMessage(LANG_CREATURE_LIST_CONSOLE, guid, cInfo->Name.c_str(), x, y, z, mapId);
+                    thisMap = sMapMgr->FindBaseNonInstanceMap(mapId);
+
+                // If map found, try to find active version of this creature
+                if (thisMap)
+                {
+                    auto const creBounds = thisMap->GetCreatureBySpawnIdStore().equal_range(guid);
+                    if (creBounds.first != creBounds.second)
+                    {
+                        for (std::unordered_multimap<uint32, Creature*>::const_iterator itr = creBounds.first; itr != creBounds.second;)
+                        {
+                            if (handler->GetSession())
+                                handler->PSendSysMessage(LANG_CREATURE_LIST_CHAT, guid, guid, cInfo->Name.c_str(), x, y, z, mapId, itr->second->GetGUID().ToString().c_str(), itr->second->IsAlive() ? "*" : " ");
+                            else
+                                handler->PSendSysMessage(LANG_CREATURE_LIST_CONSOLE, guid, cInfo->Name.c_str(), x, y, z, mapId, itr->second->GetGUID().ToString().c_str(), itr->second->IsAlive() ? "*" : " ");
+                            ++itr;
+                        }
+                        liveFound = true;
+                    }
+                }
+
+                if (!liveFound)
+                {
+                    if (handler->GetSession())
+                        handler->PSendSysMessage(LANG_CREATURE_LIST_CHAT, guid, guid, cInfo->Name.c_str(), x, y, z, mapId, "", "");
+                    else
+                        handler->PSendSysMessage(LANG_CREATURE_LIST_CONSOLE, guid, cInfo->Name.c_str(), x, y, z, mapId, "", "");
+                }
             }
             while (result->NextRow());
         }
@@ -133,11 +170,11 @@ public:
         if (!*args)
             return false;
 
-        char* id = handler->extractKeyFromLink((char*)args, "Hitem");
+        char const* id = handler->extractKeyFromLink((char*)args, "Hitem");
         if (!id)
             return false;
 
-        uint32 itemId = atol(id);
+        uint32 itemId = atoul(id);
         if (!itemId)
         {
             handler->PSendSysMessage(LANG_COMMAND_ITEMIDINVALID, itemId);
@@ -153,8 +190,8 @@ public:
             return false;
         }
 
-        char* countStr = strtok(NULL, " ");
-        uint32 count = countStr ? atol(countStr) : 10;
+        char* countStr = strtok(nullptr, " ");
+        uint32 count = countStr ? atoul(countStr) : 10;
 
         if (count == 0)
             return false;
@@ -228,15 +265,15 @@ public:
             result = CharacterDatabase.Query(stmt);
         }
         else
-            result = PreparedQueryResult(NULL);
+            result = PreparedQueryResult(nullptr);
 
         if (result)
         {
             do
             {
                 Field* fields                   = result->Fetch();
-                uint32 itemGuid                 = fields[0].GetUInt32();
-                uint32 itemSender               = fields[1].GetUInt32();
+                ObjectGuid::LowType itemGuid                 = fields[0].GetUInt32();
+                ObjectGuid::LowType itemSender               = fields[1].GetUInt32();
                 uint32 itemReceiver             = fields[2].GetUInt32();
                 uint32 itemSenderAccountId      = fields[3].GetUInt32();
                 std::string itemSenderName      = fields[4].GetString();
@@ -275,7 +312,7 @@ public:
             result = CharacterDatabase.Query(stmt);
         }
         else
-            result = PreparedQueryResult(NULL);
+            result = PreparedQueryResult(nullptr);
 
         if (result)
         {
@@ -354,7 +391,7 @@ public:
         if (!id)
             return false;
 
-        uint32 gameObjectId = atol(id);
+        uint32 gameObjectId = atoul(id);
         if (!gameObjectId)
         {
             handler->PSendSysMessage(LANG_COMMAND_LISTOBJINVALIDID, gameObjectId);
@@ -370,8 +407,8 @@ public:
             return false;
         }
 
-        char* countStr = strtok(NULL, " ");
-        uint32 count = countStr ? atol(countStr) : 10;
+        char* countStr = strtok(nullptr, " ");
+        uint32 count = countStr ? atoul(countStr) : 10;
 
         if (count == 0)
             return false;
@@ -398,17 +435,46 @@ public:
             do
             {
                 Field* fields   = result->Fetch();
-                uint32 guid     = fields[0].GetUInt32();
+                ObjectGuid::LowType guid = fields[0].GetUInt32();
                 float x         = fields[1].GetFloat();
                 float y         = fields[2].GetFloat();
                 float z         = fields[3].GetFloat();
                 uint16 mapId    = fields[4].GetUInt16();
                 uint32 entry    = fields[5].GetUInt32();
+                bool liveFound = false;
 
+                // Get map (only support base map from console)
+                Map* thisMap;
                 if (handler->GetSession())
-                    handler->PSendSysMessage(LANG_GO_LIST_CHAT, guid, entry, guid, gInfo->name.c_str(), x, y, z, mapId);
+                    thisMap = handler->GetSession()->GetPlayer()->GetMap();
                 else
-                    handler->PSendSysMessage(LANG_GO_LIST_CONSOLE, guid, gInfo->name.c_str(), x, y, z, mapId);
+                    thisMap = sMapMgr->FindBaseNonInstanceMap(mapId);
+
+                // If map found, try to find active version of this object
+                if (thisMap)
+                {
+                    auto const goBounds = thisMap->GetGameObjectBySpawnIdStore().equal_range(guid);
+                    if (goBounds.first != goBounds.second)
+                    {
+                        for (std::unordered_multimap<uint32, GameObject*>::const_iterator itr = goBounds.first; itr != goBounds.second;)
+                        {
+                            if (handler->GetSession())
+                                handler->PSendSysMessage(LANG_GO_LIST_CHAT, guid, entry, guid, gInfo->name.c_str(), x, y, z, mapId, itr->second->GetGUID().ToString().c_str(), itr->second->isSpawned() ? "*" : " ");
+                            else
+                                handler->PSendSysMessage(LANG_GO_LIST_CONSOLE, guid, gInfo->name.c_str(), x, y, z, mapId, itr->second->GetGUID().ToString().c_str(), itr->second->isSpawned() ? "*" : " ");
+                            ++itr;
+                        }
+                        liveFound = true;
+                    }
+                }
+
+                if (!liveFound)
+                {
+                    if (handler->GetSession())
+                        handler->PSendSysMessage(LANG_GO_LIST_CHAT, guid, entry, guid, gInfo->name.c_str(), x, y, z, mapId, "", "");
+                    else
+                        handler->PSendSysMessage(LANG_GO_LIST_CONSOLE, guid, gInfo->name.c_str(), x, y, z, mapId, "", "");
+                }
             }
             while (result->NextRow());
         }
@@ -471,14 +537,14 @@ public:
         Player* target;
         ObjectGuid targetGuid;
         std::string targetName;
-        PreparedStatement* stmt = NULL;
+        PreparedStatement* stmt = nullptr;
 
         if (!*args)
             return false;
 
-        ObjectGuid parseGUID(HIGHGUID_PLAYER, uint32(atol((char*)args)));
+        ObjectGuid parseGUID(HighGuid::Player, uint32(atoul(args)));
 
-        if (sObjectMgr->GetPlayerNameByGUID(parseGUID, targetName))
+        if (sCharacterCache->GetCharacterNameByGuid(parseGUID, targetName))
         {
             target = ObjectAccessor::FindPlayer(parseGUID);
             targetGuid = parseGUID;
@@ -500,7 +566,7 @@ public:
 
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_MAIL_LIST_INFO);
             stmt->setUInt32(0, targetGuid.GetCounter());
-            PreparedQueryResult queryResult = CharacterDatabase.Query(stmt);
+            queryResult = CharacterDatabase.Query(stmt);
 
             if (queryResult)
             {
@@ -534,7 +600,7 @@ public:
                         {
                             do
                             {
-                                uint32 item_guid = (*result2)[0].GetUInt32();
+                                ObjectGuid::LowType item_guid = (*result2)[0].GetUInt32();
                                 stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_MAIL_LIST_ITEMS);
                                 stmt->setUInt32(0, item_guid);
                                 PreparedQueryResult result3 = CharacterDatabase.Query(stmt);
@@ -578,7 +644,103 @@ public:
             handler->PSendSysMessage(LANG_LIST_MAIL_NOT_FOUND);
         return true;
     }
+
+    static bool HandleListSpawnPointsCommand(ChatHandler* handler, char const* /*args*/)
+    {
+        Player const* player = handler->GetSession()->GetPlayer();
+        Map const* map = player->GetMap();
+        uint32 const mapId = map->GetId();
+        bool const showAll = map->IsBattlegroundOrArena() || map->IsDungeon();
+        handler->PSendSysMessage("Listing all spawn points in map %u (%s)%s:", mapId, map->GetMapName(), showAll ? "" : " within 5000yd");
+        for (auto const& pair : sObjectMgr->GetAllCreatureData())
+        {
+            SpawnData const& data = pair.second;
+            if (data.spawnPoint.GetMapId() != mapId)
+                continue;
+            CreatureTemplate const* cTemp = sObjectMgr->GetCreatureTemplate(data.id);
+            if (!cTemp)
+                continue;
+            if (showAll || data.spawnPoint.IsInDist2d(player, 5000.0))
+                handler->PSendSysMessage("Type: %u | SpawnId: %u | Entry: %u (%s) | X: %.3f | Y: %.3f | Z: %.3f", uint32(data.type), data.spawnId, data.id, cTemp->Name.c_str(), data.spawnPoint.GetPositionX(), data.spawnPoint.GetPositionY(), data.spawnPoint.GetPositionZ());
+        }
+        for (auto const& pair : sObjectMgr->GetAllGameObjectData())
+        {
+            SpawnData const& data = pair.second;
+            if (data.spawnPoint.GetMapId() != mapId)
+                continue;
+            GameObjectTemplate const* goTemp = sObjectMgr->GetGameObjectTemplate(data.id);
+            if (!goTemp)
+                continue;
+            if (showAll || data.spawnPoint.IsInDist2d(player, 5000.0))
+                handler->PSendSysMessage("Type: %u | SpawnId: %u | Entry: %u (%s) | X: %.3f | Y: %.3f | Z: %.3f", uint32(data.type), data.spawnId, data.id, goTemp->name.c_str(), data.spawnPoint.GetPositionX(), data.spawnPoint.GetPositionY(), data.spawnPoint.GetPositionZ());
+        }
+        return true;
+    }
+
+    static char const* GetZoneName(uint32 zoneId, LocaleConstant locale)
+    {
+        AreaTableEntry const* zoneEntry = sAreaTableStore.LookupEntry(zoneId);
+        return zoneEntry ? zoneEntry->area_name[locale] : "<unknown zone>";
+    }
+    static bool HandleListRespawnsCommand(ChatHandler* handler, char const* args)
+    {
+        Player const* player = handler->GetSession()->GetPlayer();
+        Map const* map = player->GetMap();
+        uint32 range = 0;
+        if (*args)
+            range = atoi((char*)args);
+
+        RespawnVector respawns;
+        LocaleConstant locale = handler->GetSession()->GetSessionDbcLocale();
+        char const* stringOverdue = sObjectMgr->GetTrinityString(LANG_LIST_RESPAWNS_OVERDUE, locale);
+        char const* stringCreature = sObjectMgr->GetTrinityString(LANG_LIST_RESPAWNS_CREATURES, locale);
+        char const* stringGameobject = sObjectMgr->GetTrinityString(LANG_LIST_RESPAWNS_GAMEOBJECTS, locale);
+
+        uint32 zoneId = player->GetZoneId();
+        if (range)
+            handler->PSendSysMessage(LANG_LIST_RESPAWNS_RANGE, stringCreature, range);
+        else
+            handler->PSendSysMessage(LANG_LIST_RESPAWNS_ZONE, stringCreature, GetZoneName(zoneId, handler->GetSessionDbcLocale()), zoneId);
+        handler->PSendSysMessage(LANG_LIST_RESPAWNS_LISTHEADER);
+        map->GetRespawnInfo(respawns, SPAWN_TYPEMASK_CREATURE, range ? 0 : zoneId);
+        for (RespawnInfo* ri : respawns)
+        {
+            CreatureData const* data = sObjectMgr->GetCreatureData(ri->spawnId);
+            if (!data)
+                continue;
+            if (range && !player->IsInDist(data->spawnPoint, range))
+                continue;
+            uint32 gridY = ri->gridId / MAX_NUMBER_OF_GRIDS;
+            uint32 gridX = ri->gridId % MAX_NUMBER_OF_GRIDS;
+
+            std::string respawnTime = ri->respawnTime > time(NULL) ? secsToTimeString(uint64(ri->respawnTime - time(NULL)), true) : stringOverdue;
+            handler->PSendSysMessage("%u | %u | [%02u,%02u] | %s (%u) | %s", ri->spawnId, ri->entry, gridX, gridY, GetZoneName(ri->zoneId, handler->GetSessionDbcLocale()), ri->zoneId, map->IsSpawnGroupActive(data->spawnGroupData->groupId) ? respawnTime.c_str() : "inactive");
+        }
+
+        respawns.clear();
+        if (range)
+            handler->PSendSysMessage(LANG_LIST_RESPAWNS_RANGE, stringGameobject, range);
+        else
+            handler->PSendSysMessage(LANG_LIST_RESPAWNS_ZONE, stringGameobject, GetZoneName(zoneId, handler->GetSessionDbcLocale()), zoneId);
+        handler->PSendSysMessage(LANG_LIST_RESPAWNS_LISTHEADER);
+        map->GetRespawnInfo(respawns, SPAWN_TYPEMASK_GAMEOBJECT, range ? 0 : zoneId);
+        for (RespawnInfo* ri : respawns)
+        {
+            GameObjectData const* data = sObjectMgr->GetGameObjectData(ri->spawnId);
+            if (!data)
+                continue;
+            if (range && !player->IsInDist(data->spawnPoint, range))
+                continue;
+            uint32 gridY = ri->gridId / MAX_NUMBER_OF_GRIDS;
+            uint32 gridX = ri->gridId % MAX_NUMBER_OF_GRIDS;
+
+            std::string respawnTime = ri->respawnTime > time(NULL) ? secsToTimeString(uint64(ri->respawnTime - time(NULL)), true) : stringOverdue;
+            handler->PSendSysMessage("%u | %u | [% 02u, % 02u] | %s (%u) | %s", ri->spawnId, ri->entry, gridX, gridY, GetZoneName(ri->zoneId, handler->GetSessionDbcLocale()), ri->zoneId, map->IsSpawnGroupActive(data->spawnGroupData->groupId) ? respawnTime.c_str() : "inactive");
+        }
+        return true;
+    }
 };
+
 
 void AddSC_list_commandscript()
 {

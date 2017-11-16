@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,16 +16,30 @@
  */
 
 #include "ScriptMgr.h"
-#include "OutdoorPvPSI.h"
-#include "WorldPacket.h"
-#include "Player.h"
+#include "DBCStores.h"
 #include "GameObject.h"
-#include "MapManager.h"
+#include "Language.h"
+#include "Map.h"
 #include "ObjectMgr.h"
 #include "OutdoorPvPMgr.h"
+#include "OutdoorPvPSI.h"
+#include "Player.h"
 #include "ReputationMgr.h"
-#include "Language.h"
 #include "World.h"
+#include "WorldPacket.h"
+
+uint32 const SI_MAX_RESOURCES = 200;
+
+uint32 const SI_AREATRIGGER_H = 4168;
+uint32 const SI_AREATRIGGER_A = 4162;
+
+uint32 const SI_TURNIN_QUEST_CM_A = 17090;
+uint32 const SI_TURNIN_QUEST_CM_H = 18199;
+
+uint32 const SI_SILITHYST_MOUND = 181597;
+
+uint8 const OutdoorPvPSIBuffZonesNum = 3;
+uint32 const OutdoorPvPSIBuffZones[OutdoorPvPSIBuffZonesNum] = { 1377, 3428, 3429 };
 
 OutdoorPvPSI::OutdoorPvPSI()
 {
@@ -58,6 +72,8 @@ void OutdoorPvPSI::UpdateWorldState()
 
 bool OutdoorPvPSI::SetupOutdoorPvP()
 {
+    SetMapFromZone(OutdoorPvPSIBuffZones[0]);
+
     for (uint8 i = 0; i < OutdoorPvPSIBuffZonesNum; ++i)
         RegisterZone(OutdoorPvPSIBuffZones[i]);
     return true;
@@ -105,7 +121,7 @@ bool OutdoorPvPSI::HandleAreaTrigger(Player* player, uint32 trigger)
             // reward player
             player->CastSpell(player, SI_TRACES_OF_SILITHYST, true);
             // add 19 honor
-            player->RewardHonor(NULL, 1, 19);
+            player->RewardHonor(nullptr, 1, 19);
             // add 20 cenarion circle repu
             player->GetReputationMgr().ModifyReputation(sFactionStore.LookupEntry(609), 20);
             // complete quest
@@ -131,7 +147,7 @@ bool OutdoorPvPSI::HandleAreaTrigger(Player* player, uint32 trigger)
             // reward player
             player->CastSpell(player, SI_TRACES_OF_SILITHYST, true);
             // add 19 honor
-            player->RewardHonor(NULL, 1, 19);
+            player->RewardHonor(nullptr, 1, 19);
             // add 20 cenarion circle repu
             player->GetReputationMgr().ModifyReputation(sFactionStore.LookupEntry(609), 20);
             // complete quest
@@ -149,7 +165,7 @@ bool OutdoorPvPSI::HandleDropFlag(Player* player, uint32 spellId)
         // if it was dropped away from the player's turn-in point, then create a silithyst mound, if it was dropped near the areatrigger, then it was dispelled by the outdoorpvp, so do nothing
         switch (player->GetTeam())
         {
-        case ALLIANCE:
+            case ALLIANCE:
             {
                 AreaTriggerEntry const* atEntry = sAreaTriggerStore.LookupEntry(SI_AREATRIGGER_A);
                 if (atEntry)
@@ -160,13 +176,8 @@ bool OutdoorPvPSI::HandleDropFlag(Player* player, uint32 spellId)
                         // he dropped it further, summon mound
                         GameObject* go = new GameObject;
                         Map* map = player->GetMap();
-                        if (!map)
-                        {
-                            delete go;
-                            return true;
-                        }
 
-                        if (!go->Create(sObjectMgr->GenerateLowGuid(HIGHGUID_GAMEOBJECT), SI_SILITHYST_MOUND, map, player->GetPhaseMask(), player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), player->GetOrientation(), 0, 0, 0, 0, 100, GO_STATE_READY))
+                        if (!go->Create(map->GenerateLowGuid<HighGuid::GameObject>(), SI_SILITHYST_MOUND, map, player->GetPhaseMask(), *player, QuaternionData(), 255, GO_STATE_READY))
                         {
                             delete go;
                             return true;
@@ -181,9 +192,9 @@ bool OutdoorPvPSI::HandleDropFlag(Player* player, uint32 spellId)
                         }
                     }
                 }
+                break;
             }
-            break;
-        case HORDE:
+            case HORDE:
             {
                 AreaTriggerEntry const* atEntry = sAreaTriggerStore.LookupEntry(SI_AREATRIGGER_H);
                 if (atEntry)
@@ -194,13 +205,8 @@ bool OutdoorPvPSI::HandleDropFlag(Player* player, uint32 spellId)
                         // he dropped it further, summon mound
                         GameObject* go = new GameObject;
                         Map* map = player->GetMap();
-                        if (!map)
-                        {
-                            delete go;
-                            return true;
-                        }
 
-                        if (!go->Create(sObjectMgr->GenerateLowGuid(HIGHGUID_GAMEOBJECT), SI_SILITHYST_MOUND, map, player->GetPhaseMask(), player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), player->GetOrientation(), 0, 0, 0, 0, 100, GO_STATE_READY))
+                        if (!go->Create(map->GenerateLowGuid<HighGuid::GameObject>(), SI_SILITHYST_MOUND, map, player->GetPhaseMask(), *player, QuaternionData(), 255, GO_STATE_READY))
                         {
                             delete go;
                             return true;
@@ -215,8 +221,8 @@ bool OutdoorPvPSI::HandleDropFlag(Player* player, uint32 spellId)
                         }
                     }
                 }
+                break;
             }
-            break;
         }
         return true;
     }

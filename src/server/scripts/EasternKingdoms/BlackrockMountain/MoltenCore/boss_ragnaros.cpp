@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -24,8 +24,11 @@ SDCategory: Molten Core
 EndScriptData */
 
 #include "ScriptMgr.h"
-#include "ScriptedCreature.h"
+#include "InstanceScript.h"
 #include "molten_core.h"
+#include "ObjectAccessor.h"
+#include "ScriptedCreature.h"
+#include "TemporarySummon.h"
 
 enum Texts
 {
@@ -86,6 +89,7 @@ class boss_ragnaros : public CreatureScript
                 _introState = 0;
                 me->SetReactState(REACT_PASSIVE);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                SetCombatMovement(false);
             }
 
             void Initialize()
@@ -159,6 +163,7 @@ class boss_ragnaros : public CreatureScript
                         case EVENT_INTRO_5:
                             me->SetReactState(REACT_AGGRESSIVE);
                             me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                            me->SetImmuneToPC(false);
                             _introState = 2;
                             break;
                         default:
@@ -172,7 +177,7 @@ class boss_ragnaros : public CreatureScript
                     {
                         //Become unbanished again
                         me->SetReactState(REACT_AGGRESSIVE);
-                        me->setFaction(14);
+                        me->SetFaction(FACTION_MONSTER);
                         me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                         me->SetUInt32Value(UNIT_NPC_EMOTESTATE, 0);
                         me->HandleEmoteCommand(EMOTE_ONESHOT_EMERGE);
@@ -225,7 +230,7 @@ class boss_ragnaros : public CreatureScript
                                 events.ScheduleEvent(EVENT_ELEMENTAL_FIRE, urand(10000, 14000));
                                 break;
                             case EVENT_MAGMA_BLAST:
-                                if (me->IsWithinMeleeRange(me->GetVictim()))
+                                if (!me->IsWithinMeleeRange(me->GetVictim()))
                                 {
                                     DoCastVictim(SPELL_MAGMA_BLAST);
                                     if (!_hasYelledMagmaBurst)
@@ -245,12 +250,12 @@ class boss_ragnaros : public CreatureScript
                                     //is not very well supported in the core //no it really isnt
                                     //so added normaly spawning and banish workaround and attack again after 90 secs.
                                     me->AttackStop();
-                                    DoResetThreat();
+                                    ResetThreatList();
                                     me->SetReactState(REACT_PASSIVE);
                                     me->InterruptNonMeleeSpells(false);
                                     //Root self
                                     //DoCast(me, 23973);
-                                    me->setFaction(35);
+                                    me->SetFaction(FACTION_FRIENDLY);
                                     me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
                                     me->SetUInt32Value(UNIT_NPC_EMOTESTATE, EMOTE_STATE_SUBMERGED);
                                     me->HandleEmoteCommand(EMOTE_ONESHOT_SUBMERGE);
@@ -308,7 +313,7 @@ class boss_ragnaros : public CreatureScript
 
         CreatureAI* GetAI(Creature* creature) const override
         {
-            return GetInstanceAI<boss_ragnarosAI>(creature);
+            return GetMoltenCoreAI<boss_ragnarosAI>(creature);
         }
 };
 
@@ -343,7 +348,7 @@ class npc_son_of_flame : public CreatureScript
 
         CreatureAI* GetAI(Creature* creature) const override
         {
-            return GetInstanceAI<npc_son_of_flameAI>(creature);
+            return GetMoltenCoreAI<npc_son_of_flameAI>(creature);
         }
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -29,9 +29,10 @@ npc_rinji
 EndContentData */
 
 #include "ScriptMgr.h"
-#include "ScriptedCreature.h"
-#include "ScriptedEscortAI.h"
+#include "GameObject.h"
+#include "MotionMaster.h"
 #include "Player.h"
+#include "ScriptedEscortAI.h"
 
 /*######
 ## npc_oox09hl
@@ -46,9 +47,7 @@ enum OOX
     SAY_OOX_END             = 4,
     QUEST_RESQUE_OOX_09     = 836,
     NPC_MARAUDING_OWL       = 7808,
-    NPC_VILE_AMBUSHER       = 7809,
-    FACTION_ESCORTEE_A      = 774,
-    FACTION_ESCORTEE_H      = 775
+    NPC_VILE_AMBUSHER       = 7809
 };
 
 class npc_oox09hl : public CreatureScript
@@ -56,9 +55,9 @@ class npc_oox09hl : public CreatureScript
 public:
     npc_oox09hl() : CreatureScript("npc_oox09hl") { }
 
-    struct npc_oox09hlAI : public npc_escortAI
+    struct npc_oox09hlAI : public EscortAI
     {
-        npc_oox09hlAI(Creature* creature) : npc_escortAI(creature) { }
+        npc_oox09hlAI(Creature* creature) : EscortAI(creature) { }
 
         void Reset() override { }
 
@@ -75,18 +74,18 @@ public:
             summoned->GetMotionMaster()->MovePoint(0, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ());
         }
 
-        void sQuestAccept(Player* player, Quest const* quest)
+        void QuestAccept(Player* player, Quest const* quest) override
         {
             if (quest->GetQuestId() == QUEST_RESQUE_OOX_09)
             {
                 me->SetStandState(UNIT_STAND_STATE_STAND);
-                me->setFaction(player->GetTeam() == ALLIANCE ? FACTION_ESCORTEE_A : FACTION_ESCORTEE_H);
+                me->SetFaction(player->GetTeam() == ALLIANCE ? FACTION_ESCORTEE_A_PASSIVE : FACTION_ESCORTEE_H_PASSIVE);
                 Talk(SAY_OOX_START, player);
-                npc_escortAI::Start(false, false, player->GetGUID(), quest);
+                EscortAI::Start(false, false, player->GetGUID(), quest);
             }
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId, uint32 /*pathId*/) override
         {
             switch (waypointId)
             {
@@ -104,7 +103,7 @@ public:
             }
         }
 
-        void WaypointStart(uint32 pointId) override
+        void WaypointStarted(uint32 pointId, uint32 /*pathId*/) override
         {
             switch (pointId)
             {
@@ -152,21 +151,16 @@ enum Rinji
     GO_RINJI_CAGE           = 142036
 };
 
-struct Location
+Position const AmbushSpawn[] =
 {
-    float posX, posY, posZ;
+    { 191.296204f, -2839.329346f, 107.388f, 0.0f },
+    { 70.972466f,  -2848.674805f, 109.459f, 0.0f }
 };
 
-Location AmbushSpawn[] =
+Position const AmbushMoveTo[] =
 {
-    { 191.296204f, -2839.329346f, 107.388f },
-    { 70.972466f,  -2848.674805f, 109.459f }
-};
-
-Location AmbushMoveTo[] =
-{
-    { 166.630386f, -2824.780273f, 108.153f },
-    { 70.886589f,  -2874.335449f, 116.675f }
+    { 166.630386f, -2824.780273f, 108.153f, 0.0f },
+    { 70.886589f,  -2874.335449f, 116.675f, 0.0f }
 };
 
 class npc_rinji : public CreatureScript
@@ -174,9 +168,9 @@ class npc_rinji : public CreatureScript
 public:
     npc_rinji() : CreatureScript("npc_rinji") { }
 
-    struct npc_rinjiAI : public npc_escortAI
+    struct npc_rinjiAI : public EscortAI
     {
-        npc_rinjiAI(Creature* creature) : npc_escortAI(creature)
+        npc_rinjiAI(Creature* creature) : EscortAI(creature)
         {
             Initialize();
             _IsByOutrunner = false;
@@ -194,12 +188,12 @@ public:
             Initialize();
         }
 
-        void JustRespawned() override
+        void JustAppeared() override
         {
             _IsByOutrunner = false;
             spawnId = 0;
 
-            npc_escortAI::JustRespawned();
+            EscortAI::JustAppeared();
         }
 
         void EnterCombat(Unit* who) override
@@ -226,34 +220,32 @@ public:
             if (!_first)
                 spawnId = 1;
 
-            me->SummonCreature(NPC_RANGER, AmbushSpawn[spawnId].posX, AmbushSpawn[spawnId].posY, AmbushSpawn[spawnId].posZ, 0.0f,
-                TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 60000);
+            me->SummonCreature(NPC_RANGER, AmbushSpawn[spawnId], TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 60000);
 
             for (int i = 0; i < 2; ++i)
             {
-                me->SummonCreature(NPC_OUTRUNNER, AmbushSpawn[spawnId].posX, AmbushSpawn[spawnId].posY, AmbushSpawn[spawnId].posZ, 0.0f,
-                    TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 60000);
+                me->SummonCreature(NPC_OUTRUNNER, AmbushSpawn[spawnId], TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 60000);
             }
         }
 
         void JustSummoned(Creature* summoned) override
         {
             summoned->SetWalk(false);
-            summoned->GetMotionMaster()->MovePoint(0, AmbushMoveTo[spawnId].posX, AmbushMoveTo[spawnId].posY, AmbushMoveTo[spawnId].posZ);
+            summoned->GetMotionMaster()->MovePoint(0, AmbushMoveTo[spawnId]);
         }
 
-        void sQuestAccept(Player* player, Quest const* quest)
+        void QuestAccept(Player* player, Quest const* quest) override
         {
             if (quest->GetQuestId() == QUEST_RINJI_TRAPPED)
             {
                 if (GameObject* go = me->FindNearestGameObject(GO_RINJI_CAGE, INTERACTION_DISTANCE))
                     go->UseDoorOrButton();
 
-                npc_escortAI::Start(false, false, player->GetGUID(), quest);
+                EscortAI::Start(false, false, player->GetGUID(), quest);
             }
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId, uint32 /*pathId*/) override
         {
             Player* player = GetPlayerForEscort();
             if (!player)
@@ -279,7 +271,7 @@ public:
             }
         }
 
-        void UpdateEscortAI(const uint32 diff) override
+        void UpdateEscortAI(uint32 diff) override
         {
             //Check if we have a current target
             if (!UpdateVictim())

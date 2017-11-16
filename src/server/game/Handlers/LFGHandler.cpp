@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,10 +16,12 @@
  */
 
 #include "LFGMgr.h"
-#include "ObjectMgr.h"
+#include "Log.h"
 #include "Group.h"
-#include "Player.h"
+#include "ObjectAccessor.h"
+#include "ObjectMgr.h"
 #include "Opcodes.h"
+#include "Player.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
 
@@ -71,7 +73,9 @@ void WorldSession::HandleLfgJoinOpcode(WorldPacket& recvData)
     {
         uint32 dungeon;
         recvData >> dungeon;
-        newDungeons.insert((dungeon & 0x00FFFFFF));        // remove the type from the dungeon entry
+        dungeon &= 0x00FFFFFF;                             // remove the type from the dungeon entry
+        if (dungeon)
+            newDungeons.insert(dungeon);
     }
 
     recvData.read_skip<uint32>();                          // for 0..uint8 (always 3) { uint8 (always 0) }
@@ -184,7 +188,7 @@ void WorldSession::HandleLfgPlayerLockInfoRequestOpcode(WorldPacket& /*recvData*
     {
         data << uint32(*it);                               // Dungeon Entry (id + type)
         lfg::LfgReward const* reward = sLFGMgr->GetRandomDungeonReward(*it, level);
-        Quest const* quest = NULL;
+        Quest const* quest = nullptr;
         bool done = false;
         if (reward)
         {
@@ -242,7 +246,7 @@ void WorldSession::HandleLfgPartyLockInfoRequestOpcode(WorldPacket&  /*recvData*
 
     // Get the locked dungeons of the other party members
     lfg::LfgLockPartyMap lockMap;
-    for (GroupReference* itr = group->GetFirstMember(); itr != NULL; itr = itr->next())
+    for (GroupReference* itr = group->GetFirstMember(); itr != nullptr; itr = itr->next())
     {
         Player* plrg = itr->GetSource();
         if (!plrg)
@@ -463,10 +467,10 @@ void WorldSession::SendLfgJoinResult(lfg::LfgJoinResultData const& joinData)
 
 void WorldSession::SendLfgQueueStatus(lfg::LfgQueueStatusData const& queueData)
 {
-    TC_LOG_DEBUG("lfg", "SMSG_LFG_QUEUE_STATUS %s dungeon: %u, waitTime: %d, "
+    TC_LOG_DEBUG("lfg", "SMSG_LFG_QUEUE_STATUS %s state: %s, dungeon: %u, waitTime: %d, "
         "avgWaitTime: %d, waitTimeTanks: %d, waitTimeHealer: %d, waitTimeDps: %d, "
         "queuedTime: %u, tanks: %u, healers: %u, dps: %u",
-        GetPlayerInfo().c_str(), queueData.dungeonId, queueData.waitTime, queueData.waitTimeAvg,
+        GetPlayerInfo().c_str(), lfg::GetStateString(sLFGMgr->GetState(GetPlayer()->GetGUID())).c_str(), queueData.dungeonId, queueData.waitTime, queueData.waitTimeAvg,
         queueData.waitTimeTank, queueData.waitTimeHealer, queueData.waitTimeDps,
         queueData.queuedTime, queueData.tanks, queueData.healers, queueData.dps);
 
@@ -524,7 +528,7 @@ void WorldSession::SendLfgBootProposalUpdate(lfg::LfgPlayerBoot const& boot)
     lfg::LfgAnswer playerVote = boot.votes.find(guid)->second;
     uint8 votesNum = 0;
     uint8 agreeNum = 0;
-    uint32 secsleft = uint8((boot.cancelTime - time(NULL)) / 1000);
+    uint32 secsleft = uint8((boot.cancelTime - time(nullptr)) / 1000);
     for (lfg::LfgAnswerContainer::const_iterator it = boot.votes.begin(); it != boot.votes.end(); ++it)
     {
         if (it->second != lfg::LFG_ANSWER_PENDING)

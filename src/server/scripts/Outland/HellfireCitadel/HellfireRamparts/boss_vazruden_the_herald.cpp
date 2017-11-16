@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -24,9 +24,12 @@ Category: Hellfire Citadel, Hellfire Ramparts
 EndScriptData */
 
 #include "ScriptMgr.h"
+#include "hellfire_ramparts.h"
+#include "MotionMaster.h"
+#include "ObjectAccessor.h"
 #include "ScriptedCreature.h"
 #include "SpellInfo.h"
-#include "hellfire_ramparts.h"
+#include "TemporarySummon.h"
 
 enum Says
 {
@@ -86,6 +89,7 @@ class boss_nazan : public CreatureScript
             void Reset() override
             {
                 Initialize();
+                _Reset();
             }
 
             void EnterCombat(Unit* /*who*/) override { }
@@ -101,13 +105,13 @@ class boss_nazan : public CreatureScript
                 if (summoned && summoned->GetEntry() == NPC_LIQUID_FIRE)
                 {
                     summoned->SetLevel(me->getLevel());
-                    summoned->setFaction(me->getFaction());
+                    summoned->SetFaction(me->GetFaction());
                     summoned->CastSpell(summoned, DUNGEON_MODE(SPELL_SUMMON_LIQUID_FIRE, SPELL_SUMMON_LIQUID_FIRE_H), true);
                     summoned->CastSpell(summoned, SPELL_FIRE_NOVA_VISUAL, true);
                 }
             }
 
-            void SpellHitTarget(Unit* target, const SpellInfo* entry) override
+            void SpellHitTarget(Unit* target, SpellInfo const* entry) override
             {
                 if (target && entry->Id == uint32(SPELL_FIREBALL))
                     me->SummonCreature(NPC_LIQUID_FIRE, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), target->GetOrientation(), TEMPSUMMON_TIMED_DESPAWN, 30000);
@@ -138,7 +142,7 @@ class boss_nazan : public CreatureScript
                         me->SetDisableGravity(false);
                         me->SetWalk(true);
                         me->GetMotionMaster()->Clear();
-                        if (Unit* victim = SelectTarget(SELECT_TARGET_NEAREST, 0))
+                        if (Unit* victim = SelectTarget(SELECT_TARGET_MINDISTANCE, 0))
                             AttackStart(victim);
                         DoStartMovement(me->GetVictim());
                         Talk(EMOTE);
@@ -195,7 +199,7 @@ class boss_nazan : public CreatureScript
 
         CreatureAI* GetAI(Creature* creature) const override
         {
-            return new boss_nazanAI(creature);
+            return GetHellfireRampartsAI<boss_nazanAI>(creature);
         }
 };
 
@@ -281,7 +285,7 @@ class boss_vazruden : public CreatureScript
 
         CreatureAI* GetAI(Creature* creature) const override
         {
-            return new boss_vazrudenAI(creature);
+            return GetHellfireRampartsAI<boss_vazrudenAI>(creature);
         }
 };
 
@@ -297,7 +301,6 @@ class boss_vazruden_the_herald : public CreatureScript
                 Initialize();
                 summoned = false;
                 sentryDown = false;
-                lootSpawned = false;
             }
 
             void Initialize()
@@ -364,21 +367,21 @@ class boss_vazruden_the_herald : public CreatureScript
                 }
             }
 
-            void JustSummoned(Creature* summoned) override
+            void JustSummoned(Creature* summon) override
             {
-                if (!summoned)
+                if (!summon)
                     return;
                 Unit* victim = me->GetVictim();
-                if (summoned->GetEntry() == NPC_NAZAN)
+                if (summon->GetEntry() == NPC_NAZAN)
                 {
-                    summoned->SetDisableGravity(true);
-                    summoned->SetSpeed(MOVE_FLIGHT, 2.5f);
+                    summon->SetDisableGravity(true);
+                    summon->SetSpeedRate(MOVE_FLIGHT, 2.5f);
                     if (victim)
                         AttackStartNoMove(victim);
                 }
                 else
                     if (victim)
-                        summoned->AI()->AttackStart(victim);
+                        summon->AI()->AttackStart(victim);
             }
 
             void SentryDownBy(Unit* killer)
@@ -434,13 +437,6 @@ class boss_vazruden_the_herald : public CreatureScript
                                 return;
                             }
                         }
-                        else if (!lootSpawned)
-                        {
-                            me->SummonGameObject(DUNGEON_MODE(GO_FEL_IRON_CHEST_NORMAL, GO_FEL_IRON_CHECT_HEROIC), VazrudenMiddle[0], VazrudenMiddle[1], VazrudenMiddle[2], 0, 0, 0, 0, 0, 0);
-                            me->SetLootRecipient(NULL); // don't think this is necessary..
-                            //me->Kill(me);
-                            lootSpawned = true;
-                        }
                         check = 2000;
                     }
                     else
@@ -457,12 +453,11 @@ class boss_vazruden_the_herald : public CreatureScript
                 ObjectGuid NazanGUID;
                 ObjectGuid VazrudenGUID;
                 bool summoned;
-                bool lootSpawned;
         };
 
         CreatureAI* GetAI(Creature* creature) const override
         {
-            return new boss_vazruden_the_heraldAI(creature);
+            return GetHellfireRampartsAI<boss_vazruden_the_heraldAI>(creature);
         }
 };
 
@@ -519,7 +514,7 @@ class npc_hellfire_sentry : public CreatureScript
 
         CreatureAI* GetAI(Creature* creature) const override
         {
-            return new npc_hellfire_sentryAI(creature);
+            return GetHellfireRampartsAI<npc_hellfire_sentryAI>(creature);
         }
 };
 void AddSC_boss_vazruden_the_herald()

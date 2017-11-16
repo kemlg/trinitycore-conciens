@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -17,14 +17,15 @@
  */
 
 #include "BattlegroundWS.h"
-#include "Creature.h"
+#include "BattlegroundMgr.h"
+#include "DBCStores.h"
 #include "GameObject.h"
 #include "Language.h"
+#include "Log.h"
+#include "Map.h"
 #include "Object.h"
-#include "ObjectMgr.h"
-#include "BattlegroundMgr.h"
+#include "ObjectAccessor.h"
 #include "Player.h"
-#include "World.h"
 #include "WorldPacket.h"
 
 // these variables aren't used outside of this file, so declare them only here
@@ -69,6 +70,13 @@ BattlegroundWS::BattlegroundWS()
     m_HonorWinKills = 0;
     m_HonorEndKills = 0;
     _minutesElapsed = 0;
+}
+
+void BattlegroundWGScore::BuildObjectivesBlock(WorldPacket& data)
+{
+    data << uint32(2); // Objectives Count
+    data << uint32(FlagCaptures);
+    data << uint32(FlagReturns);
 }
 
 BattlegroundWS::~BattlegroundWS() { }
@@ -159,7 +167,7 @@ void BattlegroundWS::PostUpdateImpl(uint32 diff)
                     player->CastSpell(player, WS_SPELL_FOCUSED_ASSAULT, true);
                 _flagDebuffState = 1;
             }
-            else if (_flagDebuffState == 1 && _flagSpellForceTimer >= 900000) //15 minutes
+            else if (_flagDebuffState == 1 && _flagSpellForceTimer >= 15*MINUTE*IN_MILLISECONDS) //15 minutes
             {
                 if (Player* player = ObjectAccessor::FindPlayer(m_FlagKeepers[0]))
                 {
@@ -229,7 +237,7 @@ void BattlegroundWS::StartingEventOpenDoors()
 void BattlegroundWS::AddPlayer(Player* player)
 {
     Battleground::AddPlayer(player);
-    PlayerScores[player->GetGUIDLow()] = new BattlegroundWGScore(player->GetGUID());
+    PlayerScores[player->GetGUID().GetCounter()] = new BattlegroundWGScore(player->GetGUID());
 }
 
 void BattlegroundWS::RespawnFlag(uint32 Team, bool captured)
@@ -806,7 +814,7 @@ bool BattlegroundWS::UpdatePlayerScore(Player* player, uint32 type, uint32 value
     return true;
 }
 
-WorldSafeLocsEntry const* BattlegroundWS::GetClosestGraveYard(Player* player)
+WorldSafeLocsEntry const* BattlegroundWS::GetClosestGraveyard(Player* player)
 {
     //if status in progress, it returns main graveyards with spiritguides
     //else it will return the graveyard in the flagroom - this is especially good
@@ -884,7 +892,10 @@ bool BattlegroundWS::CheckAchievementCriteriaMeet(uint32 criteriaId, Player cons
     switch (criteriaId)
     {
         case BG_CRITERIA_CHECK_SAVE_THE_DAY:
-            return GetFlagState(player->GetTeam()) == BG_WS_FLAG_STATE_ON_BASE;
+            if (target)
+                if (Player const* playerTarget = target->ToPlayer())
+                    return GetFlagState(playerTarget->GetTeam()) == BG_WS_FLAG_STATE_ON_BASE;
+            return false;
     }
 
     return Battleground::CheckAchievementCriteriaMeet(criteriaId, player, target, miscValue);

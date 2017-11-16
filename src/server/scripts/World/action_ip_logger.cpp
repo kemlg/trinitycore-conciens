@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,9 +16,9 @@
  */
 
 #include "ScriptMgr.h"
-#include "Channel.h"
-#include "Guild.h"
-#include "Group.h"
+#include "DatabaseEnv.h"
+#include "Player.h"
+#include "WorldSession.h"
 
 enum IPLoggingTypes
 {
@@ -96,7 +96,7 @@ class AccountActionIpLogger : public AccountScript
 
             // We declare all the required variables
             uint32 playerGuid = accountId;
-            uint32 characterGuid = 0;
+            ObjectGuid::LowType characterGuid = 0;
             std::string systemNote = "ERROR"; // "ERROR" is a placeholder here. We change it later.
 
             // With this switch, we change systemNote so that we have a more accurate phrasing of what type it is.
@@ -144,7 +144,7 @@ class AccountActionIpLogger : public AccountScript
                 stmt->setUInt32(1, characterGuid);
                 stmt->setUInt8(2, aType);
                 stmt->setUInt32(3, playerGuid);
-                stmt->setString(4, systemNote.c_str());
+                stmt->setString(4, systemNote);
                 LoginDatabase.Execute(stmt);
             }
             else // ... but for failed login, we query last_attempt_ip from account table. Which we do with an unique query
@@ -155,7 +155,7 @@ class AccountActionIpLogger : public AccountScript
                 stmt->setUInt32(1, characterGuid);
                 stmt->setUInt8(2, aType);
                 stmt->setUInt32(3, playerGuid);
-                stmt->setString(4, systemNote.c_str());
+                stmt->setString(4, systemNote);
                 LoginDatabase.Execute(stmt);
             }
             return;
@@ -201,7 +201,7 @@ class CharacterActionIpLogger : public PlayerScript
 
             // We declare all the required variables
             uint32 playerGuid = player->GetSession()->GetAccountId();
-            uint32 characterGuid = player->GetGUIDLow();
+            ObjectGuid::LowType characterGuid = player->GetGUID().GetCounter();
             const std::string currentIp = player->GetSession()->GetRemoteAddress();
             std::string systemNote = "ERROR"; // "ERROR" is a placeholder here. We change it...
 
@@ -236,8 +236,8 @@ class CharacterActionIpLogger : public PlayerScript
             stmt->setUInt32(0, playerGuid);
             stmt->setUInt32(1, characterGuid);
             stmt->setUInt8(2, aType);
-            stmt->setString(3, currentIp.c_str()); // We query the ip here.
-            stmt->setString(4, systemNote.c_str());
+            stmt->setString(3, currentIp); // We query the ip here.
+            stmt->setString(4, systemNote);
             // Seeing as the time differences should be minimal, we do not get unixtime and the timestamp right now;
             // Rather, we let it be added with the SQL query.
 
@@ -269,7 +269,7 @@ public:
         // Else, this script isn't loaded in the first place: We require no config check.
 
         // We declare all the required variables
-        uint32 characterGuid = guid.GetCounter(); // We have no access to any member function of Player* or WorldSession*. So use old-fashioned way.
+        ObjectGuid::LowType characterGuid = guid.GetCounter(); // We have no access to any member function of Player* or WorldSession*. So use old-fashioned way.
         // Query playerGuid/accountId, as we only have characterGuid
         std::string systemNote = "ERROR"; // "ERROR" is a placeholder here. We change it later.
 
@@ -297,7 +297,7 @@ public:
         stmt2->setUInt32(1, characterGuid);
         stmt2->setUInt8(2, aType);
         stmt2->setUInt32(3, playerGuid);
-        stmt2->setString(4, systemNote.c_str());
+        stmt2->setString(4, systemNote);
         // Seeing as the time differences should be minimal, we do not get unixtime and the timestamp right now;
         // Rather, we let it be added with the SQL query.
 

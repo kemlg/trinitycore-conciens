@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,10 +16,13 @@
  */
 
 #include "ScriptMgr.h"
+#include "InstanceScript.h"
+#include "MotionMaster.h"
+#include "Player.h"
+#include "ruby_sanctum.h"
 #include "ScriptedCreature.h"
 #include "ScriptedGossip.h"
-#include "ruby_sanctum.h"
-#include "Player.h"
+#include "SpellScript.h"
 
 enum Texts
 {
@@ -43,6 +46,11 @@ enum Events
     EVENT_XERESTRASZA_EVENT_5   = 5,
     EVENT_XERESTRASZA_EVENT_6   = 6,
     EVENT_XERESTRASZA_EVENT_7   = 7,
+};
+
+enum Spells
+{
+    SPELL_RALLY                 = 75416
 };
 
 Position const xerestraszaMovePos = {3151.236f, 379.8733f, 86.31996f, 0.0f};
@@ -144,20 +152,20 @@ class npc_xerestrasza : public CreatureScript
         }
 };
 
-class at_baltharus_plateau : public AreaTriggerScript
+class at_baltharus_plateau : public OnlyOnceAreaTriggerScript
 {
     public:
-        at_baltharus_plateau() : AreaTriggerScript("at_baltharus_plateau") { }
+        at_baltharus_plateau() : OnlyOnceAreaTriggerScript("at_baltharus_plateau") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/) override
+        bool _OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/) override
         {
             // Only trigger once
             if (InstanceScript* instance = player->GetInstanceScript())
             {
-                if (Creature* xerestrasza = ObjectAccessor::GetCreature(*player, instance->GetGuidData(DATA_XERESTRASZA)))
+                if (Creature* xerestrasza = instance->GetCreature(DATA_XERESTRASZA))
                     xerestrasza->AI()->DoAction(ACTION_INTRO_BALTHARUS);
 
-                if (Creature* baltharus = ObjectAccessor::GetCreature(*player, instance->GetGuidData(DATA_BALTHARUS_THE_WARBORN)))
+                if (Creature* baltharus = instance->GetCreature(DATA_BALTHARUS_THE_WARBORN))
                     baltharus->AI()->DoAction(ACTION_INTRO_BALTHARUS);
             }
 
@@ -165,8 +173,50 @@ class at_baltharus_plateau : public AreaTriggerScript
         }
 };
 
+// 75415 - Rallying Shout
+class spell_ruby_sanctum_rallying_shout : public SpellScriptLoader
+{
+    public:
+        spell_ruby_sanctum_rallying_shout() : SpellScriptLoader("spell_ruby_sanctum_rallying_shout") { }
+
+        class spell_ruby_sanctum_rallying_shout_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_ruby_sanctum_rallying_shout_SpellScript);
+
+            bool Validate(SpellInfo const* /*spellInfo*/) override
+            {
+                return ValidateSpellInfo({ SPELL_RALLY });
+            }
+
+            void CountTargets(std::list<WorldObject*>& targets)
+            {
+                _targetCount = targets.size();
+            }
+
+            void HandleDummy(SpellEffIndex /*effIndex*/)
+            {
+                if (_targetCount && !GetCaster()->HasAura(SPELL_RALLY))
+                    GetCaster()->CastCustomSpell(SPELL_RALLY, SPELLVALUE_AURA_STACK, _targetCount, GetCaster(), TRIGGERED_FULL_MASK);
+            }
+
+            void Register() override
+            {
+                OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_ruby_sanctum_rallying_shout_SpellScript::CountTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ALLY);
+                OnEffectHit += SpellEffectFn(spell_ruby_sanctum_rallying_shout_SpellScript::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
+            }
+
+            uint32 _targetCount = 0;
+        };
+
+        SpellScript* GetSpellScript() const override
+        {
+            return new spell_ruby_sanctum_rallying_shout_SpellScript();
+        }
+};
+
 void AddSC_ruby_sanctum()
 {
     new npc_xerestrasza();
     new at_baltharus_plateau();
+    new spell_ruby_sanctum_rallying_shout();
 }

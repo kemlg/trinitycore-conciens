@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -16,17 +16,21 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "DatabaseEnv.h"
 #include "ReputationMgr.h"
+#include "DatabaseEnv.h"
 #include "DBCStores.h"
-#include "Player.h"
-#include "WorldPacket.h"
-#include "World.h"
+#include "Log.h"
 #include "ObjectMgr.h"
+#include "Player.h"
 #include "ScriptMgr.h"
+#include "World.h"
+#include "WorldPacket.h"
 #include "WorldSession.h"
 
 const int32 ReputationMgr::PointsInRank[MAX_REPUTATION_RANK] = {36000, 3000, 3000, 3000, 6000, 12000, 21000, 1000};
+
+const int32 ReputationMgr::Reputation_Cap = 42999;
+const int32 ReputationMgr::Reputation_Bottom = -42000;
 
 ReputationRank ReputationMgr::ReputationToRank(int32 standing)
 {
@@ -165,7 +169,7 @@ void ReputationMgr::SendForceReactions()
 
 void ReputationMgr::SendState(FactionState const* faction)
 {
-    uint32 count = 1;
+    uint32 count = faction ? 1 : 0;
 
     WorldPacket data(SMSG_SET_FACTION_STANDING, 17);
     data << float(0);
@@ -175,15 +179,18 @@ void ReputationMgr::SendState(FactionState const* faction)
     size_t p_count = data.wpos();
     data << uint32(count);
 
-    data << uint32(faction->ReputationListID);
-    data << uint32(faction->Standing);
+    if (faction)
+    {
+        data << uint32(faction->ReputationListID);
+        data << uint32(faction->Standing);
+    }
 
     for (FactionStateList::iterator itr = _factions.begin(); itr != _factions.end(); ++itr)
     {
         if (itr->second.needSend)
         {
             itr->second.needSend = false;
-            if (itr->second.ReputationListID != faction->ReputationListID)
+            if (!faction || itr->second.ReputationListID != faction->ReputationListID)
             {
                 data << uint32(itr->second.ReputationListID);
                 data << uint32(itr->second.Standing);
@@ -232,12 +239,6 @@ void ReputationMgr::SendInitialReputations()
     _player->SendDirectMessage(&data);
 }
 
-void ReputationMgr::SendStates()
-{
-    for (FactionStateList::iterator itr = _factions.begin(); itr != _factions.end(); ++itr)
-        SendState(&(itr->second));
-}
-
 void ReputationMgr::SendVisible(FactionState const* faction) const
 {
     if (_player->GetSession()->PlayerLoading())
@@ -282,12 +283,12 @@ void ReputationMgr::Initialize()
     }
 }
 
-bool ReputationMgr::SetReputation(FactionEntry const* factionEntry, int32 standing, bool incremental)
+bool ReputationMgr::SetReputation(FactionEntry const* factionEntry, int32 standing, bool incremental, bool spillOverOnly)
 {
     sScriptMgr->OnPlayerReputationChange(_player, factionEntry->ID, standing, incremental);
     bool res = false;
     // if spillover definition exists in DB, override DBC
-    if (const RepSpilloverTemplate* repTemplate = sObjectMgr->GetRepSpilloverTemplate(factionEntry->ID))
+    if (RepSpilloverTemplate const* repTemplate = sObjectMgr->GetRepSpilloverTemplate(factionEntry->ID))
     {
         for (uint32 i = 0; i < MAX_SPILLOVER_FACTIONS; ++i)
         {
@@ -297,7 +298,7 @@ bool ReputationMgr::SetReputation(FactionEntry const* factionEntry, int32 standi
                 {
                     // bonuses are already given, so just modify standing by rate
                     int32 spilloverRep = int32(standing * repTemplate->faction_rate[i]);
-                    SetOneFactionReputation(sFactionStore.LookupEntry(repTemplate->faction[i]), spilloverRep, incremental);
+                    SetOneFactionReputation(sFactionStore.AssertEntry(repTemplate->faction[i]), spilloverRep, incremental);
                 }
             }
         }
@@ -346,7 +347,10 @@ bool ReputationMgr::SetReputation(FactionEntry const* factionEntry, int32 standi
     FactionStateList::iterator faction = _factions.find(factionEntry->reputationListID);
     if (faction != _factions.end())
     {
-        res = SetOneFactionReputation(factionEntry, standing, incremental);
+        // if we update spillover only, do not update main reputation (rank exceeds creature reward rate)
+        if (!spillOverOnly)
+            res = SetOneFactionReputation(factionEntry, standing, incremental);
+
         // only this faction gets reported to client, even if it has no own visible standing
         SendState(&faction->second);
     }
@@ -509,7 +513,7 @@ void ReputationMgr::LoadFromDB(PreparedQueryResult result)
     // Set initial reputations (so everything is nifty before DB data load)
     Initialize();
 
-    //QueryResult* result = CharacterDatabase.PQuery("SELECT faction, standing, flags FROM character_reputation WHERE guid = '%u'", GetGUIDLow());
+    //QueryResult* result = CharacterDatabase.PQuery("SELECT faction, standing, flags FROM character_reputation WHERE guid = '%u'", GetGUID().GetCounter());
 
     if (result)
     {
@@ -571,12 +575,12 @@ void ReputationMgr::SaveToDB(SQLTransaction& trans)
         if (itr->second.needSave)
         {
             PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_REPUTATION_BY_FACTION);
-            stmt->setUInt32(0, _player->GetGUIDLow());
+            stmt->setUInt32(0, _player->GetGUID().GetCounter());
             stmt->setUInt16(1, uint16(itr->second.ID));
             trans->Append(stmt);
 
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_CHAR_REPUTATION_BY_FACTION);
-            stmt->setUInt32(0, _player->GetGUIDLow());
+            stmt->setUInt32(0, _player->GetGUID().GetCounter());
             stmt->setUInt16(1, uint16(itr->second.ID));
             stmt->setInt32(2, itr->second.Standing);
             stmt->setUInt16(3, uint16(itr->second.Flags));

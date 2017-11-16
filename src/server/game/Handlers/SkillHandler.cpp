@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -16,16 +16,14 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "WorldSession.h"
 #include "Common.h"
-#include "DatabaseEnv.h"
+#include "DBCStores.h"
 #include "Log.h"
 #include "ObjectAccessor.h"
-#include "Opcodes.h"
-#include "Player.h"
 #include "Pet.h"
-#include "UpdateMask.h"
+#include "Player.h"
 #include "WorldPacket.h"
-#include "WorldSession.h"
 
 void WorldSession::HandleLearnTalentOpcode(WorldPacket& recvData)
 {

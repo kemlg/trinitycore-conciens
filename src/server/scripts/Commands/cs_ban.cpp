@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,58 +22,57 @@ Comment: All ban related commands
 Category: commandscripts
 EndScriptData */
 
+#include "ScriptMgr.h"
 #include "AccountMgr.h"
+#include "CharacterCache.h"
 #include "Chat.h"
+#include "DatabaseEnv.h"
 #include "Language.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "Player.h"
-#include "ScriptMgr.h"
+#include "World.h"
+#include "WorldSession.h"
 
 class ban_commandscript : public CommandScript
 {
 public:
     ban_commandscript() : CommandScript("ban_commandscript") { }
 
-    ChatCommand* GetCommands() const override
+    std::vector<ChatCommand> GetCommands() const override
     {
-        static ChatCommand unbanCommandTable[] =
+        static std::vector<ChatCommand> unbanCommandTable =
         {
-            { "account",        rbac::RBAC_PERM_COMMAND_UNBAN_ACCOUNT,       true,  &HandleUnBanAccountCommand,          "", NULL },
-            { "character",      rbac::RBAC_PERM_COMMAND_UNBAN_CHARACTER,     true,  &HandleUnBanCharacterCommand,        "", NULL },
-            { "playeraccount",  rbac::RBAC_PERM_COMMAND_UNBAN_PLAYERACCOUNT, true,  &HandleUnBanAccountByCharCommand,    "", NULL },
-            { "ip",             rbac::RBAC_PERM_COMMAND_UNBAN_IP,            true,  &HandleUnBanIPCommand,               "", NULL },
-            { NULL, 0, false, NULL, "", NULL }
+            { "account",        rbac::RBAC_PERM_COMMAND_UNBAN_ACCOUNT,       true,  &HandleUnBanAccountCommand,          "" },
+            { "character",      rbac::RBAC_PERM_COMMAND_UNBAN_CHARACTER,     true,  &HandleUnBanCharacterCommand,        "" },
+            { "playeraccount",  rbac::RBAC_PERM_COMMAND_UNBAN_PLAYERACCOUNT, true,  &HandleUnBanAccountByCharCommand,    "" },
+            { "ip",             rbac::RBAC_PERM_COMMAND_UNBAN_IP,            true,  &HandleUnBanIPCommand,               "" },
         };
-        static ChatCommand banlistCommandTable[] =
+        static std::vector<ChatCommand> banlistCommandTable =
         {
-            { "account",        rbac::RBAC_PERM_COMMAND_BANLIST_ACCOUNT,   true,  &HandleBanListAccountCommand,        "", NULL },
-            { "character",      rbac::RBAC_PERM_COMMAND_BANLIST_CHARACTER, true,  &HandleBanListCharacterCommand,      "", NULL },
-            { "ip",             rbac::RBAC_PERM_COMMAND_BANLIST_IP,        true,  &HandleBanListIPCommand,             "", NULL },
-            { NULL, 0, false, NULL, "", NULL }
+            { "account",        rbac::RBAC_PERM_COMMAND_BANLIST_ACCOUNT,   true,  &HandleBanListAccountCommand,        "" },
+            { "character",      rbac::RBAC_PERM_COMMAND_BANLIST_CHARACTER, true,  &HandleBanListCharacterCommand,      "" },
+            { "ip",             rbac::RBAC_PERM_COMMAND_BANLIST_IP,        true,  &HandleBanListIPCommand,             "" },
         };
-        static ChatCommand baninfoCommandTable[] =
+        static std::vector<ChatCommand> baninfoCommandTable =
         {
-            { "account",        rbac::RBAC_PERM_COMMAND_BANINFO_ACCOUNT,   true,  &HandleBanInfoAccountCommand,        "", NULL },
-            { "character",      rbac::RBAC_PERM_COMMAND_BANINFO_CHARACTER, true,  &HandleBanInfoCharacterCommand,      "", NULL },
-            { "ip",             rbac::RBAC_PERM_COMMAND_BANINFO_IP,        true,  &HandleBanInfoIPCommand,             "", NULL },
-            { NULL, 0, false, NULL, "", NULL }
+            { "account",        rbac::RBAC_PERM_COMMAND_BANINFO_ACCOUNT,   true,  &HandleBanInfoAccountCommand,        "" },
+            { "character",      rbac::RBAC_PERM_COMMAND_BANINFO_CHARACTER, true,  &HandleBanInfoCharacterCommand,      "" },
+            { "ip",             rbac::RBAC_PERM_COMMAND_BANINFO_IP,        true,  &HandleBanInfoIPCommand,             "" },
         };
-        static ChatCommand banCommandTable[] =
+        static std::vector<ChatCommand> banCommandTable =
         {
-            { "account",        rbac::RBAC_PERM_COMMAND_BAN_ACCOUNT,       true,  &HandleBanAccountCommand,            "", NULL },
-            { "character",      rbac::RBAC_PERM_COMMAND_BAN_CHARACTER,     true,  &HandleBanCharacterCommand,          "", NULL },
-            { "playeraccount",  rbac::RBAC_PERM_COMMAND_BAN_PLAYERACCOUNT, true,  &HandleBanAccountByCharCommand,      "", NULL },
-            { "ip",             rbac::RBAC_PERM_COMMAND_BAN_IP,            true,  &HandleBanIPCommand,                 "", NULL },
-            { NULL, 0, false, NULL, "", NULL }
+            { "account",        rbac::RBAC_PERM_COMMAND_BAN_ACCOUNT,       true,  &HandleBanAccountCommand,            "" },
+            { "character",      rbac::RBAC_PERM_COMMAND_BAN_CHARACTER,     true,  &HandleBanCharacterCommand,          "" },
+            { "playeraccount",  rbac::RBAC_PERM_COMMAND_BAN_PLAYERACCOUNT, true,  &HandleBanAccountByCharCommand,      "" },
+            { "ip",             rbac::RBAC_PERM_COMMAND_BAN_IP,            true,  &HandleBanIPCommand,                 "" },
         };
-        static ChatCommand commandTable[] =
+        static std::vector<ChatCommand> commandTable =
         {
-            { "ban",            rbac::RBAC_PERM_COMMAND_BAN,     true,  NULL,                                "", banCommandTable },
-            { "baninfo",        rbac::RBAC_PERM_COMMAND_BANINFO, true,  NULL,                                "", baninfoCommandTable },
-            { "banlist",        rbac::RBAC_PERM_COMMAND_BANLIST, true,  NULL,                                "", banlistCommandTable },
-            { "unban",          rbac::RBAC_PERM_COMMAND_UNBAN,   true,  NULL,                                "", unbanCommandTable },
-            { NULL, 0, false, NULL, "", NULL }
+            { "ban",            rbac::RBAC_PERM_COMMAND_BAN,     true,  nullptr,                                "", banCommandTable },
+            { "baninfo",        rbac::RBAC_PERM_COMMAND_BANINFO, true,  nullptr,                                "", baninfoCommandTable },
+            { "banlist",        rbac::RBAC_PERM_COMMAND_BANLIST, true,  nullptr,                                "", banlistCommandTable },
+            { "unban",          rbac::RBAC_PERM_COMMAND_UNBAN,   true,  nullptr,                                "", unbanCommandTable },
         };
         return commandTable;
     }
@@ -94,11 +93,11 @@ public:
 
         std::string name = nameStr;
 
-        char* durationStr = strtok(NULL, " ");
+        char* durationStr = strtok(nullptr, " ");
         if (!durationStr || !atoi(durationStr))
             return false;
 
-        char* reasonStr = strtok(NULL, "");
+        char* reasonStr = strtok(nullptr, "");
         if (!reasonStr)
             return false;
 
@@ -165,18 +164,18 @@ public:
 
         std::string nameOrIP = cnameOrIP;
 
-        char* durationStr = strtok(NULL, " ");
+        char* durationStr = strtok(nullptr, " ");
         if (!durationStr || !atoi(durationStr))
             return false;
 
-        char* reasonStr = strtok(NULL, "");
+        char* reasonStr = strtok(nullptr, "");
         if (!reasonStr)
             return false;
 
         switch (mode)
         {
             case BAN_ACCOUNT:
-                if (!AccountMgr::normalizeString(nameOrIP))
+                if (!Utf8ToUpperOnlyLatin(nameOrIP))
                 {
                     handler->PSendSysMessage(LANG_ACCOUNT_NOT_EXIST, nameOrIP.c_str());
                     handler->SetSentErrorMessage(true);
@@ -249,7 +248,7 @@ public:
             return false;
 
         std::string accountName = nameStr;
-        if (!AccountMgr::normalizeString(accountName))
+        if (!Utf8ToUpperOnlyLatin(accountName))
         {
             handler->PSendSysMessage(LANG_ACCOUNT_NOT_EXIST, accountName.c_str());
             handler->SetSentErrorMessage(true);
@@ -282,7 +281,7 @@ public:
 
             time_t unbanDate = time_t(fields[3].GetUInt32());
             bool active = false;
-            if (fields[2].GetBool() && (fields[1].GetUInt64() == uint64(0) || unbanDate >= time(NULL)))
+            if (fields[2].GetBool() && (fields[1].GetUInt64() == uint64(0) || unbanDate >= time(nullptr)))
                 active = true;
             bool permanent = (fields[1].GetUInt64() == uint64(0));
             std::string banTime = permanent ? handler->GetTrinityString(LANG_BANINFO_INFINITE) : secsToTimeString(fields[1].GetUInt64(), true);
@@ -299,26 +298,31 @@ public:
         if (!*args)
             return false;
 
-        Player* target = ObjectAccessor::FindPlayerByName(args);
-        uint32 targetGuid = 0;
         std::string name(args);
+        if (!normalizePlayerName(name))
+        {
+            handler->SendSysMessage(LANG_BANINFO_NOCHARACTER);
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
+
+        Player* target = ObjectAccessor::FindPlayerByName(name);
+        ObjectGuid::LowType targetGuid = 0;
 
         if (!target)
         {
-            PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_GUID_BY_NAME);
-            stmt->setString(0, name);
-            PreparedQueryResult resultCharacter = CharacterDatabase.Query(stmt);
-
-            if (!resultCharacter)
+            ObjectGuid fullGuid = sCharacterCache->GetCharacterGuidByName(name);
+            if (fullGuid.IsEmpty())
             {
-                handler->PSendSysMessage(LANG_BANINFO_NOCHARACTER);
+                handler->SendSysMessage(LANG_BANINFO_NOCHARACTER);
+                handler->SetSentErrorMessage(true);
                 return false;
             }
 
-            targetGuid = (*resultCharacter)[0].GetUInt32();
+            targetGuid = fullGuid.GetCounter();
         }
         else
-            targetGuid = target->GetGUIDLow();
+            targetGuid = target->GetGUID().GetCounter();
 
         PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_BANINFO);
         stmt->setUInt32(0, targetGuid);
@@ -335,7 +339,7 @@ public:
             Field* fields = result->Fetch();
             time_t unbanDate = time_t(fields[3].GetUInt32());
             bool active = false;
-            if (fields[2].GetUInt8() && (!fields[1].GetUInt32() || unbanDate >= time(NULL)))
+            if (fields[2].GetUInt8() && (!fields[1].GetUInt32() || unbanDate >= time(nullptr)))
                 active = true;
             bool permanent = (fields[1].GetUInt32() == uint32(0));
             std::string banTime = permanent ? handler->GetTrinityString(LANG_BANINFO_INFINITE) : secsToTimeString(fields[1].GetUInt32(), true);
@@ -381,7 +385,7 @@ public:
 
     static bool HandleBanListAccountCommand(ChatHandler* handler, char const* args)
     {
-        PreparedStatement* stmt = NULL;
+        PreparedStatement* stmt = nullptr;
 
         stmt = LoginDatabase.GetPreparedStatement(LOGIN_DEL_EXPIRED_IP_BANS);
         LoginDatabase.Execute(stmt);
@@ -424,7 +428,7 @@ public:
                 Field* fields = result->Fetch();
                 uint32 accountid = fields[0].GetUInt32();
 
-                QueryResult banResult = LoginDatabase.PQuery("SELECT account.username FROM account, account_banned WHERE account_banned.id='%u' AND account_banned.id=account.id", accountid);
+                QueryResult banResult = LoginDatabase.PQuery("SELECT account.username FROM account, account_banned WHERE account_banned.id='%u' AND account_banned.id = account.id", accountid);
                 if (banResult)
                 {
                     Field* fields2 = banResult->Fetch();
@@ -583,8 +587,7 @@ public:
 
     static bool HandleBanListIPCommand(ChatHandler* handler, char const* args)
     {
-        PreparedStatement* stmt = NULL;
-        stmt = LoginDatabase.GetPreparedStatement(LOGIN_DEL_EXPIRED_IP_BANS);
+        PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_DEL_EXPIRED_IP_BANS);
         LoginDatabase.Execute(stmt);
 
         char* filterStr = strtok((char*)args, " ");
@@ -717,7 +720,7 @@ public:
         switch (mode)
         {
             case BAN_ACCOUNT:
-                if (!AccountMgr::normalizeString(nameOrIP))
+                if (!Utf8ToUpperOnlyLatin(nameOrIP))
                 {
                     handler->PSendSysMessage(LANG_ACCOUNT_NOT_EXIST, nameOrIP.c_str());
                     handler->SetSentErrorMessage(true);

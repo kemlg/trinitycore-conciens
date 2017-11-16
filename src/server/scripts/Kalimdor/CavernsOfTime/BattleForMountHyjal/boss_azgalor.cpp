@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,9 +16,10 @@
  */
 
 #include "ScriptMgr.h"
-#include "ScriptedCreature.h"
 #include "hyjal.h"
 #include "hyjal_trash.h"
+#include "InstanceScript.h"
+#include "ObjectAccessor.h"
 
 enum Spells
 {
@@ -48,7 +49,7 @@ public:
 
     CreatureAI* GetAI(Creature* creature) const override
     {
-        return GetInstanceAI<boss_azgalorAI>(creature);
+        return GetHyjalAI<boss_azgalorAI>(creature);
     }
 
     struct boss_azgalorAI : public hyjal_trashAI
@@ -101,13 +102,13 @@ public:
             Talk(SAY_ONSLAY);
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId, uint32 /*pathId*/) override
         {
             if (waypointId == 7 && instance)
             {
-                Unit* target = ObjectAccessor::GetUnit(*me, instance->GetGuidData(DATA_THRALL));
+                Creature* target = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_THRALL));
                 if (target && target->IsAlive())
-                    me->AddThreat(target, 0.0f);
+                    AddThreat(target, 0.0f);
             }
         }
 
@@ -123,8 +124,8 @@ public:
         {
             if (IsEvent)
             {
-                //Must update npc_escortAI
-                npc_escortAI::UpdateAI(diff);
+                //Must update EscortAI
+                EscortAI::UpdateAI(diff);
                 if (!go)
                 {
                     go = true;
@@ -190,7 +191,7 @@ public:
 
     CreatureAI* GetAI(Creature* creature) const override
     {
-        return GetInstanceAI<npc_lesser_doomguardAI>(creature);
+        return GetHyjalAI<npc_lesser_doomguardAI>(creature);
     }
 
     struct npc_lesser_doomguardAI : public hyjal_trashAI
@@ -200,7 +201,6 @@ public:
             CrippleTimer = 50000;
             WarstompTimer = 10000;
             CheckTimer = 5000;
-            instance = creature->GetInstanceScript();
             AzgalorGUID = instance->GetGuidData(DATA_AZGALOR);
         }
 
@@ -208,7 +208,6 @@ public:
         uint32 WarstompTimer;
         uint32 CheckTimer;
         ObjectGuid AzgalorGUID;
-        InstanceScript* instance;
 
         void Reset() override
         {
@@ -223,10 +222,6 @@ public:
         }
 
         void KilledUnit(Unit* /*victim*/) override
-        {
-        }
-
-        void WaypointReached(uint32 /*waypointId*/) override
         {
         }
 
@@ -248,10 +243,9 @@ public:
                 if (AzgalorGUID)
                 {
                     Creature* boss = ObjectAccessor::GetCreature(*me, AzgalorGUID);
-                    if (!boss || (boss && boss->isDead()))
+                    if (!boss || boss->isDead())
                     {
-                        me->setDeathState(JUST_DIED);
-                        me->RemoveCorpse();
+                        me->DespawnOrUnsummon();
                         return;
                     }
                 }

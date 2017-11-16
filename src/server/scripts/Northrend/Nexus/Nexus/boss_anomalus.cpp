@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -17,8 +17,11 @@
  */
 
 #include "ScriptMgr.h"
-#include "ScriptedCreature.h"
+#include "InstanceScript.h"
 #include "nexus.h"
+#include "ObjectAccessor.h"
+#include "ScriptedCreature.h"
+#include "TemporarySummon.h"
 
 enum Spells
 {
@@ -100,21 +103,21 @@ class boss_anomalus : public CreatureScript
             {
                 Initialize();
 
-                instance->SetData(DATA_ANOMALUS_EVENT, NOT_STARTED);
+                instance->SetBossState(DATA_ANOMALUS, NOT_STARTED);
             }
 
             void EnterCombat(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
 
-                instance->SetData(DATA_ANOMALUS_EVENT, IN_PROGRESS);
+                instance->SetBossState(DATA_ANOMALUS, IN_PROGRESS);
             }
 
             void JustDied(Unit* /*killer*/) override
             {
                 Talk(SAY_DEATH);
 
-                instance->SetData(DATA_ANOMALUS_EVENT, DONE);
+                instance->SetBossState(DATA_ANOMALUS, DONE);
             }
 
             uint32 GetData(uint32 type) const override
@@ -189,7 +192,7 @@ class boss_anomalus : public CreatureScript
 
         CreatureAI* GetAI(Creature* creature) const override
         {
-            return GetInstanceAI<boss_anomalusAI>(creature);
+            return GetNexusAI<boss_anomalusAI>(creature);
         }
 };
 
@@ -263,7 +266,7 @@ class npc_chaotic_rift : public CreatureScript
 
         CreatureAI* GetAI(Creature* creature) const override
         {
-            return GetInstanceAI<npc_chaotic_riftAI>(creature);
+            return GetNexusAI<npc_chaotic_riftAI>(creature);
         }
 };
 

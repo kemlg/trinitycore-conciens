@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -24,8 +24,11 @@ SDCategory: Coilfang Resevoir, Serpent Shrine Cavern
 EndScriptData */
 
 #include "ScriptMgr.h"
+#include "InstanceScript.h"
+#include "Map.h"
 #include "ScriptedCreature.h"
 #include "serpent_shrine.h"
+#include "TemporarySummon.h"
 
 enum Yells
 {
@@ -91,7 +94,7 @@ public:
 
     CreatureAI* GetAI(Creature* creature) const override
     {
-        return GetInstanceAI<boss_morogrim_tidewalkerAI>(creature);
+        return GetSerpentshrineCavernAI<boss_morogrim_tidewalkerAI>(creature);
     }
 
     struct boss_morogrim_tidewalkerAI : public ScriptedAI
@@ -219,12 +222,12 @@ public:
                 if (WateryGrave_Timer <= diff)
                 {
                     //Teleport 4 players under the waterfalls
-                    Unit* target;
                     GuidSet targets;
                     GuidSet::const_iterator itr;
                     for (uint8 i = 0; i < 4; ++i)
                     {
                         counter = 0;
+                        Unit* target;
                         do
                         {
                             target = SelectTarget(SELECT_TARGET_RANDOM, 1, 50, true);    //target players only
@@ -257,12 +260,12 @@ public:
                 //WateryGlobules_Timer
                 if (WateryGlobules_Timer <= diff)
                 {
-                    Unit* pGlobuleTarget;
                     GuidSet globules;
                     GuidSet::const_iterator itr;
                     for (uint8 g = 0; g < 4; g++)  //one unit can't cast more than one spell per update, so some players have to cast for us XD
                     {
                         counter = 0;
+                        Unit* pGlobuleTarget;
                         do
                         {
                             pGlobuleTarget = SelectTarget(SELECT_TARGET_RANDOM, 0, 50, true);
@@ -296,7 +299,7 @@ public:
 
     CreatureAI* GetAI(Creature* creature) const override
     {
-        return new npc_water_globuleAI(creature);
+        return GetSerpentshrineCavernAI<npc_water_globuleAI>(creature);
     }
 
     struct npc_water_globuleAI : public ScriptedAI
@@ -319,7 +322,7 @@ public:
 
             me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
             me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-            me->setFaction(14);
+            me->SetFaction(FACTION_MONSTER);
         }
 
         void EnterCombat(Unit* /*who*/) override { }

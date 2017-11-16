@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -43,7 +43,7 @@ struct WeatherData
     uint32 ScriptId;
 };
 
-enum WeatherState
+enum WeatherState : uint32
 {
     WEATHER_STATE_FINE              = 0,
     WEATHER_STATE_FOG               = 1,
@@ -62,7 +62,7 @@ enum WeatherState
 };
 
 /// Weather for one zone
-class Weather
+class TC_GAME_API Weather
 {
     public:
 

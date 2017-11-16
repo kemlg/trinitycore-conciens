@@ -1,5 +1,5 @@
- /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+/*
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,10 +16,13 @@
  */
 
 #include "ScriptMgr.h"
+#include "GameObject.h"
 #include "InstanceScript.h"
-#include "zulfarrak.h"
+#include "Map.h"
+#include "MotionMaster.h"
 #include "Player.h"
 #include "TemporarySummon.h"
+#include "zulfarrak.h"
 
 enum Misc
 {
@@ -99,7 +102,7 @@ float Spawnsway[2][3] =
 class instance_zulfarrak : public InstanceMapScript
 {
 public:
-    instance_zulfarrak() : InstanceMapScript("instance_zulfarrak", 209) { }
+    instance_zulfarrak() : InstanceMapScript(ZFScriptName, 209) { }
 
     InstanceScript* GetInstanceScript(InstanceMap* map) const override
     {
@@ -111,6 +114,7 @@ public:
         instance_zulfarrak_InstanceMapScript(Map* map) : InstanceScript(map)
         {
             SetHeaders(DataHeader);
+            GahzRillaEncounter = NOT_STARTED;
             PyramidPhase = 0;
             major_wave_Timer = 0;
             minor_wave_Timer = 0;
@@ -215,12 +219,12 @@ public:
             switch (type)
             {
                 case EVENT_PYRAMID:
-                    PyramidPhase=data;
+                    PyramidPhase = data;
                     break;
-            };
+            }
         }
 
-        virtual void Update(uint32 diff)
+        virtual void Update(uint32 diff) override
         {
             switch (PyramidPhase)
             {

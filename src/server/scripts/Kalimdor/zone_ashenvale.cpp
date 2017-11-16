@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -24,140 +24,17 @@ SDCategory: Ashenvale Forest
 EndScriptData */
 
 /* ContentData
-npc_torek
 npc_ruul_snowhoof
 EndContentData */
 
 #include "ScriptMgr.h"
+#include "GameObject.h"
+#include "GameObjectAI.h"
+#include "Player.h"
 #include "ScriptedCreature.h"
 #include "ScriptedEscortAI.h"
-#include "Player.h"
-
-/*####
-# npc_torek
-####*/
-
-enum Torek
-{
-    SAY_READY                  = 0,
-    SAY_MOVE                   = 1,
-    SAY_PREPARE                = 2,
-    SAY_WIN                    = 3,
-    SAY_END                    = 4,
-    SPELL_REND                 = 11977,
-    SPELL_THUNDERCLAP          = 8078,
-    QUEST_TOREK_ASSULT         = 6544,
-    NPC_SPLINTERTREE_RAIDER    = 12859,
-    NPC_DURIEL                 = 12860,
-    NPC_SILVERWING_SENTINEL    = 12896,
-    NPC_SILVERWING_WARRIOR     = 12897,
-    FACTION_QUEST              = 113
-};
-
-class npc_torek : public CreatureScript
-{
-public:
-    npc_torek() : CreatureScript("npc_torek") { }
-
-    struct npc_torekAI : public npc_escortAI
-    {
-        npc_torekAI(Creature* creature) : npc_escortAI(creature)
-        {
-            Initialize();
-        }
-
-        void Initialize()
-        {
-            rend_Timer = 5000;
-            thunderclap_Timer = 8000;
-            _completed = false;
-        }
-
-        void Reset() override
-        {
-            Initialize();
-        }
-
-        void EnterCombat(Unit* /*who*/) override { }
-
-        void JustSummoned(Creature* summoned) override
-        {
-            summoned->AI()->AttackStart(me);
-        }
-
-        void sQuestAccept(Player* player, Quest const* quest)
-        {
-            if (quest->GetQuestId() == QUEST_TOREK_ASSULT)
-            {
-                /// @todo find companions, make them follow Torek, at any time (possibly done by core/database in future?)
-                Talk(SAY_READY, player);
-                me->setFaction(FACTION_QUEST);
-                npc_escortAI::Start(true, true, player->GetGUID());
-            }
-        }
-
-        void WaypointReached(uint32 waypointId) override
-        {
-            if (Player* player = GetPlayerForEscort())
-            {
-                switch (waypointId)
-                {
-                    case 1:
-                        Talk(SAY_MOVE, player);
-                        break;
-                    case 8:
-                        Talk(SAY_PREPARE, player);
-                        break;
-                    case 19:
-                        /// @todo verify location and creatures amount.
-                        me->SummonCreature(NPC_DURIEL, 1776.73f, -2049.06f, 109.83f, 1.54f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
-                        me->SummonCreature(NPC_SILVERWING_SENTINEL, 1774.64f, -2049.41f, 109.83f, 1.40f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
-                        me->SummonCreature(NPC_SILVERWING_WARRIOR, 1778.73f, -2049.50f, 109.83f, 1.67f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
-                        break;
-                    case 20:
-                        Talk(SAY_WIN, player);
-                        _completed = true;
-                        player->GroupEventHappens(QUEST_TOREK_ASSULT, me);
-                        break;
-                    case 21:
-                        Talk(SAY_END, player);
-                        break;
-                }
-            }
-        }
-
-        void UpdateAI(uint32 diff) override
-        {
-            npc_escortAI::UpdateAI(diff);
-
-            if (!UpdateVictim())
-                return;
-
-            if (rend_Timer <= diff)
-            {
-                DoCastVictim(SPELL_REND);
-                rend_Timer = 20000;
-            } else rend_Timer -= diff;
-
-            if (thunderclap_Timer <= diff)
-            {
-                DoCast(me, SPELL_THUNDERCLAP);
-                thunderclap_Timer = 30000;
-            } else thunderclap_Timer -= diff;
-        }
-
-    private:
-        uint32 rend_Timer;
-        uint32 thunderclap_Timer;
-        bool   _completed;
-
-    };
-
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return new npc_torekAI(creature);
-    }
-};
+#include "SpellInfo.h"
+#include "SpellScript.h"
 
 /*####
 # npc_ruul_snowhoof
@@ -187,9 +64,9 @@ class npc_ruul_snowhoof : public CreatureScript
 public:
     npc_ruul_snowhoof() : CreatureScript("npc_ruul_snowhoof") { }
 
-    struct npc_ruul_snowhoofAI : public npc_escortAI
+    struct npc_ruul_snowhoofAI : public EscortAI
     {
-        npc_ruul_snowhoofAI(Creature* creature) : npc_escortAI(creature) { }
+        npc_ruul_snowhoofAI(Creature* creature) : EscortAI(creature) { }
 
         void Reset() override
         {
@@ -204,16 +81,16 @@ public:
             summoned->AI()->AttackStart(me);
         }
 
-        void sQuestAccept(Player* player, Quest const* quest)
+        void QuestAccept(Player* player, Quest const* quest) override
         {
             if (quest->GetQuestId() == QUEST_FREEDOM_TO_RUUL)
             {
-                me->setFaction(FACTION_QUEST);
-                npc_escortAI::Start(true, false, player->GetGUID());
+                me->SetFaction(FACTION_ESCORTEE_N_NEUTRAL_PASSIVE);
+                EscortAI::Start(true, false, player->GetGUID());
             }
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId, uint32 /*pathId*/) override
         {
             Player* player = GetPlayerForEscort();
             if (!player)
@@ -244,7 +121,7 @@ public:
 
         void UpdateAI(uint32 diff) override
         {
-            npc_escortAI::UpdateAI(diff);
+            EscortAI::UpdateAI(diff);
         }
     };
 
@@ -304,9 +181,9 @@ class npc_muglash : public CreatureScript
 public:
     npc_muglash() : CreatureScript("npc_muglash") { }
 
-    struct npc_muglashAI : public npc_escortAI
+    struct npc_muglashAI : public EscortAI
     {
-        npc_muglashAI(Creature* creature) : npc_escortAI(creature)
+        npc_muglashAI(Creature* creature) : EscortAI(creature)
         {
             Initialize();
         }
@@ -346,17 +223,17 @@ public:
             summoned->AI()->AttackStart(me);
         }
 
-        void sQuestAccept(Player* player, Quest const* quest)
+        void QuestAccept(Player* player, Quest const* quest) override
         {
             if (quest->GetQuestId() == QUEST_VORSHA)
             {
                 Talk(SAY_MUG_START1);
-                me->setFaction(FACTION_QUEST);
-                npc_escortAI::Start(true, false, player->GetGUID());
+                me->SetFaction(FACTION_ESCORTEE_N_NEUTRAL_PASSIVE);
+                EscortAI::Start(true, false, player->GetGUID());
             }
         }
 
-            void WaypointReached(uint32 waypointId) override
+            void WaypointReached(uint32 waypointId, uint32 /*pathId*/) override
             {
                 if (Player* player = GetPlayerForEscort())
                 {
@@ -414,7 +291,7 @@ public:
 
             void UpdateAI(uint32 diff) override
             {
-                npc_escortAI::UpdateAI(diff);
+                EscortAI::UpdateAI(diff);
 
                 if (!me->GetVictim())
                 {
@@ -453,27 +330,69 @@ class go_naga_brazier : public GameObjectScript
     public:
         go_naga_brazier() : GameObjectScript("go_naga_brazier") { }
 
-        bool OnGossipHello(Player* /*player*/, GameObject* go) override
+        struct go_naga_brazierAI : public GameObjectAI
         {
-            if (Creature* creature = GetClosestCreatureWithEntry(go, NPC_MUGLASH, INTERACTION_DISTANCE*2))
-            {
-                if (npc_muglash::npc_muglashAI* pEscortAI = CAST_AI(npc_muglash::npc_muglashAI, creature->AI()))
-                {
-                    creature->AI()->Talk(SAY_MUG_BRAZIER_WAIT);
+            go_naga_brazierAI(GameObject* go) : GameObjectAI(go) { }
 
-                    pEscortAI->_isBrazierExtinguished = true;
-                    return false;
+            bool GossipHello(Player* /*player*/) override
+            {
+                if (Creature* creature = GetClosestCreatureWithEntry(me, NPC_MUGLASH, INTERACTION_DISTANCE * 2))
+                {
+                    if (npc_muglash::npc_muglashAI* pEscortAI = CAST_AI(npc_muglash::npc_muglashAI, creature->AI()))
+                    {
+                        creature->AI()->Talk(SAY_MUG_BRAZIER_WAIT);
+
+                        pEscortAI->_isBrazierExtinguished = true;
+                        return false;
+                    }
                 }
+
+                return true;
+            }
+        };
+
+        GameObjectAI* GetAI(GameObject* go) const override
+        {
+            return new go_naga_brazierAI(go);
+        }
+};
+
+enum KingoftheFoulwealdMisc
+{
+    GO_BANNER = 178205
+};
+
+class spell_destroy_karangs_banner : public SpellScriptLoader
+{
+    public:
+        spell_destroy_karangs_banner() : SpellScriptLoader("spell_destroy_karangs_banner") { }
+
+        class spell_destroy_karangs_banner_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_destroy_karangs_banner_SpellScript);
+
+            void HandleAfterCast()
+            {
+                if (GameObject* banner = GetCaster()->FindNearestGameObject(GO_BANNER, GetSpellInfo()->GetMaxRange(true)))
+                    banner->Delete();
             }
 
-            return true;
+            void Register() override
+            {
+                AfterCast += SpellCastFn(spell_destroy_karangs_banner_SpellScript::HandleAfterCast);
+            }
+        };
+
+        SpellScript* GetSpellScript() const override
+        {
+            return new spell_destroy_karangs_banner_SpellScript();
         }
 };
 
 void AddSC_ashenvale()
 {
-    new npc_torek();
     new npc_ruul_snowhoof();
     new npc_muglash();
     new go_naga_brazier();
+    new spell_destroy_karangs_banner();
 }

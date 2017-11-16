@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -19,7 +19,10 @@
 #ifndef SC_FOLLOWERAI_H
 #define SC_FOLLOWERAI_H
 
+#include "ScriptedCreature.h"
 #include "ScriptSystem.h"
+
+class Quest;
 
 enum eFollowState
 {
@@ -32,13 +35,11 @@ enum eFollowState
     STATE_FOLLOW_POSTEVENT  = 0x020                         //can be set at complete and allow post event to run
 };
 
-class FollowerAI : public ScriptedAI
+class TC_GAME_API FollowerAI : public ScriptedAI
 {
     public:
         explicit FollowerAI(Creature* creature);
         ~FollowerAI() { }
-
-        //virtual void WaypointReached(uint32 uiPointId) = 0;
 
         void MovementInform(uint32 motionType, uint32 pointId) override;
 
@@ -46,16 +47,16 @@ class FollowerAI : public ScriptedAI
 
         void MoveInLineOfSight(Unit*) override;
 
-        void EnterEvadeMode() override;
+        void EnterEvadeMode(EvadeReason /*why*/ = EVADE_REASON_OTHER) override;
 
         void JustDied(Unit*) override;
 
-        void JustRespawned() override;
+        void JustAppeared() override;
 
         void UpdateAI(uint32) override;                        //the "internal" update, calls UpdateFollowerAI()
         virtual void UpdateFollowerAI(uint32);        //used when it's needed to add code in update (abilities, scripted events, etc)
 
-        void StartFollow(Player* player, uint32 factionForFollower = 0, const Quest* quest = NULL);
+        void StartFollow(Player* player, uint32 factionForFollower = 0, Quest const* quest = nullptr);
 
         void SetFollowPaused(bool bPaused);                 //if special event require follow mode to hold/resume during the follow
         void SetFollowComplete(bool bWithEndEvent = false);
@@ -69,13 +70,13 @@ class FollowerAI : public ScriptedAI
         void AddFollowState(uint32 uiFollowState) { m_uiFollowState |= uiFollowState; }
         void RemoveFollowState(uint32 uiFollowState) { m_uiFollowState &= ~uiFollowState; }
 
-        bool AssistPlayerInCombat(Unit* who);
+        bool AssistPlayerInCombatAgainst(Unit* who);
 
         ObjectGuid m_uiLeaderGUID;
         uint32 m_uiUpdateFollowTimer;
         uint32 m_uiFollowState;
 
-        const Quest* m_pQuestForFollow;                     //normally we have a quest
+        Quest const* m_pQuestForFollow;                     //normally we have a quest
 };
 
 #endif

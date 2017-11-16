@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,11 +16,12 @@
  */
 
 #include "ScriptMgr.h"
+#include "AuctionHouseBot.h"
 #include "Chat.h"
 #include "Language.h"
-#include "AuctionHouseBot.h"
+#include "RBAC.h"
 
-static const uint32 ahbotQualityIds[MAX_AUCTION_QUALITY] =
+uint32 const ahbotQualityIds[MAX_AUCTION_QUALITY] =
 {
     LANG_AHBOT_QUALITY_GRAY, LANG_AHBOT_QUALITY_WHITE,
     LANG_AHBOT_QUALITY_GREEN, LANG_AHBOT_QUALITY_BLUE,
@@ -33,50 +34,46 @@ class ahbot_commandscript : public CommandScript
 public:
     ahbot_commandscript(): CommandScript("ahbot_commandscript") {}
 
-    ChatCommand* GetCommands() const
+    std::vector<ChatCommand> GetCommands() const override
     {
-        static ChatCommand ahbotItemsAmountCommandTable[] =
+        static std::vector<ChatCommand> ahbotItemsAmountCommandTable =
         {
-            { "gray",           rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_GRAY,   true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_GRAY>,     "", NULL },
-            { "white",          rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_WHITE,  true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_WHITE>,    "", NULL },
-            { "green",          rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_GREEN,  true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_GREEN>,    "", NULL },
-            { "blue",           rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_BLUE,   true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_BLUE>,     "", NULL },
-            { "purple",         rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_PURPLE, true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_PURPLE>,   "", NULL },
-            { "orange",         rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_ORANGE, true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_ORANGE>,   "", NULL },
-            { "yellow",         rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_YELLOW, true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_YELLOW>,   "", NULL },
-            { "",               rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS,        true,  &HandleAHBotItemsAmountCommand,                                  "", NULL },
-            { NULL,             0,                  true,  NULL,                                                                                    "", NULL }
+            { "gray",           rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_GRAY,   true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_GRAY>,     "" },
+            { "white",          rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_WHITE,  true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_WHITE>,    "" },
+            { "green",          rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_GREEN,  true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_GREEN>,    "" },
+            { "blue",           rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_BLUE,   true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_BLUE>,     "" },
+            { "purple",         rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_PURPLE, true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_PURPLE>,   "" },
+            { "orange",         rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_ORANGE, true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_ORANGE>,   "" },
+            { "yellow",         rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS_YELLOW, true,  &HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_YELLOW>,   "" },
+            { "",               rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS,        true,  &HandleAHBotItemsAmountCommand,                                  "" },
         };
 
-        static ChatCommand ahbotItemsRatioCommandTable[] =
+        static std::vector<ChatCommand> ahbotItemsRatioCommandTable =
         {
-            { "alliance",       rbac::RBAC_PERM_COMMAND_AHBOT_RATIO_ALLIANCE, true,  &HandleAHBotItemsRatioHouseCommand<AUCTION_HOUSE_ALLIANCE>,    "", NULL },
-            { "horde",          rbac::RBAC_PERM_COMMAND_AHBOT_RATIO_HORDE,    true,  &HandleAHBotItemsRatioHouseCommand<AUCTION_HOUSE_HORDE>,       "", NULL },
-            { "neutral",        rbac::RBAC_PERM_COMMAND_AHBOT_RATIO_NEUTRAL,  true,  &HandleAHBotItemsRatioHouseCommand<AUCTION_HOUSE_NEUTRAL>,     "", NULL },
-            { "",               rbac::RBAC_PERM_COMMAND_AHBOT_RATIO,          true,  &HandleAHBotItemsRatioCommand,                                 "", NULL },
-            { NULL,             0,                  true,  NULL,                                                                                    "", NULL }
+            { "alliance",       rbac::RBAC_PERM_COMMAND_AHBOT_RATIO_ALLIANCE, true,  &HandleAHBotItemsRatioHouseCommand<AUCTION_HOUSE_ALLIANCE>,    "" },
+            { "horde",          rbac::RBAC_PERM_COMMAND_AHBOT_RATIO_HORDE,    true,  &HandleAHBotItemsRatioHouseCommand<AUCTION_HOUSE_HORDE>,       "" },
+            { "neutral",        rbac::RBAC_PERM_COMMAND_AHBOT_RATIO_NEUTRAL,  true,  &HandleAHBotItemsRatioHouseCommand<AUCTION_HOUSE_NEUTRAL>,     "" },
+            { "",               rbac::RBAC_PERM_COMMAND_AHBOT_RATIO,          true,  &HandleAHBotItemsRatioCommand,                                 "" },
         };
 
-        static ChatCommand ahbotCommandTable[] =
+        static std::vector<ChatCommand> ahbotCommandTable =
         {
-            { "items",          rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS,    true,   NULL,                       "", ahbotItemsAmountCommandTable },
-            { "ratio",          rbac::RBAC_PERM_COMMAND_AHBOT_RATIO,    true,   NULL,                       "", ahbotItemsRatioCommandTable },
-            { "rebuild",        rbac::RBAC_PERM_COMMAND_AHBOT_REBUILD,  true,   &HandleAHBotRebuildCommand, "", NULL },
-            { "reload",         rbac::RBAC_PERM_COMMAND_AHBOT_RELOAD,   true,   &HandleAHBotReloadCommand,  "", NULL },
-            { "status",         rbac::RBAC_PERM_COMMAND_AHBOT_STATUS,   true,   &HandleAHBotStatusCommand,  "", NULL },
-            { NULL,             0,                                      true,   NULL,                       "", NULL }
+            { "items",          rbac::RBAC_PERM_COMMAND_AHBOT_ITEMS,    true,   nullptr,                       "", ahbotItemsAmountCommandTable },
+            { "ratio",          rbac::RBAC_PERM_COMMAND_AHBOT_RATIO,    true,   nullptr,                       "", ahbotItemsRatioCommandTable },
+            { "rebuild",        rbac::RBAC_PERM_COMMAND_AHBOT_REBUILD,  true,   &HandleAHBotRebuildCommand, "" },
+            { "reload",         rbac::RBAC_PERM_COMMAND_AHBOT_RELOAD,   true,   &HandleAHBotReloadCommand,  "" },
+            { "status",         rbac::RBAC_PERM_COMMAND_AHBOT_STATUS,   true,   &HandleAHBotStatusCommand,  "" },
         };
 
-        static ChatCommand commandTable[] =
+        static std::vector<ChatCommand> commandTable =
         {
-            { "ahbot",          rbac::RBAC_PERM_COMMAND_AHBOT,  false, NULL,    "", ahbotCommandTable },
-            { NULL,             0,                              false, NULL,    "", NULL }
+            { "ahbot",          rbac::RBAC_PERM_COMMAND_AHBOT,  false, nullptr,    "", ahbotCommandTable },
         };
 
         return commandTable;
     }
 
-    static bool HandleAHBotItemsAmountCommand(ChatHandler* handler, const char* args)
+    static bool HandleAHBotItemsAmountCommand(ChatHandler* handler, char const* args)
     {
         uint32 qVals[MAX_AUCTION_QUALITY];
         char* arg = strtok((char*)args, " ");
@@ -85,7 +82,7 @@ public:
             if (!arg)
                 return false;
             qVals[i] = atoi(arg);
-            arg = strtok(NULL, " ");
+            arg = strtok(nullptr, " ");
         }
 
         sAuctionBot->SetItemsAmount(qVals);
@@ -97,7 +94,7 @@ public:
     }
 
     template <AuctionQuality Q>
-    static bool HandleAHBotItemsAmountQualityCommand(ChatHandler* handler, const char* args)
+    static bool HandleAHBotItemsAmountQualityCommand(ChatHandler* handler, char const* args)
     {
         char* arg = strtok((char*)args, " ");
         if (!arg)
@@ -111,7 +108,7 @@ public:
         return true;
     }
 
-    static bool HandleAHBotItemsRatioCommand(ChatHandler* handler, const char* args)
+    static bool HandleAHBotItemsRatioCommand(ChatHandler* handler, char const* args)
     {
         uint32 rVal[MAX_AUCTION_QUALITY];
         char* arg = strtok((char*)args, " ");
@@ -120,7 +117,7 @@ public:
             if (!arg)
                 return false;
             rVal[i] = atoi(arg);
-            arg = strtok(NULL, " ");
+            arg = strtok(nullptr, " ");
         }
 
         sAuctionBot->SetItemsRatio(rVal[0], rVal[1], rVal[2]);
@@ -131,7 +128,7 @@ public:
     }
 
     template<AuctionHouseType H>
-    static bool HandleAHBotItemsRatioHouseCommand(ChatHandler* handler, const char* args)
+    static bool HandleAHBotItemsRatioHouseCommand(ChatHandler* handler, char const* args)
     {
         char* arg = strtok((char*)args, " ");
         if (!arg)
@@ -143,28 +140,26 @@ public:
         return true;
     }
 
-    static bool HandleAHBotRebuildCommand(ChatHandler* /*handler*/, const char* args)
+    static bool HandleAHBotRebuildCommand(ChatHandler* /*handler*/, char const* args)
     {
         char* arg = strtok((char*)args, " ");
-        if (!arg)
-            return false;
 
         bool all = false;
-        if (strcmp(arg, "all") == 0)
+        if (arg && strcmp(arg, "all") == 0)
             all = true;
 
         sAuctionBot->Rebuild(all);
         return true;
     }
 
-    static bool HandleAHBotReloadCommand(ChatHandler* handler, const char* /*args*/)
+    static bool HandleAHBotReloadCommand(ChatHandler* handler, char const* /*args*/)
     {
         sAuctionBot->ReloadAllConfig();
         handler->SendSysMessage(LANG_AHBOT_RELOAD_OK);
         return true;
     }
 
-    static bool HandleAHBotStatusCommand(ChatHandler* handler, const char* args)
+    static bool HandleAHBotStatusCommand(ChatHandler* handler, char const* args)
     {
         char* arg = strtok((char*)args, " ");
         if (!arg)
@@ -233,17 +228,17 @@ public:
 
 };
 
-template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_GRAY>(ChatHandler* handler, const char*);
-template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_WHITE>(ChatHandler* handler, const char*);
-template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_GREEN>(ChatHandler* handler, const char*);
-template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_BLUE>(ChatHandler* handler, const char*);
-template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_PURPLE>(ChatHandler* handler, const char*);
-template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_ORANGE>(ChatHandler* handler, const char*);
-template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_YELLOW>(ChatHandler* handler, const char*);
+template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_GRAY>(ChatHandler* handler, char const*);
+template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_WHITE>(ChatHandler* handler, char const*);
+template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_GREEN>(ChatHandler* handler, char const*);
+template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_BLUE>(ChatHandler* handler, char const*);
+template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_PURPLE>(ChatHandler* handler, char const*);
+template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_ORANGE>(ChatHandler* handler, char const*);
+template bool ahbot_commandscript::HandleAHBotItemsAmountQualityCommand<AUCTION_QUALITY_YELLOW>(ChatHandler* handler, char const*);
 
-template bool ahbot_commandscript::HandleAHBotItemsRatioHouseCommand<AUCTION_HOUSE_ALLIANCE>(ChatHandler* handler, const char*);
-template bool ahbot_commandscript::HandleAHBotItemsRatioHouseCommand<AUCTION_HOUSE_HORDE>(ChatHandler* handler, const char*);
-template bool ahbot_commandscript::HandleAHBotItemsRatioHouseCommand<AUCTION_HOUSE_NEUTRAL>(ChatHandler* handler, const char*);
+template bool ahbot_commandscript::HandleAHBotItemsRatioHouseCommand<AUCTION_HOUSE_ALLIANCE>(ChatHandler* handler, char const*);
+template bool ahbot_commandscript::HandleAHBotItemsRatioHouseCommand<AUCTION_HOUSE_HORDE>(ChatHandler* handler, char const*);
+template bool ahbot_commandscript::HandleAHBotItemsRatioHouseCommand<AUCTION_HOUSE_NEUTRAL>(ChatHandler* handler, char const*);
 
 void AddSC_ahbot_commandscript()
 {

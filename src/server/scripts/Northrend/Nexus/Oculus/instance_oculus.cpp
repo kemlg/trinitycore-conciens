@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,15 +16,20 @@
  */
 
 #include "ScriptMgr.h"
-#include "ScriptedCreature.h"
+#include "Creature.h"
+#include "CreatureAI.h"
+#include "GameObject.h"
 #include "InstanceScript.h"
-#include "WorldPacket.h"
+#include "Map.h"
+#include "MotionMaster.h"
 #include "oculus.h"
+#include "TemporarySummon.h"
+#include "WorldPacket.h"
 
 DoorData const doorData[] =
 {
-    { GO_DRAGON_CAGE_DOOR,  DATA_DRAKOS,    DOOR_TYPE_PASSAGE,  BOUNDARY_NONE },
-    { 0,                    0,              DOOR_TYPE_ROOM,     BOUNDARY_NONE }
+    { GO_DRAGON_CAGE_DOOR,  DATA_DRAKOS,    DOOR_TYPE_PASSAGE },
+    { 0,                    0,              DOOR_TYPE_ROOM }
 };
 
 Position const VerdisaMove       = { 949.188f, 1032.91f, 359.967f, 1.093027f  };
@@ -111,26 +116,13 @@ class instance_oculus : public InstanceMapScript
 
             void OnGameObjectCreate(GameObject* go) override
             {
+                InstanceScript::OnGameObjectCreate(go);
+
                 switch (go->GetEntry())
                 {
-                    case GO_DRAGON_CAGE_DOOR:
-                        AddDoor(go, true);
-                        break;
                     case GO_EREGOS_CACHE_N:
                     case GO_EREGOS_CACHE_H:
                         EregosCacheGUID = go->GetGUID();
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            void OnGameObjectRemove(GameObject* go) override
-            {
-                switch (go->GetEntry())
-                {
-                    case GO_DRAGON_CAGE_DOOR:
-                        AddDoor(go, false);
                         break;
                     default:
                         break;
@@ -192,6 +184,7 @@ class instance_oculus : public InstanceMapScript
                             FreeDragons();
                             if (Creature* varos = instance->GetCreature(VarosGUID))
                                 varos->SetPhaseMask(1, true);
+                            events.ScheduleEvent(EVENT_VAROS_INTRO, 15000);
                         }
                         break;
                     case DATA_VAROS:
@@ -209,6 +202,7 @@ class instance_oculus : public InstanceMapScript
                             {
                                 eregos->SetPhaseMask(1, true);
                                 GreaterWhelps();
+                                events.ScheduleEvent(EVENT_EREGOS_INTRO, 5000);
                             }
                         }
                         break;
@@ -225,6 +219,21 @@ class instance_oculus : public InstanceMapScript
                 }
 
                 return true;
+            }
+
+            uint32 GetData(uint32 type) const override
+            {
+                if (type == DATA_CONSTRUCTS)
+                {
+                    if (CentrifugueConstructCounter == 0)
+                        return KILL_NO_CONSTRUCT;
+                    else if (CentrifugueConstructCounter == 1)
+                        return KILL_ONE_CONSTRUCT;
+                    else if (CentrifugueConstructCounter > 1)
+                        return KILL_MORE_CONSTRUCT;
+                }
+
+                return KILL_NO_CONSTRUCT;
             }
 
             ObjectGuid GetGuidData(uint32 type) const override
@@ -267,6 +276,28 @@ class instance_oculus : public InstanceMapScript
                 }
             }
 
+            void Update(uint32 diff) override
+            {
+                events.Update(diff);
+
+                while (uint32 eventId = events.ExecuteEvent())
+                {
+                    switch (eventId)
+                    {
+                        case EVENT_VAROS_INTRO:
+                            if (Creature* varos = instance->GetCreature(VarosGUID))
+                                varos->AI()->Talk(SAY_VAROS_INTRO_TEXT);
+                            break;
+                        case EVENT_EREGOS_INTRO:
+                            if (Creature* eregos = instance->GetCreature(EregosGUID))
+                                eregos->AI()->Talk(SAY_EREGOS_INTRO_TEXT);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+
             void GreaterWhelps()
             {
                 for (ObjectGuid guid : GreaterWhelpList)
@@ -289,6 +320,8 @@ class instance_oculus : public InstanceMapScript
             ObjectGuid EregosCacheGUID;
 
             GuidList GreaterWhelpList;
+
+            EventMap events;
         };
 
         InstanceScript* GetInstanceScript(InstanceMap* map) const override

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -24,10 +24,13 @@ SDCategory: Zul'Gurub
 EndScriptData */
 
 #include "ScriptMgr.h"
+#include "InstanceScript.h"
+#include "MotionMaster.h"
+#include "ObjectAccessor.h"
 #include "ScriptedCreature.h"
-#include "Spell.h"
 #include "SpellAuras.h"
 #include "SpellScript.h"
+#include "TemporarySummon.h"
 #include "zulgurub.h"
 
 enum Says
@@ -128,7 +131,7 @@ class boss_mandokir : public CreatureScript
                 {
                     _Reset();
                     Initialize();
-                    me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC);
+                    me->SetImmuneToAll(true);
                     events.ScheduleEvent(EVENT_CHECK_START, 1000);
                     if (Creature* speaker = ObjectAccessor::GetCreature(*me, instance->GetGuidData(NPC_VILEBRANCH_SPEAKER)))
                         if (!speaker->IsAlive())
@@ -146,6 +149,11 @@ class boss_mandokir : public CreatureScript
                         unsummon->DespawnOrUnsummon();
                 instance->SetBossState(DATA_MANDOKIR, DONE);
                 instance->SaveToDB();
+            }
+
+            void JustReachedHome() override
+            {
+                me->SetImmuneToAll(false);
             }
 
             void EnterCombat(Unit* /*who*/) override
@@ -194,9 +202,9 @@ class boss_mandokir : public CreatureScript
                     me->SetWalk(false);
                     if (id == POINT_MANDOKIR_END)
                     {
-                        me->SetHomePosition(PosMandokir[0]);
+                        me->SetHomePosition(PosMandokir[1]);
+                        me->GetMotionMaster()->MoveTargetedHome();
                         instance->SetBossState(DATA_MANDOKIR, NOT_STARTED);
-                        me->DespawnOrUnsummon(6000); // No idea how to respawn on wipe.
                     }
                 }
             }
@@ -223,7 +231,7 @@ class boss_mandokir : public CreatureScript
                                         events.ScheduleEvent(EVENT_CHECK_START, 1000);
                                     break;
                                 case EVENT_STARTED:
-                                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC);
+                                    me->SetImmuneToAll(false);
                                     me->GetMotionMaster()->MovePath(PATH_MANDOKIR, false);
                                     break;
                                 default:
@@ -278,6 +286,9 @@ class boss_mandokir : public CreatureScript
                         default:
                             break;
                     }
+
+                    if (me->HasUnitState(UNIT_STATE_CASTING))
+                        return;
                 }
 
                 DoMeleeAttackIfReady();
@@ -421,7 +432,7 @@ class npc_vilebranch_speaker : public CreatureScript
 
         CreatureAI* GetAI(Creature* creature) const override
         {
-            return GetInstanceAI<npc_vilebranch_speakerAI>(creature);
+            return GetZulGurubAI<npc_vilebranch_speakerAI>(creature);
         }
 };
 

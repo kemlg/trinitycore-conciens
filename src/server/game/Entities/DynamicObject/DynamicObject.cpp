@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -16,20 +16,22 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "DynamicObject.h"
 #include "Common.h"
-#include "UpdateMask.h"
-#include "Opcodes.h"
-#include "World.h"
+#include "GameTime.h"
+#include "Log.h"
+#include "Map.h"
 #include "ObjectAccessor.h"
-#include "DatabaseEnv.h"
-#include "GridNotifiers.h"
-#include "CellImpl.h"
-#include "GridNotifiersImpl.h"
+#include "Player.h"
+#include "SpellAuras.h"
+#include "SpellMgr.h"
 #include "ScriptMgr.h"
 #include "Transport.h"
+#include "Unit.h"
+#include "UpdateData.h"
 
 DynamicObject::DynamicObject(bool isWorldObject) : WorldObject(isWorldObject),
-    _aura(NULL), _removedAura(NULL), _caster(NULL), _duration(0), _isViewpoint(false)
+    _aura(nullptr), _removedAura(nullptr), _caster(nullptr), _duration(0), _isViewpoint(false)
 {
     m_objectType |= TYPEMASK_DYNAMICOBJECT;
     m_objectTypeId = TYPEID_DYNAMICOBJECT;
@@ -53,7 +55,7 @@ void DynamicObject::AddToWorld()
     ///- Register the dynamicObject for guid lookup and for caster
     if (!IsInWorld())
     {
-        sObjectAccessor->AddObject(this);
+        GetMap()->GetObjectsStore().Insert<DynamicObject>(GetGUID(), this);
         WorldObject::AddToWorld();
         BindToCaster();
     }
@@ -76,11 +78,12 @@ void DynamicObject::RemoveFromWorld()
 
         UnbindFromCaster();
         WorldObject::RemoveFromWorld();
-        sObjectAccessor->RemoveObject(this);
+        GetMap()->GetObjectsStore().Remove<DynamicObject>(GetGUID());
+
     }
 }
 
-bool DynamicObject::CreateDynamicObject(uint32 guidlow, Unit* caster, uint32 spellId, Position const& pos, float radius, DynamicObjectType type)
+bool DynamicObject::CreateDynamicObject(ObjectGuid::LowType guidlow, Unit* caster, uint32 spellId, Position const& pos, float radius, DynamicObjectType type)
 {
     SetMap(caster->GetMap());
     Relocate(pos);
@@ -90,7 +93,7 @@ bool DynamicObject::CreateDynamicObject(uint32 guidlow, Unit* caster, uint32 spe
         return false;
     }
 
-    WorldObject::_Create(guidlow, HIGHGUID_DYNAMICOBJECT, caster->GetPhaseMask());
+    WorldObject::_Create(guidlow, HighGuid::DynamicObject, caster->GetPhaseMask());
 
     SetEntry(spellId);
     SetObjectScale(1);
@@ -104,7 +107,7 @@ bool DynamicObject::CreateDynamicObject(uint32 guidlow, Unit* caster, uint32 spe
     SetByteValue(DYNAMICOBJECT_BYTES, 0, type);
     SetUInt32Value(DYNAMICOBJECT_SPELLID, spellId);
     SetFloatValue(DYNAMICOBJECT_RADIUS, radius);
-    SetUInt32Value(DYNAMICOBJECT_CASTTIME, getMSTime());
+    SetUInt32Value(DYNAMICOBJECT_CASTTIME, GameTime::GetGameTimeMS());
 
     if (IsWorldObject())
         setActive(true);    //must before add to map to be put in world container
@@ -204,7 +207,7 @@ void DynamicObject::RemoveAura()
 {
     ASSERT(_aura && !_removedAura);
     _removedAura = _aura;
-    _aura = NULL;
+    _aura = nullptr;
     if (!_removedAura->IsRemoved())
         _removedAura->_Remove(AURA_REMOVE_BY_DEFAULT);
 }
@@ -240,5 +243,10 @@ void DynamicObject::UnbindFromCaster()
 {
     ASSERT(_caster);
     _caster->_UnregisterDynObject(this);
-    _caster = NULL;
+    _caster = nullptr;
+}
+
+SpellInfo const* DynamicObject::GetSpellInfo() const
+{
+    return sSpellMgr->GetSpellInfo(GetSpellId());
 }

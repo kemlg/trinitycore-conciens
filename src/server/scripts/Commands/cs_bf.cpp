@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,34 +23,33 @@ Category: commandscripts
 EndScriptData */
 
 #include "ScriptMgr.h"
-#include "Chat.h"
 #include "BattlefieldMgr.h"
+#include "Chat.h"
+#include "RBAC.h"
 
 class bf_commandscript : public CommandScript
 {
 public:
     bf_commandscript() : CommandScript("bf_commandscript") { }
 
-    ChatCommand* GetCommands() const override
+    std::vector<ChatCommand> GetCommands() const override
     {
-        static ChatCommand battlefieldcommandTable[] =
+        static std::vector<ChatCommand> battlefieldcommandTable =
         {
-            { "start",          rbac::RBAC_PERM_COMMAND_BF_START,  false, &HandleBattlefieldStart,  "", NULL },
-            { "stop",           rbac::RBAC_PERM_COMMAND_BF_STOP,   false, &HandleBattlefieldEnd,    "", NULL },
-            { "switch",         rbac::RBAC_PERM_COMMAND_BF_SWITCH, false, &HandleBattlefieldSwitch, "", NULL },
-            { "timer",          rbac::RBAC_PERM_COMMAND_BF_TIMER,  false, &HandleBattlefieldTimer,  "", NULL },
-            { "enable",         rbac::RBAC_PERM_COMMAND_BF_ENABLE, false, &HandleBattlefieldEnable, "", NULL },
-            { NULL,             0,                           false, NULL,                     "", NULL }
+            { "start",          rbac::RBAC_PERM_COMMAND_BF_START,  false, &HandleBattlefieldStart,  "" },
+            { "stop",           rbac::RBAC_PERM_COMMAND_BF_STOP,   false, &HandleBattlefieldEnd,    "" },
+            { "switch",         rbac::RBAC_PERM_COMMAND_BF_SWITCH, false, &HandleBattlefieldSwitch, "" },
+            { "timer",          rbac::RBAC_PERM_COMMAND_BF_TIMER,  false, &HandleBattlefieldTimer,  "" },
+            { "enable",         rbac::RBAC_PERM_COMMAND_BF_ENABLE, false, &HandleBattlefieldEnable, "" },
         };
-        static ChatCommand commandTable[] =
+        static std::vector<ChatCommand> commandTable =
         {
-            { "bf",             rbac::RBAC_PERM_COMMAND_BF,        false, NULL,                     "", battlefieldcommandTable },
-            { NULL,             0,                           false, NULL,                     "", NULL }
+            { "bf",             rbac::RBAC_PERM_COMMAND_BF,        false, nullptr,                     "", battlefieldcommandTable },
         };
         return commandTable;
     }
 
-    static bool HandleBattlefieldStart(ChatHandler* handler, const char* args)
+    static bool HandleBattlefieldStart(ChatHandler* handler, char const* args)
     {
         uint32 battleid = 0;
         char* battleid_str = strtok((char*)args, " ");
@@ -72,7 +71,7 @@ public:
         return true;
     }
 
-    static bool HandleBattlefieldEnd(ChatHandler* handler, const char* args)
+    static bool HandleBattlefieldEnd(ChatHandler* handler, char const* args)
     {
         uint32 battleid = 0;
         char* battleid_str = strtok((char*)args, " ");
@@ -94,7 +93,7 @@ public:
         return true;
     }
 
-    static bool HandleBattlefieldEnable(ChatHandler* handler, const char* args)
+    static bool HandleBattlefieldEnable(ChatHandler* handler, char const* args)
     {
         uint32 battleid = 0;
         char* battleid_str = strtok((char*)args, " ");
@@ -124,7 +123,7 @@ public:
         return true;
     }
 
-    static bool HandleBattlefieldSwitch(ChatHandler* handler, const char* args)
+    static bool HandleBattlefieldSwitch(ChatHandler* handler, char const* args)
     {
         uint32 battleid = 0;
         char* battleid_str = strtok((char*)args, " ");
@@ -145,14 +144,14 @@ public:
         return true;
     }
 
-    static bool HandleBattlefieldTimer(ChatHandler* handler, const char* args)
+    static bool HandleBattlefieldTimer(ChatHandler* handler, char const* args)
     {
         uint32 battleid = 0;
         uint32 time = 0;
         char* battleid_str = strtok((char*)args, " ");
         if (!battleid_str)
             return false;
-        char* time_str = strtok(NULL, " ");
+        char* time_str = strtok(nullptr, " ");
         if (!time_str)
             return false;
 

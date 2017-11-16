@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,8 +15,12 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Common.h"
 #include "GuildMgr.h"
+#include "DatabaseEnv.h"
+#include "Guild.h"
+#include "Log.h"
+#include "ObjectMgr.h"
+#include "World.h"
 
 GuildMgr::GuildMgr() : NextGuildId(1)
 { }
@@ -32,12 +36,12 @@ void GuildMgr::AddGuild(Guild* guild)
     GuildStore[guild->GetId()] = guild;
 }
 
-void GuildMgr::RemoveGuild(uint32 guildId)
+void GuildMgr::RemoveGuild(ObjectGuid::LowType guildId)
 {
     GuildStore.erase(guildId);
 }
 
-uint32 GuildMgr::GenerateGuildId()
+ObjectGuid::LowType GuildMgr::GenerateGuildId()
 {
     if (NextGuildId >= 0xFFFFFFFE)
     {
@@ -48,13 +52,13 @@ uint32 GuildMgr::GenerateGuildId()
 }
 
 // Guild collection
-Guild* GuildMgr::GetGuildById(uint32 guildId) const
+Guild* GuildMgr::GetGuildById(ObjectGuid::LowType guildId) const
 {
     GuildContainer::const_iterator itr = GuildStore.find(guildId);
     if (itr != GuildStore.end())
         return itr->second;
 
-    return NULL;
+    return nullptr;
 }
 
 Guild* GuildMgr::GetGuildByName(const std::string& guildName) const
@@ -68,15 +72,21 @@ Guild* GuildMgr::GetGuildByName(const std::string& guildName) const
         if (search == gname)
             return itr->second;
     }
-    return NULL;
+    return nullptr;
 }
 
-std::string GuildMgr::GetGuildNameById(uint32 guildId) const
+std::string GuildMgr::GetGuildNameById(ObjectGuid::LowType guildId) const
 {
     if (Guild* guild = GetGuildById(guildId))
         return guild->GetName();
 
     return "";
+}
+
+GuildMgr* GuildMgr::instance()
+{
+    static GuildMgr instance;
+    return &instance;
 }
 
 Guild* GuildMgr::GetGuildByLeader(ObjectGuid guid) const
@@ -85,7 +95,7 @@ Guild* GuildMgr::GetGuildByLeader(ObjectGuid guid) const
         if (itr->second->GetLeaderGUID() == guid)
             return itr->second;
 
-    return NULL;
+    return nullptr;
 }
 
 void GuildMgr::LoadGuilds()

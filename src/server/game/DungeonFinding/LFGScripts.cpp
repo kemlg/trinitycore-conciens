@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,14 +19,16 @@
  * Interaction between core and LFGScripts
  */
 
-#include "Common.h"
-#include "SharedDefines.h"
-#include "Player.h"
-#include "Group.h"
 #include "LFGScripts.h"
+#include "Common.h"
+#include "Group.h"
 #include "LFGMgr.h"
-#include "ScriptMgr.h"
+#include "Log.h"
+#include "Map.h"
+#include "Player.h"
 #include "ObjectAccessor.h"
+#include "ScriptMgr.h"
+#include "SharedDefines.h"
 #include "WorldSession.h"
 
 namespace lfg
@@ -44,6 +46,8 @@ void LFGPlayerScript::OnLogout(Player* player)
         player->GetSession()->SendLfgLfrList(false);
         sLFGMgr->LeaveLfg(player->GetGUID());
     }
+    else if (player->GetSession()->PlayerDisconnected())
+        sLFGMgr->LeaveLfg(player->GetGUID(), true);
 }
 
 void LFGPlayerScript::OnLogin(Player* player, bool /*loginFirst*/)
@@ -87,11 +91,11 @@ void LFGPlayerScript::OnMapChanged(Player* player)
             player->RemoveAurasDueToSpell(LFG_SPELL_LUCK_OF_THE_DRAW);
             player->TeleportTo(player->m_homebindMapId, player->m_homebindX, player->m_homebindY, player->m_homebindZ, 0.0f);
             TC_LOG_ERROR("lfg", "LFGPlayerScript::OnMapChanged, Player %s (%u) is in LFG dungeon map but does not have a valid group! "
-                "Teleporting to homebind.", player->GetName().c_str(), player->GetGUIDLow());
+                "Teleporting to homebind.", player->GetName().c_str(), player->GetGUID().GetCounter());
             return;
         }
 
-        for (GroupReference* itr = group->GetFirstMember(); itr != NULL; itr = itr->next())
+        for (GroupReference* itr = group->GetFirstMember(); itr != nullptr; itr = itr->next())
             if (Player* member = itr->GetSource())
                 player->GetSession()->SendNameQueryOpcode(member->GetGUID());
 
@@ -99,7 +103,17 @@ void LFGPlayerScript::OnMapChanged(Player* player)
             player->CastSpell(player, LFG_SPELL_LUCK_OF_THE_DRAW, true);
     }
     else
+    {
+        Group* group = player->GetGroup();
+        if (group && group->GetMembersCount() == 1)
+        {
+            sLFGMgr->LeaveLfg(group->GetGUID());
+            group->Disband();
+            TC_LOG_DEBUG("lfg", "LFGPlayerScript::OnMapChanged, Player %s(%s) is last in the lfggroup so we disband the group.",
+                player->GetName().c_str(), player->GetGUID().ToString().c_str());
+        }
         player->RemoveAurasDueToSpell(LFG_SPELL_LUCK_OF_THE_DRAW);
+    }
 }
 
 LFGGroupScript::LFGGroupScript() : GroupScript("LFGGroupScript") { }
@@ -227,6 +241,12 @@ void LFGGroupScript::OnInviteMember(Group* group, ObjectGuid guid)
     // leader and no gguid == first invite after leader is added to new group (this is the real invite)
     if (leader && !gguid)
         sLFGMgr->LeaveLfg(leader);
+}
+
+void AddSC_LFGScripts()
+{
+    new LFGPlayerScript();
+    new LFGGroupScript();
 }
 
 } // namespace lfg

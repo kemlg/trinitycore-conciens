@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -28,14 +28,16 @@ npc_alexstrasza_wr_gate
 EndContentData */
 
 #include "ScriptMgr.h"
-#include "ScriptedCreature.h"
-#include "ScriptedGossip.h"
-#include "SpellScript.h"
-#include "SpellAuraEffects.h"
-#include "ScriptedEscortAI.h"
-#include "Vehicle.h"
 #include "CombatAI.h"
+#include "MotionMaster.h"
+#include "ObjectAccessor.h"
+#include "ObjectMgr.h"
 #include "Player.h"
+#include "ScriptedEscortAI.h"
+#include "ScriptedGossip.h"
+#include "SpellInfo.h"
+#include "SpellScript.h"
+#include "Vehicle.h"
 
 /*#####
 # npc_commander_eligor_dawnbringer
@@ -174,7 +176,7 @@ class npc_commander_eligor_dawnbringer : public CreatureScript
                 {
                     if (id == 1)
                     {
-                        me->SetFacingTo(PosTalkLocations[talkWing].m_orientation);
+                        me->SetFacingTo(PosTalkLocations[talkWing].GetOrientation());
                         TurnAudience();
 
                         switch (talkWing)
@@ -360,52 +362,10 @@ class npc_commander_eligor_dawnbringer : public CreatureScript
                 uint8    talkWing;
         };
 
-        CreatureAI* GetAI(Creature* creature) const
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_commander_eligor_dawnbringerAI(creature);
         }
-};
-
-enum AlexstraszaWrGate
-{
-    // Quest
-    QUEST_RETURN_TO_AG_A    = 12499,
-    QUEST_RETURN_TO_AG_H    = 12500,
-
-    // Movie
-    MOVIE_ID_GATES          = 14
-};
-
-#define GOSSIP_ITEM_WHAT_HAPPENED   "Alexstrasza, can you show me what happened here?"
-
-class npc_alexstrasza_wr_gate : public CreatureScript
-{
-public:
-    npc_alexstrasza_wr_gate() : CreatureScript("npc_alexstrasza_wr_gate") { }
-
-    bool OnGossipHello(Player* player, Creature* creature) override
-    {
-        if (creature->IsQuestGiver())
-            player->PrepareQuestMenu(creature->GetGUID());
-
-        if (player->GetQuestRewardStatus(QUEST_RETURN_TO_AG_A) || player->GetQuestRewardStatus(QUEST_RETURN_TO_AG_H))
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_WHAT_HAPPENED, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-
-        player->SEND_GOSSIP_MENU(player->GetGossipTextId(creature), creature->GetGUID());
-        return true;
-    }
-
-    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action) override
-    {
-        player->PlayerTalkClass->ClearMenus();
-        if (action == GOSSIP_ACTION_INFO_DEF+1)
-        {
-            player->CLOSE_GOSSIP_MENU();
-            player->SendMovieStart(MOVIE_ID_GATES);
-        }
-
-        return true;
-    }
 };
 
 /*######
@@ -421,9 +381,7 @@ enum StrengthenAncientsMisc
     SPELL_CREATE_ITEM_BARK      = 47550,
     SPELL_CONFUSED              = 47044,
 
-    NPC_LOTHALOR                = 26321,
-
-    FACTION_WALKER_ENEMY        = 14,
+    NPC_LOTHALOR                = 26321
 };
 
 class spell_q12096_q12092_dummy : public SpellScriptLoader // Strengthen the Ancients: On Interact Dummy to Woodlands Walker
@@ -453,10 +411,10 @@ public:
                 tree->AI()->Talk(SAY_WALKER_FRIENDLY, player);
                 tree->DespawnOrUnsummon(1000);
             }
-            else if (roll == 0) // enemy version
+            else // enemy version
             {
                 tree->AI()->Talk(SAY_WALKER_ENEMY, player);
-                tree->setFaction(FACTION_WALKER_ENEMY);
+                tree->SetFaction(FACTION_MONSTER);
                 tree->Attack(player, true);
             }
         }
@@ -536,33 +494,6 @@ class npc_wyrmrest_defender : public CreatureScript
     public:
         npc_wyrmrest_defender() : CreatureScript("npc_wyrmrest_defender") { }
 
-        bool OnGossipHello(Player* player, Creature* creature) override
-        {
-            if (player->GetQuestStatus(QUEST_DEFENDING_WYRMREST_TEMPLE) == QUEST_STATUS_INCOMPLETE)
-            {
-                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-                player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_DEF1, creature->GetGUID());
-            }
-            else
-                player->SEND_GOSSIP_MENU(player->GetGossipTextId(creature), creature->GetGUID());
-
-            return true;
-        }
-
-        bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
-        {
-            player->PlayerTalkClass->ClearMenus();
-            if (action == GOSSIP_ACTION_INFO_DEF+1)
-            {
-                player->SEND_GOSSIP_MENU(GOSSIP_TEXTID_DEF2, creature->GetGUID());
-                // Makes player cast trigger spell for 49207 on self
-                player->CastSpell(player, SPELL_CHARACTER_SCRIPT, true);
-                // The gossip should not auto close
-            }
-
-            return true;
-        }
-
         struct npc_wyrmrest_defenderAI : public VehicleAI
         {
             npc_wyrmrest_defenderAI(Creature* creature) : VehicleAI(creature)
@@ -590,6 +521,8 @@ class npc_wyrmrest_defender : public CreatureScript
 
             void UpdateAI(uint32 diff) override
             {
+                VehicleAI::UpdateAI(diff);
+
                 // Check system for Health Warning should happen first time whenever get under 30%,
                 // after it should be able to happen only after recovery of last renew is fully done (20 sec),
                 // next one used won't interfere
@@ -606,7 +539,8 @@ class npc_wyrmrest_defender : public CreatureScript
                         renewRecoveryCanCheck = false;
                         hpWarningReady = true;
                     }
-                    else RenewRecoveryChecker -= diff;
+                    else
+                        RenewRecoveryChecker -= diff;
                 }
             }
 
@@ -616,7 +550,7 @@ class npc_wyrmrest_defender : public CreatureScript
                 {
                     case SPELL_WYRMREST_DEFENDER_MOUNT:
                         Talk(WHISPER_MOUNTED, me->GetCharmerOrOwner());
-                        me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC);
+                        me->SetImmuneToAll(false);
                         me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP_ATTACKABLE);
                         break;
                     // Both below are for checking low hp warning
@@ -625,12 +559,39 @@ class npc_wyrmrest_defender : public CreatureScript
                         break;
                     case SPELL_RENEW:
                         if (!hpWarningReady && RenewRecoveryChecker <= 100)
-                        {
                             RenewRecoveryChecker = 20000;
-                        }
+
                         renewRecoveryCanCheck = true;
                         break;
                 }
+            }
+
+            bool GossipHello(Player* player) override
+            {
+                if (player->GetQuestStatus(QUEST_DEFENDING_WYRMREST_TEMPLE) == QUEST_STATUS_INCOMPLETE)
+                {
+                    AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_ITEM_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+                    SendGossipMenuFor(player, GOSSIP_TEXTID_DEF1, me->GetGUID());
+                }
+                else
+                    SendGossipMenuFor(player, player->GetGossipTextId(me), me->GetGUID());
+
+                return true;
+            }
+
+            bool GossipSelect(Player* player, uint32 /*menuId*/, uint32 gossipListId) override
+            {
+                uint32 const action = player->PlayerTalkClass->GetGossipOptionAction(gossipListId);
+                ClearGossipMenuFor(player);
+                if (action == GOSSIP_ACTION_INFO_DEF + 1)
+                {
+                    SendGossipMenuFor(player, GOSSIP_TEXTID_DEF2, me->GetGUID());
+                    // Makes player cast trigger spell for 49207 on self
+                    player->CastSpell(player, SPELL_CHARACTER_SCRIPT, true);
+                    // The gossip should not auto close
+                }
+
+                return true;
             }
         };
 
@@ -681,7 +642,7 @@ class npc_torturer_lecraft : public CreatureScript
                     Talk (SAY_AGGRO, player);
             }
 
-            void SpellHit(Unit* caster, const SpellInfo* spell) override
+            void SpellHit(Unit* caster, SpellInfo const* spell) override
             {
                 if (spell->Id != SPELL_HIGH_EXECUTORS_BRANDING_IRON)
                     return;
@@ -737,18 +698,43 @@ class npc_torturer_lecraft : public CreatureScript
                 ObjectGuid _playerGUID;
         };
 
-        CreatureAI* GetAI(Creature* creature) const
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_torturer_lecraftAI(creature);
         }
 };
 
+enum MessengerTorvus
+{
+    NPC_MESSENGER_TORVUS        = 26649,
+    QUEST_MESSAGE_FROM_THE_WEST = 12033,
+
+    TALK_0 = 0
+};
+
+class at_nearby_messenger_torvus : public AreaTriggerScript
+{
+public:
+    at_nearby_messenger_torvus() : AreaTriggerScript("at_nearby_messenger_torvus") { }
+
+    bool OnTrigger(Player* player, AreaTriggerEntry const* /*at*/) override
+    {
+        if (player->IsAlive())
+            if (Quest const* quest = sObjectMgr->GetQuestTemplate(QUEST_MESSAGE_FROM_THE_WEST))
+                if (player->CanTakeQuest(quest, false))
+                    if (Creature* creature = player->FindNearestCreature(NPC_MESSENGER_TORVUS, 50.0f, true))
+                        creature->AI()->Talk(TALK_0, player);
+
+        return true;
+    }
+};
+
 void AddSC_dragonblight()
 {
     new npc_commander_eligor_dawnbringer();
-    new npc_alexstrasza_wr_gate();
     new spell_q12096_q12092_dummy();
     new spell_q12096_q12092_bark();
     new npc_wyrmrest_defender();
     new npc_torturer_lecraft();
+    new at_nearby_messenger_torvus();
 }

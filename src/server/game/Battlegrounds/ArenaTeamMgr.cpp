@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,8 +21,8 @@
 #include "Log.h"
 #include "DatabaseEnv.h"
 #include "Language.h"
-#include "ObjectAccessor.h"
 #include "Player.h"
+#include "ObjectAccessor.h"
 
 ArenaTeamMgr::ArenaTeamMgr()
 {
@@ -35,6 +35,12 @@ ArenaTeamMgr::~ArenaTeamMgr()
         delete itr->second;
 }
 
+ArenaTeamMgr* ArenaTeamMgr::instance()
+{
+    static ArenaTeamMgr instance;
+    return &instance;
+}
+
 // Arena teams collection
 ArenaTeam* ArenaTeamMgr::GetArenaTeamById(uint32 arenaTeamId) const
 {
@@ -42,7 +48,7 @@ ArenaTeam* ArenaTeamMgr::GetArenaTeamById(uint32 arenaTeamId) const
     if (itr != ArenaTeamStore.end())
         return itr->second;
 
-    return NULL;
+    return nullptr;
 }
 
 ArenaTeam* ArenaTeamMgr::GetArenaTeamByName(const std::string& arenaTeamName) const
@@ -56,7 +62,7 @@ ArenaTeam* ArenaTeamMgr::GetArenaTeamByName(const std::string& arenaTeamName) co
         if (search == teamName)
             return itr->second;
     }
-    return NULL;
+    return nullptr;
 }
 
 ArenaTeam* ArenaTeamMgr::GetArenaTeamByCaptain(ObjectGuid guid) const
@@ -65,7 +71,7 @@ ArenaTeam* ArenaTeamMgr::GetArenaTeamByCaptain(ObjectGuid guid) const
         if (itr->second->GetCaptain() == guid)
             return itr->second;
 
-    return NULL;
+    return nullptr;
 }
 
 void ArenaTeamMgr::AddArenaTeam(ArenaTeam* arenaTeam)
@@ -93,7 +99,7 @@ void ArenaTeamMgr::LoadArenaTeams()
     uint32 oldMSTime = getMSTime();
 
     // Clean out the trash before loading anything
-    CharacterDatabase.Execute("DELETE FROM arena_team_member WHERE arenaTeamId NOT IN (SELECT arenaTeamId FROM arena_team)");       // One-time query
+    CharacterDatabase.DirectExecute("DELETE FROM arena_team_member WHERE arenaTeamId NOT IN (SELECT arenaTeamId FROM arena_team)");       // One-time query
 
     //                                                        0        1         2         3          4              5            6            7           8
     QueryResult result = CharacterDatabase.Query("SELECT arenaTeamId, name, captainGuid, type, backgroundColor, emblemStyle, emblemColor, borderStyle, borderColor, "
@@ -121,7 +127,7 @@ void ArenaTeamMgr::LoadArenaTeams()
 
         if (!newArenaTeam->LoadArenaTeamFromDB(result) || !newArenaTeam->LoadMembersFromDB(result2))
         {
-            newArenaTeam->Disband(NULL);
+            newArenaTeam->Disband(nullptr);
             delete newArenaTeam;
             continue;
         }
@@ -158,7 +164,7 @@ void ArenaTeamMgr::DistributeArenaPoints()
     for (std::map<uint32, uint32>::iterator playerItr = PlayerPoints.begin(); playerItr != PlayerPoints.end(); ++playerItr)
     {
         // Add points to player if online
-        if (Player* player = ObjectAccessor::FindConnectedPlayer(ObjectGuid(HIGHGUID_PLAYER, playerItr->first)))
+        if (Player* player = ObjectAccessor::FindConnectedPlayer(ObjectGuid(HighGuid::Player, playerItr->first)))
             player->ModifyArenaPoints(playerItr->second, trans);
         else    // Update database
         {
@@ -180,8 +186,9 @@ void ArenaTeamMgr::DistributeArenaPoints()
     {
         if (ArenaTeam* at = titr->second)
         {
-            at->FinishWeek();
-            at->SaveToDB();
+            if (at->FinishWeek())
+                at->SaveToDB();
+
             at->NotifyStatsChanged();
         }
     }

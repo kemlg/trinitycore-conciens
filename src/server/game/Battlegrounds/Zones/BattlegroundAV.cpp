@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -17,17 +17,26 @@
  */
 
 #include "BattlegroundAV.h"
-
-#include "ObjectMgr.h"
-#include "WorldPacket.h"
-
-#include "Formulas.h"
+#include "Creature.h"
+#include "CreatureAI.h"
+#include "DBCStores.h"
 #include "GameObject.h"
 #include "Language.h"
+#include "Log.h"
+#include "MotionMaster.h"
+#include "ObjectMgr.h"
 #include "Player.h"
-#include "ScriptedCreature.h"
-#include "SpellAuras.h"
 #include "WorldSession.h"
+
+void BattlegroundAVScore::BuildObjectivesBlock(WorldPacket& data)
+{
+    data << uint32(5); // Objectives Count
+    data << uint32(GraveyardsAssaulted);
+    data << uint32(GraveyardsDefended);
+    data << uint32(TowersAssaulted);
+    data << uint32(TowersDefended);
+    data << uint32(MinesCaptured);
+}
 
 BattlegroundAV::BattlegroundAV()
 {
@@ -275,7 +284,7 @@ void BattlegroundAV::UpdateScore(uint16 team, int16 points)
 Creature* BattlegroundAV::AddAVCreature(uint16 cinfoid, uint16 type)
 {
     bool isStatic = false;
-    Creature* creature = NULL;
+    Creature* creature = nullptr;
     ASSERT(type <= AV_CPLACE_MAX + AV_STATICCPLACE_MAX);
     if (type >= AV_CPLACE_MAX) //static
     {
@@ -294,7 +303,7 @@ Creature* BattlegroundAV::AddAVCreature(uint16 cinfoid, uint16 type)
         creature = AddCreature(BG_AV_CreatureInfo[cinfoid], type, BG_AV_CreaturePos[type]);
     }
     if (!creature)
-        return NULL;
+        return nullptr;
     if (creature->GetEntry() == BG_AV_CreatureInfo[AV_NPC_A_CAPTAIN] || creature->GetEntry() == BG_AV_CreatureInfo[AV_NPC_H_CAPTAIN])
         creature->SetRespawnDelay(RESPAWN_ONE_DAY); /// @todo look if this can be done by database + also add this for the wingcommanders
 
@@ -304,7 +313,8 @@ Creature* BattlegroundAV::AddAVCreature(uint16 cinfoid, uint16 type)
         if (!isStatic && ((cinfoid >= AV_NPC_A_GRAVEDEFENSE0 && cinfoid <= AV_NPC_A_GRAVEDEFENSE3)
             || (cinfoid >= AV_NPC_H_GRAVEDEFENSE0 && cinfoid <= AV_NPC_H_GRAVEDEFENSE3)))
         {
-            CreatureData &data = sObjectMgr->NewOrExistCreatureData(creature->GetDBTableGUIDLow());
+            CreatureData &data = sObjectMgr->NewOrExistCreatureData(creature->GetSpawnId());
+            data.spawnGroupData = sObjectMgr->GetDefaultSpawnGroup();
             data.spawndist = 5;
         }
         //else spawndist will be 15, so creatures move maximum=10
@@ -342,7 +352,7 @@ Creature* BattlegroundAV::AddAVCreature(uint16 cinfoid, uint16 type)
     {
         if (Creature* trigger = AddCreature(WORLD_TRIGGER, triggerSpawnID, BG_AV_CreaturePos[triggerSpawnID]))
         {
-            trigger->setFaction(newFaction);
+            trigger->SetFaction(newFaction);
             trigger->CastSpell(trigger, SPELL_HONORABLE_DEFENDER_25Y, false);
         }
     }
@@ -394,7 +404,7 @@ void BattlegroundAV::PostUpdateImpl(uint32 diff)
             }
         }
         if (m_Mine_Timer <= 0)
-            m_Mine_Timer=AV_MINE_TICK_TIMER; //this is at the end, cause we need to update both mines
+            m_Mine_Timer = AV_MINE_TICK_TIMER; //this is at the end, cause we need to update both mines
 
         //looks for all timers of the nodes and destroy the building (for graveyards the building wont get destroyed, it goes just to the other team
         for (BG_AV_Nodes i = BG_AV_NODES_FIRSTAID_STATION; i < BG_AV_NODES_MAX; ++i)
@@ -437,7 +447,7 @@ void BattlegroundAV::StartingEventOpenDoors()
 void BattlegroundAV::AddPlayer(Player* player)
 {
     Battleground::AddPlayer(player);
-    PlayerScores[player->GetGUIDLow()] = new BattlegroundAVScore(player->GetGUID());
+    PlayerScores[player->GetGUID().GetCounter()] = new BattlegroundAVScore(player->GetGUID());
 }
 
 void BattlegroundAV::EndBattleground(uint32 winner)
@@ -754,7 +764,7 @@ void BattlegroundAV::PopulateNode(BG_AV_Nodes node)
             DelCreature(node + 302);
             return;
         }
-        trigger->setFaction(owner == ALLIANCE ? 84 : 83);
+        trigger->SetFaction(owner == ALLIANCE ? FACTION_ALLIANCE_GENERIC : FACTION_HORDE_GENERIC);
         trigger->CastSpell(trigger, SPELL_HONORABLE_DEFENDER_25Y, false);
     }
 }
@@ -791,7 +801,7 @@ BG_AV_Nodes BattlegroundAV::GetNodeThroughObject(uint32 object)
     if (object == BG_AV_OBJECT_FLAG_N_SNOWFALL_GRAVE)
         return BG_AV_NODES_SNOWFALL_GRAVE;
     TC_LOG_ERROR("bg.battleground", "BattlegroundAV: ERROR! GetPlace got a wrong object :(");
-    ASSERT(false);
+    ABORT();
     return BG_AV_Nodes(0);
 }
 
@@ -829,7 +839,7 @@ uint32 BattlegroundAV::GetObjectThroughNode(BG_AV_Nodes node)
     else if (m_Nodes[node].Owner == AV_NEUTRAL_TEAM)
         return BG_AV_OBJECT_FLAG_N_SNOWFALL_GRAVE;
     TC_LOG_ERROR("bg.battleground", "BattlegroundAV: Error! GetPlaceNode couldn't resolve node %i", node);
-    ASSERT(false);
+    ABORT();
     return 0;
 }
 
@@ -1094,10 +1104,10 @@ void BattlegroundAV::SendMineWorldStates(uint32 mine)
         UpdateWorldState(BG_AV_MineWorldStates[mine2][prevowner], 0);
 }
 
-WorldSafeLocsEntry const* BattlegroundAV::GetClosestGraveYard(Player* player)
+WorldSafeLocsEntry const* BattlegroundAV::GetClosestGraveyard(Player* player)
 {
-    WorldSafeLocsEntry const* pGraveyard = NULL;
-    WorldSafeLocsEntry const* entry = NULL;
+    WorldSafeLocsEntry const* pGraveyard = nullptr;
+    WorldSafeLocsEntry const* entry = nullptr;
     float dist = 0;
     float minDist = 0;
     float x, y;
@@ -1378,10 +1388,10 @@ bool BattlegroundAV::SetupBattleground()
 
     //creatures
     TC_LOG_DEBUG("bg.battleground", "BG_AV start poputlating nodes");
-    for (BG_AV_Nodes i = BG_AV_NODES_FIRSTAID_STATION; i < BG_AV_NODES_MAX; ++i)
+    for (BG_AV_Nodes n = BG_AV_NODES_FIRSTAID_STATION; n < BG_AV_NODES_MAX; ++n)
     {
-        if (m_Nodes[i].Owner)
-            PopulateNode(i);
+        if (m_Nodes[n].Owner)
+            PopulateNode(n);
     }
     //all creatures which don't get despawned through the script are static
     TC_LOG_DEBUG("bg.battleground", "BG_AV: start spawning static creatures");
@@ -1404,22 +1414,22 @@ void BattlegroundAV::AssaultNode(BG_AV_Nodes node, uint16 team)
     if (m_Nodes[node].TotalOwner == team)
     {
         TC_LOG_FATAL("bg.battleground", "Assaulting team is TotalOwner of node");
-        ASSERT(false);
+        ABORT();
     }
     if (m_Nodes[node].Owner == team)
     {
         TC_LOG_FATAL("bg.battleground", "Assaulting team is owner of node");
-        ASSERT(false);
+        ABORT();
     }
     if (m_Nodes[node].State == POINT_DESTROYED)
     {
         TC_LOG_FATAL("bg.battleground", "Destroyed node is being assaulted");
-        ASSERT(false);
+        ABORT();
     }
     if (m_Nodes[node].State == POINT_ASSAULTED && m_Nodes[node].TotalOwner) //only assault an assaulted node if no totalowner exists
     {
         TC_LOG_FATAL("bg.battleground", "Assault on an not assaulted node with total owner");
-        ASSERT(false);
+        ABORT();
     }
     //the timer gets another time, if the previous owner was 0 == Neutral
     m_Nodes[node].Timer      = (m_Nodes[node].PrevOwner)? BG_AV_CAPTIME : BG_AV_SNOWFALL_FIRSTCAP;
@@ -1488,7 +1498,7 @@ void BattlegroundAV::ResetBGSubclass()
         InitNode(i, HORDE, true);
     InitNode(BG_AV_NODES_SNOWFALL_GRAVE, AV_NEUTRAL_TEAM, false); //give snowfall neutral owner
 
-    m_Mine_Timer=AV_MINE_TICK_TIMER;
+    m_Mine_Timer = AV_MINE_TICK_TIMER;
     for (uint16 i = 0; i < AV_CPLACE_MAX+AV_STATICCPLACE_MAX; i++)
         if (BgCreatures[i])
             DelCreature(i);

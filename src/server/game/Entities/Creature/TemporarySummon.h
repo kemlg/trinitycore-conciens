@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -21,23 +21,9 @@
 
 #include "Creature.h"
 
-enum SummonerType
-{
-    SUMMONER_TYPE_CREATURE      = 0,
-    SUMMONER_TYPE_GAMEOBJECT    = 1,
-    SUMMONER_TYPE_MAP           = 2
-};
+struct SummonPropertiesEntry;
 
-/// Stores data for temp summons
-struct TempSummonData
-{
-    uint32 entry;        ///< Entry of summoned creature
-    Position pos;        ///< Position, where should be creature spawned
-    TempSummonType type; ///< Summon type, see TempSummonType for available types
-    uint32 time;         ///< Despawn time, usable only with certain temp summon types
-};
-
-class TempSummon : public Creature
+class TC_GAME_API TempSummon : public Creature
 {
     public:
         explicit TempSummon(SummonPropertiesEntry const* properties, Unit* owner, bool isWorldObject);
@@ -45,6 +31,7 @@ class TempSummon : public Creature
         void Update(uint32 time) override;
         virtual void InitStats(uint32 lifetime);
         virtual void InitSummon();
+        void UpdateObjectVisibilityOnCreate() override;
         virtual void UnSummon(uint32 msTime = 0);
         void RemoveFromWorld() override;
         void SetTempSummonType(TempSummonType type);
@@ -53,9 +40,9 @@ class TempSummon : public Creature
         Creature* GetSummonerCreatureBase() const;
         ObjectGuid GetSummonerGUID() const { return m_summonerGUID; }
         TempSummonType const& GetSummonType() { return m_type; }
-        uint32 GetTimer() { return m_timer; }
+        uint32 GetTimer() const { return m_timer; }
 
-        const SummonPropertiesEntry* const m_Properties;
+        SummonPropertiesEntry const* const m_Properties;
     private:
         TempSummonType m_type;
         uint32 m_timer;
@@ -63,7 +50,7 @@ class TempSummon : public Creature
         ObjectGuid m_summonerGUID;
 };
 
-class Minion : public TempSummon
+class TC_GAME_API Minion : public TempSummon
 {
     public:
         Minion(SummonPropertiesEntry const* properties, Unit* owner, bool isWorldObject);
@@ -72,15 +59,16 @@ class Minion : public TempSummon
         Unit* GetOwner() const { return m_owner; }
         float GetFollowAngle() const override { return m_followAngle; }
         void SetFollowAngle(float angle) { m_followAngle = angle; }
-        bool IsPetGhoul() const {return GetEntry() == 26125;} // Ghoul may be guardian or pet
-        bool IsSpiritWolf() const {return GetEntry() == 29264;} // Spirit wolf from feral spirits
+        bool IsPetGhoul() const { return GetEntry() == 26125; } // Ghoul may be guardian or pet
+        bool IsSpiritWolf() const { return GetEntry() == 29264; } // Spirit wolf from feral spirits
         bool IsGuardianPet() const;
+        bool IsRisenAlly() const { return GetEntry() == 30230; }
     protected:
         Unit* const m_owner;
         float m_followAngle;
 };
 
-class Guardian : public Minion
+class TC_GAME_API Guardian : public Minion
 {
     public:
         Guardian(SummonPropertiesEntry const* properties, Unit* owner, bool isWorldObject);
@@ -98,13 +86,14 @@ class Guardian : public Minion
         void UpdateDamagePhysical(WeaponAttackType attType) override;
 
         int32 GetBonusDamage() const { return m_bonusSpellDamage; }
+        float GetBonusStatFromOwner(Stats stat) const { return m_statFromOwner[stat]; }
         void SetBonusDamage(int32 damage);
     protected:
         int32   m_bonusSpellDamage;
         float   m_statFromOwner[MAX_STATS];
 };
 
-class Puppet : public Minion
+class TC_GAME_API Puppet : public Minion
 {
     public:
         Puppet(SummonPropertiesEntry const* properties, Unit* owner);
@@ -114,7 +103,7 @@ class Puppet : public Minion
         void RemoveFromWorld() override;
 };
 
-class ForcedUnsummonDelayEvent : public BasicEvent
+class TC_GAME_API ForcedUnsummonDelayEvent : public BasicEvent
 {
 public:
     ForcedUnsummonDelayEvent(TempSummon& owner) : BasicEvent(), m_owner(owner) { }

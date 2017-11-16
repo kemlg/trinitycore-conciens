@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -15,20 +15,18 @@
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#include <limits.h>
 
 #include "PathCommon.h"
 #include "MapBuilder.h"
-
 #include "MapTree.h"
-#include "ModelInstance.h"
-
 #include "DetourNavMeshBuilder.h"
 #include "DetourNavMesh.h"
-#include "DetourCommon.h"
+#include "IntermediateValues.h"
+
+#include <limits.h>
 
 #define MMAP_MAGIC 0x4d4d4150   // 'MMAP'
-#define MMAP_VERSION 5
+#define MMAP_VERSION 6
 
 struct MmapTileHeader
 {
@@ -36,18 +34,28 @@ struct MmapTileHeader
     uint32 dtVersion;
     uint32 mmapVersion;
     uint32 size;
-    bool usesLiquids : 1;
+    char usesLiquids;
+    char padding[3];
 
     MmapTileHeader() : mmapMagic(MMAP_MAGIC), dtVersion(DT_NAVMESH_VERSION),
-        mmapVersion(MMAP_VERSION), size(0), usesLiquids(true) {}
+        mmapVersion(MMAP_VERSION), size(0), usesLiquids(true), padding() {}
 };
+
+// All padding fields must be handled and initialized to ensure mmaps_generator will produce binary-identical *.mmtile files
+static_assert(sizeof(MmapTileHeader) == 20, "MmapTileHeader size is not correct, adjust the padding field size");
+static_assert(sizeof(MmapTileHeader) == (sizeof(MmapTileHeader::mmapMagic) +
+                                         sizeof(MmapTileHeader::dtVersion) +
+                                         sizeof(MmapTileHeader::mmapVersion) +
+                                         sizeof(MmapTileHeader::size) +
+                                         sizeof(MmapTileHeader::usesLiquids) +
+                                         sizeof(MmapTileHeader::padding)), "MmapTileHeader has uninitialized padding fields");
 
 namespace MMAP
 {
     MapBuilder::MapBuilder(float maxWalkableAngle, bool skipLiquid,
         bool skipContinents, bool skipJunkMaps, bool skipBattlegrounds,
-        bool debugOutput, bool bigBaseUnit, const char* offMeshFilePath) :
-        m_terrainBuilder     (NULL),
+        bool debugOutput, bool bigBaseUnit, int mapid, char const* offMeshFilePath) :
+        m_terrainBuilder     (nullptr),
         m_debugOutput        (debugOutput),
         m_offMeshFilePath    (offMeshFilePath),
         m_skipContinents     (skipContinents),
@@ -55,7 +63,10 @@ namespace MMAP
         m_skipBattlegrounds  (skipBattlegrounds),
         m_maxWalkableAngle   (maxWalkableAngle),
         m_bigBaseUnit        (bigBaseUnit),
-        m_rcContext          (NULL),
+        m_mapid              (mapid),
+        m_totalTiles         (0u),
+        m_totalTilesProcessed(0u),
+        m_rcContext          (nullptr),
         _cancelationToken    (false)
     {
         m_terrainBuilder = new TerrainBuilder(skipLiquid);
@@ -142,8 +153,29 @@ namespace MMAP
                 if (tiles->insert(tileID).second)
                     count++;
             }
+
+            // make sure we process maps which don't have tiles
+            if (tiles->empty())
+            {
+                // convert coord bounds to grid bounds
+                uint32 minX, minY, maxX, maxY;
+                getGridBounds(mapID, minX, minY, maxX, maxY);
+
+                // add all tiles within bounds to tile list.
+                for (uint32 i = minX; i <= maxX; ++i)
+                    for (uint32 j = minY; j <= maxY; ++j)
+                        if (tiles->insert(StaticMapTree::packTileID(i, j)).second)
+                            count++;
+            }
         }
         printf("found %u.\n\n", count);
+
+        // Calculate tiles to process in total
+        for (TileList::iterator it = m_tiles.begin(); it != m_tiles.end(); ++it)
+        {
+            if (!shouldSkipMap(it->m_mapId))
+                m_totalTiles += it->m_tiles->size();
+        }
     }
 
     /**************************************************************************/
@@ -164,7 +196,7 @@ namespace MMAP
     {
         while (1)
         {
-            uint32 mapId;
+            uint32 mapId = 0;
 
             _queue.WaitAndPop(mapId);
 
@@ -175,9 +207,11 @@ namespace MMAP
         }
     }
 
-    void MapBuilder::buildAllMaps(int threads)
+    void MapBuilder::buildAllMaps(unsigned int threads)
     {
-        for (int i = 0; i < threads; ++i)
+        printf("Using %u threads to extract mmaps\n", threads);
+
+        for (unsigned int i = 0; i < threads; ++i)
         {
             _workerThreads.push_back(std::thread(&MapBuilder::WorkerThread, this));
         }
@@ -215,12 +249,14 @@ namespace MMAP
     }
 
     /**************************************************************************/
-    void MapBuilder::getGridBounds(uint32 mapID, uint32 &minX, uint32 &minY, uint32 &maxX, uint32 &maxY)
+    void MapBuilder::getGridBounds(uint32 mapID, uint32 &minX, uint32 &minY, uint32 &maxX, uint32 &maxY) const
     {
-        maxX = INT_MAX;
-        maxY = INT_MAX;
-        minX = INT_MIN;
-        minY = INT_MIN;
+        // min and max are initialized to invalid values so the caller iterating the [min, max] range
+        // will never enter the loop unless valid min/max values are found
+        maxX = 0;
+        maxY = 0;
+        minX = std::numeric_limits<uint32>::max();
+        minY = std::numeric_limits<uint32>::max();
 
         float bmin[3] = { 0, 0, 0 };
         float bmax[3] = { 0, 0, 0 };
@@ -281,7 +317,7 @@ namespace MMAP
             return;
         }
 
-        dtNavMesh* navMesh = NULL;
+        dtNavMesh* navMesh = nullptr;
         buildNavMesh(mapId, navMesh);
         if (!navMesh)
         {
@@ -345,7 +381,7 @@ namespace MMAP
     /**************************************************************************/
     void MapBuilder::buildSingleTile(uint32 mapID, uint32 tileX, uint32 tileY)
     {
-        dtNavMesh* navMesh = NULL;
+        dtNavMesh* navMesh = nullptr;
         buildNavMesh(mapID, navMesh);
         if (!navMesh)
         {
@@ -360,33 +396,17 @@ namespace MMAP
     /**************************************************************************/
     void MapBuilder::buildMap(uint32 mapID)
     {
-#ifndef __APPLE__
-        //printf("[Thread %u] Building map %03u:\n", uint32(ACE_Thread::self()), mapID);
-#endif
-
         std::set<uint32>* tiles = getTileList(mapID);
-
-        // make sure we process maps which don't have tiles
-        if (!tiles->size())
-        {
-            // convert coord bounds to grid bounds
-            uint32 minX, minY, maxX, maxY;
-            getGridBounds(mapID, minX, minY, maxX, maxY);
-
-            // add all tiles within bounds to tile list.
-            for (uint32 i = minX; i <= maxX; ++i)
-                for (uint32 j = minY; j <= maxY; ++j)
-                    tiles->insert(StaticMapTree::packTileID(i, j));
-        }
 
         if (!tiles->empty())
         {
             // build navMesh
-            dtNavMesh* navMesh = NULL;
+            dtNavMesh* navMesh = nullptr;
             buildNavMesh(mapID, navMesh);
             if (!navMesh)
             {
                 printf("[Map %03i] Failed creating navmesh!\n", mapID);
+                m_totalTilesProcessed += tiles->size();
                 return;
             }
 
@@ -399,10 +419,9 @@ namespace MMAP
                 // unpack tile coords
                 StaticMapTree::unpackTileID((*it), tileX, tileY);
 
-                if (shouldSkipTile(mapID, tileX, tileY))
-                    continue;
-
-                buildTile(mapID, tileX, tileY, navMesh);
+                if (!shouldSkipTile(mapID, tileX, tileY))
+                    buildTile(mapID, tileX, tileY, navMesh);
+                ++m_totalTilesProcessed;
             }
 
             dtFreeNavMesh(navMesh);
@@ -414,7 +433,7 @@ namespace MMAP
     /**************************************************************************/
     void MapBuilder::buildTile(uint32 mapID, uint32 tileX, uint32 tileY, dtNavMesh* navMesh)
     {
-        printf("[Map %03i] Building tile [%02u,%02u]\n", mapID, tileX, tileY);
+        printf("%u%% [Map %03i] Building tile [%02u,%02u]\n", percentageDone(m_totalTiles, m_totalTilesProcessed), mapID, tileX, tileY);
 
         MeshData meshData;
 
@@ -461,7 +480,7 @@ namespace MMAP
         //if (tileBits < 1) tileBits = 1;                                     // need at least one bit!
         //int polyBits = sizeof(dtPolyRef)*8 - SALT_MIN_BITS - tileBits;
 
-        int polyBits = STATIC_POLY_BITS;
+        int polyBits = DT_POLY_BITS;
 
         int maxTiles = tiles->size();
         int maxPolysPerTile = 1 << polyBits;
@@ -486,7 +505,7 @@ namespace MMAP
 
         // use Max because '32 - tileX' is negative for values over 32
         float bmin[3], bmax[3];
-        getTileBounds(tileXMax, tileYMax, NULL, 0, bmin, bmax);
+        getTileBounds(tileXMax, tileYMax, nullptr, 0, bmin, bmax);
 
         /***       now create the navmesh       ***/
 
@@ -684,11 +703,11 @@ namespace MMAP
                 // we may want to keep them in the future for debug
                 // but right now, we don't have the code to merge them
                 rcFreeHeightField(tile.solid);
-                tile.solid = NULL;
+                tile.solid = nullptr;
                 rcFreeCompactHeightfield(tile.chf);
-                tile.chf = NULL;
+                tile.chf = nullptr;
                 rcFreeContourSet(tile.cset);
-                tile.cset = NULL;
+                tile.cset = nullptr;
 
                 pmmerge[nmerge] = tile.pmesh;
                 dmmerge[nmerge] = tile.dmesh;
@@ -699,7 +718,7 @@ namespace MMAP
         iv.polyMesh = rcAllocPolyMesh();
         if (!iv.polyMesh)
         {
-            printf("%s alloc iv.polyMesh FIALED!\n", tileString);
+            printf("%s alloc iv.polyMesh FAILED!\n", tileString);
             delete[] pmmerge;
             delete[] dmmerge;
             delete[] tiles;
@@ -710,7 +729,7 @@ namespace MMAP
         iv.polyMeshDetail = rcAllocPolyMeshDetail();
         if (!iv.polyMeshDetail)
         {
-            printf("%s alloc m_dmesh FIALED!\n", tileString);
+            printf("%s alloc m_dmesh FAILED!\n", tileString);
             delete[] pmmerge;
             delete[] dmmerge;
             delete[] tiles;
@@ -765,7 +784,7 @@ namespace MMAP
         params.buildBvTree = true;
 
         // will hold final navmesh
-        unsigned char* navData = NULL;
+        unsigned char* navData = nullptr;
         int navDataSize = 0;
 
         do
@@ -833,7 +852,7 @@ namespace MMAP
                 char message[1024];
                 sprintf(message, "[Map %03i] Failed to open %s for writing!\n", mapID, fileName);
                 perror(message);
-                navMesh->removeTile(tileRef, NULL, NULL);
+                navMesh->removeTile(tileRef, nullptr, nullptr);
                 break;
             }
 
@@ -850,7 +869,7 @@ namespace MMAP
             fclose(file);
 
             // now that tile is written to disk, we can unload it
-            navMesh->removeTile(tileRef, NULL, NULL);
+            navMesh->removeTile(tileRef, nullptr, nullptr);
         }
         while (0);
 
@@ -891,6 +910,9 @@ namespace MMAP
     /**************************************************************************/
     bool MapBuilder::shouldSkipMap(uint32 mapID)
     {
+        if (m_mapid >= 0)
+            return static_cast<uint32>(m_mapid) != mapID;
+
         if (m_skipContinents)
             switch (mapID)
             {
@@ -1003,6 +1025,15 @@ namespace MMAP
             return false;
 
         return true;
+    }
+
+    /**************************************************************************/
+    uint32 MapBuilder::percentageDone(uint32 totalTiles, uint32 totalTilesBuilt)
+    {
+        if (totalTiles)
+            return totalTilesBuilt * 100 / totalTiles;
+
+        return 0;
     }
 
 }

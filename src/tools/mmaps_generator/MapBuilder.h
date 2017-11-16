@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -19,19 +19,17 @@
 #ifndef _MAP_BUILDER_H
 #define _MAP_BUILDER_H
 
-#include <vector>
-#include <set>
-#include <map>
-#include <list>
-#include <atomic>
-#include <thread>
-
 #include "TerrainBuilder.h"
-#include "IntermediateValues.h"
 
 #include "Recast.h"
 #include "DetourNavMesh.h"
 #include "ProducerConsumerQueue.h"
+
+#include <vector>
+#include <set>
+#include <list>
+#include <atomic>
+#include <thread>
 
 using namespace VMAP;
 
@@ -39,7 +37,7 @@ namespace MMAP
 {
     struct MapTiles
     {
-        MapTiles() : m_mapId(uint32(-1)), m_tiles(NULL) {}
+        MapTiles() : m_mapId(uint32(-1)), m_tiles(nullptr) {}
 
         MapTiles(uint32 id, std::set<uint32>* tiles) : m_mapId(id), m_tiles(tiles) {}
         ~MapTiles() {}
@@ -57,7 +55,7 @@ namespace MMAP
 
     struct Tile
     {
-        Tile() : chf(NULL), solid(NULL), cset(NULL), pmesh(NULL), dmesh(NULL) {}
+        Tile() : chf(nullptr), solid(nullptr), cset(nullptr), pmesh(nullptr), dmesh(nullptr) {}
         ~Tile()
         {
             rcFreeCompactHeightfield(chf);
@@ -83,7 +81,8 @@ namespace MMAP
                 bool skipBattlegrounds   = false,
                 bool debugOutput         = false,
                 bool bigBaseUnit         = false,
-                const char* offMeshFilePath = NULL);
+                int mapid                = -1,
+                char const* offMeshFilePath = nullptr);
 
             ~MapBuilder();
 
@@ -95,7 +94,7 @@ namespace MMAP
             void buildSingleTile(uint32 mapID, uint32 tileX, uint32 tileY);
 
             // builds list of maps, then builds all of mmap tiles (based on the skip settings)
-            void buildAllMaps(int threads);
+            void buildAllMaps(unsigned int threads);
 
             void WorkerThread();
 
@@ -120,24 +119,31 @@ namespace MMAP
             void getTileBounds(uint32 tileX, uint32 tileY,
                 float* verts, int vertCount,
                 float* bmin, float* bmax);
-            void getGridBounds(uint32 mapID, uint32 &minX, uint32 &minY, uint32 &maxX, uint32 &maxY);
+            void getGridBounds(uint32 mapID, uint32 &minX, uint32 &minY, uint32 &maxX, uint32 &maxY) const;
 
             bool shouldSkipMap(uint32 mapID);
             bool isTransportMap(uint32 mapID);
             bool shouldSkipTile(uint32 mapID, uint32 tileX, uint32 tileY);
+
+            uint32 percentageDone(uint32 totalTiles, uint32 totalTilesDone);
 
             TerrainBuilder* m_terrainBuilder;
             TileList m_tiles;
 
             bool m_debugOutput;
 
-            const char* m_offMeshFilePath;
+            char const* m_offMeshFilePath;
             bool m_skipContinents;
             bool m_skipJunkMaps;
             bool m_skipBattlegrounds;
 
             float m_maxWalkableAngle;
             bool m_bigBaseUnit;
+
+            int32 m_mapid;
+
+            std::atomic<uint32> m_totalTiles;
+            std::atomic<uint32> m_totalTilesProcessed;
 
             // build performance - not really used for now
             rcContext* m_rcContext;

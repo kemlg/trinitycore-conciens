@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,8 @@ npc_lesser_shadow_fissure
 EndContentData */
 
 #include "ScriptMgr.h"
+#include "InstanceScript.h"
+#include "ObjectAccessor.h"
 #include "ScriptedCreature.h"
 #include "shattered_halls.h"
 
@@ -108,6 +110,7 @@ class boss_grand_warlock_nethekurse : public CreatureScript
 
             void Reset() override
             {
+                _Reset();
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
 
                 Initialize();
@@ -115,9 +118,8 @@ class boss_grand_warlock_nethekurse : public CreatureScript
 
             void JustDied(Unit* /*killer*/) override
             {
+                _JustDied();
                 Talk(SAY_DIE);
-
-                instance->SetBossState(DATA_NETHEKURSE, DONE);
             }
 
             void SetData(uint32 data, uint32 value) override
@@ -180,24 +182,23 @@ class boss_grand_warlock_nethekurse : public CreatureScript
             }
 
             void MoveInLineOfSight(Unit* who) override
-
             {
                 if (!IntroOnce && me->IsWithinDistInMap(who, 30.0f))
-                    {
+                {
                     if (who->GetTypeId() != TYPEID_PLAYER)
                         return;
 
-                        Talk(SAY_INTRO);
-                        IntroOnce = true;
-                        IsIntroEvent = true;
+                    Talk(SAY_INTRO);
+                    IntroOnce = true;
+                    IsIntroEvent = true;
 
-                        instance->SetBossState(DATA_NETHEKURSE, IN_PROGRESS);
-                    }
+                    instance->SetBossState(DATA_NETHEKURSE, IN_PROGRESS);
+                }
 
-                    if (IsIntroEvent || !IsMainEvent)
-                        return;
+                if (IsIntroEvent || !IsMainEvent)
+                    return;
 
-                    ScriptedAI::MoveInLineOfSight(who);
+                ScriptedAI::MoveInLineOfSight(who);
             }
 
             void EnterCombat(Unit* /*who*/) override
@@ -207,7 +208,7 @@ class boss_grand_warlock_nethekurse : public CreatureScript
 
             void JustSummoned(Creature* summoned) override
             {
-                summoned->setFaction(16);
+                summoned->SetFaction(FACTION_MONSTER_2);
                 summoned->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
                 summoned->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
 
@@ -300,7 +301,7 @@ class boss_grand_warlock_nethekurse : public CreatureScript
 
         CreatureAI* GetAI(Creature* creature) const override
         {
-            return GetInstanceAI<boss_grand_warlock_nethekurseAI>(creature);
+            return GetShatteredHallsAI<boss_grand_warlock_nethekurseAI>(creature);
         }
 };
 
@@ -368,7 +369,7 @@ class npc_fel_orc_convert : public CreatureScript
 
         CreatureAI* GetAI(Creature* creature) const override
         {
-            return GetInstanceAI<npc_fel_orc_convertAI>(creature);
+            return GetShatteredHallsAI<npc_fel_orc_convertAI>(creature);
         }
 };
 
@@ -393,7 +394,7 @@ class npc_lesser_shadow_fissure : public CreatureScript
 
         CreatureAI* GetAI(Creature* creature) const override
         {
-            return new npc_lesser_shadow_fissureAI(creature);
+            return GetShatteredHallsAI<npc_lesser_shadow_fissureAI>(creature);
         }
 };
 

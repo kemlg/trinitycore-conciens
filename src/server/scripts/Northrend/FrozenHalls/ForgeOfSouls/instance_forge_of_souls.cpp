@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,16 +16,18 @@
  */
 
 #include "ScriptMgr.h"
-#include "InstanceScript.h"
+#include "AreaBoundary.h"
+#include "Creature.h"
 #include "forge_of_souls.h"
+#include "InstanceScript.h"
+#include "Map.h"
 #include "Player.h"
 
-#define MAX_ENCOUNTER 2
-
-/* Forge of Souls encounters:
-0- Bronjahm, The Godfather of Souls
-1- The Devourer of Souls
-*/
+BossBoundaryData const boundaries =
+{
+    { DATA_BRONJAHM,          new CircleBoundary(Position(5297.3f, 2506.45f), 100.96)                                                             },
+    { DATA_DEVOURER_OF_SOULS, new ParallelogramBoundary(Position(5663.56f, 2570.53f), Position(5724.39f, 2520.45f), Position(5570.36f, 2461.42f)) }
+};
 
 class instance_forge_of_souls : public InstanceMapScript
 {
@@ -37,7 +39,8 @@ class instance_forge_of_souls : public InstanceMapScript
             instance_forge_of_souls_InstanceScript(Map* map) : InstanceScript(map)
             {
                 SetHeaders(DataHeader);
-                SetBossNumber(MAX_ENCOUNTER);
+                SetBossNumber(EncounterCount);
+                LoadBossBoundaries(boundaries);
 
                 teamInInstance = 0;
             }
@@ -60,10 +63,10 @@ class instance_forge_of_souls : public InstanceMapScript
 
                 switch (creature->GetEntry())
                 {
-                    case CREATURE_BRONJAHM:
+                    case NPC_BRONJAHM:
                         bronjahm = creature->GetGUID();
                         break;
-                    case CREATURE_DEVOURER:
+                    case NPC_DEVOURER:
                         devourerOfSouls = creature->GetGUID();
                         break;
                     case NPC_SYLVANAS_PART1:
@@ -100,7 +103,7 @@ class instance_forge_of_souls : public InstanceMapScript
                 {
                     case DATA_BRONJAHM:
                         return bronjahm;
-                    case DATA_DEVOURER:
+                    case DATA_DEVOURER_OF_SOULS:
                         return devourerOfSouls;
                     default:
                         break;

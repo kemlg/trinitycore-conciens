@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,13 +16,16 @@
  */
 
 #include "ScriptMgr.h"
+#include "Creature.h"
+#include "GameObject.h"
 #include "InstanceScript.h"
+#include "Map.h"
 #include "scarlet_monastery.h"
 
 DoorData const doorData[] =
 {
-    { GO_HIGH_INQUISITORS_DOOR, DATA_MOGRAINE_AND_WHITE_EVENT, DOOR_TYPE_ROOM, BOUNDARY_NONE },
-    { 0,                        0,                             DOOR_TYPE_ROOM, BOUNDARY_NONE } // END
+    { GO_HIGH_INQUISITORS_DOOR, DATA_MOGRAINE_AND_WHITE_EVENT, DOOR_TYPE_ROOM },
+    { 0,                        0,                             DOOR_TYPE_ROOM } // END
 };
 
 class instance_scarlet_monastery : public InstanceMapScript
@@ -43,25 +46,12 @@ class instance_scarlet_monastery : public InstanceMapScript
 
             void OnGameObjectCreate(GameObject* go) override
             {
+                InstanceScript::OnGameObjectCreate(go);
+
                 switch (go->GetEntry())
                 {
                     case GO_PUMPKIN_SHRINE:
                         PumpkinShrineGUID = go->GetGUID();
-                        break;
-                    case GO_HIGH_INQUISITORS_DOOR:
-                        AddDoor(go, true);
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            void OnGameObjectRemove(GameObject* go) override
-            {
-                switch (go->GetEntry())
-                {
-                    case GO_HIGH_INQUISITORS_DOOR:
-                        AddDoor(go, false);
                         break;
                     default:
                         break;
@@ -121,7 +111,7 @@ class instance_scarlet_monastery : public InstanceMapScript
                             {
                                 Creature* add = instance->GetCreature(guid);
                                 if (add && add->IsAlive())
-                                    add->Kill(add);
+                                    add->KillSelf();
                             }
                             HorsemanAdds.clear();
                             HandleGameObject(PumpkinShrineGUID, false);

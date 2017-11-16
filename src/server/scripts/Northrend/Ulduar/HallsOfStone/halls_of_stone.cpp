@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,11 +16,13 @@
  */
 
 #include "ScriptMgr.h"
-#include "ScriptedCreature.h"
-#include "ScriptedGossip.h"
-#include "ScriptedEscortAI.h"
 #include "halls_of_stone.h"
+#include "InstanceScript.h"
+#include "ObjectAccessor.h"
 #include "Player.h"
+#include "ScriptedEscortAI.h"
+#include "ScriptedGossip.h"
+#include "TemporarySummon.h"
 
 enum Texts
 {
@@ -269,32 +271,9 @@ class npc_brann_hos : public CreatureScript
 public:
     npc_brann_hos() : CreatureScript("npc_brann_hos") { }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    struct npc_brann_hosAI : public EscortAI
     {
-        player->PlayerTalkClass->ClearMenus();
-        if (action == GOSSIP_ACTION_INFO_DEF+1 || action == GOSSIP_ACTION_INFO_DEF+2)
-        {
-            player->CLOSE_GOSSIP_MENU();
-            ENSURE_AI(npc_brann_hos::npc_brann_hosAI, creature->AI())->StartWP();
-        }
-
-        return true;
-    }
-
-    bool OnGossipHello(Player* player, Creature* creature) override
-    {
-        if (creature->IsQuestGiver())
-            player->PrepareQuestMenu(creature->GetGUID());
-
-        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_START, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
-        player->SEND_GOSSIP_MENU(TEXT_ID_START, creature->GetGUID());
-
-        return true;
-    }
-
-    struct npc_brann_hosAI : public npc_escortAI
-    {
-        npc_brann_hosAI(Creature* creature) : npc_escortAI(creature)
+        npc_brann_hosAI(Creature* creature) : EscortAI(creature)
         {
             Initialize();
             instance = creature->GetInstanceScript();
@@ -330,7 +309,7 @@ public:
 
                 DespawnDwarf();
 
-                instance->SetBossState(DATA_BRANN_EVENT, NOT_STARTED);
+                instance->SetBossState(DATA_TRIBUNAL_OF_AGES, NOT_STARTED);
             }
         }
 
@@ -347,7 +326,7 @@ public:
             lDwarfGUIDList.clear();
         }
 
-        void WaypointReached(uint32 waypointId) override
+        void WaypointReached(uint32 waypointId, uint32 /*pathId*/) override
         {
             switch (waypointId)
             {
@@ -362,8 +341,10 @@ public:
                     break;
                 case 13:
                     Talk(SAY_EVENT_INTRO_1);
+                    instance->SetBossState(DATA_TRIBUNAL_OF_AGES, IN_PROGRESS);
                     SetEscortPaused(true);
                     JumpToNextStep(20000);
+                    // @todo: There should be a pause here and a gossip should start the next step.
                     break;
                 case 17:
                     Talk(SAY_EVENT_INTRO_2);
@@ -403,7 +384,7 @@ public:
         void JustSummoned(Creature* summoned) override
         {
             lDwarfGUIDList.push_back(summoned->GetGUID());
-            summoned->AddThreat(me, 0.0f);
+            AddThreat(me, 0.0f, summoned);
             summoned->AI()->AttackStart(me);
         }
 
@@ -421,9 +402,9 @@ public:
             Start();
         }
 
-        void DamageTaken(Unit* /*done_by*/, uint32 & /*damage*/) override
+        void DamageTaken(Unit* /*done_by*/, uint32& /*damage*/) override
         {
-            if (brannSparklinNews)
+            if (instance->GetBossState(DATA_TRIBUNAL_OF_AGES) == IN_PROGRESS)
                 brannSparklinNews = false;
         }
 
@@ -435,16 +416,15 @@ public:
             return 0;
         }
 
-        void UpdateEscortAI(const uint32 uiDiff) override
+        void UpdateEscortAI(uint32 uiDiff) override
         {
             if (uiPhaseTimer <= uiDiff)
             {
                 switch (uiStep)
                 {
                     case 1:
-                        if (instance->GetBossState(DATA_BRANN_EVENT) != NOT_STARTED)
+                        if (instance->GetBossState(DATA_TRIBUNAL_OF_AGES) != NOT_STARTED)
                             return;
-                        instance->SetBossState(DATA_BRANN_EVENT, IN_PROGRESS);
                         bIsBattle = false;
                         Talk(SAY_ESCORT_START);
                         SetRun(true);
@@ -575,14 +555,14 @@ public:
                         me->SetStandState(UNIT_STAND_STATE_STAND);
                         instance->HandleGameObject(instance->GetGuidData(DATA_GO_SKY_FLOOR), true);
                         if (Creature* temp = ObjectAccessor::GetCreature(*me, uiControllerGUID))
-                            temp->DealDamage(temp, temp->GetHealth(), NULL, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, NULL, false);
+                            temp->DealDamage(temp, temp->GetHealth(), nullptr, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, nullptr, false);
                         bIsBattle = true;
                         SetEscortPaused(false);
                         JumpToNextStep(6500);
                         break;
                     case 29:
                         Talk(SAY_EVENT_END_02);
-                        instance->SetBossState(DATA_BRANN_EVENT, DONE);
+                        instance->SetBossState(DATA_TRIBUNAL_OF_AGES, DONE);
                         me->CastSpell(me, SPELL_REWARD_ACHIEVEMENT, true);
                         JumpToNextStep(5500);
                         break;
@@ -704,6 +684,30 @@ public:
 
             DoMeleeAttackIfReady();
         }
+
+        bool GossipSelect(Player* player, uint32 /*menuId*/, uint32 gossipListId) override
+        {
+            uint32 const action = player->PlayerTalkClass->GetGossipOptionAction(gossipListId);
+            ClearGossipMenuFor(player);
+            if (action == GOSSIP_ACTION_INFO_DEF + 1 || action == GOSSIP_ACTION_INFO_DEF + 2)
+            {
+                CloseGossipMenuFor(player);
+                StartWP();
+            }
+
+            return true;
+        }
+
+        bool GossipHello(Player* player) override
+        {
+            if (me->IsQuestGiver())
+                player->PrepareQuestMenu(me->GetGUID());
+
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_ITEM_START, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+            SendGossipMenuFor(player, TEXT_ID_START, me->GetGUID());
+
+            return true;
+        }
     };
 
     CreatureAI* GetAI(Creature* creature) const override
@@ -715,9 +719,7 @@ public:
 class achievement_brann_spankin_new : public AchievementCriteriaScript
 {
     public:
-        achievement_brann_spankin_new() : AchievementCriteriaScript("achievement_brann_spankin_new")
-        {
-        }
+        achievement_brann_spankin_new() : AchievementCriteriaScript("achievement_brann_spankin_new") { }
 
         bool OnCheck(Player* /*player*/, Unit* target) override
         {

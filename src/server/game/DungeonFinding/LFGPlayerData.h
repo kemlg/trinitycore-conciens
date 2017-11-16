@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -26,7 +26,7 @@ namespace lfg
 /**
     Stores all lfg data needed about the player.
 */
-class LfgPlayerData
+class TC_GAME_API LfgPlayerData
 {
     public:
         LfgPlayerData();
@@ -41,7 +41,7 @@ class LfgPlayerData
         // Queue
         void SetRoles(uint8 roles);
         void SetComment(std::string const& comment);
-        void SetSelectedDungeons(const LfgDungeonSet& dungeons);
+        void SetSelectedDungeons(LfgDungeonSet const& dungeons);
 
         // General
         LfgState GetState() const;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -17,15 +17,29 @@
  */
 
 #include "ScriptMgr.h"
+#include "AreaBoundary.h"
+#include "GameObject.h"
 #include "InstanceScript.h"
-#include "trial_of_the_crusader.h"
+#include "Log.h"
+#include "Map.h"
+#include "ObjectAccessor.h"
 #include "Player.h"
 #include "TemporarySummon.h"
+#include "trial_of_the_crusader.h"
+
+BossBoundaryData const boundaries =
+{
+    { BOSS_BEASTS,    new CircleBoundary(Position(563.26f, 139.6f), 75.0)        },
+    { BOSS_JARAXXUS,  new CircleBoundary(Position(563.26f, 139.6f), 75.0)        },
+    { BOSS_CRUSADERS, new CircleBoundary(Position(563.26f, 139.6f), 75.0)        },
+    { BOSS_VALKIRIES, new CircleBoundary(Position(563.26f, 139.6f), 75.0)        },
+    { BOSS_ANUBARAK,  new EllipseBoundary(Position(746.0f, 135.0f), 100.0, 75.0) }
+};
 
 class instance_trial_of_the_crusader : public InstanceMapScript
 {
     public:
-        instance_trial_of_the_crusader() : InstanceMapScript("instance_trial_of_the_crusader", 649) { }
+        instance_trial_of_the_crusader() : InstanceMapScript(ToCrScriptName, 649) { }
 
         struct instance_trial_of_the_crusader_InstanceMapScript : public InstanceScript
         {
@@ -33,6 +47,7 @@ class instance_trial_of_the_crusader : public InstanceMapScript
             {
                 SetHeaders(DataHeader);
                 SetBossNumber(MAX_ENCOUNTERS);
+                LoadBossBoundaries(boundaries);
                 TrialCounter = 50;
                 EventStage = 0;
                 NorthrendBeasts = NOT_STARTED;
@@ -190,6 +205,13 @@ class instance_trial_of_the_crusader : public InstanceMapScript
                 }
             }
 
+            void OnUnitDeath(Unit* unit) override
+            {
+                if (unit->GetTypeId() == TYPEID_PLAYER && IsEncounterInProgress())
+                    TributeToImmortalityEligible = false;
+
+            }
+
             bool SetBossState(uint32 type, EncounterState state) override
             {
                 if (!InstanceScript::SetBossState(type, state))
@@ -248,12 +270,6 @@ class instance_trial_of_the_crusader : public InstanceMapScript
                                 if (GetBossState(BOSS_VALKIRIES) == SPECIAL)
                                     state = DONE;
                                 break;
-                            case DONE:
-                                if (instance->GetPlayers().getFirst()->GetSource()->GetTeam() == ALLIANCE)
-                                    EventStage = 4020;
-                                else
-                                    EventStage = 4030;
-                                break;
                             default:
                                 break;
                         }
@@ -304,7 +320,7 @@ class instance_trial_of_the_crusader : public InstanceMapScript
 
                                 if (tributeChest)
                                     if (Creature* tirion =  instance->GetCreature(TirionGUID))
-                                        if (GameObject* chest = tirion->SummonGameObject(tributeChest, 805.62f, 134.87f, 142.16f, 3.27f, 0, 0, 0, 0, WEEK))
+                                        if (GameObject* chest = tirion->SummonGameObject(tributeChest, 805.62f, 134.87f, 142.16f, 3.27f, QuaternionData(), WEEK))
                                             chest->SetRespawnTime(chest->GetRespawnDelay());
                                 break;
                             }
@@ -329,14 +345,14 @@ class instance_trial_of_the_crusader : public InstanceMapScript
 
                 if (type < MAX_ENCOUNTERS)
                 {
-                    TC_LOG_INFO("scripts", "[ToCr] BossState(type %u) %u = state %u;", type, GetBossState(type), state);
+                    TC_LOG_DEBUG("scripts", "[ToCr] BossState(type %u) %u = state %u;", type, GetBossState(type), state);
                     if (state == FAIL)
                     {
                         if (instance->IsHeroic())
                         {
                             --TrialCounter;
                             // decrease attempt counter at wipe
-                            Map::PlayerList const &PlayerList = instance->GetPlayers();
+                            Map::PlayerList const& PlayerList = instance->GetPlayers();
                             for (Map::PlayerList::const_iterator itr = PlayerList.begin(); itr != PlayerList.end(); ++itr)
                                 if (Player* player = itr->GetSource())
                                     player->SendUpdateWorldState(UPDATE_STATE_UI_COUNT, TrialCounter);
@@ -426,9 +442,6 @@ class instance_trial_of_the_crusader : public InstanceMapScript
                             ++MistressOfPainCount;
                         else if (data == DECREASE)
                             --MistressOfPainCount;
-                        break;
-                    case DATA_TRIBUTE_TO_IMMORTALITY_ELIGIBLE:
-                        TributeToImmortalityEligible = false;
                         break;
                     default:
                         break;
@@ -633,7 +646,7 @@ class instance_trial_of_the_crusader : public InstanceMapScript
                 return SaveDataBuffer;
             }
 
-            void Load(const char* strIn) override
+            void Load(char const* strIn) override
             {
                 if (!strIn)
                 {

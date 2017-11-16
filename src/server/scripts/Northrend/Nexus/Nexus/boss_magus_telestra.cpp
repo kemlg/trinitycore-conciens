@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -17,8 +17,13 @@
  */
 
 #include "ScriptMgr.h"
-#include "ScriptedCreature.h"
+#include "GameEventMgr.h"
+#include "GameTime.h"
+#include "InstanceScript.h"
+#include "MotionMaster.h"
 #include "nexus.h"
+#include "ScriptedCreature.h"
+#include "TemporarySummon.h"
 
 enum Spells
 {
@@ -31,7 +36,9 @@ enum Spells
 
     SPELL_FIRE_MAGUS_VISUAL                       = 47705,
     SPELL_FROST_MAGUS_VISUAL                      = 47706,
-    SPELL_ARCANE_MAGUS_VISUAL                     = 47704
+    SPELL_ARCANE_MAGUS_VISUAL                     = 47704,
+
+    SPELL_WEAR_CHRISTMAS_HAT                      = 61400
 };
 
 enum Creatures
@@ -53,7 +60,9 @@ enum Yells
 enum Misc
 {
     ACTION_MAGUS_DEAD                             = 1,
-    DATA_SPLIT_PERSONALITY                        = 2
+    DATA_SPLIT_PERSONALITY                        = 2,
+
+    GAME_EVENT_WINTER_VEIL                        = 2,
 };
 
 const Position  CenterOfRoom = {504.80f, 89.07f, -16.12f, 6.27f};
@@ -65,7 +74,7 @@ public:
 
     CreatureAI* GetAI(Creature* creature) const override
     {
-        return GetInstanceAI<boss_magus_telestraAI>(creature);
+        return GetNexusAI<boss_magus_telestraAI>(creature);
     }
 
     struct boss_magus_telestraAI : public ScriptedAI
@@ -128,21 +137,24 @@ public:
             me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
             me->SetVisible(true);
 
-            instance->SetData(DATA_MAGUS_TELESTRA_EVENT, NOT_STARTED);
+            instance->SetBossState(DATA_MAGUS_TELESTRA, NOT_STARTED);
+
+            if (IsHeroic() && sGameEventMgr->IsActiveEvent(GAME_EVENT_WINTER_VEIL) && !me->HasAura(SPELL_WEAR_CHRISTMAS_HAT))
+                me->AddAura(SPELL_WEAR_CHRISTMAS_HAT, me);
         }
 
         void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
 
-            instance->SetData(DATA_MAGUS_TELESTRA_EVENT, IN_PROGRESS);
+            instance->SetBossState(DATA_MAGUS_TELESTRA, IN_PROGRESS);
         }
 
         void JustDied(Unit* /*killer*/) override
         {
             Talk(SAY_DEATH);
 
-            instance->SetData(DATA_MAGUS_TELESTRA_EVENT, DONE);
+            instance->SetBossState(DATA_MAGUS_TELESTRA, DONE);
         }
 
         void KilledUnit(Unit* who) override
@@ -159,7 +171,7 @@ public:
                 while (time[i] != 0)
                     ++i;
 
-                time[i] = sWorld->GetGameTime();
+                time[i] = GameTime::GetGameTime();
                 if (i == 2 && (time[2] - time[1] < 5) && (time[1] - time[0] < 5))
                     ++splitPersonality;
             }
@@ -249,7 +261,7 @@ public:
                     for (uint8 n = 0; n < 3; ++n)
                         time[n] = 0;
                     me->GetMotionMaster()->Clear();
-                    me->SetPosition(CenterOfRoom.GetPositionX(), CenterOfRoom.GetPositionY(), CenterOfRoom.GetPositionZ(), CenterOfRoom.GetOrientation());
+                    me->UpdatePosition(CenterOfRoom.GetPositionX(), CenterOfRoom.GetPositionY(), CenterOfRoom.GetPositionZ(), CenterOfRoom.GetOrientation());
                     DoCast(me, SPELL_TELESTRA_BACK);
                     me->SetVisible(true);
                     if (Phase == 1)

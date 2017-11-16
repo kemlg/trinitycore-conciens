@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,39 +22,42 @@ Comment: All tele related commands
 Category: commandscripts
 EndScriptData */
 
+#include "ScriptMgr.h"
 #include "Chat.h"
+#include "DatabaseEnv.h"
+#include "DBCStores.h"
 #include "Group.h"
 #include "Language.h"
 #include "MapManager.h"
+#include "MotionMaster.h"
 #include "ObjectMgr.h"
 #include "Player.h"
-#include "ScriptMgr.h"
+#include "RBAC.h"
+#include "WorldSession.h"
 
 class tele_commandscript : public CommandScript
 {
 public:
     tele_commandscript() : CommandScript("tele_commandscript") { }
 
-    ChatCommand* GetCommands() const override
+    std::vector<ChatCommand> GetCommands() const override
     {
-        static ChatCommand teleCommandTable[] =
+        static std::vector<ChatCommand> teleCommandTable =
         {
-            { "add",   rbac::RBAC_PERM_COMMAND_TELE_ADD,   false, &HandleTeleAddCommand,   "", NULL },
-            { "del",   rbac::RBAC_PERM_COMMAND_TELE_DEL,    true, &HandleTeleDelCommand,   "", NULL },
-            { "name",  rbac::RBAC_PERM_COMMAND_TELE_NAME,   true, &HandleTeleNameCommand,  "", NULL },
-            { "group", rbac::RBAC_PERM_COMMAND_TELE_GROUP, false, &HandleTeleGroupCommand, "", NULL },
-            { "",      rbac::RBAC_PERM_COMMAND_TELE,       false, &HandleTeleCommand,      "", NULL },
-            { NULL,    0,                            false, NULL,                    "", NULL }
+            { "add",   rbac::RBAC_PERM_COMMAND_TELE_ADD,   false, &HandleTeleAddCommand,   "" },
+            { "del",   rbac::RBAC_PERM_COMMAND_TELE_DEL,    true, &HandleTeleDelCommand,   "" },
+            { "name",  rbac::RBAC_PERM_COMMAND_TELE_NAME,   true, &HandleTeleNameCommand,  "" },
+            { "group", rbac::RBAC_PERM_COMMAND_TELE_GROUP, false, &HandleTeleGroupCommand, "" },
+            { "",      rbac::RBAC_PERM_COMMAND_TELE,       false, &HandleTeleCommand,      "" },
         };
-        static ChatCommand commandTable[] =
+        static std::vector<ChatCommand> commandTable =
         {
-            { "tele", rbac::RBAC_PERM_COMMAND_TELE, false, NULL, "", teleCommandTable },
-            { NULL,   0,                      false, NULL, "", NULL }
+            { "tele", rbac::RBAC_PERM_COMMAND_TELE, false, nullptr, "", teleCommandTable },
         };
         return commandTable;
     }
 
-    static bool HandleTeleAddCommand(ChatHandler* handler, const char* args)
+    static bool HandleTeleAddCommand(ChatHandler* handler, char const* args)
     {
         if (!*args)
             return false;
@@ -94,7 +97,7 @@ public:
         return true;
     }
 
-    static bool HandleTeleDelCommand(ChatHandler* handler, const char* args)
+    static bool HandleTeleDelCommand(ChatHandler* handler, char const* args)
     {
         if (!*args)
             return false;
@@ -114,7 +117,7 @@ public:
     }
 
     // teleport player to given game_tele.entry
-    static bool HandleTeleNameCommand(ChatHandler* handler, const char* args)
+    static bool HandleTeleNameCommand(ChatHandler* handler, char const* args)
     {
         char* nameStr;
         char* teleStr;
@@ -195,7 +198,7 @@ public:
         else
         {
             // check offline security
-            if (handler->HasLowerSecurity(NULL, target_guid))
+            if (handler->HasLowerSecurity(nullptr, target_guid))
                 return false;
 
             std::string nameLink = handler->playerLink(target_name);
@@ -211,7 +214,7 @@ public:
     }
 
     //Teleport group to given game_tele.entry
-    static bool HandleTeleGroupCommand(ChatHandler* handler, const char* args)
+    static bool HandleTeleGroupCommand(ChatHandler* handler, char const* args)
     {
         if (!*args)
             return false;
@@ -255,7 +258,7 @@ public:
             return false;
         }
 
-        for (GroupReference* itr = grp->GetFirstMember(); itr != NULL; itr = itr->next())
+        for (GroupReference* itr = grp->GetFirstMember(); itr != nullptr; itr = itr->next())
         {
             Player* player = itr->GetSource();
 
@@ -294,7 +297,7 @@ public:
         return true;
     }
 
-    static bool HandleTeleCommand(ChatHandler* handler, const char* args)
+    static bool HandleTeleCommand(ChatHandler* handler, char const* args)
     {
         if (!*args)
             return false;
@@ -319,7 +322,7 @@ public:
         }
 
         MapEntry const* map = sMapStore.LookupEntry(tele->mapId);
-        if (!map || map->IsBattlegroundOrArena())
+        if (!map || (map->IsBattlegroundOrArena() && (me->GetMapId() != tele->mapId || !me->IsGameMaster())))
         {
             handler->SendSysMessage(LANG_CANNOT_TELE_TO_BG);
             handler->SetSentErrorMessage(true);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -18,7 +18,10 @@
 #ifndef TRINITY_SPELLAURADEFINES_H
 #define TRINITY_SPELLAURADEFINES_H
 
-#define MAX_AURAS 64                                        // client support up to 255, but it will cause problems with group auras updating
+#include "Define.h"
+
+#define MAX_AURAS 255                         // Client-side limit
+#define MAX_AURAS_GROUP_UPDATE 64             // Limit of SMSG_PARY_MEMBER_STATS_FULL and SMSG_PARTY_MEMBER_STATS
 
 enum AURA_FLAGS
 {
@@ -50,6 +53,16 @@ enum AuraEffectHandleModes
     AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK = (AURA_EFFECT_HANDLE_REAPPLY | AURA_EFFECT_HANDLE_REAL)
 };
 
+enum AuraRemoveMode
+{
+    AURA_REMOVE_NONE = 0,
+    AURA_REMOVE_BY_DEFAULT = 1,       // scripted remove, remove by stack with aura with different ids and sc aura remove
+    AURA_REMOVE_BY_CANCEL,
+    AURA_REMOVE_BY_ENEMY_SPELL,       // dispel and absorb aura destroy
+    AURA_REMOVE_BY_EXPIRE,            // aura duration has ended
+    AURA_REMOVE_BY_DEATH
+};
+
 //m_schoolAbsorb
 enum DAMAGE_ABSORB_TYPE
 {
@@ -57,7 +70,7 @@ enum DAMAGE_ABSORB_TYPE
     ONLY_MAGIC_ABSORB       = -1
 };
 
-enum AuraType
+enum AuraType : uint32
 {
     SPELL_AURA_NONE                                         = 0,
     SPELL_AURA_BIND_SIGHT                                   = 1,
@@ -348,7 +361,7 @@ enum AuraType
     SPELL_AURA_ABILITY_PERIODIC_CRIT                        = 286,
     SPELL_AURA_DEFLECT_SPELLS                               = 287,
     SPELL_AURA_IGNORE_HIT_DIRECTION                         = 288,
-    SPELL_AURA_289                                          = 289,
+    SPELL_AURA_PREVENT_DURABILITY_LOSS                      = 289,
     SPELL_AURA_MOD_CRIT_PCT                                 = 290,
     SPELL_AURA_MOD_XP_QUEST_PCT                             = 291,
     SPELL_AURA_OPEN_STABLE                                  = 292,
@@ -367,7 +380,7 @@ enum AuraType
     SPELL_AURA_MOD_MINIMUM_SPEED                            = 305,
     SPELL_AURA_306                                          = 306,
     SPELL_AURA_HEAL_ABSORB_TEST                             = 307,
-    SPELL_AURA_MOD_CRIT_CHANCE_FOR_CASTER                   = 308,  // NYI
+    SPELL_AURA_MOD_CRIT_CHANCE_FOR_CASTER                   = 308,
     SPELL_AURA_309                                          = 309,
     SPELL_AURA_MOD_CREATURE_AOE_DAMAGE_AVOIDANCE            = 310,
     SPELL_AURA_311                                          = 311,

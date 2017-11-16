@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,14 +16,17 @@
  */
 
 #include "ScriptMgr.h"
-#include "InstanceScript.h"
 #include "arcatraz.h"
+#include "Creature.h"
+#include "GameObject.h"
+#include "InstanceScript.h"
+#include "Map.h"
 
 DoorData const doorData[] =
 {
-    { GO_CONTAINMENT_CORE_SECURITY_FIELD_ALPHA, DATA_SOCCOTHRATES,  DOOR_TYPE_PASSAGE,  BOUNDARY_NONE },
-    { GO_CONTAINMENT_CORE_SECURITY_FIELD_BETA,  DATA_DALLIAH,       DOOR_TYPE_PASSAGE,  BOUNDARY_NONE },
-    { 0,                                        0,                  DOOR_TYPE_ROOM,     BOUNDARY_NONE } // END
+    { GO_CONTAINMENT_CORE_SECURITY_FIELD_ALPHA, DATA_SOCCOTHRATES,  DOOR_TYPE_PASSAGE },
+    { GO_CONTAINMENT_CORE_SECURITY_FIELD_BETA,  DATA_DALLIAH,       DOOR_TYPE_PASSAGE },
+    { 0,                                        0,                  DOOR_TYPE_ROOM } // END
 };
 
 class instance_arcatraz : public InstanceMapScript
@@ -64,12 +67,10 @@ class instance_arcatraz : public InstanceMapScript
 
             void OnGameObjectCreate(GameObject* go) override
             {
+                InstanceScript::OnGameObjectCreate(go);
+
                 switch (go->GetEntry())
                 {
-                    case GO_CONTAINMENT_CORE_SECURITY_FIELD_ALPHA:
-                    case GO_CONTAINMENT_CORE_SECURITY_FIELD_BETA:
-                        AddDoor(go, true);
-                        break;
                     case GO_STASIS_POD_ALPHA:
                         StasisPodGUIDs[0] = go->GetGUID();
                         break;
@@ -87,19 +88,6 @@ class instance_arcatraz : public InstanceMapScript
                         break;
                     case GO_WARDENS_SHIELD:
                         WardensShieldGUID = go->GetGUID();
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            void OnGameObjectRemove(GameObject* go) override
-            {
-                switch (go->GetEntry())
-                {
-                    case GO_CONTAINMENT_CORE_SECURITY_FIELD_ALPHA:
-                    case GO_CONTAINMENT_CORE_SECURITY_FIELD_BETA:
-                        AddDoor(go, false);
                         break;
                     default:
                         break;

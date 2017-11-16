@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,9 +23,8 @@
 #define MAX_BAG_SIZE 36                                     // 2.0.12
 
 #include "Item.h"
-#include "ItemPrototype.h"
 
-class Bag : public Item
+class TC_GAME_API Bag : public Item
 {
     public:
 
@@ -35,15 +34,15 @@ class Bag : public Item
         void AddToWorld() override;
         void RemoveFromWorld() override;
 
-        bool Create(uint32 guidlow, uint32 itemid, Player const* owner) override;
+        bool Create(ObjectGuid::LowType guidlow, ObjectGuid::LowType itemid, Player const* owner) override;
 
         void Clear();
         void StoreItem(uint8 slot, Item* pItem, bool update);
         void RemoveItem(uint8 slot, bool update);
 
         Item* GetItemByPos(uint8 slot) const;
-        uint32 GetItemCount(uint32 item, Item* eItem = NULL) const;
-        uint32 GetItemCountWithLimitCategory(uint32 limitCategory, Item* skipItem = NULL) const;
+        uint32 GetItemCount(uint32 item, Item* eItem = nullptr) const;
+        uint32 GetItemCountWithLimitCategory(uint32 limitCategory, Item* skipItem = nullptr) const;
 
         uint8 GetSlotByItemGUID(ObjectGuid guid) const;
         bool IsEmpty() const;
@@ -54,7 +53,7 @@ class Bag : public Item
         // overwrite virtual Item::SaveToDB
         void SaveToDB(SQLTransaction& trans) override;
         // overwrite virtual Item::LoadFromDB
-        bool LoadFromDB(uint32 guid, ObjectGuid owner_guid, Field* fields, uint32 entry) override;
+        bool LoadFromDB(ObjectGuid::LowType guid, ObjectGuid owner_guid, Field* fields, uint32 entry) override;
         // overwrite virtual Item::DeleteFromDB
         void DeleteFromDB(SQLTransaction& trans) override;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -51,7 +51,7 @@ struct LfgCompatibilityData
 /// Stores player or group queue info
 struct LfgQueueData
 {
-    LfgQueueData(): joinTime(time_t(time(NULL))), tanks(LFG_TANKS_NEEDED),
+    LfgQueueData(): joinTime(time_t(time(nullptr))), tanks(LFG_TANKS_NEEDED),
         healers(LFG_HEALERS_NEEDED), dps(LFG_DPS_NEEDED)
         { }
 
@@ -83,12 +83,13 @@ typedef std::map<ObjectGuid, LfgQueueData> LfgQueueDataContainer;
 /**
     Stores all data related to queue
 */
-class LFGQueue
+class TC_GAME_API LFGQueue
 {
     public:
 
         // Add/Remove from queue
-        void AddToQueue(ObjectGuid guid);
+        std::string GetDetailedMatchRoles(GuidList const& check) const;
+        void AddToQueue(ObjectGuid guid, bool reAdd = false);
         void RemoveFromQueue(ObjectGuid guid);
         void AddQueueData(ObjectGuid guid, time_t joinTime, LfgDungeonSet const& dungeons, LfgRolesMap const& rolesMap);
         void RemoveQueueData(ObjectGuid guid);
@@ -115,6 +116,7 @@ class LFGQueue
 
         void AddToNewQueue(ObjectGuid guid);
         void AddToCurrentQueue(ObjectGuid guid);
+        void AddToFrontCurrentQueue(ObjectGuid guid);
         void RemoveFromNewQueue(ObjectGuid guid);
         void RemoveFromCurrentQueue(ObjectGuid guid);
 

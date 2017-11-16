@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -18,16 +18,26 @@
 
 #include "PassiveAI.h"
 #include "Creature.h"
-#include "TemporarySummon.h"
 
 PassiveAI::PassiveAI(Creature* c) : CreatureAI(c) { me->SetReactState(REACT_PASSIVE); }
 PossessedAI::PossessedAI(Creature* c) : CreatureAI(c) { me->SetReactState(REACT_PASSIVE); }
 NullCreatureAI::NullCreatureAI(Creature* c) : CreatureAI(c) { me->SetReactState(REACT_PASSIVE); }
 
+int32 NullCreatureAI::Permissible(Creature const* creature)
+{
+    if (creature->HasFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_SPELLCLICK))
+        return PERMIT_BASE_PROACTIVE + 50;
+
+    if (creature->IsTrigger())
+        return PERMIT_BASE_PROACTIVE;
+
+    return PERMIT_BASE_IDLE;
+}
+
 void PassiveAI::UpdateAI(uint32)
 {
     if (me->IsInCombat() && me->getAttackers().empty())
-        EnterEvadeMode();
+        EnterEvadeMode(EVADE_REASON_NO_HOSTILES);
 }
 
 void PossessedAI::AttackStart(Unit* target)
@@ -59,21 +69,43 @@ void PossessedAI::KilledUnit(Unit* victim)
         victim->RemoveFlag(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_LOOTABLE);
 }
 
+void PossessedAI::OnCharmed(bool /*apply*/)
+{
+    me->NeedChangeAI = true;
+    me->IsAIEnabled = false;
+}
+
 void CritterAI::DamageTaken(Unit* /*done_by*/, uint32&)
 {
     if (!me->HasUnitState(UNIT_STATE_FLEEING))
         me->SetControlled(true, UNIT_STATE_FLEEING);
 }
 
-void CritterAI::EnterEvadeMode()
+void CritterAI::EnterEvadeMode(EvadeReason why)
 {
     if (me->HasUnitState(UNIT_STATE_FLEEING))
         me->SetControlled(false, UNIT_STATE_FLEEING);
-    CreatureAI::EnterEvadeMode();
+    CreatureAI::EnterEvadeMode(why);
+}
+
+int32 CritterAI::Permissible(Creature const* creature)
+{
+    if (creature->IsCritter() && !creature->HasUnitTypeMask(UNIT_MASK_GUARDIAN))
+        return PERMIT_BASE_PROACTIVE;
+
+    return PERMIT_BASE_NO;
 }
 
 void TriggerAI::IsSummonedBy(Unit* summoner)
 {
     if (me->m_spells[0])
         me->CastSpell(me, me->m_spells[0], false, nullptr, nullptr, summoner->GetGUID());
+}
+
+int32 TriggerAI::Permissible(Creature const* creature)
+{
+    if (creature->IsTrigger() && creature->m_spells[0])
+        return PERMIT_BASE_SPECIAL;
+
+    return PERMIT_BASE_NO;
 }

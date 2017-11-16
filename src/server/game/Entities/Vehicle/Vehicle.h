@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -29,7 +29,7 @@ struct VehicleEntry;
 class Unit;
 class VehicleJoinEvent;
 
-class Vehicle : public TransportBase
+class TC_GAME_API Vehicle : public TransportBase
 {
     protected:
         friend bool Unit::CreateVehicleKit(uint32 id, uint32 creatureEntry);
@@ -87,7 +87,7 @@ class Vehicle : public TransportBase
         void InitMovementInfoForBase();
 
         /// This method transforms supplied transport offsets into global coordinates
-        void CalculatePassengerPosition(float& x, float& y, float& z, float* o /*= NULL*/) const override
+        void CalculatePassengerPosition(float& x, float& y, float& z, float* o /*= nullptr*/) const override
         {
             TransportBase::CalculatePassengerPosition(x, y, z, o,
                 GetBase()->GetPositionX(), GetBase()->GetPositionY(),
@@ -95,7 +95,7 @@ class Vehicle : public TransportBase
         }
 
         /// This method transforms supplied global coordinates into local offsets
-        void CalculatePassengerOffset(float& x, float& y, float& z, float* o /*= NULL*/) const override
+        void CalculatePassengerOffset(float& x, float& y, float& z, float* o /*= nullptr*/) const override
         {
             TransportBase::CalculatePassengerOffset(x, y, z, o,
                 GetBase()->GetPositionX(), GetBase()->GetPositionY(),
@@ -118,12 +118,11 @@ class Vehicle : public TransportBase
         PendingJoinEventContainer _pendingJoinEvents;       ///< Collection of delayed join events for prospective passengers
 };
 
-class VehicleJoinEvent : public BasicEvent
+class TC_GAME_API VehicleJoinEvent : public BasicEvent
 {
     friend class Vehicle;
     protected:
         VehicleJoinEvent(Vehicle* v, Unit* u) : Target(v), Passenger(u), Seat(Target->Seats.end()) { }
-        ~VehicleJoinEvent();
         bool Execute(uint64, uint32) override;
         void Abort(uint64) override;
 

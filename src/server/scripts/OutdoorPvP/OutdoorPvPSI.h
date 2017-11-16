@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -28,22 +28,6 @@ enum OutdoorPvPSISpells
     SI_CENARION_FAVOR = 30754
 };
 
-const uint32 SI_MAX_RESOURCES = 200;
-
-const uint8 OutdoorPvPSIBuffZonesNum = 3;
-
-const uint32 OutdoorPvPSIBuffZones[OutdoorPvPSIBuffZonesNum] = { 1377, 3428, 3429 };
-
-const uint32 SI_AREATRIGGER_H = 4168;
-
-const uint32 SI_AREATRIGGER_A = 4162;
-
-const uint32 SI_TURNIN_QUEST_CM_A = 17090;
-
-const uint32 SI_TURNIN_QUEST_CM_H = 18199;
-
-const uint32 SI_SILITHYST_MOUND = 181597;
-
 enum SI_WorldStates
 {
     SI_GATHERED_A = 2313,
@@ -56,22 +40,22 @@ class OutdoorPvPSI : public OutdoorPvP
     public:
         OutdoorPvPSI();
 
-        bool SetupOutdoorPvP();
+        bool SetupOutdoorPvP() override;
 
-        void HandlePlayerEnterZone(Player* player, uint32 zone);
-        void HandlePlayerLeaveZone(Player* player, uint32 zone);
+        void HandlePlayerEnterZone(Player* player, uint32 zone) override;
+        void HandlePlayerLeaveZone(Player* player, uint32 zone) override;
 
-        bool Update(uint32 diff);
+        bool Update(uint32 diff) override;
 
-        void FillInitialWorldStates(WorldPacket &data);
+        void FillInitialWorldStates(WorldPacket &data) override;
 
-        void SendRemoveWorldStates(Player* player);
+        void SendRemoveWorldStates(Player* player) override;
 
-        bool HandleAreaTrigger(Player* player, uint32 trigger);
+        bool HandleAreaTrigger(Player* player, uint32 trigger) override;
 
-        bool HandleDropFlag(Player* player, uint32 spellId);
+        bool HandleDropFlag(Player* player, uint32 spellId) override;
 
-        bool HandleCustomSpell(Player* player, uint32 spellId, GameObject* go);
+        bool HandleCustomSpell(Player* player, uint32 spellId, GameObject* go) override;
 
         void UpdateWorldState();
 
