@@ -1090,7 +1090,6 @@ class GenericAuraScriptLoader : public SpellScriptLoader
         AuraScript* GetAuraScript() const override { return new A(); }
 };
 #define RegisterAuraScript(aura_script) new GenericAuraScriptLoader<aura_script>(#aura_script)
->>>>>>> upstream/3.3.5
 
 template <class S, class A>
 class GenericSpellAndAuraScriptLoader : public SpellScriptLoader
