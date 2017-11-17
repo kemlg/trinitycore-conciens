@@ -19,8 +19,6 @@
 #include <errno.h>
 
 #include "Common.h"
-#include <ace/Singleton.h>
-#include <ace/Atomic_Op.h>
 
 #include "DBCStores.h"
 #include "SharedDefines.h"
