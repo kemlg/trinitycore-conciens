@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -37,8 +37,9 @@ enum WorldDatabaseStatements : uint32
     WORLD_INS_QUEST_STARTER,
     WORLD_INS_QUEST_ENDER,
     WORLD_SEL_QUEST_POOLS,
-    WORLD_DEL_CRELINKED_RESPAWN,
-    WORLD_REP_CREATURE_LINKED_RESPAWN,
+    WORLD_DEL_LINKED_RESPAWN,
+    WORLD_DEL_LINKED_RESPAWN_MASTER,
+    WORLD_REP_LINKED_RESPAWN,
     WORLD_SEL_CREATURE_TEXT,
     WORLD_SEL_SMART_SCRIPTS,
     WORLD_SEL_SMARTAI_WP,
@@ -107,6 +108,7 @@ enum WorldDatabaseStatements : uint32
     WORLD_UPD_CREATURE_ZONE_AREA_DATA,
     WORLD_UPD_GAMEOBJECT_ZONE_AREA_DATA,
     WORLD_DEL_SPAWNGROUP_MEMBER,
+    WORLD_DEL_GAMEOBJECT_ADDON,
 
     MAX_WORLDDATABASE_STATEMENTS
 };

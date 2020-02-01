@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -107,7 +106,7 @@ public:
             Initialize();
         }
 
-        void SetGUID(ObjectGuid guid, int32 id/* = 0 */) override
+        void SetGUID(ObjectGuid const& guid, int32 id) override
         {
             if (id == INNER_DEMON_VICTIM)
                 victimGUID = guid;
@@ -129,14 +128,14 @@ public:
 
         void DamageTaken(Unit* done_by, uint32 &damage) override
         {
-            if (done_by->GetGUID() != victimGUID && done_by->GetGUID() != me->GetGUID())
+            if (!done_by || (done_by->GetGUID() != victimGUID && done_by->GetGUID() != me->GetGUID()))
             {
                 damage = 0;
                 ModifyThreatByPercent(done_by, -100);
             }
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
             if (!victimGUID)
                 return;
@@ -158,7 +157,7 @@ public:
                     AttackStart(owner);
                 } else if (owner && owner->isDead())
                 {
-                    me->DealDamage(me, me->GetHealth(), nullptr, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, nullptr, false);
+                    me->KillSelf();
                     return;
                 }
             }
@@ -413,7 +412,7 @@ public:
             instance->SetData(DATA_LEOTHERASTHEBLINDEVENT, DONE);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
             if (me->HasAura(AURA_BANISH))
             return;
@@ -516,8 +515,7 @@ public:
                     if (me->IsWithinDist(me->GetVictim(), 30))
                     {
                         //DoCastVictim(SPELL_CHAOS_BLAST, true);
-                        int damage = 100;
-                        me->CastCustomSpell(me->GetVictim(), SPELL_CHAOS_BLAST, &damage, nullptr, nullptr, false, nullptr, nullptr, me->GetGUID());
+                        me->CastSpell(me->GetVictim(), SPELL_CHAOS_BLAST, CastSpellExtraArgs().SetOriginalCaster(me->GetGUID()).AddSpellBP0(100));
                     }
                     ChaosBlast_Timer = 3000;
                 } else ChaosBlast_Timer -= diff;
@@ -526,7 +524,7 @@ public:
                 {
                     ThreatManager const& mgr = me->GetThreatManager();
                     std::list<Unit*> TargetList;
-                    Unit* currentVictim = mgr.GetCurrentVictim();
+                    Unit* currentVictim = mgr.GetLastVictim();
                     for (ThreatReference const* ref : mgr.GetSortedThreatList())
                     {
                         if (Player* tempTarget = ref->GetVictim()->ToPlayer())
@@ -653,7 +651,7 @@ public:
             DoCast(me, 8149, true);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
             StartEvent();
         }
@@ -673,8 +671,7 @@ public:
                 if (me->IsWithinDist(me->GetVictim(), 30))
                 {
                     //DoCastVictim(SPELL_CHAOS_BLAST, true);
-                    int damage = 100;
-                    me->CastCustomSpell(me->GetVictim(), SPELL_CHAOS_BLAST, &damage, nullptr, nullptr, false, nullptr, nullptr, me->GetGUID());
+                    me->CastSpell(me->GetVictim(), SPELL_CHAOS_BLAST, CastSpellExtraArgs().SetOriginalCaster(me->GetGUID()).AddSpellBP0(100));
                     ChaosBlast_Timer = 3000;
                 }
              } else ChaosBlast_Timer -= diff;
@@ -728,7 +725,7 @@ public:
                 ENSURE_AI(boss_leotheras_the_blind::boss_leotheras_the_blindAI, leotheras->AI())->CheckChannelers(/*false*/);
         }
 
-        void EnterCombat(Unit* who) override
+        void JustEngagedWith(Unit* who) override
         {
             me->InterruptNonMeleeSpells(false);
             instance->SetGuidData(DATA_LEOTHERAS_EVENT_STARTER, who->GetGUID());

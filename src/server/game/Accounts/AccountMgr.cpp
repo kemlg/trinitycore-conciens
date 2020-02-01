@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2017 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -390,6 +389,18 @@ std::string AccountMgr::CalculateShaPassHash(std::string const& name, std::strin
     return ByteArrayToHexStr(sha.GetDigest(), sha.GetLength());
 }
 
+bool AccountMgr::IsBannedAccount(std::string const& name)
+{
+    PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_SEL_ACCOUNT_BANNED_BY_USERNAME);
+    stmt->setString(0, name);
+    PreparedQueryResult result = LoginDatabase.Query(stmt);
+
+    if (!result)
+        return false;
+
+    return true;
+}
+
 bool AccountMgr::IsPlayerAccount(uint32 gmlevel)
 {
     return gmlevel == SEC_PLAYER;
@@ -494,7 +505,7 @@ void AccountMgr::LoadRBAC()
 
 void AccountMgr::UpdateAccountAccess(rbac::RBACData* rbac, uint32 accountId, uint8 securityLevel, int32 realmId)
 {
-    if (rbac && securityLevel == rbac->GetSecurityLevel())
+    if (rbac && securityLevel != rbac->GetSecurityLevel())
         rbac->SetSecurityLevel(securityLevel);
 
     SQLTransaction trans = LoginDatabase.BeginTransaction();
