@@ -12,12 +12,13 @@
 #include <ctime>
 
 #include "EventBridge.h"
+#include "Item.h"
+#include "GameTime.h"
 #include "Config.h"
 #include "DatabaseEnv.h"
 #include "DBCStores.h"
 #include "ObjectMgr.h"
 #include "OutdoorPvPMgr.h"
-#include "ScriptLoader.h"
 #include "ScriptSystem.h"
 #include "Transport.h"
 #include "Vehicle.h"
@@ -35,12 +36,12 @@
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
-#include "restclient.h"
+#include "restclient/restclient.h"
 #include "ObjectAccessor.h"
 #include "MapManager.h"
 #include "DatabaseEnv.h"
 #include "World.h"
-#include "geohash.cpp"
+#include "geohash/geohash.hpp"
 
 #include <queue>
 #include <boost/thread.hpp>  
@@ -145,8 +146,8 @@ struct sockaddr_in				server_addr;
 SynchronisedQueue<rapidjson::Document*>		queue;
 
 static bool removeQuestFromDB() {
-    SQLTransaction trans = WorldDatabase.BeginTransaction();
-    PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_DEL_QUEST_CREATURE_STARTER);
+    SQLTransaction<WorldDatabaseConnection> trans = WorldDatabase.BeginTransaction();
+    PreparedStatement<WorldDatabaseConnection>* stmt = WorldDatabase.GetPreparedStatement(WORLD_DEL_QUEST_CREATURE_STARTER);
     stmt->setInt32(0, 999999);
     trans->Append(stmt);
     WorldDatabase.DirectCommitTransaction(trans);
@@ -167,9 +168,9 @@ static bool removeQuestFromDB() {
 }
 
 static bool addQuestToDB() {
-    SQLTransaction trans = WorldDatabase.BeginTransaction();
+    SQLTransaction<WorldDatabaseConnection> trans = WorldDatabase.BeginTransaction();
     
-    PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_INS_QUEST_TEMPLATE);
+    PreparedStatement<WorldDatabaseConnection>* stmt = WorldDatabase.GetPreparedStatement(WORLD_INS_QUEST_TEMPLATE);
     stmt->setInt32(0, 999999);
     stmt->setInt8(1, 2);
     stmt->setInt8(2, 1);
@@ -235,7 +236,7 @@ static bool updateCreature(uint64 guid)
 	WorldSession* ws = itr->second;
 	if(ws->GetPlayer())
 	{
-	    Creature *obj = sObjectAccessor->GetCreatureOrPetOrVehicle(*ws->GetPlayer(), ObjectGuid(guid));
+	    Creature *obj = ObjectAccessor::GetCreatureOrPetOrVehicle(*ws->GetPlayer(), ObjectGuid(guid));
 	    int phaseMask = obj->GetPhaseMask();
 	    int tmpPhaseMask = phaseMask == 2 ? 3 : 2;
 	    obj->SendUpdateToPlayer(ws->GetPlayer());
@@ -249,40 +250,42 @@ static bool updateCreature(uint64 guid)
     return true;
 }
 
-static bool createGameObject(int objectId, int mapId, double x, double y, double z, double o)
+static bool createGameObject(int objectId, int mapId, float x, float y, float z, float o)
 {
     char* spawntimeSecs = strtok(NULL, " ");
     const GameObjectTemplate* objectInfo = sObjectMgr->GetGameObjectTemplate(objectId);
 
     if (!objectInfo)
     {
-	TC_LOG_INFO("server.loading", "LANG_GAMEOBJECT_NOT_EXIST %d", objectId);
-	return false;
+        TC_LOG_INFO("server.loading", "LANG_GAMEOBJECT_NOT_EXIST %d", objectId);
+        return false;
     }
 
     if (objectInfo->displayId && !sGameObjectDisplayInfoStore.LookupEntry(objectInfo->displayId))
     {
-	// report to DB errors log as in loading case
-	TC_LOG_ERROR("sql.sql", "Gameobject (Entry %u GoType: %u) have invalid displayId (%u), not spawned.", objectId, objectInfo->type, objectInfo->displayId);
-	TC_LOG_INFO("server.loading", "LANG_GAMEOBJECT_HAVE_INVALID_DATA %d", objectId);
-	return false;
+        // report to DB errors log as in loading case
+        TC_LOG_ERROR("sql.sql", "Gameobject (Entry %u GoType: %u) have invalid displayId (%u), not spawned.", objectId, objectInfo->type, objectInfo->displayId);
+        TC_LOG_INFO("server.loading", "LANG_GAMEOBJECT_HAVE_INVALID_DATA %d", objectId);
+        return false;
     }
     
     Map* map = sMapMgr->FindMap(mapId, 0);
   
     GameObject* object = new GameObject;
-    uint32 guidLow = sObjectMgr->GenerateLowGuid(HIGHGUID_GAMEOBJECT);
+    Position pos = { x, y, z, o };
+    QuaternionData rot = QuaternionData::fromEulerAnglesZYX(o, 0.f, 0.f);
+    uint32 guidLow = map->GenerateLowGuid<HighGuid::GameObject>();
 
-    if (!object->Create(guidLow, objectInfo->entry, map, uint32(PHASEMASK_ANYWHERE), x, y, z, o, 0.0f, 0.0f, 0.0f, 0.0f, 0, GO_STATE_READY))
+    if (!object->Create(guidLow, objectInfo->entry, map, uint32(PHASEMASK_ANYWHERE), pos, rot, 0, GO_STATE_READY))
     {
-	delete object;
-	return false;
+        delete object;
+        return false;
     }
 
     if (spawntimeSecs)
     {
-	uint32 value = atoi((char*)spawntimeSecs);
-	object->SetRespawnTime(value);
+        uint32 value = atoi((char*)spawntimeSecs);
+        object->SetRespawnTime(value);
     }
 
     // fill the gameobject data and save to the db
@@ -293,14 +296,14 @@ static bool createGameObject(int objectId, int mapId, double x, double y, double
 
     object = new GameObject();
     // this will generate a new guid if the object is in an instance
-    if (!object->LoadGameObjectFromDB(guidLow, map))
+    if (!object->LoadFromDB(guidLow, map, true))
     {
-	delete object;
-	return false;
+        delete object;
+        return false;
     }
 
     /// @todo is it really necessary to add both the real and DB table guid here ?
-    sObjectMgr->AddGameobjectToGrid(guidLow, sObjectMgr->GetGOData(guidLow));
+    sObjectMgr->AddGameobjectToGrid(guidLow, sObjectMgr->GetGameObjectData(guidLow));
 
     TC_LOG_INFO("server.loading", "LANG_GAMEOBJECT_ADD %d %s %d %f %f %f", objectId, objectInfo->name.c_str(), guidLow, x, y, z);
     return true;
@@ -312,12 +315,12 @@ void processActions(rapidjson::Document& d)
   {
     const rapidjson::Value& action = *itr;
     const char* actionId = action["action-id"].GetString();
-    const ObjectGuid guid(HIGHGUID_UNIT, (uint32)295, (uint32)80346);
+    const ObjectGuid guid(HighGuid::GameObject, (uint32)295, (uint32)80346);
 
     if(!strcmp(actionId, "create"))
     {
-      createGameObject(action["object-id"].GetInt(), action["map-id"].GetInt(), action["x"].GetDouble(),
-          action["y"].GetDouble(), action["z"].GetDouble(), action["o"].GetDouble());
+      createGameObject(action["object-id"].GetInt(), action["map-id"].GetInt(), action["x"].GetFloat(),
+          action["y"].GetFloat(), action["z"].GetFloat(), action["o"].GetFloat());
     }
     else if(!strcmp(actionId, "reload-quests"))
     {
@@ -394,7 +397,7 @@ void* processMessages(void *)
 	events.Accept(writer);
 
 	if(size > 0 && checkPortTCP(3000, "conciens.mooo.com")) {
-	  RestClient::response r = RestClient::post("http://conciens.mooo.com:3000/event", "text/json", buffer.GetString());
+	  RestClient::Response r = RestClient::post("http://conciens.mooo.com:3000/event", "text/json", buffer.GetString());
 	  actions.Parse(r.body.c_str());
 	  processActions(actions);
 	}
@@ -477,11 +480,11 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	rapidjson::Value jsonGuild (rapidjson::kObjectType);
 	rapidjson::Value jsonChannel (rapidjson::kObjectType);
 	rapidjson::Value jsonSpell (rapidjson::kObjectType);
-  rapidjson::Value jsonGeometry (rapidjson::kObjectType);
+	rapidjson::Value jsonGeometry (rapidjson::kObjectType);
 	rapidjson::Document::AllocatorType& a = d->GetAllocator();
 	d->SetObject();
 	
-  std::time_t curtime = sWorld->GetGameTime();
+  std::time_t curtime = GameTime::GetGameTime();
   uint32 nsecs = std::difftime(curtime, basetime);
 
   d->AddMember(rapidjson::StringRef("timestamp"), nsecs, a);
@@ -500,90 +503,90 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	}
 	
 	if(area != NULL) {
-	  d->AddMember("area", area->id, a);
+	  d->AddMember("area", area->ID, a);
 	}
-	
-	if(player != NULL) {
-	  player->GetPosition(x, y, z, o);
-    mapId = player->GetMapId();
-	  jsonPlayer.AddMember("guid", player->GetGUIDLow(), a);
-	  jsonPlayer.AddMember("name", rapidjson::StringRef(player->GetName().c_str()), a);
-	  jsonPlayer.AddMember("level", player->getLevel(), a);
-	  rapidjson::Value s;
-	  const char* text = player->ToString().c_str();
-	  s.SetString(text, strlen(text), a);
-	  jsonPlayer.AddMember("description", s, a);
-	  jsonPlayer.AddMember("x", x, a);
-	  jsonPlayer.AddMember("y", y, a);
-	  jsonPlayer.AddMember("z", z, a);
-	  jsonPlayer.AddMember("o", o, a);
-	  jsonPlayer.AddMember("map", mapId, a);
-	  d->AddMember("player", jsonPlayer, a);
-	}
-	
-	if(actor != NULL) {
-	  actor->GetPosition(x, y, z, o);
-    mapId = actor->GetMapId();
-	  jsonActor.AddMember("guid", actor->GetGUIDLow(), a);
-	  jsonActor.AddMember("name", rapidjson::StringRef(actor->GetName().c_str()), a);
-	  jsonActor.AddMember("level", actor->getLevel(), a);
-	  rapidjson::Value s;
-	  const char* text = actor->ToString().c_str();
-	  s.SetString(text, strlen(text), a);
-	  jsonActor.AddMember("description", s, a);
-	  jsonActor.AddMember("x", x, a);
-	  jsonActor.AddMember("y", y, a);
-	  jsonActor.AddMember("z", z, a);
-	  jsonActor.AddMember("o", o, a);
-	  jsonActor.AddMember("map", mapId, a);
-	  d->AddMember("actor", jsonActor, a);
-	}
-	
-	if(target != NULL) {
-	  target->GetPosition(x, y, z, o);
-    mapId = target->GetMapId();
-	  jsonTarget.AddMember("guid", target->GetGUIDLow(), a);
-	  jsonTarget.AddMember("name", rapidjson::StringRef(target->GetName().c_str()), a);
-	  jsonTarget.AddMember("level", target->getLevel(), a);
-	  jsonTarget.AddMember("x", x, a);
-	  jsonTarget.AddMember("y", y, a);
-	  jsonTarget.AddMember("z", z, a);
-	  jsonTarget.AddMember("o", o, a);
-	  jsonTarget.AddMember("map", mapId, a);
-	  d->AddMember("target", jsonTarget, a);
-	}
-	
-	if(creature != NULL) {
-	  creature->GetPosition(x, y, z, o);
-    mapId = creature->GetMapId();
-	  jsonCreature.AddMember("guid", creature->GetGUIDLow(), a);
-	  jsonCreature.AddMember("name", rapidjson::StringRef(creature->GetName().c_str()), a);
-	  jsonCreature.AddMember("level", creature->getLevel(), a);
-	  jsonCreature.AddMember("x", x, a);
-	  jsonCreature.AddMember("y", y, a);
-	  jsonCreature.AddMember("z", z, a);
-	  jsonCreature.AddMember("o", o, a);
-	  jsonCreature.AddMember("map", mapId, a);
-	  d->AddMember("creature", jsonCreature, a);
-	}
-	
-	if(item != NULL) {
-	  jsonItem.AddMember("guid", item->GetGUIDLow(), a);
-	  jsonItem.AddMember("name", rapidjson::StringRef(item->GetTemplate()->Name1.c_str()), a);
-	  d->AddMember("item", jsonItem, a);
-	}
-	
-	if(quest != NULL) {
-	  jsonQuest.AddMember("id", quest->GetQuestId(), a);
-	  jsonQuest.AddMember("name", rapidjson::StringRef(quest->GetTitle().c_str()), a);
-	  jsonQuest.AddMember("description", rapidjson::StringRef(quest->GetDetails().c_str()), a);
-	  d->AddMember("quest", jsonQuest, a);
-	}
+
+    if(player != NULL) {
+        player->GetPosition(x, y, z, o);
+        mapId = player->GetMapId();
+        jsonPlayer.AddMember("guid", player->GetGUID().GetEntry(), a);
+        jsonPlayer.AddMember("name", rapidjson::StringRef(player->GetName().c_str()), a);
+        jsonPlayer.AddMember("level", player->GetLevel(), a);
+        rapidjson::Value s;
+        const char* text = player->GetName().c_str();
+        s.SetString(text, strlen(text), a);
+        jsonPlayer.AddMember("description", s, a);
+        jsonPlayer.AddMember("x", x, a);
+        jsonPlayer.AddMember("y", y, a);
+        jsonPlayer.AddMember("z", z, a);
+        jsonPlayer.AddMember("o", o, a);
+        jsonPlayer.AddMember("map", mapId, a);
+        d->AddMember("player", jsonPlayer, a);
+    }
+
+    if(actor != NULL) {
+        actor->GetPosition(x, y, z, o);
+        mapId = actor->GetMapId();
+        jsonActor.AddMember("guid", actor->GetGUID().GetEntry(), a);
+        jsonActor.AddMember("name", rapidjson::StringRef(actor->GetName().c_str()), a);
+        jsonActor.AddMember("level", actor->GetLevel(), a);
+        rapidjson::Value s;
+        const char* text = actor->GetName().c_str();
+        s.SetString(text, strlen(text), a);
+        jsonActor.AddMember("description", s, a);
+        jsonActor.AddMember("x", x, a);
+        jsonActor.AddMember("y", y, a);
+        jsonActor.AddMember("z", z, a);
+        jsonActor.AddMember("o", o, a);
+        jsonActor.AddMember("map", mapId, a);
+        d->AddMember("actor", jsonActor, a);
+    }
+
+    if(target != NULL) {
+        target->GetPosition(x, y, z, o);
+        mapId = target->GetMapId();
+        jsonTarget.AddMember("guid", target->GetGUID().GetEntry(), a);
+        jsonTarget.AddMember("name", rapidjson::StringRef(target->GetName().c_str()), a);
+        jsonTarget.AddMember("level", target->GetLevel(), a);
+        jsonTarget.AddMember("x", x, a);
+        jsonTarget.AddMember("y", y, a);
+        jsonTarget.AddMember("z", z, a);
+        jsonTarget.AddMember("o", o, a);
+        jsonTarget.AddMember("map", mapId, a);
+        d->AddMember("target", jsonTarget, a);
+    }
+
+    if(creature != NULL) {
+        creature->GetPosition(x, y, z, o);
+        mapId = creature->GetMapId();
+        jsonCreature.AddMember("guid", creature->GetGUID().GetEntry(), a);
+        jsonCreature.AddMember("name", rapidjson::StringRef(creature->GetName().c_str()), a);
+        jsonCreature.AddMember("level", creature->GetLevel(), a);
+        jsonCreature.AddMember("x", x, a);
+        jsonCreature.AddMember("y", y, a);
+        jsonCreature.AddMember("z", z, a);
+        jsonCreature.AddMember("o", o, a);
+        jsonCreature.AddMember("map", mapId, a);
+        d->AddMember("creature", jsonCreature, a);
+    }
+
+    if(item != NULL) {
+        jsonItem.AddMember("guid", item->GetEntry(), a);
+        jsonItem.AddMember("name", rapidjson::StringRef(item->GetTemplate()->Name1.c_str()), a);
+        d->AddMember("item", jsonItem, a);
+    }
+
+    if(quest != NULL) {
+        jsonQuest.AddMember("id", quest->GetQuestId(), a);
+        jsonQuest.AddMember("name", rapidjson::StringRef(quest->GetTitle().c_str()), a);
+        jsonQuest.AddMember("description", rapidjson::StringRef(quest->GetDetails().c_str()), a);
+        d->AddMember("quest", jsonQuest, a);
+    }
 
 	if(targets != NULL && targets->GetObjectTarget() != NULL) {
 	  targets->GetObjectTarget()->GetPosition(x, y, z, o);
     mapId = targets->GetObjectTarget()->GetMapId();
-	  jsonTarget.AddMember("guid", targets->GetObjectTarget()->GetGUIDLow(), a);
+	  jsonTarget.AddMember("guid", targets->GetObjectTarget()->GetGUID().GetEntry(), a);
 	  jsonTarget.AddMember("name", rapidjson::StringRef(targets->GetObjectTarget()->GetName().c_str()), a);
 	  jsonTarget.AddMember("x", x, a);
 	  jsonTarget.AddMember("y", y, a);
@@ -602,7 +605,7 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	if(go != NULL) {
 	  go->GetPosition(x, y, z, o);
     mapId = go->GetMapId();
-	  jsonGameObject.AddMember("guid", go->GetGUIDLow(), a);
+	  jsonGameObject.AddMember("guid", go->GetGUID().GetEntry(), a);
 	  jsonGameObject.AddMember("name", rapidjson::StringRef(go->GetName().c_str()), a);
 	  jsonGameObject.AddMember("x", x, a);
 	  jsonGameObject.AddMember("y", y, a);
@@ -663,7 +666,9 @@ void EventBridge::sendEvent(const int event_type, const Player* player, const Cr
 	
 	if(spell != NULL) {
 	  jsonSpell.AddMember("id", spell->GetSpellInfo()->Id, a);
-	  jsonSpell.AddMember("name", rapidjson::StringRef(*spell->GetSpellInfo()->SpellName), a);
+      std::array<const char*, 16> arr = spell->GetSpellInfo()->SpellName;
+      const char **data = arr.data();
+	  jsonSpell.AddMember("name", rapidjson::StringRef(data[0]), a);
 	  jsonSpell.AddMember("family", spell->GetSpellInfo()->SpellFamilyName, a);
 	  d->AddMember("spell", jsonSpell, a);
 	}

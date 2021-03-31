@@ -1049,8 +1049,9 @@ class TC_GAME_API ScriptMgr
         void OnQuestStatusChange(Player* player, uint32 questId);
         void OnMovieComplete(Player* player, uint32 movieId);
         void OnPlayerRepop(Player* player);
+        void OnPlayerUpdatePosition(Player* player);
 
-    public: /* AccountScript */
+public: /* AccountScript */
 
         void OnAccountLogin(uint32 accountId);
         void OnFailedAccountLogin(uint32 accountId);

@@ -31,7 +31,6 @@ class AuraScript;
 class Battleground;
 class BattlegroundMap;
 class Channel;
-class ChatCommand;
 class Creature;
 class CreatureAI;
 class DynamicObject;
