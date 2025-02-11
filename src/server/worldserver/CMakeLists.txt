@@ -52,6 +52,9 @@ target_link_libraries(worldserver
     scripts
     game
     gsoap
+    boost_system
+    boost_thread
+    curl
     readline)
 
 CollectIncludeDirectories(
