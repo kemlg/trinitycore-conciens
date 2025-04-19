@@ -59,7 +59,12 @@ Windows, Linux and macOS.
 ## Install: cOncienS flavor
 
 ```bash
-sudo apt-get install libboost-program-options* libboost-system* libboost-thread* libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient15-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libjson-spirit-dev libace-dev libncurses5-dev deluge-console deluge git cmake build-essential libssl-dev
+ln -fs /usr/share/zoneinfo/Europe/Amsterdam /etc/localtime
+DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata
+apt-get install -y libboost-all-dev clang libcurl4-openssl-dev p7zip-full vim build-essential autoconf libtool gcc g++ make cmake git-core patch wget links zip unzip unrar openssl libssl-dev mysql-server mysql-client libmysqlclient-dev libmysql++-dev libreadline6-dev libncurses5-dev zlib1g-dev libbz2-dev libace-dev libncurses-dev deluge-console deluge git cmake build-essential libssl-dev
+apt-get install -y git clang cmake make gcc g++ libmysqlclient-dev libssl-dev libbz2-dev libreadline-dev libncurses-dev libboost-all-dev mysql-server p7zip
+update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100
+update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang 100
 git clone https://github.com/mrtazz/restclient-cpp
 cd restclient-cpp/
 ./autogen.sh
@@ -119,6 +124,43 @@ mysql -u root -p characters < trinitycore-conciens/sql/base/characters_database.
 mysql -u root -p world < TDB_full_335.57_2014_10_19.sql
 mysql -u root -p world < trinitycore-conciens/sql/updates/world/2014_10*.sql
 cd
+```
+
+### Ubuntu 22.04
+
+```bash
+apt-get update && apt-get install -yq libboost-all-dev g++-11 cmake libssl-dev libmysql++-dev libreadline-dev libbz2-dev git libcurl4-openssl-dev
+update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave /usr/bin/g++ g++ /usr/bin/g++-11
+git clone https://github.com/mrtazz/restclient-cpp
+cd restclient-cpp/
+./autogen.sh
+./configure
+make
+sudo make install
+sudo cp /usr/local/include/restclient-cpp/* /usr/include/
+cd ..
+git clone https://github.com/miloyip/rapidjson
+sudo cp -R rapidjson/include/rapidjson /usr/include/
+cd /code
+mkdir build
+cd build
+cmake ../ -DWITH_WARNINGS=1 -DWITH_COREDEBUG=0 -DUSE_COREPCH=1 -DUSE_SCRIPTPCH=1 -DTOOLS=1 -DSCRIPTS=static -DSERVERS=1 -DNOJEM=0 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS_DEBUG="-DNDEBUG" -DCMAKE_CXX_FLAGS_DEBUG="-DNDEBUG" -DCMAKE_INSTALL_PREFIX=check_install -DBUILD_TESTING=1
+make -j 12
+```
+
+### MacOS
+
+```bash
+brew tap mrtazz/oss
+brew install boost mysql automake restclient-cpp
+git clone https://github.com/Tencent/rapidjson
+cp -R rapidjson/include/rapidjson /usr/local/include
+git clone https://github.com/kemlg/trinitycore-conciens
+cd trinitycore-conciens
+mkdir bin
+mkdir build
+cd build
+cmake ../ -DPREFIX=$(pwd)/../bin/server -DCONF_DIR=$(pwd)/../bin/server/conf -DLIBSDIR=$(pwd)/../bin/server/lib -DUSE_SFMT=1 -DTOOLS=1 -DSCRIPTS=static -DSERVERS=1 -DWITH_WARNINGS=1
 ```
 
 ## Reporting issues
