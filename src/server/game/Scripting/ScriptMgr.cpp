@@ -1608,7 +1608,7 @@ bool ScriptMgr::OnAreaTrigger(Player* player, AreaTriggerEntry const* trigger)
     ASSERT(trigger);
 
     GET_SCRIPT_RET(AreaTriggerScript, sObjectMgr->GetAreaTriggerScriptId(trigger->ID), tmpscript, false);
-    eb->sendEvent(EVENT_TYPE_AREA_TRIGGER,player,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,trigger);
+    eb->sendEvent(EVENT_TYPE_AREA_TRIGGER,player,NULL,0,NULL,NULL,NULL,NULL,0,NULL,NULL,trigger);
     return tmpscript->OnTrigger(player, trigger);
 }
 
@@ -1984,7 +1984,7 @@ void ScriptMgr::OnPlayerFailedDelete(ObjectGuid guid, uint32 accountId)
     std::ostringstream sin;
     sin << guid;
     std::string intAsString(sin.str());
-    eb->sendEvent(EVENT_TYPE_PLAYER_DELETE, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, intAsString.c_str());
+    eb->sendEvent(EVENT_TYPE_PLAYER_DELETE, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, intAsString.c_str());
     FOREACH_SCRIPT(PlayerScript)->OnFailedDelete(guid, accountId);
 }
 
@@ -2018,6 +2018,16 @@ void ScriptMgr::OnPlayerRepop(Player* player)
 void ScriptMgr::OnPlayerUpdatePosition(Player* player)
 {
     eb->sendEvent(EVENT_TYPE_PLAYER_UPDATE, player);
+}
+
+void ScriptMgr::OnCreatureUpdatePosition(Creature* creature)
+{
+    for (auto p = creature->GetMap()->GetPlayers().begin(); p != creature->GetMap()->GetPlayers().end(); ++p) {
+        Player* player = p->GetSource();
+        if (player->IsWithinLOSInMap(creature) && player->CanSeeOrDetect(creature, false, true)) {
+            eb->sendEvent(EVENT_TYPE_CREATURE_UPDATE, player, creature);
+        }
+    }
 }
 
 void ScriptMgr::OnQuestObjectiveProgress(Player* player, Quest const* quest, uint32 objectiveIndex, uint16 progress)

@@ -12955,6 +12955,9 @@ bool Unit::UpdatePosition(float x, float y, float z, float orientation, bool tel
     _positionUpdateInfo.Relocated = relocated;
     _positionUpdateInfo.Turned = turn;
 
+    if (Creature *c = dynamic_cast<Creature *>(this))
+        sScriptMgr->OnCreatureUpdatePosition(c);
+
     return (relocated || turn);
 }
 

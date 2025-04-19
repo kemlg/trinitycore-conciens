@@ -23,7 +23,7 @@
 #include "IteratorPair.h"
 #include "Log.h"
 #include "ObjectDefines.h"
-#include "Regex.h"
+#include "RegexCI.h"
 #include "SharedDefines.h"
 #include "SpellMgr.h"
 #include "Timer.h"

@@ -21,6 +21,7 @@ target_link_libraries(tests
   PRIVATE
     trinity-core-interface
     game
+    curl
     Catch2::Catch2)
 
 CollectIncludeDirectories(

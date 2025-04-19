@@ -1041,6 +1041,7 @@ class TC_GAME_API ScriptMgr
         void OnMovieComplete(Player* player, uint32 movieId);
         void OnPlayerRepop(Player* player);
         void OnPlayerUpdatePosition(Player* player);
+        void OnCreatureUpdatePosition(Creature* creature);
 
 public: /* AccountScript */
 
