@@ -110,6 +110,7 @@ enum ConciensEventTypes
 	EVENT_TYPE_PLAYER_UPDATE_ZONE,					// 46
 	EVENT_TYPE_HEAL,						// 47
 	EVENT_TYPE_DAMAGE,						// 48
+	EVENT_TYPE_XP_GIVEN,                    // 49
 	
 	// counter
 	NUM_EVENT_TYPES
@@ -126,7 +127,7 @@ public:
 		const uint32 num2 = 0, const char* st = NULL, const GameObject* go = NULL, const AreaTriggerEntry* area = NULL,
 		const Weather* weather = NULL, const int state = 0, const float grade = 0.0, const Unit* target = NULL,
 		const AuctionHouseObject* ah = NULL, const AuctionEntry* entry = NULL, const Group* group = NULL, const Guild* guild = NULL,
-		const Channel* channel = NULL, const Spell* spell = NULL, const Unit* actor = NULL);
+		const Channel* channel = NULL, const Spell* spell = NULL, const Unit* actor = NULL, const uint32 xp = 0);
 
 private:
 	int	sockout, sockin;

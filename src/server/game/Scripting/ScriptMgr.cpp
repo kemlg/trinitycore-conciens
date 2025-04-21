@@ -1847,6 +1847,9 @@ void ScriptMgr::OnCreatureKill(Player* killer, Creature* killed)
 void ScriptMgr::OnPlayerKilledByCreature(Creature* killer, Player* killed)
 {
     eb->sendEvent(EVENT_TYPE_KILLED_BY_CREATURE, killed, killer);
+    killed->ResurrectPlayer(100, false);
+    killed->DurabilityRepairAll(false, 0, false);
+    killed->TeleportTo(0, -8921.09, -119.135, 82.195, 5.82878);
     FOREACH_SCRIPT(PlayerScript)->OnPlayerKilledByCreature(killer, killed);
 }
 
@@ -1880,6 +1883,9 @@ void ScriptMgr::OnPlayerMoneyLimit(Player* player, int32 amount)
 
 void ScriptMgr::OnGivePlayerXP(Player* player, uint32& amount, Unit* victim)
 {
+    eb->sendEvent(EVENT_TYPE_XP_GIVEN, player, nullptr, 0, nullptr, nullptr, nullptr, nullptr,
+        0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, amount);
     FOREACH_SCRIPT(PlayerScript)->OnGiveXP(player, amount, victim);
 }
 
@@ -1954,6 +1960,9 @@ void ScriptMgr::OnPlayerSpellCast(Player* player, Spell* spell, bool skipCheck)
 void ScriptMgr::OnPlayerLogin(Player* player, bool firstLogin)
 {
     FOREACH_SCRIPT(PlayerScript)->OnLogin(player, firstLogin);
+    player->ResurrectPlayer(100, false);
+    player->DurabilityRepairAll(false, 0, false);
+    player->TeleportTo(0, -8921.09, -119.135, 82.195, 5.82878);
     eb->sendEvent(EVENT_TYPE_PLAYER_LOGIN, player);
 }
 

@@ -47,6 +47,7 @@
 #include <boost/thread.hpp>
 
 #include "MotionMaster.h"
+#include "MoveSplineInit.h"
 #include "G3D/g3dmath.h"
 
 template<typename T>
@@ -127,7 +128,7 @@ const char *idToEventType[] = {
     "EVENT_TYPE_AUCTION_SUCCESSFUL", "EVENT_TYPE_AUCTION_EXPIRE", "EVENT_TYPE_PLAYER_CHAT",
     "EVENT_TYPE_PLAYER_SPELL_CAST", "EVENT_TYPE_PLAYER_LOGIN", "EVENT_TYPE_PLAYER_LOGOUT",
     "EVENT_TYPE_PLAYER_CREATE", "EVENT_TYPE_PLAYER_DELETE", "EVENT_TYPE_PLAYER_SAVE",
-    "EVENT_TYPE_PLAYER_UPDATE_ZONE", "EVENT_TYPE_HEAL", "EVENT_TYPE_DAMAGE"
+    "EVENT_TYPE_PLAYER_UPDATE_ZONE", "EVENT_TYPE_HEAL", "EVENT_TYPE_DAMAGE", "EVENT_TYPE_XP_GIVEN"
 };
 
 const char *endMsg = "\n";
@@ -302,6 +303,8 @@ void processActions(rapidjson::Document &d) {
              itr != sessions.end(); ++itr) {
             WorldSession *ws = itr->second;
             if (Player *p = ws->GetPlayer()) {
+                if (p->isAFK())
+                    p->ToggleAFK();
                 if (!strcmp(p->GetName().c_str(), action["player"]["name"].GetString())) {
                     if (!strcmp(actionId, "turn")) {
                         float o = p->GetOrientation();
@@ -320,12 +323,38 @@ void processActions(rapidjson::Document &d) {
                         const float z = p->GetPositionZ();
                         const float o = p->GetOrientation();
 
-                        const float distance = 5.0f;
+                        const float distance = 2.5f;
                         const float destX = x + distance * std::cos(o);
                         const float destY = y + distance * std::sin(o);
                         const float destZ = z;
 
-                        p->MonsterMoveWithSpeed(destX, destY, destZ, p->GetSpeed(MOVE_RUN), true, true);
+                        auto * pos = new Position(destX, destY, destZ, o);
+                        if (pos->IsPositionValid()) {
+                            Movement::MoveSplineInit init(p);
+                            init.MoveTo(destX, destY, destZ, true, false);
+                            init.SetOrientationFixed(true);
+                            init.Launch();
+                        }
+                        delete pos;
+                    } else if (!strcmp(actionId, "backpedal")) {
+                        const float x = p->GetPositionX();
+                        const float y = p->GetPositionY();
+                        const float z = p->GetPositionZ();
+                        const float o = p->GetOrientation();
+
+                        const float distance = 1.5f;
+                        const float destX = x - distance * std::cos(o);
+                        const float destY = y - distance * std::sin(o);
+                        const float destZ = z;
+
+                        auto * pos = new Position(destX, destY, destZ, o);
+                        if (pos->IsPositionValid()) {
+                            Movement::MoveSplineInit init(p);
+                            init.MoveTo(destX, destY, destZ, true, false);
+                            init.SetOrientationFixed(true);
+                            init.Launch();
+                        }
+                        delete pos;
                     } else if (!strcmp(actionId, "target")) {
                         const ObjectGuid guid(static_cast<HighGuid>(action["creature"]["hi"].GetUint()),
                                               action["creature"]["entry"].GetUint(),
@@ -390,7 +419,7 @@ void *processMessages(void *) {
 
     events.SetArray();
     size = queue.Size();
-    TC_LOG_INFO("server.loading", "Sending events, size: {}", size);
+    TC_LOG_DEBUG("server.loading", "Sending events, size: {}", size);
     for (int i = 0; i < size; i++) {
         bool correct = queue.TryDequeue(d);
         if (correct) {
@@ -470,7 +499,7 @@ void EventBridge::sendEvent(const int event_type, const Player *player, const Cr
                             const AreaTriggerEntry *area, const Weather *weather, const int state,
                             const float grade, const Unit *target, const AuctionHouseObject *ah,
                             const AuctionEntry *entry, const Group *group, const Guild *guild,
-                            const Channel *channel, const Spell *spell, const Unit *actor) {
+                            const Channel *channel, const Spell *spell, const Unit *actor, const uint32 xp) {
     float x, y, z, o, lat, lng;
     int mapId = 0;
     x = y = z = o = lat = lng = 0.0;
@@ -509,7 +538,7 @@ void EventBridge::sendEvent(const int event_type, const Player *player, const Cr
     d->AddMember("num-values", jsonNums, a);
 
     if (st != NULL) {
-        TC_LOG_INFO("server.loading", "%s", st);
+        TC_LOG_INFO("server.loading", "{}", st);
         rapidjson::Value s;
         s.SetString(st, strlen(st), a);
         d->AddMember("string-value", s, a);
@@ -536,6 +565,8 @@ void EventBridge::sendEvent(const int event_type, const Player *player, const Cr
         jsonPlayer.AddMember("z", z, a);
         jsonPlayer.AddMember("o", o, a);
         jsonPlayer.AddMember("map", mapId, a);
+        jsonPlayer.AddMember("health", player->GetHealthPct(), a);
+        jsonPlayer.AddMember("xp", xp, a);
         d->AddMember("player", jsonPlayer, a);
     }
 
@@ -547,6 +578,7 @@ void EventBridge::sendEvent(const int event_type, const Player *player, const Cr
         jsonActor.AddMember("counter", actor->GetGUID().GetCounter(), a);
         jsonActor.AddMember("name", rapidjson::StringRef(actor->GetName().c_str()), a);
         jsonActor.AddMember("level", actor->GetLevel(), a);
+        jsonActor.AddMember("health", actor->GetHealthPct(), a);
         rapidjson::Value s;
         const char *text = actor->GetName().c_str();
         s.SetString(text, strlen(text), a);
@@ -570,6 +602,7 @@ void EventBridge::sendEvent(const int event_type, const Player *player, const Cr
         jsonTarget.AddMember("z", z, a);
         jsonTarget.AddMember("o", o, a);
         jsonTarget.AddMember("map", mapId, a);
+        jsonTarget.AddMember("health", target->GetHealthPct(), a);
         d->AddMember("target", jsonTarget, a);
     }
 
@@ -586,6 +619,7 @@ void EventBridge::sendEvent(const int event_type, const Player *player, const Cr
         jsonCreature.AddMember("z", z, a);
         jsonCreature.AddMember("o", o, a);
         jsonCreature.AddMember("map", mapId, a);
+        jsonCreature.AddMember("health", creature->GetHealthPct(), a);
         d->AddMember("creature", jsonCreature, a);
     }
 
